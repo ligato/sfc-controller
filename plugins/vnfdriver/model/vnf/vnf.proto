@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package vnf;
+
+message VnfEntity {
+    string name = 1;
+    string container = 2;
+
+    message L2XConnect {
+        repeated string port_labels = 1;
+    }
+    repeated L2XConnect l2xconnects = 3;
+};

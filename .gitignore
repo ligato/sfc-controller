@@ -1,3 +1,9 @@
+glide.lock
+.idea/
+*.log
+.vagrant
+.DS_Store
+sfc-controller
 # Binaries for programs and plugins
 *.exe
 *.dll
@@ -12,3 +18,4 @@
 
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
+

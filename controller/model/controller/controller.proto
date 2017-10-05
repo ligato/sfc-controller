@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package controller;
+
+enum ExtEntDriverType {
+    EE_DRIVER_TYPE_UNKNOWN = 0;
+    EE_DRIVER_TYPE_IOSXE_SSH = 1;
+}
+message ExternalEntity {
+    string name = 1;
+    string mgmnt_ip_address = 2;
+    uint32 mgmnt_port = 3;
+    string basic_auth_user = 4;
+    string basic_auth_passwd = 5;
+    ExtEntDriverType ee_driver_type = 6;
+
+    message HostInterface {
+        string if_name = 1;
+        string ipv4_addr = 2;
+    }
+    HostInterface host_interface = 7;
+
+    message HostVxlan {
+        string if_name = 1;
+        string source_ipv4 = 2;
+    }
+    HostVxlan host_vxlan = 8;
+
+    message HostBD {
+        uint32 id = 1;
+        string bdi_ipv4 = 2;
+        repeated string interfaces = 3;
+    }
+    HostBD host_bd = 9;
+};
+
+message HostEntity {
+    string name = 1;
+    string eth_if_name = 2;
+    string eth_ipv4 = 3;
+    string loopback_mac_addr = 4;
+    string loopback_ipv4 = 5;
+};
+
+enum SfcType {
+    SFC_UNKNOWN_TYPE = 0;
+
+    SFC_NS_VXLAN = 1;  /* VXLAN-based north-south SFC */
+
+    SFC_NS_NIC_BD = 3;       /* physial NIC-based north-south SFC - bridge domain -based */
+    SFC_NS_NIC_L2XCONN = 4;  /* physial NIC-based north-south SFC - l2xconnect -based */
+
+    SFC_EW_BD = 2;       /* bridge domain -based east-west SFC */
+    SFC_EW_L2XCONN = 5;  /* l2xconnect -based east-west SFC */
+};
+
+enum SfcElementType {
+    ELEMENT_UNKNOWN = 0;
+    EXTERNAL_ENTITY = 1;
+    CONTAINER_AGENT_VPP_MEMIF = 2;
+    CONTAINER_AGENT_NOVPP_AFP = 3;
+    CONTAINER_AGENT_NOVPP_MEMIF = 4;
+
+    HOST_ENTITY = 5;
+    CONTAINER_AGENT_VPP_AFP = 6;
+};
+
+message CustomInfoType {
+    string label = 1;
+}
+
+message SfcEntity {
+    string name = 1;
+    string description = 2;
+    SfcType type = 3;
+    string sfc_ipv4_prefix = 4;     // optional field allowing east-west memIFs to use a fixed prefix
+    uint32 sfc_ipv4_prefix_len = 5; // otherwise, controller will manage a 10.X.X.X addr space
+
+    message SfcElement {
+        string container = 1;
+        string port_label = 2;
+        string etcd_vpp_switch_key = 3;   // static for now, k8s will tell us which host this container is deployed
+        string ipv4_addr = 4;             // optional, if provided, this overrides what ipAddr the if is given
+        string mac_addr = 5;              // optional, if provided, this overrides what mac the if is given
+        SfcElementType type = 6;
+        CustomInfoType custom_info = 7;   // opaque string ... possibly json for app specific information
+    };
+    repeated SfcElement elements = 7;
+};
