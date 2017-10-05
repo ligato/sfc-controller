@@ -66,9 +66,9 @@ type Flavor struct {
 
 // Inject interconnects plugins - injects the dependencies. If it has been called
 // already it is no op.
-func (f *Flavor) Inject() error {
+func (f *Flavor) Inject() bool {
 	if f.injected {
-		return nil
+		return false
 	}
 
 	f.FlavorLocal.Inject()
@@ -99,7 +99,7 @@ func (f *Flavor) Inject() error {
 
 	f.injected = true
 
-	return nil
+	return true
 }
 
 // Plugins returns all plugins from the flavour. The set of plugins is supposed
