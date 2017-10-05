@@ -159,7 +159,7 @@ test:
 lint:
 	$(call lint_only)
 
-.PHONY: golint
+.PHONY: lint
 
 # report suspicious constructs using go vet tool
 govet:
