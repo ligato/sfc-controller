@@ -58,6 +58,14 @@ define lint_only
     @echo "# done"
 endef
 
+# verify that links in markdown files are valid
+# requires npm install -g markdown-link-check
+define check_links_only
+    @echo "# checking links"
+    @./scripts/check_links.sh
+    @echo "# done"
+endef
+
 # run test examples
 define test_examples
     @echo "# TODO Testing examples"
@@ -159,13 +167,13 @@ test:
 lint:
 	$(call lint_only)
 
-.PHONY: lint
-
 # report suspicious constructs using go vet tool
 govet:
 	@./scripts/govet.sh
 
-.PHONY: govet
+# validate links in markdown files
+check_links:
+	$(call check_links_only)
 
 # clean
 clean:
@@ -181,6 +189,4 @@ test-examples:
 test-cover:
 	$(call test_cover_only)
 
-.PHONY: clean build
-
-.PHONY: clean install
+.PHONY: build update-dep install-dep test lint clean
