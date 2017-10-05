@@ -14,14 +14,14 @@ function static_analysis() {
   local PLUGINS=$(${TOOL} "${PWD}/plugins${SELECTOR}")
   local EXAMPLES=$(${TOOL} "${PWD}/examples${SELECTOR}")
   local FLAVORS=$(${TOOL} "${PWD}/flavors${SELECTOR}")
-  local IDXVPP=$(${TOOL} "${PWD}/idxvpp${SELECTOR}")
+  local CONTROLLER=$(${TOOL} "${PWD}/controller{SELECTOR}")
 
   local ALL="$CLIENTV1
 $CMD
 $PLUGINS
 $EXAMPLES
 $FLAVORS
-$IDXVPP
+$CONTROLLER
 "
 
   local OUT=$(echo "${ALL}" | grep -F "${FILES}" | grep -v "${WHITELIST_ERRORS}")

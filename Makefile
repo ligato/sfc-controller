@@ -17,6 +17,39 @@ define generate_sources
         @echo "# done"
 endef
 
+# run all tests
+define test_only
+	@echo "# running unit tests"
+	@go test ./tests/go/itest
+	@echo "# done"
+endef
+
+# run all tests with coverage
+define test_cover_only
+	@echo "# running unit tests with coverage analysis"
+	@go test -covermode=count -coverprofile=${COVER_DIR}coverage_unit1.out ./tests/go/itest
+	@echo "# merging coverage results"
+    @cd vendor/github.com/wadey/gocovmerge && go install -v
+    @gocovmerge ${COVER_DIR}coverage_unit1.out  > ${COVER_DIR}coverage.out
+    @echo "# coverage data generated into ${COVER_DIR}coverage.out"
+    @echo "# done"
+endef
+
+# run all tests with coverage and display HTML report
+define test_cover_html
+    $(call test_cover_only)
+    @go tool cover -html=${COVER_DIR}coverage.out -o ${COVER_DIR}coverage.html
+    @echo "# coverage report generated into ${COVER_DIR}coverage.html"
+    @go tool cover -html=${COVER_DIR}coverage.out
+endef
+
+# run all tests with coverage and display XML report
+define test_cover_xml
+	$(call test_cover_only)
+    @gocov convert ${COVER_DIR}coverage.out | gocov-xml > ${COVER_DIR}coverage.xml
+    @echo "# coverage report generated into ${COVER_DIR}coverage.xml"
+endef
+
 # install dependencies according to glide.yaml & glide.lock (in case vendor dir was deleted)
 define install_dependencies
 	$(if $(shell command -v glide install 2> /dev/null),$(info glide dependency manager is ready),$(error glide dependency manager missing, info about installation can be found here https://github.com/Masterminds/glide))
@@ -126,6 +159,13 @@ clean:
 	@echo "# cleaning up the plugin binary"
 	@rm -f ${PLUGIN_BIN}
 	@echo "# done"
+
+# run smoke tests on examples - TODO
+test-examples:
+
+# run tests with coverage report
+test-cover:
+    $(call test_cover_only)
 
 .PHONY: clean build
 
