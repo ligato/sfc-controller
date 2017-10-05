@@ -50,6 +50,14 @@ define test_cover_xml
     @echo "# coverage report generated into ${COVER_DIR}coverage.xml"
 endef
 
+# run code analysis
+define lint_only
+   @echo "# running code analysis"
+    @./scripts/golint.sh
+    @./scripts/govet.sh
+    @echo "# done"
+endef
+
 # run test examples
 define test_examples
     @echo "# TODO Testing examples"
@@ -148,8 +156,8 @@ test:
 #       @cd etcd && go test -cover
 
 # print golint suggestions to stderr
-golint:
-	@./scripts/golint.sh
+lint:
+	$(call lint_only)
 
 .PHONY: golint
 
