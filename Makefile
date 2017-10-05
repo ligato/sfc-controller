@@ -50,6 +50,11 @@ define test_cover_xml
     @echo "# coverage report generated into ${COVER_DIR}coverage.xml"
 endef
 
+# run test examples
+define test_examples
+    @echo "# TODO Testing examples"
+endef
+
 # install dependencies according to glide.yaml & glide.lock (in case vendor dir was deleted)
 define install_dependencies
 	$(if $(shell command -v glide install 2> /dev/null),$(info glide dependency manager is ready),$(error glide dependency manager missing, info about installation can be found here https://github.com/Masterminds/glide))
@@ -162,6 +167,7 @@ clean:
 
 # run smoke tests on examples - TODO
 test-examples:
+    $(call test_examples)
 
 # run tests with coverage report
 test-cover:
