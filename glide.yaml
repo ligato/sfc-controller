@@ -1,7 +1,7 @@
 package: github.com/ligato/sfc-controller
 import:
 - package: github.com/ligato/cn-infra
-  version: 83eb6249d68174ca6088aeda705eda6e17a0e30d
+  version: f93d8a9e0d094778babf84628853d868e149a573
   vcs: git
 - package: github.com/ligato/vpp-agent
   version: dff4fb1da0f7e0841d2d9912d72c85fb901af7e6

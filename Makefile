@@ -1,6 +1,6 @@
 VERSION=$(shell git rev-parse HEAD)
 DATE=$(shell date +'%Y-%m-%dT%H:%M%:z')
-LDFLAGS=-ldflags '-X wwwin-gitlab-sjc.cisco.com/ctao/sfc-controller/vendor/github.com/ligato/cn-infra/core.BuildVersion=$(VERSION) -X wwwin-gitlab-sjc.cisco.com/ctao/sfc-controller/vendor/github.com/ligato/cn-infra/core.BuildDate=$(DATE)'
+LDFLAGS=-ldflags '-X github.com/ligato/sfc-controller/vendor/github.com/ligato/cn-infra/core.BuildVersion=$(VERSION) -X github.com/ligato/sfc-controller/vendor/github.com/ligato/cn-infra/core.BuildDate=$(DATE)'
 
 PLUGIN_SOURCES="sfc_controller.go"
 PLUGIN_BIN="sfc_controller.so"

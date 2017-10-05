@@ -14,8 +14,8 @@ echo $GOPATH
 
 
 # checkout agent code
-#go get -insecure wwwin-gitlab-sjc.cisco.com/ctao/sfc-controller
-#go get -insecure wwwin-gitlab-sjc.cisco.com/ctao/sfc-controller
+#go get -insecure github.com/ligato/sfc-controller
+#go get -insecure github.com/ligato/sfc-controller
 
 
 # build the agent
