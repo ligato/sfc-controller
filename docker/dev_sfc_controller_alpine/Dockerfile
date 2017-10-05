@@ -28,7 +28,7 @@ RUN rm -rf protobuf
 COPY docker/dev_sfc_controller_alpine/build-glide.sh .
 RUN ./build-glide.sh
 
-COPY / /root/go/src/wwwin-gitlab-sjc.cisco.com/ctao/sfc-controller/
+COPY / /root/go/src/github.com/ligato/sfc-controller/
 COPY docker/dev_sfc_controller_alpine/build-controller.sh .
 RUN ./build-controller.sh
 

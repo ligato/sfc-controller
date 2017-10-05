@@ -66,16 +66,22 @@ type Flavor struct {
 
 // Inject interconnects plugins - injects the dependencies. If it has been called
 // already it is no op.
-func (f *Flavor) Inject() error {
+func (f *Flavor) Inject() bool {
 	if f.injected {
-		return nil
+		return false
 	}
 
 	f.FlavorLocal.Inject()
 
-	f.HTTP.Deps.PluginLogDeps = *f.LogDeps("http")
+	httpInfraDeps := f.InfraDeps("http", local.WithConf())
+	f.HTTP.Deps.Log = httpInfraDeps.Log
+	f.HTTP.Deps.PluginName = httpInfraDeps.PluginName
+	f.HTTP.Deps.PluginConfig = httpInfraDeps.PluginConfig
 
-	f.LogMngRPC.Deps.PluginLogDeps = *f.LogDeps("log-mng-rpc")
+	logMngInfraDeps := f.InfraDeps("log-mng-rpc")
+	f.LogMngRPC.Deps.Log = logMngInfraDeps.Log
+	f.LogMngRPC.Deps.PluginName = logMngInfraDeps.PluginName
+	f.LogMngRPC.Deps.PluginConfig = logMngInfraDeps.PluginConfig
 	f.LogMngRPC.LogRegistry = f.FlavorLocal.LogRegistry()
 	f.LogMngRPC.HTTP = &f.HTTP
 
@@ -93,7 +99,7 @@ func (f *Flavor) Inject() error {
 
 	f.injected = true
 
-	return nil
+	return true
 }
 
 // Plugins returns all plugins from the flavour. The set of plugins is supposed

@@ -38,7 +38,7 @@ type Plugin struct {
 
 type infraDeps interface {
 	// InfraDeps for getting PlugginInfraDeps instance (logger, config, plugin name, statuscheck)
-	InfraDeps(pluginName string) *local.PluginInfraDeps
+	InfraDeps(pluginName string, opts ...local.InfraDepsOpts) *local.PluginInfraDeps
 }
 
 // OfDifferentAgent allows access DB of different agent (with a particular microservice label).
@@ -126,6 +126,21 @@ func (plugin *Plugin) Put(key string, data proto.Message, opts ...datasync.PutOp
 	}
 
 	return errors.New("Transport adapter is not ready yet. (Probably called before AfterInit)")
+}
+
+// Delete propagates this call to a particular kvdb.Plugin unless the kvdb.Plugin is Disabled().
+//
+// This method is supposed to be called in Plugin.AfterInit() or later (even from different go routine).
+func (plugin *Plugin) Delete(key string, opts ...datasync.DelOption) (existed bool, err error) {
+	if plugin.KvPlugin.Disabled() {
+		return false, nil
+	}
+
+	if plugin.adapter != nil {
+		return plugin.adapter.db.Delete(key, opts...)
+	}
+
+	return false, errors.New("Transport adapter is not ready yet. (Probably called before AfterInit)")
 }
 
 // Close resources

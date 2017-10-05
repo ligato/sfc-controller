@@ -1,6 +1,6 @@
 VERSION=$(shell git rev-parse HEAD)
 DATE=$(shell date +'%Y-%m-%dT%H:%M%:z')
-LDFLAGS=-ldflags '-X wwwin-gitlab-sjc.cisco.com/ctao/sfc-controller/vendor/github.com/ligato/cn-infra/core.BuildVersion=$(VERSION) -X wwwin-gitlab-sjc.cisco.com/ctao/sfc-controller/vendor/github.com/ligato/cn-infra/core.BuildDate=$(DATE)'
+LDFLAGS=-ldflags '-X github.com/ligato/sfc-controller/vendor/github.com/ligato/cn-infra/core.BuildVersion=$(VERSION) -X github.com/ligato/sfc-controller/vendor/github.com/ligato/cn-infra/core.BuildDate=$(DATE)'
 
 PLUGIN_SOURCES="sfc_controller.go"
 PLUGIN_BIN="sfc_controller.so"
@@ -15,6 +15,60 @@ define generate_sources
         @go generate -v
         @cd plugins/vnfdriver && go generate -v
         @echo "# done"
+endef
+
+# run all tests
+define test_only
+	@echo "# running unit tests"
+	@go test ./tests/go/itest
+	@echo "# done"
+endef
+
+# run all tests with coverage
+define test_cover_only
+	@echo "# running unit tests with coverage analysis"
+	@go test -covermode=count -coverprofile=${COVER_DIR}coverage_unit1.out ./tests/go/itest
+	@echo "# merging coverage results"
+    @cd vendor/github.com/wadey/gocovmerge && go install -v
+    @gocovmerge ${COVER_DIR}coverage_unit1.out  > ${COVER_DIR}coverage.out
+    @echo "# coverage data generated into ${COVER_DIR}coverage.out"
+    @echo "# done"
+endef
+
+# run all tests with coverage and display HTML report
+define test_cover_html
+    $(call test_cover_only)
+    @go tool cover -html=${COVER_DIR}coverage.out -o ${COVER_DIR}coverage.html
+    @echo "# coverage report generated into ${COVER_DIR}coverage.html"
+    @go tool cover -html=${COVER_DIR}coverage.out
+endef
+
+# run all tests with coverage and display XML report
+define test_cover_xml
+	$(call test_cover_only)
+    @gocov convert ${COVER_DIR}coverage.out | gocov-xml > ${COVER_DIR}coverage.xml
+    @echo "# coverage report generated into ${COVER_DIR}coverage.xml"
+endef
+
+# run code analysis
+define lint_only
+   @echo "# running code analysis"
+    @./scripts/golint.sh
+    @./scripts/govet.sh
+    @echo "# done"
+endef
+
+# verify that links in markdown files are valid
+# requires npm install -g markdown-link-check
+define check_links_only
+    @echo "# checking links"
+    @./scripts/check_links.sh
+    @echo "# done"
+endef
+
+# run test examples
+define test_examples
+    @echo "# TODO Testing examples"
 endef
 
 # install dependencies according to glide.yaml & glide.lock (in case vendor dir was deleted)
@@ -110,16 +164,16 @@ test:
 #       @cd etcd && go test -cover
 
 # print golint suggestions to stderr
-golint:
-	@./scripts/golint.sh
-
-.PHONY: golint
+lint:
+	$(call lint_only)
 
 # report suspicious constructs using go vet tool
 govet:
 	@./scripts/govet.sh
 
-.PHONY: govet
+# validate links in markdown files
+check_links:
+	$(call check_links_only)
 
 # clean
 clean:
@@ -127,6 +181,12 @@ clean:
 	@rm -f ${PLUGIN_BIN}
 	@echo "# done"
 
-.PHONY: clean build
+# run smoke tests on examples - TODO
+test-examples:
+	$(call test_examples)
 
-.PHONY: clean install
+# run tests with coverage report
+test-cover:
+	$(call test_cover_only)
+
+.PHONY: build update-dep install-dep test lint clean
