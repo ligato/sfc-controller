@@ -11,10 +11,10 @@ RUN mkdir /opt/sfc-controller/plugin
 WORKDIR /opt/sfc-controller/dev
 
 # install Go & Glide
-RUN wget https://storage.googleapis.com/golang/go1.8.linux-amd64.tar.gz && \
-    tar -xvf go1.8.linux-amd64.tar.gz && \
+RUN wget https://storage.googleapis.com/golang/go1.9.linux-amd64.tar.gz && \
+    tar -xvf go1.9.linux-amd64.tar.gz && \
     mv go /usr/local && \
-    rm -f go1.8.linux-amd64.tar.gz
+    rm -f go1.9.linux-amd64.tar.gz
 
 # build & install Protobuf & gogo protobuf compiler
 RUN apt-get install -y make && \
@@ -29,17 +29,15 @@ RUN git clone https://github.com/google/protobuf.git && \
 
 RUN apt-get install -y golang-gogoprotobuf-dev
 
-COPY build-controller.sh .
+COPY docker/dev_sfc_controller/build-controller.sh .
 RUN ./build-controller.sh
 
-COPY etcd.conf .
-COPY kafka.conf .
-COPY sfc.conf .
+COPY docker/dev_sfc_controller/etcd.conf .
+COPY docker/dev_sfc_controller/kafka.conf .
+COPY docker/dev_sfc_controller/sfc.conf .
 
 WORKDIR /root/
 
-# add supervisor conf file
-COPY supervisord.conf /etc/supervisord.conf
-
 # run supervisor as the default executable
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+CMD ["/root/go/bin/sfc-controller", "--etcdv3-config=/opt/sfc-controller/dev/etcd.conf", "--sfc-config=/opt/sfc-controller/dev/sfc.conf"]
+

@@ -20,7 +20,6 @@ echo $GOPATH
 
 # build the agent
 cd $GOPATH/src/github.com/ligato/sfc-controller
-#cd sfc-controller
 source setup-env.sh
 make
 make install
