@@ -167,11 +167,11 @@ clean:
 
 # run smoke tests on examples - TODO
 test-examples:
-    $(call test_examples)
+	$(call test_examples)
 
 # run tests with coverage report
 test-cover:
-    $(call test_cover_only)
+	$(call test_cover_only)
 
 .PHONY: clean build
 
