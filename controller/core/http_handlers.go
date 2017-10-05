@@ -23,10 +23,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/unrolled/render"
 	"io/ioutil"
 	"net/http"
-	"github.com/ligato/sfc-controller/controller/model/controller"
 )
 
 const (
@@ -37,7 +37,7 @@ var ()
 
 var sfcplg *SfcControllerPluginHandler
 
-// register the handler frunc for GET and POST, TODO PUT/DELETE
+// InitHttpHandlers: register the handler funcs for GET and POST, TODO PUT/DELETE
 func (sfcCtrlPlugin *SfcControllerPluginHandler) InitHttpHandlers() {
 
 	sfcplg = sfcCtrlPlugin

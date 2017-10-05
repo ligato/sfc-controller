@@ -19,7 +19,6 @@
 package core
 
 import (
-	"os"
 	"github.com/ligato/cn-infra/core"
 	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/cn-infra/db/keyval/etcdv3"
@@ -27,26 +26,27 @@ import (
 	"github.com/ligato/cn-infra/logging/logroot"
 	"github.com/ligato/cn-infra/rpc/rest"
 	"github.com/ligato/cn-infra/utils/safeclose"
-	"github.com/namsral/flag"
 	"github.com/ligato/sfc-controller/controller/cnpdriver"
 	"github.com/ligato/sfc-controller/controller/extentitydriver"
 	"github.com/ligato/sfc-controller/controller/model/controller"
+	"github.com/namsral/flag"
+	"os"
 )
 
 // Plugin identifier (must be unique throughout the system)
 const PluginID core.PluginName = "SfcController"
 
 var (
-	cnpDriverName string // cli flag - see RegisterFlags
-	sfcConfigFile string // cli flag - see RegisterFlags
-	cleanSfcDatastore bool // cli flag - see RegisterFlags
-	log           = logroot.StandardLogger()
+	cnpDriverName     string // cli flag - see RegisterFlags
+	sfcConfigFile     string // cli flag - see RegisterFlags
+	cleanSfcDatastore bool   // cli flag - see RegisterFlags
+	log               = logroot.StandardLogger()
 )
 
 // Add command line flags here.
 func RegisterFlags() {
 	flag.StringVar(&cnpDriverName, "cnp-driver", "sfcctlrl2",
-		"Container Netowrking Policy driver: sfcctlrl2, sfcctlrl3")
+		"Container Networking Policy driver: sfcctlrl2, sfcctlrl3")
 	flag.StringVar(&sfcConfigFile, "sfc-config", "",
 		"Name of a sfc config (yaml) file to load at startup")
 	flag.BoolVar(&cleanSfcDatastore, "clean", false,
@@ -83,11 +83,11 @@ type SfcControllerPluginHandler struct {
 	Etcd    *etcdv3.Plugin
 	HTTPmux *rest.Plugin
 
-	cnpDriverPlugin cnpdriver.SfcControllerCNPDriverAPI
-	yamlConfig      *YamlConfig
-	ramConfigCache  SfcControllerCacheType
-	controllerReady bool
-	db              keyval.ProtoBroker
+	cnpDriverPlugin       cnpdriver.SfcControllerCNPDriverAPI
+	yamlConfig            *YamlConfig
+	ramConfigCache        SfcControllerCacheType
+	controllerReady       bool
+	db                    keyval.ProtoBroker
 	ReconcileVppLabelsMap ReconcileVppLabelsMapType
 }
 
@@ -123,7 +123,6 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 	}
 
 	log.Infof("CNP Driver: %s", sfcCtrlPlugin.cnpDriverPlugin.GetName())
-
 
 	sfcCtrlPlugin.ReconcileInit()
 

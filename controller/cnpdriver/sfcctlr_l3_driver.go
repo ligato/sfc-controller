@@ -19,8 +19,7 @@ import (
 	"github.com/ligato/sfc-controller/controller/model/controller"
 )
 
-const (
-)
+const ()
 
 type sfcCtlrL3CNPDriver struct {
 	name string
@@ -53,7 +52,6 @@ func (cnpd *sfcCtlrL3CNPDriver) GetName() string {
 func (cnpd *sfcCtlrL3CNPDriver) ReconcileStart(vppEtcdLabels map[string]struct{}) error {
 	return nil
 }
-
 
 // Perform end processing for the reconcile of the CNP datastore
 func (cnpd *sfcCtlrL3CNPDriver) ReconcileEnd() error {

@@ -19,8 +19,8 @@ package core
 
 import (
 	"github.com/ghodss/yaml"
-	"io/ioutil"
 	"github.com/ligato/sfc-controller/controller/model/controller"
+	"io/ioutil"
 )
 
 type YamlConfig struct {

@@ -128,7 +128,7 @@ func readUntilShell(rChan chan string, errChan chan error) (string, error) {
 
 			if active {
 				// no more data for some time, but there was some activity before, consider the output as complete
-				log.Warn("No more response from the router within the timeout interval, considering the recieved output as complete.")
+				log.Warn("No more response from the router within the timeout interval, considering the received output as complete.")
 				return buffer.String(), nil
 			} else if totalTime >= disconnectTimeout {
 				// no data from the router at all, return disconnected error

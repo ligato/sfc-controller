@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// The renderer uses the config for hosts, external entites, and SFC's and
-// invokes the registered CNP driver.  Driver API's are invoked for wiring
-// hosts to hosts, hosts to external routers, and the SFC's.
+// Package core: The renderer uses the config for hosts, external entites,
+// and SFC's and invokes the registered CNP driver.  Driver API's are invoked
+// for wiring hosts to hosts, hosts to external routers, and the SFC's.
 package core
 
 import (
-	"os"
 	"github.com/ligato/sfc-controller/controller/model/controller"
+	"os"
 )
 
 // Render the config: note that because we are wiring everything, we wire only one end when we

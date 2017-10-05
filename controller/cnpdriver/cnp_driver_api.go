@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // cnp_driver_api is an interface definition for the container network policy.
-// The goal of this interface is to provide generic routines for wiring contianers,
+// The goal of this interface is to provide generic routines for wiring containers,
 // host to hosts, and hosts to external routers.
 //
 // The current networking policies are the L2 policy with VxLan tunnels between
@@ -38,7 +38,7 @@ var (
 // are invoked, the sfc controller will call methods on this interface for the
 // registered plugin to effect the inter-host, intra-host network connectivity.  As well,
 // as host-external entity wiring.
-// sfc controller natively supports its own container netwroking policy driver for both
+// sfc controller natively supports its own container networking policy driver for both
 // l3 and l2 overlays.
 type SfcControllerCNPDriverAPI interface {
 	InitPlugin() error

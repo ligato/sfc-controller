@@ -13,7 +13,7 @@ for providing data-plane connectivity for cloud native containers.  The
 containers may be [Ligato VPP-agent][0] enabled containers which in turn use
 [VPP][1] based cloud-native [Virtual Network Functions][2] (VNFs) or the
 containers may be application containers communicating via veth interfaces.
-The VPP Agent is built on top of the [CN-Infra platform][16] for developing 
+The VPP Agent is built on top of the [CN-Infra platform][5] for developing 
 cloud-native Virtual Network Functions (VNFs). 
 
 The SFC Controller supports a wide variety of topologies.  The controller can
@@ -44,18 +44,14 @@ controlled hosts.
 * **VPP agent containers**: these containers are VPP enabled and have a
 [Ligato VPP-agent][0] which controls the VPP in the container.  VNF's are
 developed as extensions to [VPP][1].
-* non-VPP containers: these are application containers which communicate
+* **non-VPP containers**: these are application containers which communicate
 with other containers or externally via veth interfaces.  The VSwitch VPP
 creates the veth interfaces.
 
-The SFC Controller is basically a set of plugins that use the 
-CN-Infra platform to interact with other services / microservices in the
-cloud (e.g. a KV data store, messaging, log warehouse, etc.). The SFC Controller
-exposes VPP functionality to client apps via a higher-level model-driven 
-API. Clients that consume this API may be either external (connecting to 
-the VPP Agent via REST, gRPC API, Etcd or message bus transport), or local
-Apps and/or Extension plugins running on the same CN-Infra platform in the 
-same Linux process. 
+## SFC Toppologies
+The SFC Controller supports the following topologies: 
+
+![SFC Topolgies](docs/imgs/sfc_topologies.png "SFC Topologies")
 
 ## Plugins
 
@@ -63,8 +59,10 @@ The SFC controller is written with a plugin architecture so that functionality
 can be extended.
 
 The set of plugins in the SFC Controller is as follows:
-* [CN-Infra core][13] - lifecycle management of plugins (loading, 
-  initialization, unloading)
+* [l2_driver][3] - l2 bridge, vxlan tunnel plugin (wire inter-host,
+    and host-external router)
+* [CN-Infra core][5] - lifecycle management of plugins (loading, 
+    initialization, unloading)
 
 ## Tools
 The SFC Controller repository also contains tools for building and troubleshooting 
@@ -75,12 +73,12 @@ of VNFs based on the VPP Agent:
 
 ## Quickstart
 For a quick start with the sfc-controller, you can use pre-built Docker images with
-the Agent and VPP on [Dockerhub][14].
+the Agent and VPP on [Dockerhub][6].
 
-0. Start ETCD and Kafka on your host (e.g. in Docker as described [here][15]).
+0. Start ETCD and Kafka on your host (e.g. in Docker as described [here][7]).
    Note: **The SFC Controller in the pre-built Docker image will not start if it can't 
    connect to both Etcd and Kafka**.  Note: also start the VSwitch VPP.  See the
-   [Quickstart VSwitch VPP][17]
+   [Quickstart VSwitch VPP][8]
 
 1. Run VPP + VPP Agent in a Docker image:
 ```
@@ -93,12 +91,6 @@ docker run -it --name sfc-contoller --rm ligato/sfc-controller
 docker exec -it sfc-controller sfcdump
 ```
 
-3. Check the configuration (using agentctl or directly using VPP console):
-```
-docker exec -it vpp agentctl -e 172.17.0.1:2379 show
-docker exec -it vpp vppctl -s localhost:5002
-```
-
 ## Documentation
 GoDoc can be browsed [online](https://godoc.org/github.com/ligato/sfc-controller).
 
@@ -109,19 +101,15 @@ Read the README for the [Development Docker Image](docker/dev_sfc-controller/REA
 ### Deployment:
 [![K8s integration](docs/imgs/k8s_deployment_thumb.png "SFC Controller - K8s integration")](docs/Deployment.md)
 
-### Extensibility:
-[![VPP Agent Extensibility](docs/imgs/extensibility_thumb.png "VPP Agent - example of extensibility")](https://github.com/ligato/cn-sample-service)
-
 ## Contribution:
 If you are interested in contributing, please see the [contribution guidelines](CONTRIBUTING.md).
 
 [0]: https://github.com/ligato/vpp-agent
 [1]: https://fd.io/
 [2]: https://github.com/ligato/cn-infra/blob/master/docs/readmes/cn_virtual_function.md
-[3]: https://developers.google.com/protocol-buffers/
-[4]: https://wiki.fd.io/view/GoVPP
-[13]: https://github.com/ligato/cn-infra/tree/master/core
-[14]: https://hub.docker.com/r/ligato/sfc-controller/
-[15]: docker/dev_vpp_agent/README.md#running-etcd-server-on-local-host
-[16]: https://github.com/ligato/cn-infra
-[17]: https://github.com/ligato/vpp-agent#quickstart
+[3]: https://github.com/ligato/sfc-controller/tree/master/controller/cnpdriver
+[4]: https://github.com/ligato/cn-infra
+[5]: https://github.com/ligato/cn-infra/tree/master/core
+[6]: https://hub.docker.com/r/ligato/sfc-controller/
+[7]: docker/dev_vpp_agent/README.md#running-etcd-server-on-local-host
+[8]: https://github.com/ligato/vpp-agent#quickstart

@@ -33,6 +33,9 @@ import (
 	"github.com/ligato/cn-infra/logging/logroot"
 	"github.com/ligato/cn-infra/servicelabel"
 	"github.com/ligato/cn-infra/utils/addrs"
+	"github.com/ligato/sfc-controller/controller/extentitydriver"
+	"github.com/ligato/sfc-controller/controller/model/controller"
+	"github.com/ligato/sfc-controller/controller/utils"
 	"github.com/ligato/vpp-agent/clientv1/linux"
 	"github.com/ligato/vpp-agent/clientv1/linux/remoteclient"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
@@ -40,9 +43,6 @@ import (
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
 	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/model/interfaces"
 	"strings"
-	"github.com/ligato/sfc-controller/controller/extentitydriver"
-	"github.com/ligato/sfc-controller/controller/model/controller"
-	"github.com/ligato/sfc-controller/controller/utils"
 )
 
 var (
@@ -534,6 +534,7 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForExternalEntity(ee *controller.Ex
 // Perform CNP specific wiring for inter-container wiring, and container to external router wiring
 func (cnpd *sfcCtlrL2CNPDriver) WireSfcEntity(sfc *controller.SfcEntity) error {
 
+	var err error = nil
 	// the semantic difference between a north_south vs an east-west sfc entity, it what is the bridge that
 	// the memIf/afPkt if's will be associated.
 	switch sfc.Type {
@@ -541,28 +542,28 @@ func (cnpd *sfcCtlrL2CNPDriver) WireSfcEntity(sfc *controller.SfcEntity) error {
 	case controller.SfcType_SFC_NS_VXLAN:
 		// north/south VXLAN type, memIfs/cntrs connect to vrouters/RASs bridge
 		cnpd.l2CNPEntityCache.SFCs[sfc.Name] = *sfc
-		return cnpd.wireSfcNorthSouthVXLANElements(sfc)
+		err = cnpd.wireSfcNorthSouthVXLANElements(sfc)
 
 	case controller.SfcType_SFC_NS_NIC_BD:
 		fallthrough
 	case controller.SfcType_SFC_NS_NIC_L2XCONN:
 		// north/south NIC type, memIfs/cntrs connect to physical NIC
 		cnpd.l2CNPEntityCache.SFCs[sfc.Name] = *sfc
-		return cnpd.wireSfcNorthSouthNICElements(sfc)
+		err = cnpd.wireSfcNorthSouthNICElements(sfc)
 
 	case controller.SfcType_SFC_EW_BD:
 		fallthrough
 	case controller.SfcType_SFC_EW_L2XCONN:
 		// east/west type, memIfs/cntrs connect to the hosts easet/west bridge
 		cnpd.l2CNPEntityCache.SFCs[sfc.Name] = *sfc
-		return cnpd.wireSfcEastWestElements(sfc)
+		err = cnpd.wireSfcEastWestElements(sfc)
 
 	default:
-		err := fmt.Errorf("WireSfcEntity: unknown entity type: '%s'", sfc.Type)
+		err = fmt.Errorf("WireSfcEntity: unknown entity type: '%s'", sfc.Type)
 		log.Error(err.Error())
-		return err
 	}
-	return nil
+
+	return err
 }
 
 // for now, ensure there is only one ee ... as each container will be wirred to it

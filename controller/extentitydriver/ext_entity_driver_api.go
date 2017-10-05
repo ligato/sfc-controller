@@ -17,16 +17,16 @@ package extentitydriver
 
 import (
 	"fmt"
+	"github.com/ligato/sfc-controller/controller/model/controller"
+	"github.com/ligato/sfc-controller/controller/utils"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
 	"strings"
 	"time"
-	"github.com/ligato/sfc-controller/controller/model/controller"
-	"github.com/ligato/sfc-controller/controller/utils"
 
 	"github.com/ligato/cn-infra/logging/logroot"
-	"net"
 	"github.com/ligato/sfc-controller/controller/extentitydriver/iosxecfg"
 	"github.com/ligato/sfc-controller/controller/extentitydriver/iosxecfg/model/iosxe"
+	"net"
 )
 
 // TODO: make these constants configurable in the controller NB API?
