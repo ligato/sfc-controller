@@ -48,7 +48,7 @@ developed as extensions to [VPP][1].
 with other containers or externally via veth interfaces.  The VSwitch VPP
 creates the veth interfaces.
 
-## SFC Toppologies
+## SFC Topologies
 The SFC Controller supports the following topologies: 
 
 ![SFC Topolgies](docs/imgs/sfc_topologies.png "SFC Topologies")
@@ -95,7 +95,7 @@ docker exec -it sfc-controller sfcdump
 GoDoc can be browsed [online](https://godoc.org/github.com/ligato/sfc-controller).
 
 ## Next Steps
-Read the README for the [Development Docker Image](docker/dev_sfc-controller/README.md) for more details.
+Read the README for the [Development Docker Image](docker/dev_sfc_controller/README.md) for more details.
 
 
 ### Deployment:
