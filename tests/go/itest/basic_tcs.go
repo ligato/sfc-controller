@@ -34,6 +34,7 @@ func (t *basicTCSuite) TC01ResyncEmptyVpp1Agent(sfcCfg *sfccore.YamlConfig, vppA
 	t.Then.VppAgentCfgContains("HOST-1", vppAgentCfg...)
 	t.Then.HTTPGetEntities(sfcCfg)
 }
+
 // TC02HTTPPostasserts that vpp agent writes properly vpp-agent configuration
 // This TC assumes that vpp-agent configuration was empty before the test.
 // Then SFC Controller starts and after that SFC Controller is configured via REST HTTP posts.

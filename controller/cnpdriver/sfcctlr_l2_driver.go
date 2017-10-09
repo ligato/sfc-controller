@@ -46,11 +46,7 @@ import (
 )
 
 var (
-	gVLanID        uint32 = 4999
-	gMemIfID       uint32
-	gMacInstanceID uint32
-	gIPInstanceID  uint32
-	log            = logroot.StandardLogger()
+	log = logroot.StandardLogger()
 )
 
 type sfcCtlrL2CNPDriver struct {
@@ -62,6 +58,17 @@ type sfcCtlrL2CNPDriver struct {
 	reconcileBefore     reconcileCacheType
 	reconcileAfter      reconcileCacheType
 	reconcileInProgress bool
+	seq                 sequencer
+}
+
+// sequencer groups all sequences used by L2 driver.
+// (instead of using global variables that caused
+// problems while running automated tests)
+type sequencer struct {
+	VLanID uint32
+	MemIfID       uint32
+	MacInstanceID uint32
+	IPInstanceID  uint32
 }
 
 type heToEEStateType struct {
@@ -109,6 +116,8 @@ func NewSfcCtlrL2CNPDriver(name string, dbFactory func(string) keyval.ProtoBroke
 
 	cnpd.initL2CNPCache()
 	cnpd.initReconcileCache()
+
+	cnpd.seq.VLanID = 4999
 
 	return cnpd
 }
@@ -421,8 +430,8 @@ func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToExternalEntity(he *controller.Ho
 
 	// create the vxlan i'f before the BD
 	ifName := "IF_VXLAN_H2E_" + he.Name + "_" + ee.Name
-	gVLanID++ // track these at some point
-	vlanIf, err := cnpd.vxLanCreate(he.Name, ifName, gVLanID, he.LoopbackIpv4, ee.HostVxlan.SourceIpv4)
+	cnpd.seq.VLanID++ // track these at some point
+	vlanIf, err := cnpd.vxLanCreate(he.Name, ifName, cnpd.seq.VLanID, he.LoopbackIpv4, ee.HostVxlan.SourceIpv4)
 	if err != nil {
 		log.Error("WireHostEntityToExternalEntity: error creating vxlan: '%s'", ifName)
 		return err
@@ -496,8 +505,8 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 		var loopbackMacAddress string
 
 		if he.LoopbackMacAddr == "" { // if not supplied, generate one
-			gMacInstanceID++
-			loopbackMacAddress = formatMacAddress(gMacInstanceID)
+			cnpd.seq.MacInstanceID++
+			loopbackMacAddress = formatMacAddress(cnpd.seq.MacInstanceID)
 
 		} else {
 			loopbackMacAddress = he.LoopbackMacAddr
@@ -942,7 +951,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 
 	// for now just incr the memIfIndex for each pair of memIfs (vnf, vswitch)
 	// vswitch is master of the (vswitch/vnf) pair
-	gMemIfID++
+	cnpd.seq.MemIfID++
 
 	var macAddress string
 	var ipv4Address string
@@ -952,8 +961,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 	if vnfChainElement.Ipv4Addr == "" {
 		if generateAddresses {
 			if sfc.SfcIpv4Prefix == "" {
-				gIPInstanceID++
-				ipv4Address = formatIpv4Address(gIPInstanceID) + "/24"
+				cnpd.seq.IPInstanceID++
+				ipv4Address = formatIpv4Address(cnpd.seq.IPInstanceID) + "/24"
 			}
 		}
 	} else {
@@ -962,8 +971,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 
 	if vnfChainElement.MacAddr == "" {
 		if generateAddresses {
-			gMacInstanceID++
-			macAddress = formatMacAddress(gMacInstanceID)
+			cnpd.seq.MacInstanceID++
+			macAddress = formatMacAddress(cnpd.seq.MacInstanceID)
 		}
 	} else {
 		macAddress = vnfChainElement.MacAddr
@@ -971,7 +980,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 
 	// create a memif in the vnf container
 	memIfName := vnfChainElement.PortLabel
-	if _, err := cnpd.memIfCreate(vnfChainElement.Container, memIfName, gMemIfID,
+	if _, err := cnpd.memIfCreate(vnfChainElement.Container, memIfName, cnpd.seq.MemIfID,
 		false, ipv4Address, macAddress); err != nil {
 		log.Error("createMemIfPair: error creating memIf for container: '%s'", memIfName)
 		return "", err
@@ -979,7 +988,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 
 	// now create a memif for the vpp switch
 	memIfName = "IF_MEMIF_VSWITCH_" + vnfChainElement.Container + "_" + vnfChainElement.PortLabel
-	memIf, err := cnpd.memIfCreate(vnfChainElement.EtcdVppSwitchKey, memIfName, gMemIfID,
+	memIf, err := cnpd.memIfCreate(vnfChainElement.EtcdVppSwitchKey, memIfName, cnpd.seq.MemIfID,
 		true, "", "")
 	if err != nil {
 		log.Error("createMemIfPair: error creating memIf for vpp switch: '%s'", memIf.Name)
@@ -1030,16 +1039,16 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 		// TODO: figure out how ipam, and macam should be done, for now just start at 1 and increment :-(
 		if vnfChainElement.Ipv4Addr == "" {
 			if sfc.SfcIpv4Prefix == "" {
-				gIPInstanceID++
-				ipv4Address = formatIpv4Address(gIPInstanceID) + "/24"
+				cnpd.seq.IPInstanceID++
+				ipv4Address = formatIpv4Address(cnpd.seq.IPInstanceID) + "/24"
 			}
 		} else {
 			ipv4Address = vnfChainElement.Ipv4Addr + "/24"
 		}
 	}
 	if vnfChainElement.MacAddr == "" {
-		gMacInstanceID++
-		macAddress = formatMacAddress(gMacInstanceID)
+		cnpd.seq.MacInstanceID++
+		macAddress = formatMacAddress(cnpd.seq.MacInstanceID)
 
 	} else {
 		macAddress = vnfChainElement.MacAddr
@@ -1070,7 +1079,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 		afPktIf1, err := cnpd.afPacketCreate(vnfChainElement.Container, vnfChainElement.PortLabel,
 			veth1Name, "", "")
 		if err != nil {
-			log.Error("createAFPacketVEthPair: error creating memIf for vpp switch: '%s'", afPktIf1.Name)
+			log.Error("createAFPacketVEthPair: error creating afpacket for vpp switch: '%s'", afPktIf1.Name)
 			return "", err
 		}
 	}
@@ -1079,7 +1088,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 	afPktName := "IF_AFPIF_VSWITCH_" + vnfChainElement.Container + "_" + vnfChainElement.PortLabel
 	afPktIf2, err := cnpd.afPacketCreate(vnfChainElement.EtcdVppSwitchKey, afPktName, veth2Name, "", "")
 	if err != nil {
-		log.Error("createAFPacketVEthPair: error creating memIf for vpp switch: '%s'", afPktIf2.Name)
+		log.Error("createAFPacketVEthPair: error creating afpacket for vpp switch: '%s'", afPktIf2.Name)
 		return "", err
 	}
 

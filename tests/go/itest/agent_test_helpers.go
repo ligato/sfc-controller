@@ -163,9 +163,16 @@ func (t *Then) VppAgentCfgContains(micorserviceLabel string, interfaceBDEtc ...p
 			found, _, err := db.GetValue(key, ifaceExist)
 			gomega.Expect(found).Should(gomega.BeTrue(), "interface not found "+key)
 			gomega.Expect(err).Should(gomega.BeNil(), "error reading "+key)
-			//TODO enable after gettring rid of globals
-			// gomega.Expect(ifaceExist).Should(gomega.BeEquivalentTo(ifaceExpected), "error reading "+key)
+			gomega.Expect(ifaceExist).Should(gomega.BeEquivalentTo(ifaceExpected), "error reading "+key)
 		case *l2.BridgeDomains_BridgeDomain:
+			bdExpected := expected.(*l2.BridgeDomains_BridgeDomain)
+			bdActual := &l2.BridgeDomains_BridgeDomain{}
+
+			key := l2.BridgeDomainKey(bdExpected.Name)
+			found, _, err := db.GetValue(key, bdActual)
+			gomega.Expect(found).Should(gomega.BeTrue(), "bd not found "+key)
+			gomega.Expect(err).Should(gomega.BeNil(), "error reading "+key)
+			gomega.Expect(bdActual).Should(gomega.BeEquivalentTo(bdExpected), "error reading "+key)
 		}
 	}
 }

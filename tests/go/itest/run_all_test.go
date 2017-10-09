@@ -7,6 +7,8 @@ import (
 	"github.com/ligato/sfc-controller/tests/go/itest/sfctestdata"
 	//"github.com/ligato/sfc-controller/tests/go/itest/vpptestdata"
 	"github.com/ligato/sfc-controller/tests/go/itest/vpptestdata"
+	"github.com/ligato/sfc-controller/tests/go/itest/linuxtestdata"
+	"github.com/golang/protobuf/proto"
 )
 
 // Test runs all TC methods of multiple test suites in sequence
@@ -15,16 +17,20 @@ func Test(t *testing.T) {
 
 	go func() {
 		t.Run("basic_tcs", func(t *testing.T) {
-			suite := &basicTCSuite{T: t}
+			VPP1MEMIF2_Loopback_VETH := []proto.Message{&vpptestdata.VPP1MEMIF1,
+				&vpptestdata.VPP1MEMIF2,
+				&vpptestdata.Agent1Afpacket01,
+				&vpptestdata.Agent1Loopback,
+				&linuxtestdata.Agent1Veth01,
+				&vpptestdata.BD_INTERNAL_EW_HOST1}
+
 			t.Run("TC01ResyncEmptyVpp1Agent", func(t *testing.T) {
-				suite.TC01ResyncEmptyVpp1Agent(&sfctestdata.VPP1MEMIF2,
-					&vpptestdata.VPP1MEMIF1,
-				)
+				suite := &basicTCSuite{T: t}
+				suite.TC01ResyncEmptyVpp1Agent(&sfctestdata.VPP1MEMIF2_Loopback_VETH, VPP1MEMIF2_Loopback_VETH...)
 			})
 			t.Run("TC02HTTPPost", func(t *testing.T) {
-				suite.TC02HTTPPost(&sfctestdata.VPP1MEMIF2,
-					&vpptestdata.VPP1MEMIF1,
-				)
+				suite := &basicTCSuite{T: t}
+				suite.TC02HTTPPost(&sfctestdata.VPP1MEMIF2_Loopback_VETH, VPP1MEMIF2_Loopback_VETH...)
 			})
 		})
 		doneChan <- struct{}{}
