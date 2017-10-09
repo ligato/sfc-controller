@@ -65,7 +65,7 @@ type sfcCtlrL2CNPDriver struct {
 // (instead of using global variables that caused
 // problems while running automated tests)
 type sequencer struct {
-	VLanID uint32
+	VLanID        uint32
 	MemIfID       uint32
 	MacInstanceID uint32
 	IPInstanceID  uint32
@@ -100,13 +100,18 @@ type reconcileCacheType struct {
 	l3Routes map[string]l3.StaticRoutes_Route
 }
 
+// NewRemoteClientTxn new vpp-agent remote client instance on top of key-val DB (ETCD)
+// <microserviceLabel> that identifies a specific vpp-agent that needs to be configured
+// <dbFactory> returns new instance of DataBroker for accessing key-val DB (ETCD)
 func NewRemoteClientTxn(microserviceLabel string, dbFactory func(string) keyval.ProtoBroker) linux.DataChangeDSL {
 	prefix := servicelabel.GetDifferentAgentPrefix(microserviceLabel)
 	broker := dbFactory(prefix)
 	return remoteclient.DataChangeRequestDB(broker)
 }
 
-// Init the driver/mode for Native SFC Controller L2 Container Networking Policy
+// NewSfcCtlrL2CNPDriver creates new driver/mode for Native SFC Controller L2 Container Networking Policy
+// <name> of the driver/plugin
+// <dbFactory> returns new instance of DataBroker for accessing key-val DB (ETCD)
 func NewSfcCtlrL2CNPDriver(name string, dbFactory func(string) keyval.ProtoBroker) *sfcCtlrL2CNPDriver {
 
 	cnpd := &sfcCtlrL2CNPDriver{}
