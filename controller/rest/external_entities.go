@@ -105,7 +105,7 @@ func (plugin *SfcControllerRPC) processExternalEntityPost(formatter *render.Rend
 	plugin.RAMConfigCache.PutExternalEntity(&ee)
 
 	//TODO do this outside rest package (watcher)
-	//if err := sfcplg.DatastoreExternalEntityPut(&ee); err != nil {
+	//if err := sfcplg.DatastoreExternalEntityCreate(&ee); err != nil {
 	//	formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
 	//	return
 	//}
