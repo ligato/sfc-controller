@@ -152,16 +152,6 @@ func (cnpd *sfcCtlrL2CNPDriver) initReconcileCache() error {
 	return nil
 }
 
-// Perform plugin specific initializations
-func (cnpd *sfcCtlrL2CNPDriver) InitPlugin() error {
-	return nil
-}
-
-// Cleanup anything as plugin is being de-reged
-func (cnpd *sfcCtlrL2CNPDriver) DeinitPlugin() error {
-	return nil
-}
-
 // Return user friendly name for this plugin
 func (cnpd *sfcCtlrL2CNPDriver) GetName() string {
 	return cnpd.name

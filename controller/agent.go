@@ -26,6 +26,7 @@ import (
 	"github.com/ligato/sfc-controller/controller/core"
 	"github.com/ligato/sfc-controller/plugins/vnfdriver"
 	"time"
+	"github.com/ligato/sfc-controller/controller/cnpdriver"
 )
 
 // NewAgent returns a new instance of the Agent with plugins.
@@ -84,7 +85,7 @@ func (marker *WithPluginsOpt) OptionMarkerCore() {}
 // for different flavours. The plugins are initialized in the same order as they appear
 // in the structure.
 type FlavorSFCFull struct {
-	local.FlavorLocal
+	*local.FlavorLocal
 	HTTP      rest.Plugin
 	HealthRPC probe.Plugin
 	LogMngRPC logmanager.Plugin
@@ -103,6 +104,9 @@ func (f *FlavorSFCFull) Inject() bool {
 		return false
 	}
 
+	if f.FlavorLocal == nil {
+		f.FlavorLocal = &local.FlavorLocal{}
+	}
 	f.FlavorLocal.Inject()
 
 	httpInfraDeps := f.InfraDeps("http", local.WithConf())
@@ -123,6 +127,9 @@ func (f *FlavorSFCFull) Inject() bool {
 
 	f.ETCD.Deps.PluginInfraDeps = *f.InfraDeps("etcdv3")
 
+	if f.Sfc.CNPDriver == nil {
+		f.Sfc.CNPDriver = cnpdriver.NewSfcCtlrL2CNPDriver("sfcctlrl2", f.ETCD.NewBroker)
+	}
 	f.Sfc.Etcd = &f.ETCD
 	f.Sfc.HTTPmux = &f.HTTP
 

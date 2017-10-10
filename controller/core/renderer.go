@@ -67,7 +67,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderConfigFromRamCache() erro
 		}
 	}
 
-	sfcCtrlPlugin.cnpDriverPlugin.Dump()
+	sfcCtrlPlugin.CNPDriver.Dump()
 
 	return nil
 }
@@ -83,13 +83,13 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderExternalEntity(ee *contro
 
 	if configOnlyEE {
 		log.Infof("WireInternalsForExternalEntity: ee:'%s'", ee.Name)
-		sfcCtrlPlugin.cnpDriverPlugin.WireInternalsForExternalEntity(ee)
+		sfcCtrlPlugin.CNPDriver.WireInternalsForExternalEntity(ee)
 	}
 
 	if wireToOtherEntities {
 		for _, he := range sfcCtrlPlugin.ramConfigCache.HEs {
 			log.Infof("WireHostEntityToExternalEntity: he:'%s' to ee:'%s'", he.Name, ee.Name)
-			sfcCtrlPlugin.cnpDriverPlugin.WireHostEntityToExternalEntity(&he, ee)
+			sfcCtrlPlugin.CNPDriver.WireHostEntityToExternalEntity(&he, ee)
 		}
 	}
 
@@ -106,24 +106,24 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderHostEntity(sh *controller
 
 	if configOnlyHE {
 		log.Infof("WireInternalsForHostEntity: he:'%s'", sh.Name)
-		sfcCtrlPlugin.cnpDriverPlugin.WireInternalsForHostEntity(sh)
+		sfcCtrlPlugin.CNPDriver.WireInternalsForHostEntity(sh)
 	}
 
 	if wireToOtherEntities {
 		for _, ee := range sfcCtrlPlugin.ramConfigCache.EEs {
 			log.Infof("WireHostEntityToExternalEntity: he:'%s' to ee:'%s'/'%s'",
 				sh.Name, ee.Name, ee.MgmntIpAddress)
-			sfcCtrlPlugin.cnpDriverPlugin.WireHostEntityToExternalEntity(sh, &ee)
+			sfcCtrlPlugin.CNPDriver.WireHostEntityToExternalEntity(sh, &ee)
 		}
 
 		for _, dh := range sfcCtrlPlugin.ramConfigCache.HEs {
 			if *sh != dh {
 				log.Infof("WireHostEntityToDestinationHostEntity: sh:'%s' to dh:'%s'",
 					sh.Name, dh.Name)
-				sfcCtrlPlugin.cnpDriverPlugin.WireHostEntityToDestinationHostEntity(sh, &dh)
+				sfcCtrlPlugin.CNPDriver.WireHostEntityToDestinationHostEntity(sh, &dh)
 				log.Infof("WireHostEntityToDestinationHostEntity: dh:'%s' to sh:'%s'",
 					dh.Name, sh.Name)
-				sfcCtrlPlugin.cnpDriverPlugin.WireHostEntityToDestinationHostEntity(&dh, sh)
+				sfcCtrlPlugin.CNPDriver.WireHostEntityToDestinationHostEntity(&dh, sh)
 			}
 		}
 	}
@@ -144,7 +144,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderServiceFunctionEntity(sfc
 
 	log.Infof("renderServiceFunctionEntity: WireSfcEntities: for '%s'/'%s'",
 		sfc.Name, sfc.Description)
-	if err := sfcCtrlPlugin.cnpDriverPlugin.WireSfcEntity(sfc); err != nil {
+	if err := sfcCtrlPlugin.CNPDriver.WireSfcEntity(sfc); err != nil {
 		return err
 	}
 

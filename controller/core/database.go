@@ -270,7 +270,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityDeleteAll() e
 	return sfcCtrlPlugin.DatastoreSfcEntityIterate(func(name string, sfc *controller.SfcEntity) {
 		key := controller.SfcEntityNameKey(name)
 		log.Infof("DatastoreSfcEntityDeleteAll: deleting sfc: '%s': ", key, *sfc)
-		sfcCtrlPlugin.db.Delete(key)//TODO move to DatastoreSfcEntityDelete
+		sfcCtrlPlugin.db.Delete(key) //TODO move to DatastoreSfcEntityDelete
 	})
 }
 

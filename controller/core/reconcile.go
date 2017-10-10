@@ -38,7 +38,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileInit() error {
 	return nil
 }
 
-// ReconcileStart: init the reconcile procedure for all plguins
+// ReconcileStart: init the reconcile procedure for all plugins
 func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileStart() error {
 
 	log.Info("ReconcileStart: enter ...")
@@ -49,7 +49,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileStart() error {
 	}
 	sfcCtrlPlugin.ReconcileLoadAllVppLabels()
 
-	sfcCtrlPlugin.cnpDriverPlugin.ReconcileStart(sfcCtrlPlugin.ReconcileVppLabelsMap)
+	sfcCtrlPlugin.CNPDriver.ReconcileStart(sfcCtrlPlugin.ReconcileVppLabelsMap)
 
 	return nil
 }
@@ -60,7 +60,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileEnd() error {
 	log.Info("ReconcileEnd: begin ...")
 	defer log.Info("ReconcileEnd: exit ...")
 
-	sfcCtrlPlugin.cnpDriverPlugin.ReconcileEnd()
+	sfcCtrlPlugin.CNPDriver.ReconcileEnd()
 
 	return nil
 }

@@ -23,15 +23,7 @@
 package cnpdriver
 
 import (
-	"errors"
-	"fmt"
-	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/sfc-controller/controller/model/controller"
-)
-
-var (
-	cnpDriverRegistered = false
-	cnpDriverName       string
 )
 
 // Each Container Networking Policy (CNP) Driver implements this interface.  As n/b api's
@@ -41,8 +33,6 @@ var (
 // sfc controller natively supports its own container networking policy driver for both
 // l3 and l2 overlays.
 type SfcControllerCNPDriverAPI interface {
-	InitPlugin() error
-	DeinitPlugin() error
 	GetName() string
 	ReconcileStart(vppEtcdLabels map[string]struct{}) error
 	ReconcileEnd() error
@@ -52,34 +42,4 @@ type SfcControllerCNPDriverAPI interface {
 	WireInternalsForExternalEntity(ee *controller.ExternalEntity) error
 	WireSfcEntity(sfc *controller.SfcEntity) error
 	Dump()
-}
-
-// Register the container networking policy driver mode: example: sfcctlr layer 2, ...
-func RegisterCNPDriverPlugin(name string, dbFactory func(string) keyval.ProtoBroker) (SfcControllerCNPDriverAPI, error) {
-
-	var cnpDriverAPI SfcControllerCNPDriverAPI
-
-	if cnpDriverRegistered {
-		//Commented out because of the test (global variables make testing hard)
-		//This change should not harm normal production code.
-		//errMsg := fmt.Sprintf("RegisterCNPDriverPlugin: CNPDriver '%s' is currently registered", cnpDriverName)
-		//log.Error(errMsg)
-		//return nil, errors.New(errMsg)
-	}
-
-	switch name {
-	case "sfcctlrl2":
-		cnpDriverAPI = NewSfcCtlrL2CNPDriver(name, dbFactory)
-	case "sfcctlrl3":
-		cnpDriverAPI = NewSfcCtlrL3CNPDriver(name)
-	default:
-		errMsg := fmt.Sprintf("RegisterCNPDriverPlugin: CNPDriver '%s' not recognized", name)
-		log.Error(errMsg)
-		return nil, errors.New(errMsg)
-	}
-
-	cnpDriverName = name
-	cnpDriverRegistered = true
-
-	return cnpDriverAPI, nil
 }

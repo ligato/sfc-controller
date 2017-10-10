@@ -36,7 +36,6 @@ import (
 const PluginID core.PluginName = "SfcController"
 
 var (
-	cnpDriverName     string // cli flag - see RegisterFlags
 	sfcConfigFile     string // cli flag - see RegisterFlags
 	cleanSfcDatastore bool   // cli flag - see RegisterFlags
 	log               = logroot.StandardLogger()
@@ -44,8 +43,6 @@ var (
 
 // Add command line flags here.
 func RegisterFlags() {
-	flag.StringVar(&cnpDriverName, "cnp-driver", "sfcctlrl2",
-		"Container Networking Policy driver: sfcctlrl2, sfcctlrl3")
 	flag.StringVar(&sfcConfigFile, "sfc-config", "",
 		"Name of a sfc config (yaml) file to load at startup")
 	flag.BoolVar(&cleanSfcDatastore, "clean", false,
@@ -55,7 +52,6 @@ func RegisterFlags() {
 // Dump the command line flags
 func LogFlags() {
 	log.Debugf("LogFlags:")
-	log.Debugf("\tcnpDriver:'%s'", cnpDriverName)
 	log.Debugf("\tsfcConfigFile:'%s'", sfcConfigFile)
 }
 
@@ -78,16 +74,23 @@ type SfcControllerCacheType struct {
 	SFCs map[string]controller.SfcEntity
 }
 
+// SfcControllerPluginHandler glues together:
+// CNP Driver, ext. entity driver, VNF Driver, ETCD, HTTP, SFC config
 type SfcControllerPluginHandler struct {
-	Etcd    *etcdv3.Plugin
-	HTTPmux *rest.Plugin
+	Deps
 
-	cnpDriverPlugin       cnpdriver.SfcControllerCNPDriverAPI
 	yamlConfig            *YamlConfig
 	ramConfigCache        SfcControllerCacheType
 	controllerReady       bool
 	db                    keyval.ProtoBroker
 	ReconcileVppLabelsMap ReconcileVppLabelsMapType
+}
+
+// Deps are SfcControllerPluginHandler injected dependencies
+type Deps struct {
+	Etcd      *etcdv3.Plugin                      //inject
+	HTTPmux   *rest.Plugin                        //inject
+	CNPDriver cnpdriver.SfcControllerCNPDriverAPI //inject
 }
 
 // Init the controller, read the db, reconcile/resync, render config to etcd
@@ -114,14 +117,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 	// register northbound controller API's
 	sfcCtrlPlugin.InitHttpHandlers()
 
-	sfcCtrlPlugin.cnpDriverPlugin, err = cnpdriver.RegisterCNPDriverPlugin(cnpDriverName,
-		func(prefix string) keyval.ProtoBroker { return sfcCtrlPlugin.Etcd.NewBroker(prefix) })
-	if err != nil {
-		log.Error("error loading cnp driver sfcCtrlPlugin", err)
-		return err
-	}
-
-	log.Infof("CNP Driver: %s", sfcCtrlPlugin.cnpDriverPlugin.GetName())
+	log.Infof("CNP Driver: %s", sfcCtrlPlugin.CNPDriver.GetName())
 
 	sfcCtrlPlugin.ReconcileInit()
 
