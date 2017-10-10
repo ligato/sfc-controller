@@ -30,7 +30,6 @@ import (
 	"github.com/ligato/sfc-controller/controller/extentitydriver"
 	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/namsral/flag"
-	"os"
 )
 
 // Plugin identifier (must be unique throughout the system)
@@ -119,7 +118,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 		func(prefix string) keyval.ProtoBroker { return sfcCtrlPlugin.Etcd.NewBroker(prefix) })
 	if err != nil {
 		log.Error("error loading cnp driver sfcCtrlPlugin", err)
-		os.Exit(1)
+		return err
 	}
 
 	log.Infof("CNP Driver: %s", sfcCtrlPlugin.cnpDriverPlugin.GetName())
@@ -131,7 +130,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 	// read config database into ramCache
 	if err := sfcCtrlPlugin.ReadEtcdDatastoreIntoRamCache(); err != nil {
 		log.Error("error reading etcd config into ram cache: ", err)
-		os.Exit(1)
+		return err
 	}
 
 	// If a startup yaml file is provided, then pull it into the ram cache and write it to the database
@@ -141,29 +140,29 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 
 		if err := sfcCtrlPlugin.readConfigFromFile(sfcConfigFile); err != nil {
 			log.Error("error loading config: ", err)
-			os.Exit(1)
+			return err
 		}
 
 		if err := sfcCtrlPlugin.copyYamlConfigToRamCache(); err != nil {
 			log.Error("error copying config to ram cache: ", err)
-			os.Exit(1)
+			return err
 		}
 
 		if err := sfcCtrlPlugin.validateRamCache(); err != nil {
 			log.Error("error validating ram cache: ", err)
-			os.Exit(1)
+			return err
 		}
 
 		if err := sfcCtrlPlugin.WriteRamCacheToEtcd(); err != nil {
 			log.Error("error writing ram config to etcd datastore: ", err)
-			os.Exit(1)
+			return err
 		}
 
 	}
 
 	if err = sfcCtrlPlugin.renderConfigFromRamCache(); err != nil {
 		log.Error("error copying config to ram cache: ", err)
-		os.Exit(1)
+		return err
 	}
 
 	sfcCtrlPlugin.ReconcileEnd()
