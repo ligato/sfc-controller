@@ -130,7 +130,7 @@ func processExternalEntityPost(formatter *render.Render, w http.ResponseWriter, 
 
 	sfcplg.ramConfigCache.EEs[vars[entityName]] = ee
 
-	if err := sfcplg.DatastoreExternalEntityCreate(&ee); err != nil {
+	if err := sfcplg.DatastoreExternalEntityPut(&ee); err != nil {
 		formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
 		return
 	}
@@ -214,7 +214,7 @@ func processHostEntityPost(formatter *render.Render, w http.ResponseWriter, req 
 	}
 	sfcplg.ramConfigCache.HEs[vars[entityName]] = he
 
-	if err := sfcplg.DatastoreHostEntityCreate(&he); err != nil {
+	if err := sfcplg.DatastoreHostEntityPut(&he); err != nil {
 		formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
 		return
 	}
@@ -300,7 +300,7 @@ func processSfcChainPost(formatter *render.Render, w http.ResponseWriter, req *h
 
 	sfcplg.ramConfigCache.SFCs[vars[entityName]] = sfc
 
-	if err := sfcplg.DatastoreSfcEntityCreate(&sfc); err != nil {
+	if err := sfcplg.DatastoreSfcEntityPut(&sfc); err != nil {
 		formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
 		return
 	}

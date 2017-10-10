@@ -96,7 +96,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 
 	sfcCtrlPlugin.db = sfcCtrlPlugin.Etcd.NewBroker(keyval.Root)
 
-	sfcCtrlPlugin.InitRamCache()
+	sfcCtrlPlugin.initRamCache()
 
 	extentitydriver.SfcExternalEntityDriverInit()
 
@@ -109,7 +109,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 
 	// if -clean then remove the sfc controller datastore, reconcile will remove all extraneous i/f's, BD's etc
 	if cleanSfcDatastore {
-		sfcCtrlPlugin.DatastoreReInitialize()
+		sfcCtrlPlugin.DatastoreClean()
 	}
 
 	// register northbound controller API's
@@ -174,7 +174,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 }
 
 // create the ram cache
-func (sfcCtrlPlugin *SfcControllerPluginHandler) InitRamCache() {
+func (sfcCtrlPlugin *SfcControllerPluginHandler) initRamCache() {
 	sfcCtrlPlugin.ramConfigCache.EEs = make(map[string]controller.ExternalEntity)
 	sfcCtrlPlugin.ramConfigCache.HEs = make(map[string]controller.HostEntity)
 	sfcCtrlPlugin.ramConfigCache.SFCs = make(map[string]controller.SfcEntity)

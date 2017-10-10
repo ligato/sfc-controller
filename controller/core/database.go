@@ -32,17 +32,17 @@ import (
 func (sfcCtrlPlugin *SfcControllerPluginHandler) WriteRamCacheToEtcd() error {
 
 	for _, ee := range sfcCtrlPlugin.ramConfigCache.EEs {
-		if err := sfcCtrlPlugin.DatastoreExternalEntityCreate(&ee); err != nil {
+		if err := sfcCtrlPlugin.DatastoreExternalEntityPut(&ee); err != nil {
 			return err
 		}
 	}
 	for _, he := range sfcCtrlPlugin.ramConfigCache.HEs {
-		if err := sfcCtrlPlugin.DatastoreHostEntityCreate(&he); err != nil {
+		if err := sfcCtrlPlugin.DatastoreHostEntityPut(&he); err != nil {
 			return err
 		}
 	}
 	for _, sfc := range sfcCtrlPlugin.ramConfigCache.SFCs {
-		if err := sfcCtrlPlugin.DatastoreSfcEntityCreate(&sfc); err != nil {
+		if err := sfcCtrlPlugin.DatastoreSfcEntityPut(&sfc); err != nil {
 			return err
 		}
 	}
@@ -71,34 +71,34 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) ReadEtcdDatastoreIntoRamCache()
 }
 
 // clear the sfc tree in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreReInitialize() error {
+func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreClean() error {
 
-	log.Infof("DatastoreReInitialize: clearing etc tree")
+	log.Infof("DatastoreClean: clearing etc tree")
 
 	if err := sfcCtrlPlugin.DatastoreExternalEntityDeleteAll(); err != nil {
-		log.Error("DatastoreReInitialize: DatastoreExternalEntityDeleteAll: ", err)
+		log.Error("DatastoreClean: DatastoreExternalEntityDeleteAll: ", err)
 	}
 	if err := sfcCtrlPlugin.DatastoreHostEntityDeleteAll(); err != nil {
-		log.Error("DatastoreReInitialize: DatastoreHostEntityDeleteAll: ", err)
+		log.Error("DatastoreClean: DatastoreHostEntityDeleteAll: ", err)
 	}
 	if err := sfcCtrlPlugin.DatastoreSfcEntityDeleteAll(); err != nil {
-		log.Error("DatastoreReInitialize: DatastoreSfcEntityDeleteAll: ", err)
+		log.Error("DatastoreClean: DatastoreSfcEntityDeleteAll: ", err)
 	}
 
 	return nil
 }
 
 // create the specified entity in the sfc db in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreExternalEntityCreate(ee *controller.ExternalEntity) error {
+func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreExternalEntityPut(ee *controller.ExternalEntity) error {
 
 	name := controller.ExternalEntityNameKey(ee.Name)
 
-	log.Infof("DatastoreExternalEntityCreate: setting key: '%s'", name)
+	log.Infof("DatastoreExternalEntityPut: setting key: '%s'", name)
 
 	err := sfcCtrlPlugin.db.Put(name, ee)
 	if err != nil {
-		log.Error("DatastoreExternalEntityCreate: error storing key: '%s'", name)
-		log.Error("DatastoreExternalEntityCreate: databroker put: ", err)
+		log.Error("DatastoreExternalEntityPut: error storing key: '%s'", name)
+		log.Error("DatastoreExternalEntityPut: databroker put: ", err)
 		return err
 	}
 	return nil
@@ -154,12 +154,6 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreExternalEntityIterate(
 	return nil
 }
 
-// Update the specified entity in the sfc db in the etcd tree
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreExternalEntityUpdate(ee *controller.ExternalEntity) error {
-
-	return nil
-}
-
 // Delete the specified entity from the sfc db in the etcd tree
 func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreExternalEntityDelete(ee *controller.ExternalEntity) error {
 
@@ -167,16 +161,16 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreExternalEntityDelete(e
 }
 
 // create the specified entity in the sfc db in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreHostEntityCreate(he *controller.HostEntity) error {
+func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreHostEntityPut(he *controller.HostEntity) error {
 
 	name := controller.HostEntityNameKey(he.Name)
 
-	log.Infof("DatastoreHostEntityCreate: setting key: '%s'", name)
+	log.Infof("DatastoreHostEntityPut: setting key: '%s'", name)
 
 	err := sfcCtrlPlugin.db.Put(name, he)
 	if err != nil {
-		log.Error("DatastoreHostEntityCreate: error storing key: '%s'", name)
-		log.Error("DatastoreHostEntityCreate: databroker put: ", err)
+		log.Error("DatastoreHostEntityPut: error storing key: '%s'", name)
+		log.Error("DatastoreHostEntityPut: databroker put: ", err)
 		return err
 	}
 	return nil
@@ -233,12 +227,6 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreHostEntityIterate(acti
 	return nil
 }
 
-// Update the specified entity in the sfc db in the etcd tree
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreHostEntityUpdate(ee *controller.HostEntity) error {
-
-	return nil
-}
-
 // Delete the specified entity from the sfc db in the etcd tree
 func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreHostEntityDelete(ee *controller.HostEntity) error {
 
@@ -246,16 +234,16 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreHostEntityDelete(ee *c
 }
 
 // create the specified entity in the sfc db in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityCreate(sfc *controller.SfcEntity) error {
+func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityPut(sfc *controller.SfcEntity) error {
 
 	name := controller.SfcEntityNameKey(sfc.Name)
 
-	log.Infof("DatastoreSfcEntityCreate: setting key: '%s'", name)
+	log.Infof("DatastoreSfcEntityPut: setting key: '%s'", name)
 
 	err := sfcCtrlPlugin.db.Put(name, sfc)
 	if err != nil {
-		log.Error("DatastoreSfcEntityCreate: error storing key: '%s'", name)
-		log.Error("DatastoreSfcEntityCreate: databroker put: ", err)
+		log.Error("DatastoreSfcEntityPut: error storing key: '%s'", name)
+		log.Error("DatastoreSfcEntityPut: databroker put: ", err)
 		return err
 	}
 
@@ -274,13 +262,15 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityRetrieveAllIn
 // remove the specified entities from the sfc db in etcd
 func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityDeleteAll() error {
 
+	//TODO DELETE ALL could delete all key by prefixes db.Delete(prefix, WithPrefix())
+
 	log.Info("DatastoreSfcEntityDeleteAll: begin ...")
 	defer log.Info("DatastoreSfcEntityDeleteAll: exit ...")
 
 	return sfcCtrlPlugin.DatastoreSfcEntityIterate(func(name string, sfc *controller.SfcEntity) {
 		key := controller.SfcEntityNameKey(name)
 		log.Infof("DatastoreSfcEntityDeleteAll: deleting sfc: '%s': ", key, *sfc)
-		sfcCtrlPlugin.db.Delete(key)
+		sfcCtrlPlugin.db.Delete(key)//TODO move to DatastoreSfcEntityDelete
 	})
 }
 
@@ -310,12 +300,6 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityIterate(actio
 		actionFunc(sfc.Name, sfc)
 
 	}
-	return nil
-}
-
-// Update the specified entity in the sfc db in the etcd tree
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityUpdate(ee *controller.HostEntity) error {
-
 	return nil
 }
 
