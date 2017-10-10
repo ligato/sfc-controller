@@ -5,7 +5,7 @@ import (
 	"github.com/ligato/sfc-controller/controller/model/controller"
 )
 
-var VPP1MEMIF2 = sfccore.YamlConfig{
+var VPP1MEMIF2_Loopback_VETH = sfccore.YamlConfig{
 	HEs: []controller.HostEntity{{
 		Name: "HOST-1",
 		//mgmnt_ip_address: "192.168.0.1",
