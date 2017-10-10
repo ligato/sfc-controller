@@ -18,13 +18,67 @@ import (
 	agent_api "github.com/ligato/cn-infra/core"
 	"github.com/ligato/cn-infra/db/keyval/etcdv3"
 	"github.com/ligato/cn-infra/flavors/local"
+	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/logging/logmanager"
 
 	"github.com/ligato/cn-infra/rpc/rest"
 	"github.com/ligato/cn-infra/health/probe"
 	"github.com/ligato/sfc-controller/controller/core"
 	"github.com/ligato/sfc-controller/plugins/vnfdriver"
+	"time"
 )
+
+// NewAgent returns a new instance of the Agent with plugins.
+// <opts> example NewAgent(WithCustomPlugin(func(flavor *FlavorSFCFull) {
+//     return []*NamedPlugin{{"MyCustom", MyCustomPlugin{flavor.PluginXY}}
+// })
+func NewAgent(opts ...agent_api.Option) *agent_api.Agent {
+	flavor := &FlavorSFCFull{}
+	plugins := flavor.Plugins()
+
+	var agentCoreLogger logging.Logger
+	maxStartup := 15 * time.Second
+
+	for _, opt := range opts {
+		switch opt.(type) {
+		case pluginsLister:
+			plugins = append(plugins, opt.(pluginsLister).Plugins(flavor)...)
+		case *agent_api.WithTimeoutOpt:
+			ms := opt.(*agent_api.WithTimeoutOpt).Timeout
+			if ms > 0 {
+				maxStartup = ms
+			}
+		case *agent_api.WithLoggerOpt:
+			agentCoreLogger = opt.(*agent_api.WithLoggerOpt).Logger
+		}
+	}
+
+	if agentCoreLogger == nil {
+		agentCoreLogger = flavor.LoggerFor("agent_core")
+	}
+
+	return agent_api.NewAgent(agentCoreLogger, maxStartup, plugins...)
+}
+
+type pluginsLister interface {
+	Plugins(*FlavorSFCFull) []*agent_api.NamedPlugin
+}
+
+// WithPluginsOpt is return value of WithPlugins() utility
+// to define option of SFC Controller NewAgent().
+type WithPluginsOpt struct {
+	ListPlugins func(*FlavorSFCFull) []*agent_api.NamedPlugin
+}
+
+// WithPlugins for adding custom plugins to SFC Controller
+// <ListPlugins> is a callback that uses flavor input to
+// inject dependencies for custom plugins that are in output
+func WithPlugins(listPlugins func(*FlavorSFCFull) []*agent_api.NamedPlugin) *WithPluginsOpt {
+	return &WithPluginsOpt{listPlugins}
+}
+
+// OptionMarkerCore is just for marking implementation that it implements this interface
+func (marker *WithPluginsOpt) OptionMarkerCore() {}
 
 // FlavorSFCFull is set of common used generic plugins. This flavour can be used as a base
 // for different flavours. The plugins are initialized in the same order as they appear

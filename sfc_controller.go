@@ -18,8 +18,6 @@
 package main
 
 import (
-	"time"
-
 	agent_api "github.com/ligato/cn-infra/core"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/logging/logroot"
@@ -42,8 +40,6 @@ func init() {
 }
 
 func main() {
-
-	f := controller.FlavorSFCFull{}
-	agent := agent_api.NewAgent(log, 15*time.Second, f.Plugins()...)
+	agent := controller.NewAgent()
 	agent_api.EventLoopWithInterrupt(agent, nil)
 }
