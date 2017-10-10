@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package rest
+package rpc
 
 import (
 	"encoding/json"
@@ -23,8 +23,8 @@ import (
 	"net/http"
 )
 
-// ExternalEntityIdx thread-safe access to RAM Cache
-type ExternalEntityIdx interface {
+// ExternalEntityIdxRW thread-safe access to RAM Cache
+type ExternalEntityIdxRW interface {
 	GetExternalEntity(externalEntityName string) (entity *controller.ExternalEntity, found bool)
 	PutExternalEntity(*controller.ExternalEntity)
 	ListExternalEntities() []*controller.ExternalEntity
@@ -40,7 +40,7 @@ func (plugin *SfcControllerRPC) externalEntitiesHandler(formatter *render.Render
 			req.Method, req.URL)
 
 		var eeArray = make([]controller.ExternalEntity, 0)
-		for _, ee := range plugin.RAMConfigCache.ListExternalEntities() {
+		for _, ee := range plugin.SFCNorthbound.ListExternalEntities() {
 			eeArray = append(eeArray, *ee)
 		}
 		switch req.Method {
@@ -62,7 +62,7 @@ func (plugin *SfcControllerRPC) externalEntityHandler(formatter *render.Render) 
 		case "GET":
 			vars := mux.Vars(req)
 
-			if ee, exists := plugin.RAMConfigCache.GetExternalEntity(vars[entityName]); exists {
+			if ee, exists := plugin.SFCNorthbound.GetExternalEntity(vars[entityName]); exists {
 				formatter.JSON(w, http.StatusOK, ee)
 			} else {
 				formatter.JSON(w, http.StatusNotFound, "external entity does not found:"+vars[entityName])
@@ -90,7 +90,7 @@ func (plugin *SfcControllerRPC) processExternalEntityPost(formatter *render.Rend
 		return
 	}
 
-	if err := plugin.RAMConfigCache.ValidateExternalEntity(&ee); err != nil {
+	if err := plugin.SFCNorthbound.ValidateExternalEntity(&ee); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
@@ -102,7 +102,7 @@ func (plugin *SfcControllerRPC) processExternalEntityPost(formatter *render.Rend
 		return
 	}
 
-	plugin.RAMConfigCache.PutExternalEntity(&ee)
+	plugin.SFCNorthbound.PutExternalEntity(&ee)
 
 	//TODO do this outside rest package (watcher)
 	//if err := sfcplg.DatastoreExternalEntityCreate(&ee); err != nil {

@@ -27,6 +27,7 @@ import (
 	"github.com/ligato/sfc-controller/plugins/vnfdriver"
 	"time"
 	"github.com/ligato/sfc-controller/controller/cnpdriver"
+	"github.com/ligato/sfc-controller/controller/rpc"
 )
 
 // NewAgent returns a new instance of the Agent with plugins.
@@ -92,6 +93,7 @@ type FlavorSFCFull struct {
 	ETCD      etcdv3.Plugin
 
 	Sfc       core.SfcControllerPluginHandler
+	SfcRPC    rpc.SfcControllerRPC
 	VNFDriver vnfdriver.Plugin
 
 	injected bool
@@ -130,8 +132,10 @@ func (f *FlavorSFCFull) Inject() bool {
 	if f.Sfc.CNPDriver == nil {
 		f.Sfc.CNPDriver = cnpdriver.NewSfcCtlrL2CNPDriver("sfcctlrl2", f.ETCD.NewBroker)
 	}
-	f.Sfc.Etcd = &f.ETCD
-	f.Sfc.HTTPmux = &f.HTTP
+	f.Sfc.Deps.Etcd = &f.ETCD
+	f.SfcRPC.Deps.HTTP = &f.HTTP
+	f.SfcRPC.Deps.PluginLogDeps = *f.LogDeps("sfc-rpc")
+	f.SfcRPC.Deps.SFCNorthbound = &f.Sfc
 
 	f.VNFDriver.Etcd = &f.ETCD
 	f.VNFDriver.HTTPmux = &f.HTTP

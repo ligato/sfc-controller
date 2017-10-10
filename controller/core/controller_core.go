@@ -21,10 +21,8 @@ package core
 import (
 	"github.com/ligato/cn-infra/core"
 	"github.com/ligato/cn-infra/db/keyval"
-	"github.com/ligato/cn-infra/db/keyval/etcdv3"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/logging/logroot"
-	"github.com/ligato/cn-infra/rpc/rest"
 	"github.com/ligato/cn-infra/utils/safeclose"
 	"github.com/ligato/sfc-controller/controller/cnpdriver"
 	"github.com/ligato/sfc-controller/controller/extentitydriver"
@@ -88,8 +86,7 @@ type SfcControllerPluginHandler struct {
 
 // Deps are SfcControllerPluginHandler injected dependencies
 type Deps struct {
-	Etcd      *etcdv3.Plugin                      //inject
-	HTTPmux   *rest.Plugin                        //inject
+	Etcd      keyval.KvProtoPlugin                //inject
 	CNPDriver cnpdriver.SfcControllerCNPDriverAPI //inject
 }
 
@@ -113,9 +110,6 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 	if cleanSfcDatastore {
 		sfcCtrlPlugin.DatastoreClean()
 	}
-
-	// register northbound controller API's
-	sfcCtrlPlugin.InitHttpHandlers()
 
 	log.Infof("CNP Driver: %s", sfcCtrlPlugin.CNPDriver.GetName())
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package rest
+package rpc
 
 import (
 	"fmt"
@@ -36,16 +36,16 @@ type SfcControllerRPC struct {
 
 // Deps contains all injected dependencies of SfcControllerRPC
 type Deps struct {
-	HTTP           rest.HTTPHandlers //inject
-	local.PluginInfraDeps            //inject
-	RAMConfigCache RamConfigCacheRW  //inject
+	HTTP          rest.HTTPHandlers //inject
+	local.PluginLogDeps             //inject
+	SFCNorthbound SFCNorthboundRW   //inject
 }
 
-// RamConfigCacheRW allows to Get/Put External Entity, SFC Entity, Host Entity
-type RamConfigCacheRW interface {
-	ExternalEntityIdx
-	SFCEntityIdx
-	HostEntityIdx
+// SFCAPI allows to Get/Put External Entity, SFC Entity, Host Entity
+type SFCNorthboundRW interface {
+	ExternalEntityIdxRW
+	SFCEntityIdxRW
+	HostEntityIdxRW
 }
 
 // Init registers the handler funcs for GET and POST, TODO PUT/DELETE

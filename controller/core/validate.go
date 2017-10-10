@@ -25,17 +25,17 @@ import (
 func (sfcCtrlPlugin *SfcControllerPluginHandler) validateRamCache() error {
 
 	for _, ee := range sfcCtrlPlugin.ramConfigCache.EEs {
-		if err := sfcCtrlPlugin.validateEE(&ee); err != nil {
+		if err := sfcCtrlPlugin.ValidateExternalEntity(&ee); err != nil {
 			return err
 		}
 	}
 	for _, he := range sfcCtrlPlugin.ramConfigCache.HEs {
-		if err := sfcCtrlPlugin.validateHE(&he); err != nil {
+		if err := sfcCtrlPlugin.ValidateHostEntity(&he); err != nil {
 			return err
 		}
 	}
 	for _, sfc := range sfcCtrlPlugin.ramConfigCache.SFCs {
-		if err := sfcCtrlPlugin.validateSFC(&sfc); err != nil {
+		if err := sfcCtrlPlugin.ValidateSFCEntity(&sfc); err != nil {
 			return err
 		}
 	}
@@ -43,8 +43,8 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) validateRamCache() error {
 	return nil
 }
 
-// validate the External Router, TODO: perform better/complete validation
-func (sfcCtrlPlugin *SfcControllerPluginHandler) validateEE(ee *controller.ExternalEntity) error {
+// ValidateExternalEntity validates the External Router, TODO: perform better/complete validation
+func (sfcCtrlPlugin *SfcControllerPluginHandler) ValidateExternalEntity(ee *controller.ExternalEntity) error {
 
 	if ee.Name == "" {
 		err := fmt.Errorf("Missing entity name")
@@ -57,8 +57,8 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) validateEE(ee *controller.Exter
 	return nil
 }
 
-// validate the Host Entity, TODO: perform better/complete validation
-func (sfcCtrlPlugin *SfcControllerPluginHandler) validateHE(he *controller.HostEntity) error {
+// ValidateHostEntity validates the Host Entity, TODO: perform better/complete validation
+func (sfcCtrlPlugin *SfcControllerPluginHandler) ValidateHostEntity(he *controller.HostEntity) error {
 
 	if he.Name == "" {
 		err := fmt.Errorf("Missing entity name")
@@ -68,8 +68,8 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) validateHE(he *controller.HostE
 	return nil
 }
 
-// validate the SFC, TODO: perform better/complete validation
-func (sfcCtrlPlugin *SfcControllerPluginHandler) validateSFC(sfc *controller.SfcEntity) error {
+// ValidateSFCEntity validates the SFC, TODO: perform better/complete validation
+func (sfcCtrlPlugin *SfcControllerPluginHandler) ValidateSFCEntity(sfc *controller.SfcEntity) error {
 
 	if sfc.Name == "" {
 		err := fmt.Errorf("Missing entity name")
@@ -79,10 +79,10 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) validateSFC(sfc *controller.Sfc
 	if numSfcElements <= 0 {
 		return nil
 	}
-	log.Debugf("validateSFC: sfc=", sfc)
+	log.Debugf("ValidateSFCEntity: sfc=", sfc)
 
 	//for i, sfcChainElement := range sfc.GetElements() {
-	//	log.Debugf("validateSFC: sfc_chain_element[%d]=", i, sfcChainElement)
+	//	log.Debugf("ValidateSFCEntity: sfc_chain_element[%d]=", i, sfcChainElement)
 	//	if sfcChainElement.Type == controller.SfcElementType_EXTERNAL_ENTITY {
 	//		if i > 0 && i < numSfcElements-1 {
 	//			err := fmt.Errorf("External entity cannot be inside the chain: i='%d', sfcElement:'%s'",

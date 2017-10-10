@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package rest contains SFC Controller HTTP REST handlers implementation.
+// Package rpc contains SFC Controller HTTP REST handlers implementation.
 // The model for the controller in
 // ligato/sfc-controller/controller/model drives the REST interface.  The
 // model is described in the protobuf file.  Each of the entites like hosts,
 // external routers, and SFC's can be configrued (CRUDed) via REST calls.
-package rest
+package rpc

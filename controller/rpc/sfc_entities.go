@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package rest
+package rpc
 
 import (
 	"encoding/json"
@@ -23,93 +23,95 @@ import (
 	"net/http"
 )
 
-// HostEntityIdx thread-safe access to RAM Cache
-type HostEntityIdx interface {
-	GetHostEntity(hostEntityName string) (entity *controller.HostEntity, found bool)
-	PutHostEntity(*controller.HostEntity)
-	ListHostEntities() []*controller.HostEntity
-	ValidateHostEntity(*controller.HostEntity) error
+// SFCEntityIdxRW thread-safe access to RAM Cache
+type SFCEntityIdxRW interface {
+	GetSFCEntity(sfcName string) (entity *controller.SfcEntity, found bool)
+	PutSFCEntity(*controller.SfcEntity)
+	ListSFCEntities() []*controller.SfcEntity
+	ValidateSFCEntity(*controller.SfcEntity) error
 }
 
 // Example curl invocations: for obtaining ALL host_entities
-//   - GET:  curl -v http://localhost:9191/sfc_controller/api/v1/config/HEs
-func (plugin *SfcControllerRPC) hostEntitiesHandler(formatter *render.Render) http.HandlerFunc {
+//   - GET:  curl -v http://localhost:9191/sfc_controller/api/v1/config/SFCs
+//   - POST: not supported
+func (plugin *SfcControllerRPC) sfcChainsHandler(formatter *render.Render) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		plugin.Log.Debugf("Host Entities HTTP handler: Method %s, URL: %s", req.Method, req.URL)
+		plugin.Log.Debugf("SFC Chains HTTP handler: Method %s, URL: %s", req.Method, req.URL)
 
-		var heArray = make([]controller.HostEntity, 0)
-		for _, he := range plugin.RAMConfigCache.ListHostEntities() {
-			heArray = append(heArray, *he)
+		var sfcArray = make([]controller.SfcEntity, 0)
+		for _, sfc := range plugin.SFCNorthbound.ListSFCEntities() {
+			sfcArray = append(sfcArray, *sfc)
 		}
 		switch req.Method {
 		case "GET":
-			formatter.JSON(w, http.StatusOK, heArray)
+			formatter.JSON(w, http.StatusOK, sfcArray)
 			return
 		}
 	}
 }
 
 // Example curl invocations: for obtaining a provided host_entity
-//   - GET:  curl -v http://localhost:9191/sfc_controller/api/v1/config/HEs/<hostName>
+//   - GET:  curl -v http://localhost:9191/sfc_controller/api/v1/config/SFCs/<chainName>
 //   - POST: curl -v -X POST -d '{"counter":30}' http://localhost:9191/example/test
-func (plugin *SfcControllerRPC) hostEntityHandler(formatter *render.Render) http.HandlerFunc {
+func (plugin *SfcControllerRPC) sfcChainHandler(formatter *render.Render) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, req *http.Request) {
-		plugin.Log.Debugf("Host Entity HTTP handler: Method %s, URL: %s", req.Method, req.URL)
+		plugin.Log.Debugf("SFC Chain HTTP handler: Method %s, URL: %s", req.Method, req.URL)
 
 		switch req.Method {
 		case "GET":
 			vars := mux.Vars(req)
-			if he, exists := plugin.RAMConfigCache.GetHostEntity(vars[entityName]); exists {
-		formatter.JSON(w, http.StatusOK, he)
-		} else {
-		formatter.JSON(w, http.StatusNotFound, "host entity does not found:"+vars[entityName])
-		}
+			if sfc, exists := plugin.SFCNorthbound.GetSFCEntity(vars[entityName]); exists {
+				formatter.JSON(w, http.StatusOK, sfc)
+			} else {
+				formatter.JSON(w, http.StatusNotFound, "sfc chain does not fouind:"+vars[entityName])
+			}
 			return
 		case "POST":
-			plugin.processHostEntityPost(formatter, w, req)
+			plugin.processSfcChainPost(formatter, w, req)
 		}
 	}
 }
 
-// create the host and wire to all other hosts? and external entities
-func (plugin *SfcControllerRPC) processHostEntityPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
+// wire the set/chain of containers to the vswitch and possibly external routers
+func (plugin *SfcControllerRPC) processSfcChainPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		plugin.Log.Debugf("Can't read body, error '%s'", err)
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
-	var he controller.HostEntity
-	err = json.Unmarshal(body, &he)
+	var sfc controller.SfcEntity
+	err = json.Unmarshal(body, &sfc)
 	if err != nil {
 		plugin.Log.Debugf("Can't parse body, error '%s'", err)
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
 
-	if err := plugin.RAMConfigCache.ValidateHostEntity(&he); err != nil {
+	if err := plugin.SFCNorthbound.ValidateSFCEntity(&sfc); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
 
 	vars := mux.Vars(req)
 
-	if vars[entityName] != he.Name {
-		formatter.JSON(w, http.StatusBadRequest, "json name does not match url name")
+	if vars[entityName] != sfc.Name {
+		formatter.JSON(w, http.StatusBadRequest, "json name does not matach url name")
 		return
 	}
-	plugin.RAMConfigCache.PutHostEntity(&he)
+
+	plugin.SFCNorthbound.PutSFCEntity(&sfc)
 
 	//TODO do this outside rest package (watcher)
-	//if err := sfcplg.DatastoreHostEntityCreate(&he); err != nil {
+	//if err := sfcplg.DatastoreSfcEntityCreate(&sfc); err != nil {
 	//	formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
 	//	return
 	//}
 
 	//TODO do this outside rest package (watcher)
-	//if err := sfcplg.renderHostEntity(&he, true, true); err != nil {
+	//if err := sfcplg.renderServiceFunctionEntity(&sfc); err != nil {
 	//	formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 	//	return
 	//}

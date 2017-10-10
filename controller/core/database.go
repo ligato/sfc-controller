@@ -305,6 +305,80 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityIterate(actio
 
 // Delete the specified entity from the sfc db in the etcd tree
 func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityDelete(ee *controller.HostEntity) error {
-
 	return nil
+}
+
+// GetExternalEntity gets from RAM cache
+func (sfcCtrlPlugin *SfcControllerPluginHandler) GetExternalEntity(externalEntityName string) (entity *controller.ExternalEntity, found bool) {
+	//TODO - do this thread safe
+	ee, found := sfcCtrlPlugin.ramConfigCache.EEs[externalEntityName]
+	return &ee, found
+}
+
+// PutExternalEntity updates RAM cache & ETCD
+func (sfcCtrlPlugin *SfcControllerPluginHandler) PutExternalEntity(ee *controller.ExternalEntity) {
+	//TODO - do this thread safe
+	sfcCtrlPlugin.ramConfigCache.EEs[ee.Name] = *ee
+	sfcCtrlPlugin.DatastoreExternalEntityPut(ee)
+	//TODO fire event go channel (to process this using watcher pattern)
+}
+
+// ListExternalEntities lists RAM cache
+func (sfcCtrlPlugin *SfcControllerPluginHandler) ListExternalEntities() []*controller.ExternalEntity {
+	//TODO - do this thread safe
+	ret := []*controller.ExternalEntity{}
+	for _, ee := range sfcCtrlPlugin.ramConfigCache.EEs {
+		ret = append(ret, &ee)
+	}
+	return ret
+}
+
+// GetHostEntity gets from RAM cache
+func (sfcCtrlPlugin *SfcControllerPluginHandler) GetHostEntity(hostEntityName string) (entity *controller.HostEntity, found bool) {
+	//TODO - do this thread safe
+	he, found := sfcCtrlPlugin.ramConfigCache.HEs[hostEntityName]
+	return &he, found
+}
+
+// PutHostEntity updates RAM cache & ETCD
+func (sfcCtrlPlugin *SfcControllerPluginHandler) PutHostEntity(he *controller.HostEntity) {
+	//TODO - do this thread safe
+	sfcCtrlPlugin.ramConfigCache.HEs[he.Name] = *he
+	//TODO fire event go channel (to process this using watcher pattern)
+	sfcCtrlPlugin.DatastoreHostEntityPut(he)
+}
+
+// ListHostEntities lists RAM cache
+func (sfcCtrlPlugin *SfcControllerPluginHandler) ListHostEntities() []*controller.HostEntity {
+	//TODO - do this thread safe
+	ret := []*controller.HostEntity{}
+	for _, he := range sfcCtrlPlugin.ramConfigCache.HEs {
+		ret = append(ret, he)
+	}
+	return ret
+}
+
+// GetSFCEntity gets from RAM cache
+func (sfcCtrlPlugin *SfcControllerPluginHandler) GetSFCEntity(sfcName string) (entity *controller.SfcEntity, found bool) {
+	//TODO - do this thread safe
+	sfc, found := sfcCtrlPlugin.ramConfigCache.SFCs[sfcName]
+	return &sfc, found
+}
+
+// PutHostEntity updates RAM cache & ETCD
+func (sfcCtrlPlugin *SfcControllerPluginHandler) PutSFCEntity(sfc *controller.SfcEntity) {
+	//TODO - do this thread safe
+	sfcCtrlPlugin.ramConfigCache.SFCs[sfc.Name] = *sfc
+	//TODO fire event go channel (to process this using watcher pattern)
+	sfcCtrlPlugin.DatastoreSfcEntityPut(sfc)
+}
+
+// ListHostEntities lists RAM cache
+func (sfcCtrlPlugin *SfcControllerPluginHandler) ListSFCEntities() []*controller.SfcEntity {
+	//TODO - do this thread safe
+	ret := []*controller.SfcEntity{}
+	for _, sfc := range sfcCtrlPlugin.ramConfigCache.SFCs {
+		ret = append(ret, &sfc)
+	}
+	return ret
 }
