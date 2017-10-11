@@ -40,6 +40,7 @@ message HostEntity {
     string eth_ipv4 = 3;
     string loopback_mac_addr = 4;
     string loopback_ipv4 = 5;
+    uint32 vni = 6;          /* VXLAN Network Identifier */
 };
 
 enum SfcType {
@@ -84,6 +85,7 @@ message SfcEntity {
         string mac_addr = 5;              // optional, if provided, this overrides what mac the if is given
         SfcElementType type = 6;
         CustomInfoType custom_info = 7;   // opaque string ... possibly json for app specific information
+        uint32 port_id = 8;               // optional, (memif) network interface id
     };
     repeated SfcElement elements = 7;
 };

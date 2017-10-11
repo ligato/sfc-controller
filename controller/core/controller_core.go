@@ -20,9 +20,6 @@ package core
 
 import (
 	"github.com/ligato/cn-infra/db/keyval"
-	"github.com/ligato/cn-infra/utils/safeclose"
-	"github.com/ligato/sfc-controller/controller/cnpdriver"
-	"github.com/ligato/sfc-controller/controller/extentitydriver"
 	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/namsral/flag"
 	"github.com/ligato/cn-infra/flavors/local"
@@ -43,9 +40,12 @@ func init() {
 
 // ram cache of controller entities indexed by entity name
 type SfcControllerCacheType struct {
-	EEs  map[string]controller.ExternalEntity
-	HEs  map[string]controller.HostEntity
-	SFCs map[string]controller.SfcEntity
+	EEs         map[string /*EE name*/ ]controller.ExternalEntity
+	HEs         map[string /*HE name*/ ]controller.HostEntity
+	SFCs        map[string /*SFC name*/ ]controller.SfcEntity
+	watcherEEs  map[string /*subscriber name*/ ]func(*controller.ExternalEntity) error
+	watcherHEs  map[string /*subscriber name*/ ]func(*controller.HostEntity) error
+	watcherSFCs map[string /*subscriber name*/ ]func(*controller.SfcEntity) error
 }
 
 // SfcControllerPluginHandler glues together:
@@ -57,13 +57,21 @@ type SfcControllerPluginHandler struct {
 	controllerReady       bool
 	db                    keyval.ProtoBroker
 	ReconcileVppLabelsMap ReconcileVppLabelsMapType
+	seq                   sequencer
 }
 
 // Deps are SfcControllerPluginHandler injected dependencies
 type Deps struct {
-	Etcd      keyval.KvProtoPlugin //inject
+	Etcd keyval.KvProtoPlugin //inject
 	local.PluginInfraDeps
-	CNPDriver cnpdriver.SfcControllerCNPDriverAPI //inject
+}
+
+// sequencer groups all sequences needed for model/controller/controller.proto
+type sequencer struct {
+	VLanID        uint32
+	PortID        uint32
+	MacInstanceID uint32
+	IPInstanceID  uint32
 }
 
 // Init the controller, read the db, reconcile/resync, render config to etcd
@@ -72,8 +80,7 @@ func (plugin *SfcControllerPluginHandler) Init() error {
 	plugin.db = plugin.Etcd.NewBroker(keyval.Root)
 
 	plugin.initRamCache()
-
-	extentitydriver.SfcExternalEntityDriverInit()
+	plugin.seq.VLanID = 4999
 
 	plugin.Log.Infof("Initializing plugin '%s'", plugin.PluginName)
 
@@ -84,8 +91,6 @@ func (plugin *SfcControllerPluginHandler) Init() error {
 	if cleanSfcDatastore {
 		plugin.DatastoreClean()
 	}
-
-	plugin.Log.Infof("CNP Driver: %s", plugin.CNPDriver.GetName())
 
 	plugin.ReconcileInit()
 
@@ -136,6 +141,10 @@ func (plugin *SfcControllerPluginHandler) initRamCache() {
 	plugin.ramConfigCache.EEs = make(map[string]controller.ExternalEntity)
 	plugin.ramConfigCache.HEs = make(map[string]controller.HostEntity)
 	plugin.ramConfigCache.SFCs = make(map[string]controller.SfcEntity)
+
+	plugin.ramConfigCache.watcherEEs = make(map[string]func(*controller.ExternalEntity) error)
+	plugin.ramConfigCache.watcherHEs = make(map[string]func(*controller.HostEntity) error)
+	plugin.ramConfigCache.watcherSFCs = make(map[string]func(*controller.SfcEntity) error)
 }
 
 // Dump the command line flags
@@ -143,9 +152,4 @@ func (plugin *SfcControllerPluginHandler) logFlags() {
 	plugin.Log.Debugf("LogFlags:")
 	plugin.Log.Debugf("\tsfcConfigFile:'%s'", plugin.PluginConfig.GetConfigName())
 	plugin.Log.Debugf("\tcleanSfcDatastore:'%s'", cleanSfcDatastore)
-}
-
-// perform close down procedures
-func (plugin *SfcControllerPluginHandler) Close() error {
-	return safeclose.Close(extentitydriver.EEOperationChannel)
 }

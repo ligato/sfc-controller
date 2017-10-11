@@ -179,6 +179,7 @@ type HostEntity struct {
 	EthIpv4         string `protobuf:"bytes,3,opt,name=eth_ipv4,proto3" json:"eth_ipv4,omitempty"`
 	LoopbackMacAddr string `protobuf:"bytes,4,opt,name=loopback_mac_addr,proto3" json:"loopback_mac_addr,omitempty"`
 	LoopbackIpv4    string `protobuf:"bytes,5,opt,name=loopback_ipv4,proto3" json:"loopback_ipv4,omitempty"`
+	Vni             uint32 `protobuf:"bytes,6,opt,name=vni,proto3" json:"vni,omitempty"`
 }
 
 func (m *HostEntity) Reset()         { *m = HostEntity{} }
@@ -221,6 +222,7 @@ type SfcEntity_SfcElement struct {
 	MacAddr          string          `protobuf:"bytes,5,opt,name=mac_addr,proto3" json:"mac_addr,omitempty"`
 	Type             SfcElementType  `protobuf:"varint,6,opt,name=type,proto3,enum=controller.SfcElementType" json:"type,omitempty"`
 	CustomInfo       *CustomInfoType `protobuf:"bytes,7,opt,name=custom_info" json:"custom_info,omitempty"`
+	PortId           uint32          `protobuf:"bytes,8,opt,name=port_id,proto3" json:"port_id,omitempty"`
 }
 
 func (m *SfcEntity_SfcElement) Reset()         { *m = SfcEntity_SfcElement{} }
