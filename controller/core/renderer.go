@@ -26,48 +26,48 @@ import (
 // process all hosts -> EEs, as when we process all EE -> Hosts, we will program the other end
 // at that time.  BUT, when an individual REST call is made to add a new HOST, we will process
 // both ends at that time.  See the http handler for an example of how the renderEE is done.
-func (sfcCtrlPlugin *SfcControllerPluginHandler) renderConfigFromRamCache() error {
+func (plugin *SfcControllerPluginHandler) renderConfigFromRamCache() error {
 
-	log.Infof("render host entities from ram cache")
-	for _, he := range sfcCtrlPlugin.ramConfigCache.HEs {
-		if err := sfcCtrlPlugin.renderHostEntity(&he, true, false); err != nil {
-			log.Error("Error rendering host entity:", he)
+	plugin.Log.Infof("render host entities from ram cache")
+	for _, he := range plugin.ramConfigCache.HEs {
+		if err := plugin.renderHostEntity(&he, true, false); err != nil {
+			plugin.Log.Error("Error rendering host entity:", he)
 			os.Exit(1)
 		}
 	}
 
-	log.Infof("render external entities from ram cache")
-	for _, ee := range sfcCtrlPlugin.ramConfigCache.EEs {
-		if err := sfcCtrlPlugin.renderExternalEntity(&ee, true, false); err != nil {
-			log.Error("Error rendering external entity:", ee)
+	plugin.Log.Infof("render external entities from ram cache")
+	for _, ee := range plugin.ramConfigCache.EEs {
+		if err := plugin.renderExternalEntity(&ee, true, false); err != nil {
+			plugin.Log.Error("Error rendering external entity:", ee)
 			os.Exit(1)
 		}
 	}
 
-	for _, he := range sfcCtrlPlugin.ramConfigCache.HEs {
-		if err := sfcCtrlPlugin.renderHostEntity(&he, false, true); err != nil {
-			log.Error("Error rendering host entity:", he)
+	for _, he := range plugin.ramConfigCache.HEs {
+		if err := plugin.renderHostEntity(&he, false, true); err != nil {
+			plugin.Log.Error("Error rendering host entity:", he)
 			os.Exit(1)
 		}
 	}
 
-	log.Infof("render external entities from ram cache")
-	for _, ee := range sfcCtrlPlugin.ramConfigCache.EEs {
-		if err := sfcCtrlPlugin.renderExternalEntity(&ee, false, true); err != nil {
-			log.Error("Error rendering external entity:", ee)
+	plugin.Log.Infof("render external entities from ram cache")
+	for _, ee := range plugin.ramConfigCache.EEs {
+		if err := plugin.renderExternalEntity(&ee, false, true); err != nil {
+			plugin.Log.Error("Error rendering external entity:", ee)
 			os.Exit(1)
 		}
 	}
 
-	log.Infof("render sfc's from ram cache")
-	for _, sfc := range sfcCtrlPlugin.ramConfigCache.SFCs {
-		if err := sfcCtrlPlugin.renderServiceFunctionEntity(&sfc); err != nil {
-			log.Error("Error rendering service function chain:", sfc)
+	plugin.Log.Infof("render sfc's from ram cache")
+	for _, sfc := range plugin.ramConfigCache.SFCs {
+		if err := plugin.renderServiceFunctionEntity(&sfc); err != nil {
+			plugin.Log.Error("Error rendering service function chain:", sfc)
 			os.Exit(1)
 		}
 	}
 
-	sfcCtrlPlugin.CNPDriver.Dump()
+	plugin.CNPDriver.Dump()
 
 	return nil
 }
@@ -75,21 +75,21 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderConfigFromRamCache() erro
 // For this ee, find all host entities and effect external entity to host wiring.  Will need a "session"
 // per external entity, and this session will be used to communicate wiring configuration.  Also, if the
 // configOnlyEE is false, then from each host entity, wire from host to this ee.
-func (sfcCtrlPlugin *SfcControllerPluginHandler) renderExternalEntity(ee *controller.ExternalEntity, configOnlyEE bool,
+func (plugin *SfcControllerPluginHandler) renderExternalEntity(ee *controller.ExternalEntity, configOnlyEE bool,
 	wireToOtherEntities bool) error {
 
-	log.Infof("renderExternalEntity: ee:'%s'/'%s', configOnlyEE=%d, wireToOtherEntities=%d",
+	plugin.Log.Infof("renderExternalEntity: ee:'%s'/'%s', configOnlyEE=%d, wireToOtherEntities=%d",
 		ee.Name, ee.MgmntIpAddress, configOnlyEE, wireToOtherEntities)
 
 	if configOnlyEE {
-		log.Infof("WireInternalsForExternalEntity: ee:'%s'", ee.Name)
-		sfcCtrlPlugin.CNPDriver.WireInternalsForExternalEntity(ee)
+		plugin.Log.Infof("WireInternalsForExternalEntity: ee:'%s'", ee.Name)
+		plugin.CNPDriver.WireInternalsForExternalEntity(ee)
 	}
 
 	if wireToOtherEntities {
-		for _, he := range sfcCtrlPlugin.ramConfigCache.HEs {
-			log.Infof("WireHostEntityToExternalEntity: he:'%s' to ee:'%s'", he.Name, ee.Name)
-			sfcCtrlPlugin.CNPDriver.WireHostEntityToExternalEntity(&he, ee)
+		for _, he := range plugin.ramConfigCache.HEs {
+			plugin.Log.Infof("WireHostEntityToExternalEntity: he:'%s' to ee:'%s'", he.Name, ee.Name)
+			plugin.CNPDriver.WireHostEntityToExternalEntity(&he, ee)
 		}
 	}
 
@@ -98,32 +98,32 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderExternalEntity(ee *contro
 
 // For this source host, find other host entities, and effect inter-host wiring, and host-external wiring.
 // Also, if configOnlyHE is set, wire from each ee to this new host, and from all other hosts to this new one.
-func (sfcCtrlPlugin *SfcControllerPluginHandler) renderHostEntity(sh *controller.HostEntity, configOnlyHE bool,
+func (plugin *SfcControllerPluginHandler) renderHostEntity(sh *controller.HostEntity, configOnlyHE bool,
 	wireToOtherEntities bool) error {
 
-	log.Infof("renderHostEntity: sh:'%s', configOnlyFrom=%d, wireToOtherEntities=%d", sh.Name, configOnlyHE,
+	plugin.Log.Infof("renderHostEntity: sh:'%s', configOnlyFrom=%d, wireToOtherEntities=%d", sh.Name, configOnlyHE,
 		wireToOtherEntities)
 
 	if configOnlyHE {
-		log.Infof("WireInternalsForHostEntity: he:'%s'", sh.Name)
-		sfcCtrlPlugin.CNPDriver.WireInternalsForHostEntity(sh)
+		plugin.Log.Infof("WireInternalsForHostEntity: he:'%s'", sh.Name)
+		plugin.CNPDriver.WireInternalsForHostEntity(sh)
 	}
 
 	if wireToOtherEntities {
-		for _, ee := range sfcCtrlPlugin.ramConfigCache.EEs {
-			log.Infof("WireHostEntityToExternalEntity: he:'%s' to ee:'%s'/'%s'",
+		for _, ee := range plugin.ramConfigCache.EEs {
+			plugin.Log.Infof("WireHostEntityToExternalEntity: he:'%s' to ee:'%s'/'%s'",
 				sh.Name, ee.Name, ee.MgmntIpAddress)
-			sfcCtrlPlugin.CNPDriver.WireHostEntityToExternalEntity(sh, &ee)
+			plugin.CNPDriver.WireHostEntityToExternalEntity(sh, &ee)
 		}
 
-		for _, dh := range sfcCtrlPlugin.ramConfigCache.HEs {
+		for _, dh := range plugin.ramConfigCache.HEs {
 			if *sh != dh {
-				log.Infof("WireHostEntityToDestinationHostEntity: sh:'%s' to dh:'%s'",
+				plugin.Log.Infof("WireHostEntityToDestinationHostEntity: sh:'%s' to dh:'%s'",
 					sh.Name, dh.Name)
-				sfcCtrlPlugin.CNPDriver.WireHostEntityToDestinationHostEntity(sh, &dh)
-				log.Infof("WireHostEntityToDestinationHostEntity: dh:'%s' to sh:'%s'",
+				plugin.CNPDriver.WireHostEntityToDestinationHostEntity(sh, &dh)
+				plugin.Log.Infof("WireHostEntityToDestinationHostEntity: dh:'%s' to sh:'%s'",
 					dh.Name, sh.Name)
-				sfcCtrlPlugin.CNPDriver.WireHostEntityToDestinationHostEntity(&dh, sh)
+				plugin.CNPDriver.WireHostEntityToDestinationHostEntity(&dh, sh)
 			}
 		}
 	}
@@ -132,19 +132,19 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderHostEntity(sh *controller
 }
 
 // For each element in the chain, ... render ...
-func (sfcCtrlPlugin *SfcControllerPluginHandler) renderServiceFunctionEntity(sfc *controller.SfcEntity) error {
+func (plugin *SfcControllerPluginHandler) renderServiceFunctionEntity(sfc *controller.SfcEntity) error {
 
-	log.Infof("renderServiceFunctionEntity: sfc:'%s'", sfc.Name)
+	plugin.Log.Infof("renderServiceFunctionEntity: sfc:'%s'", sfc.Name)
 
 	numSfcElements := len(sfc.GetElements())
 	if numSfcElements == 0 {
-		log.Warnf("renderServiceFunctionEntity: sfc:'%s' has no elements", sfc.Name)
+		plugin.Log.Warnf("renderServiceFunctionEntity: sfc:'%s' has no elements", sfc.Name)
 		return nil
 	}
 
-	log.Infof("renderServiceFunctionEntity: WireSfcEntities: for '%s'/'%s'",
+	plugin.Log.Infof("renderServiceFunctionEntity: WireSfcEntities: for '%s'/'%s'",
 		sfc.Name, sfc.Description)
-	if err := sfcCtrlPlugin.CNPDriver.WireSfcEntity(sfc); err != nil {
+	if err := plugin.CNPDriver.WireSfcEntity(sfc); err != nil {
 		return err
 	}
 

@@ -132,6 +132,9 @@ func (f *FlavorSFCFull) Inject() bool {
 	if f.Sfc.CNPDriver == nil {
 		f.Sfc.CNPDriver = cnpdriver.NewSfcCtlrL2CNPDriver("sfcctlrl2", f.ETCD.NewBroker)
 	}
+
+	f.Sfc.Deps.PluginInfraDeps = *f.InfraDeps("sfc",
+		local.WithConf("Name of a sfc config (yaml) file to load at startup", "sfc.conf"))
 	f.Sfc.Deps.Etcd = &f.ETCD
 	f.SfcRPC.Deps.HTTP = &f.HTTP
 	f.SfcRPC.Deps.PluginLogDeps = *f.LogDeps("sfc-rpc")

@@ -29,20 +29,20 @@ import (
 )
 
 // flush the ram cache to the sfc cache to the tree in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) WriteRamCacheToEtcd() error {
+func (plugin *SfcControllerPluginHandler) WriteRamCacheToEtcd() error {
 
-	for _, ee := range sfcCtrlPlugin.ramConfigCache.EEs {
-		if err := sfcCtrlPlugin.DatastoreExternalEntityPut(&ee); err != nil {
+	for _, ee := range plugin.ramConfigCache.EEs {
+		if err := plugin.DatastoreExternalEntityPut(&ee); err != nil {
 			return err
 		}
 	}
-	for _, he := range sfcCtrlPlugin.ramConfigCache.HEs {
-		if err := sfcCtrlPlugin.DatastoreHostEntityPut(&he); err != nil {
+	for _, he := range plugin.ramConfigCache.HEs {
+		if err := plugin.DatastoreHostEntityPut(&he); err != nil {
 			return err
 		}
 	}
-	for _, sfc := range sfcCtrlPlugin.ramConfigCache.SFCs {
-		if err := sfcCtrlPlugin.DatastoreSfcEntityPut(&sfc); err != nil {
+	for _, sfc := range plugin.ramConfigCache.SFCs {
+		if err := plugin.DatastoreSfcEntityPut(&sfc); err != nil {
 			return err
 		}
 	}
@@ -51,88 +51,88 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) WriteRamCacheToEtcd() error {
 }
 
 // pull the sfc db from the etcd tree into the ram cache
-func (sfcCtrlPlugin *SfcControllerPluginHandler) ReadEtcdDatastoreIntoRamCache() error {
+func (plugin *SfcControllerPluginHandler) ReadEtcdDatastoreIntoRamCache() error {
 
-	log.Infof("ReadEtcdDatastoreIntoRamCache: start ...")
+	plugin.Log.Infof("ReadEtcdDatastoreIntoRamCache: start ...")
 
-	if err := sfcCtrlPlugin.DatastoreExternalEntityRetrieveAllIntoRamCache(); err != nil {
+	if err := plugin.DatastoreExternalEntityRetrieveAllIntoRamCache(); err != nil {
 		return err
 	}
-	if err := sfcCtrlPlugin.DatastoreHostEntityRetrieveAllIntoRamCache(); err != nil {
+	if err := plugin.DatastoreHostEntityRetrieveAllIntoRamCache(); err != nil {
 		return err
 	}
-	if err := sfcCtrlPlugin.DatastoreSfcEntityRetrieveAllIntoRamCache(); err != nil {
+	if err := plugin.DatastoreSfcEntityRetrieveAllIntoRamCache(); err != nil {
 		return err
 	}
 
-	log.Infof("ReadEtcdDatastoreIntoRamCache: end ...")
+	plugin.Log.Infof("ReadEtcdDatastoreIntoRamCache: end ...")
 
 	return nil
 }
 
 // clear the sfc tree in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreClean() error {
+func (plugin *SfcControllerPluginHandler) DatastoreClean() error {
 
-	log.Infof("DatastoreClean: clearing etc tree")
+	plugin.Log.Infof("DatastoreClean: clearing etc tree")
 
-	if err := sfcCtrlPlugin.DatastoreExternalEntityDeleteAll(); err != nil {
-		log.Error("DatastoreClean: DatastoreExternalEntityDeleteAll: ", err)
+	if err := plugin.DatastoreExternalEntityDeleteAll(); err != nil {
+		plugin.Log.Error("DatastoreClean: DatastoreExternalEntityDeleteAll: ", err)
 	}
-	if err := sfcCtrlPlugin.DatastoreHostEntityDeleteAll(); err != nil {
-		log.Error("DatastoreClean: DatastoreHostEntityDeleteAll: ", err)
+	if err := plugin.DatastoreHostEntityDeleteAll(); err != nil {
+		plugin.Log.Error("DatastoreClean: DatastoreHostEntityDeleteAll: ", err)
 	}
-	if err := sfcCtrlPlugin.DatastoreSfcEntityDeleteAll(); err != nil {
-		log.Error("DatastoreClean: DatastoreSfcEntityDeleteAll: ", err)
+	if err := plugin.DatastoreSfcEntityDeleteAll(); err != nil {
+		plugin.Log.Error("DatastoreClean: DatastoreSfcEntityDeleteAll: ", err)
 	}
 
 	return nil
 }
 
 // create the specified entity in the sfc db in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreExternalEntityPut(ee *controller.ExternalEntity) error {
+func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityPut(ee *controller.ExternalEntity) error {
 
 	name := controller.ExternalEntityNameKey(ee.Name)
 
-	log.Infof("DatastoreExternalEntityPut: setting key: '%s'", name)
+	plugin.Log.Infof("DatastoreExternalEntityPut: setting key: '%s'", name)
 
-	err := sfcCtrlPlugin.db.Put(name, ee)
+	err := plugin.db.Put(name, ee)
 	if err != nil {
-		log.Error("DatastoreExternalEntityPut: error storing key: '%s'", name)
-		log.Error("DatastoreExternalEntityPut: databroker put: ", err)
+		plugin.Log.Error("DatastoreExternalEntityPut: error storing key: '%s'", name)
+		plugin.Log.Error("DatastoreExternalEntityPut: databroker put: ", err)
 		return err
 	}
 	return nil
 }
 
 // pull the specified entities from the sfc db in etcd into the sfc ram cache
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreExternalEntityRetrieveAllIntoRamCache() error {
+func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityRetrieveAllIntoRamCache() error {
 
-	return sfcCtrlPlugin.DatastoreExternalEntityIterate(func(key string, ee *controller.ExternalEntity) {
-		sfcCtrlPlugin.ramConfigCache.EEs[key] = *ee
-		log.Infof("DatastoreExternalEntityRetrieveAllIntoRamCache: adding ee: '%s': ", key, *ee)
+	return plugin.DatastoreExternalEntityIterate(func(key string, ee *controller.ExternalEntity) {
+		plugin.ramConfigCache.EEs[key] = *ee
+		plugin.Log.Infof("DatastoreExternalEntityRetrieveAllIntoRamCache: adding ee: '%s': ", key, *ee)
 	})
 }
 
 // remove the specified entities from the sfc db in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreExternalEntityDeleteAll() error {
+func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityDeleteAll() error {
 
-	log.Info("DatastoreExternalEntityDeleteAll: begin ...")
-	defer log.Info("DatastoreExternalEntityDeleteAll: exit ...")
+	plugin.Log.Info("DatastoreExternalEntityDeleteAll: begin ...")
+	defer plugin.Log.Info("DatastoreExternalEntityDeleteAll: exit ...")
 
-	return sfcCtrlPlugin.DatastoreExternalEntityIterate(func(name string, ee *controller.ExternalEntity) {
+	return plugin.DatastoreExternalEntityIterate(func(name string, ee *controller.ExternalEntity) {
 		key := controller.ExternalEntityNameKey(name)
-		log.Infof("DatastoreExternalEntityDeleteAll: deleting ee: '%s': ", key, *ee)
-		sfcCtrlPlugin.db.Delete(key)
+		plugin.Log.Infof("DatastoreExternalEntityDeleteAll: deleting ee: '%s': ", key, *ee)
+		plugin.db.Delete(key)
 	})
 }
 
 // iterate over the set of specified entities in the sfc tree in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreExternalEntityIterate(actionFunc func(key string,
+func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityIterate(actionFunc func(key string,
 	val *controller.ExternalEntity)) error {
 
-	kvi, err := sfcCtrlPlugin.db.ListValues(controller.ExternalEntityKeyPrefix())
+	kvi, err := plugin.db.ListValues(controller.ExternalEntityKeyPrefix())
 	if err != nil {
-		log.Fatal(err)
+		plugin.Log.Fatal(err)
 		return nil
 	}
 
@@ -144,10 +144,10 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreExternalEntityIterate(
 		ee := &controller.ExternalEntity{}
 		err := kv.GetValue(ee)
 		if err != nil {
-			log.Fatal(err)
+			plugin.Log.Fatal(err)
 			return nil
 		}
-		log.Infof("DatastoreExternalEntityIterate: iterating ee: '%s': ", ee.Name, ee)
+		plugin.Log.Infof("DatastoreExternalEntityIterate: iterating ee: '%s': ", ee.Name, ee)
 		actionFunc(ee.Name, ee)
 
 	}
@@ -155,56 +155,56 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreExternalEntityIterate(
 }
 
 // Delete the specified entity from the sfc db in the etcd tree
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreExternalEntityDelete(ee *controller.ExternalEntity) error {
+func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityDelete(ee *controller.ExternalEntity) error {
 
 	return nil
 }
 
 // create the specified entity in the sfc db in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreHostEntityPut(he *controller.HostEntity) error {
+func (plugin *SfcControllerPluginHandler) DatastoreHostEntityPut(he *controller.HostEntity) error {
 
 	name := controller.HostEntityNameKey(he.Name)
 
-	log.Infof("DatastoreHostEntityPut: setting key: '%s'", name)
+	plugin.Log.Infof("DatastoreHostEntityPut: setting key: '%s'", name)
 
-	err := sfcCtrlPlugin.db.Put(name, he)
+	err := plugin.db.Put(name, he)
 	if err != nil {
-		log.Error("DatastoreHostEntityPut: error storing key: '%s'", name)
-		log.Error("DatastoreHostEntityPut: databroker put: ", err)
+		plugin.Log.Error("DatastoreHostEntityPut: error storing key: '%s'", name)
+		plugin.Log.Error("DatastoreHostEntityPut: databroker put: ", err)
 		return err
 	}
 	return nil
 }
 
 // pull the specified entities from the sfc db in etcd into the sfc ram cache
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreHostEntityRetrieveAllIntoRamCache() error {
+func (plugin *SfcControllerPluginHandler) DatastoreHostEntityRetrieveAllIntoRamCache() error {
 
-	return sfcCtrlPlugin.DatastoreHostEntityIterate(func(key string, he *controller.HostEntity) {
-		sfcCtrlPlugin.ramConfigCache.HEs[key] = *he
-		log.Infof("DatastoreHostEntityRetrieveAllIntoRamCache: adding he: '%s': ", key, *he)
+	return plugin.DatastoreHostEntityIterate(func(key string, he *controller.HostEntity) {
+		plugin.ramConfigCache.HEs[key] = *he
+		plugin.Log.Infof("DatastoreHostEntityRetrieveAllIntoRamCache: adding he: '%s': ", key, *he)
 	})
 }
 
 // remove the specified entities from the sfc db in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreHostEntityDeleteAll() error {
+func (plugin *SfcControllerPluginHandler) DatastoreHostEntityDeleteAll() error {
 
-	log.Info("DatastoreHostEntityDeleteAll: begin ...")
-	defer log.Info("DatastoreHostEntityDeleteAll: exit ...")
+	plugin.Log.Info("DatastoreHostEntityDeleteAll: begin ...")
+	defer plugin.Log.Info("DatastoreHostEntityDeleteAll: exit ...")
 
-	return sfcCtrlPlugin.DatastoreHostEntityIterate(func(name string, he *controller.HostEntity) {
+	return plugin.DatastoreHostEntityIterate(func(name string, he *controller.HostEntity) {
 		key := controller.HostEntityNameKey(name)
-		log.Infof("DatastoreHostsEntityDeleteAll: deleting he: '%s': ", key, *he)
-		sfcCtrlPlugin.db.Delete(key)
+		plugin.Log.Infof("DatastoreHostsEntityDeleteAll: deleting he: '%s': ", key, *he)
+		plugin.db.Delete(key)
 	})
 }
 
 // iterate over the set of specified entities in the sfc tree in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreHostEntityIterate(actionFunc func(key string,
+func (plugin *SfcControllerPluginHandler) DatastoreHostEntityIterate(actionFunc func(key string,
 	he *controller.HostEntity)) error {
 
-	kvi, err := sfcCtrlPlugin.db.ListValues(controller.HostEntityKeyPrefix())
+	kvi, err := plugin.db.ListValues(controller.HostEntityKeyPrefix())
 	if err != nil {
-		log.Fatal(err)
+		plugin.Log.Fatal(err)
 		return nil
 	}
 
@@ -216,11 +216,11 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreHostEntityIterate(acti
 		he := &controller.HostEntity{}
 		err := kv.GetValue(he)
 		if err != nil {
-			log.Fatal(err)
+			plugin.Log.Fatal(err)
 			return nil
 		}
 
-		log.Infof("DatastoreHostEntityIterate: getting he: '%s': ", he.Name, he)
+		plugin.Log.Infof("DatastoreHostEntityIterate: getting he: '%s': ", he.Name, he)
 		actionFunc(he.Name, he)
 
 	}
@@ -228,22 +228,22 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreHostEntityIterate(acti
 }
 
 // Delete the specified entity from the sfc db in the etcd tree
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreHostEntityDelete(ee *controller.HostEntity) error {
+func (plugin *SfcControllerPluginHandler) DatastoreHostEntityDelete(ee *controller.HostEntity) error {
 
 	return nil
 }
 
 // create the specified entity in the sfc db in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityPut(sfc *controller.SfcEntity) error {
+func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityPut(sfc *controller.SfcEntity) error {
 
 	name := controller.SfcEntityNameKey(sfc.Name)
 
-	log.Infof("DatastoreSfcEntityPut: setting key: '%s'", name)
+	plugin.Log.Infof("DatastoreSfcEntityPut: setting key: '%s'", name)
 
-	err := sfcCtrlPlugin.db.Put(name, sfc)
+	err := plugin.db.Put(name, sfc)
 	if err != nil {
-		log.Error("DatastoreSfcEntityPut: error storing key: '%s'", name)
-		log.Error("DatastoreSfcEntityPut: databroker put: ", err)
+		plugin.Log.Error("DatastoreSfcEntityPut: error storing key: '%s'", name)
+		plugin.Log.Error("DatastoreSfcEntityPut: databroker put: ", err)
 		return err
 	}
 
@@ -251,36 +251,36 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityPut(sfc *cont
 }
 
 // pull the specified entities from the sfc db in etcd into the sfc ram cache
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityRetrieveAllIntoRamCache() error {
+func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityRetrieveAllIntoRamCache() error {
 
-	return sfcCtrlPlugin.DatastoreSfcEntityIterate(func(key string, sfc *controller.SfcEntity) {
-		sfcCtrlPlugin.ramConfigCache.SFCs[key] = *sfc
-		log.Infof("DatastoreSfcEntityRetrieveAllIntoRamCache: adding sfc: '%s': ", key, *sfc)
+	return plugin.DatastoreSfcEntityIterate(func(key string, sfc *controller.SfcEntity) {
+		plugin.ramConfigCache.SFCs[key] = *sfc
+		plugin.Log.Infof("DatastoreSfcEntityRetrieveAllIntoRamCache: adding sfc: '%s': ", key, *sfc)
 	})
 }
 
 // remove the specified entities from the sfc db in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityDeleteAll() error {
+func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityDeleteAll() error {
 
 	//TODO DELETE ALL could delete all key by prefixes db.Delete(prefix, WithPrefix())
 
-	log.Info("DatastoreSfcEntityDeleteAll: begin ...")
-	defer log.Info("DatastoreSfcEntityDeleteAll: exit ...")
+	plugin.Log.Info("DatastoreSfcEntityDeleteAll: begin ...")
+	defer plugin.Log.Info("DatastoreSfcEntityDeleteAll: exit ...")
 
-	return sfcCtrlPlugin.DatastoreSfcEntityIterate(func(name string, sfc *controller.SfcEntity) {
+	return plugin.DatastoreSfcEntityIterate(func(name string, sfc *controller.SfcEntity) {
 		key := controller.SfcEntityNameKey(name)
-		log.Infof("DatastoreSfcEntityDeleteAll: deleting sfc: '%s': ", key, *sfc)
-		sfcCtrlPlugin.db.Delete(key) //TODO move to DatastoreSfcEntityDelete
+		plugin.Log.Infof("DatastoreSfcEntityDeleteAll: deleting sfc: '%s': ", key, *sfc)
+		plugin.db.Delete(key) //TODO move to DatastoreSfcEntityDelete
 	})
 }
 
 // iterate over the set of specified entities in the sfc tree in etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityIterate(actionFunc func(key string,
+func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityIterate(actionFunc func(key string,
 	sfc *controller.SfcEntity)) error {
 
-	kvi, err := sfcCtrlPlugin.db.ListValues(controller.SfcEntityKeyPrefix())
+	kvi, err := plugin.db.ListValues(controller.SfcEntityKeyPrefix())
 	if err != nil {
-		log.Fatal(err)
+		plugin.Log.Fatal(err)
 		return nil
 	}
 
@@ -292,11 +292,11 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityIterate(actio
 		sfc := &controller.SfcEntity{}
 		err := kv.GetValue(sfc)
 		if err != nil {
-			log.Fatal(err)
+			plugin.Log.Fatal(err)
 			return nil
 		}
 
-		log.Infof("DatastoreSfcEntityIterate: getting sfc: '%s': ", sfc.Name, sfc)
+		plugin.Log.Infof("DatastoreSfcEntityIterate: getting sfc: '%s': ", sfc.Name, sfc)
 		actionFunc(sfc.Name, sfc)
 
 	}
@@ -304,80 +304,80 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityIterate(actio
 }
 
 // Delete the specified entity from the sfc db in the etcd tree
-func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityDelete(ee *controller.HostEntity) error {
+func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityDelete(ee *controller.HostEntity) error {
 	return nil
 }
 
 // GetExternalEntity gets from RAM cache
-func (sfcCtrlPlugin *SfcControllerPluginHandler) GetExternalEntity(externalEntityName string) (entity *controller.ExternalEntity, found bool) {
+func (plugin *SfcControllerPluginHandler) GetExternalEntity(externalEntityName string) (entity *controller.ExternalEntity, found bool) {
 	//TODO - do this thread safe
-	ee, found := sfcCtrlPlugin.ramConfigCache.EEs[externalEntityName]
+	ee, found := plugin.ramConfigCache.EEs[externalEntityName]
 	return &ee, found
 }
 
 // PutExternalEntity updates RAM cache & ETCD
-func (sfcCtrlPlugin *SfcControllerPluginHandler) PutExternalEntity(ee *controller.ExternalEntity) {
+func (plugin *SfcControllerPluginHandler) PutExternalEntity(ee *controller.ExternalEntity) {
 	//TODO - do this thread safe
-	sfcCtrlPlugin.ramConfigCache.EEs[ee.Name] = *ee
-	sfcCtrlPlugin.DatastoreExternalEntityPut(ee)
+	plugin.ramConfigCache.EEs[ee.Name] = *ee
+	plugin.DatastoreExternalEntityPut(ee)
 	//TODO fire event go channel (to process this using watcher pattern)
 }
 
 // ListExternalEntities lists RAM cache
-func (sfcCtrlPlugin *SfcControllerPluginHandler) ListExternalEntities() []*controller.ExternalEntity {
+func (plugin *SfcControllerPluginHandler) ListExternalEntities() []*controller.ExternalEntity {
 	//TODO - do this thread safe
 	ret := []*controller.ExternalEntity{}
-	for _, ee := range sfcCtrlPlugin.ramConfigCache.EEs {
+	for _, ee := range plugin.ramConfigCache.EEs {
 		ret = append(ret, &ee)
 	}
 	return ret
 }
 
 // GetHostEntity gets from RAM cache
-func (sfcCtrlPlugin *SfcControllerPluginHandler) GetHostEntity(hostEntityName string) (entity *controller.HostEntity, found bool) {
+func (plugin *SfcControllerPluginHandler) GetHostEntity(hostEntityName string) (entity *controller.HostEntity, found bool) {
 	//TODO - do this thread safe
-	he, found := sfcCtrlPlugin.ramConfigCache.HEs[hostEntityName]
+	he, found := plugin.ramConfigCache.HEs[hostEntityName]
 	return &he, found
 }
 
 // PutHostEntity updates RAM cache & ETCD
-func (sfcCtrlPlugin *SfcControllerPluginHandler) PutHostEntity(he *controller.HostEntity) {
+func (plugin *SfcControllerPluginHandler) PutHostEntity(he *controller.HostEntity) {
 	//TODO - do this thread safe
-	sfcCtrlPlugin.ramConfigCache.HEs[he.Name] = *he
+	plugin.ramConfigCache.HEs[he.Name] = *he
 	//TODO fire event go channel (to process this using watcher pattern)
-	sfcCtrlPlugin.DatastoreHostEntityPut(he)
+	plugin.DatastoreHostEntityPut(he)
 }
 
 // ListHostEntities lists RAM cache
-func (sfcCtrlPlugin *SfcControllerPluginHandler) ListHostEntities() []*controller.HostEntity {
+func (plugin *SfcControllerPluginHandler) ListHostEntities() []*controller.HostEntity {
 	//TODO - do this thread safe
 	ret := []*controller.HostEntity{}
-	for _, he := range sfcCtrlPlugin.ramConfigCache.HEs {
-		ret = append(ret, he)
+	for _, he := range plugin.ramConfigCache.HEs {
+		ret = append(ret, &he)
 	}
 	return ret
 }
 
 // GetSFCEntity gets from RAM cache
-func (sfcCtrlPlugin *SfcControllerPluginHandler) GetSFCEntity(sfcName string) (entity *controller.SfcEntity, found bool) {
+func (plugin *SfcControllerPluginHandler) GetSFCEntity(sfcName string) (entity *controller.SfcEntity, found bool) {
 	//TODO - do this thread safe
-	sfc, found := sfcCtrlPlugin.ramConfigCache.SFCs[sfcName]
+	sfc, found := plugin.ramConfigCache.SFCs[sfcName]
 	return &sfc, found
 }
 
 // PutHostEntity updates RAM cache & ETCD
-func (sfcCtrlPlugin *SfcControllerPluginHandler) PutSFCEntity(sfc *controller.SfcEntity) {
+func (plugin *SfcControllerPluginHandler) PutSFCEntity(sfc *controller.SfcEntity) {
 	//TODO - do this thread safe
-	sfcCtrlPlugin.ramConfigCache.SFCs[sfc.Name] = *sfc
+	plugin.ramConfigCache.SFCs[sfc.Name] = *sfc
 	//TODO fire event go channel (to process this using watcher pattern)
-	sfcCtrlPlugin.DatastoreSfcEntityPut(sfc)
+	plugin.DatastoreSfcEntityPut(sfc)
 }
 
 // ListHostEntities lists RAM cache
-func (sfcCtrlPlugin *SfcControllerPluginHandler) ListSFCEntities() []*controller.SfcEntity {
+func (plugin *SfcControllerPluginHandler) ListSFCEntities() []*controller.SfcEntity {
 	//TODO - do this thread safe
 	ret := []*controller.SfcEntity{}
-	for _, sfc := range sfcCtrlPlugin.ramConfigCache.SFCs {
+	for _, sfc := range plugin.ramConfigCache.SFCs {
 		ret = append(ret, &sfc)
 	}
 	return ret

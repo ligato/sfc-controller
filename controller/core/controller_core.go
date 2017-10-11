@@ -19,49 +19,25 @@
 package core
 
 import (
-	"github.com/ligato/cn-infra/core"
 	"github.com/ligato/cn-infra/db/keyval"
-	"github.com/ligato/cn-infra/logging"
-	"github.com/ligato/cn-infra/logging/logroot"
 	"github.com/ligato/cn-infra/utils/safeclose"
 	"github.com/ligato/sfc-controller/controller/cnpdriver"
 	"github.com/ligato/sfc-controller/controller/extentitydriver"
 	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/namsral/flag"
+	"github.com/ligato/cn-infra/flavors/local"
 )
-
-// Plugin identifier (must be unique throughout the system)
-const PluginID core.PluginName = "SfcController"
 
 var (
-	sfcConfigFile     string // cli flag - see RegisterFlags
-	cleanSfcDatastore bool   // cli flag - see RegisterFlags
-	log               = logroot.StandardLogger()
+	cleanSfcDatastore bool // cli flag - see RegisterFlags
 )
-
-// Add command line flags here.
-func RegisterFlags() {
-	flag.StringVar(&sfcConfigFile, "sfc-config", "",
-		"Name of a sfc config (yaml) file to load at startup")
-	flag.BoolVar(&cleanSfcDatastore, "clean", false,
-		"Clean the SFC datastore entries")
-}
-
-// Dump the command line flags
-func LogFlags() {
-	log.Debugf("LogFlags:")
-	log.Debugf("\tsfcConfigFile:'%s'", sfcConfigFile)
-}
 
 // Init is the Go init() function for the sfcCtrlPlugin. It should
 // contain the boiler plate initialization code that is executed
 // when the sfcCtrlPlugin is loaded into the Agent.
 func init() {
-	// Logger must be initialized for each sfcCtrlPlugin individually.
-	log.SetLevel(logging.DebugLevel)
-	//TODO with Lukas pluginapi.RegisterLogger(PluginID, log.StandardLogger())
-
-	RegisterFlags()
+	flag.BoolVar(&cleanSfcDatastore, "clean", false,
+		"Clean the SFC datastore entries")
 
 }
 
@@ -77,7 +53,6 @@ type SfcControllerCacheType struct {
 type SfcControllerPluginHandler struct {
 	Deps
 
-	yamlConfig            *YamlConfig
 	ramConfigCache        SfcControllerCacheType
 	controllerReady       bool
 	db                    keyval.ProtoBroker
@@ -86,90 +61,91 @@ type SfcControllerPluginHandler struct {
 
 // Deps are SfcControllerPluginHandler injected dependencies
 type Deps struct {
-	Etcd      keyval.KvProtoPlugin                //inject
+	Etcd      keyval.KvProtoPlugin //inject
+	local.PluginInfraDeps
 	CNPDriver cnpdriver.SfcControllerCNPDriverAPI //inject
 }
 
 // Init the controller, read the db, reconcile/resync, render config to etcd
-func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
+func (plugin *SfcControllerPluginHandler) Init() error {
 
-	sfcCtrlPlugin.db = sfcCtrlPlugin.Etcd.NewBroker(keyval.Root)
+	plugin.db = plugin.Etcd.NewBroker(keyval.Root)
 
-	sfcCtrlPlugin.initRamCache()
+	plugin.initRamCache()
 
 	extentitydriver.SfcExternalEntityDriverInit()
 
-	var err error
-
-	log.Infof("Initializing sfcCtrlPlugin '%s'", PluginID)
+	plugin.Log.Infof("Initializing plugin '%s'", plugin.PluginName)
 
 	// Flag variables registered in init() are ready to use in InitPlugin()
-	LogFlags()
+	plugin.logFlags()
 
 	// if -clean then remove the sfc controller datastore, reconcile will remove all extraneous i/f's, BD's etc
 	if cleanSfcDatastore {
-		sfcCtrlPlugin.DatastoreClean()
+		plugin.DatastoreClean()
 	}
 
-	log.Infof("CNP Driver: %s", sfcCtrlPlugin.CNPDriver.GetName())
+	plugin.Log.Infof("CNP Driver: %s", plugin.CNPDriver.GetName())
 
-	sfcCtrlPlugin.ReconcileInit()
+	plugin.ReconcileInit()
 
-	sfcCtrlPlugin.ReconcileStart()
-
-	// read config database into ramCache
-	if err := sfcCtrlPlugin.ReadEtcdDatastoreIntoRamCache(); err != nil {
-		log.Error("error reading etcd config into ram cache: ", err)
-		return err
-	}
+	plugin.ReconcileStart()
 
 	// If a startup yaml file is provided, then pull it into the ram cache and write it to the database
 	// Note that there may already be already an existing database so the policy is that the config yaml
 	// file will replace any conflicting entries in the database.
-	if sfcConfigFile != "" {
-
-		if err := sfcCtrlPlugin.readConfigFromFile(sfcConfigFile); err != nil {
-			log.Error("error loading config: ", err)
+	if cfg, cfgFound, err := plugin.readConfigFromFile(); err != nil {
+		plugin.Log.Error("error loading config: ", err)
+		return err
+	} else if cfgFound {
+		if err := plugin.copyYamlConfigToRamCache(cfg); err != nil {
+			plugin.Log.Error("error copying config to ram cache: ", err)
 			return err
 		}
 
-		if err := sfcCtrlPlugin.copyYamlConfigToRamCache(); err != nil {
-			log.Error("error copying config to ram cache: ", err)
+		if err := plugin.validateRamCache(); err != nil {
+			plugin.Log.Error("error validating ram cache: ", err)
 			return err
 		}
 
-		if err := sfcCtrlPlugin.validateRamCache(); err != nil {
-			log.Error("error validating ram cache: ", err)
+		if err := plugin.WriteRamCacheToEtcd(); err != nil {
+			plugin.Log.Error("error writing ram config to etcd datastore: ", err)
 			return err
 		}
-
-		if err := sfcCtrlPlugin.WriteRamCacheToEtcd(); err != nil {
-			log.Error("error writing ram config to etcd datastore: ", err)
+	} else { // read config database into ramCache
+		if err := plugin.ReadEtcdDatastoreIntoRamCache(); err != nil {
+			plugin.Log.Error("error reading etcd config into ram cache: ", err)
 			return err
 		}
-
 	}
 
-	if err = sfcCtrlPlugin.renderConfigFromRamCache(); err != nil {
-		log.Error("error copying config to ram cache: ", err)
+	if err := plugin.renderConfigFromRamCache(); err != nil {
+		plugin.Log.Error("error copying config to ram cache: ", err)
 		return err
 	}
 
-	sfcCtrlPlugin.ReconcileEnd()
+	plugin.ReconcileEnd()
 
-	sfcCtrlPlugin.controllerReady = true
+	plugin.controllerReady = true
 
 	return nil
 }
 
 // create the ram cache
-func (sfcCtrlPlugin *SfcControllerPluginHandler) initRamCache() {
-	sfcCtrlPlugin.ramConfigCache.EEs = make(map[string]controller.ExternalEntity)
-	sfcCtrlPlugin.ramConfigCache.HEs = make(map[string]controller.HostEntity)
-	sfcCtrlPlugin.ramConfigCache.SFCs = make(map[string]controller.SfcEntity)
+func (plugin *SfcControllerPluginHandler) initRamCache() {
+	plugin.ramConfigCache.EEs = make(map[string]controller.ExternalEntity)
+	plugin.ramConfigCache.HEs = make(map[string]controller.HostEntity)
+	plugin.ramConfigCache.SFCs = make(map[string]controller.SfcEntity)
+}
+
+// Dump the command line flags
+func (plugin *SfcControllerPluginHandler) logFlags() {
+	plugin.Log.Debugf("LogFlags:")
+	plugin.Log.Debugf("\tsfcConfigFile:'%s'", plugin.PluginConfig.GetConfigName())
+	plugin.Log.Debugf("\tcleanSfcDatastore:'%s'", cleanSfcDatastore)
 }
 
 // perform close down procedures
-func (sfcCtrlPlugin *SfcControllerPluginHandler) Close() error {
+func (plugin *SfcControllerPluginHandler) Close() error {
 	return safeclose.Close(extentitydriver.EEOperationChannel)
 }

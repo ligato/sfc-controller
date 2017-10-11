@@ -18,9 +18,7 @@
 package core
 
 import (
-	"github.com/ghodss/yaml"
 	"github.com/ligato/sfc-controller/controller/model/controller"
-	"io/ioutil"
 )
 
 type YamlConfig struct {
@@ -31,44 +29,40 @@ type YamlConfig struct {
 	SFCs        []controller.SfcEntity      `json:"sfc_entities"`
 }
 
-// open the file and parse the yaml into the json datastructure
-func (sfcCtrlPlugin *SfcControllerPluginHandler) readConfigFromFile(fpath string) error {
+// open the file and parse the yaml into the go datastructure YamlConfig
+func (plugin *SfcControllerPluginHandler) readConfigFromFile() (
+	cfc *YamlConfig, found bool, err error) {
 
-	log.Debugf("fpath of sfc-config: '%s'", fpath)
+	plugin.Log.Debugf("sfc-config loading: '%s'", plugin.PluginConfig.GetConfigName())
 
-	b, err := ioutil.ReadFile(fpath)
-	if err != nil {
-		return err
+	yamlConfig := &YamlConfig{}
+	found, err = plugin.PluginConfig.GetValue(yamlConfig)
+	if !found || err != nil {
+		return nil, found, err
 	}
 
-	sfcCtrlPlugin.yamlConfig = &YamlConfig{}
+	plugin.Log.Debugf("sfc-config loaded: '%s'", yamlConfig)
 
-	if err := yaml.Unmarshal(b, sfcCtrlPlugin.yamlConfig); err != nil {
-		return err
-	}
-
-	log.Debugf("sfc-config: '%s'", sfcCtrlPlugin.yamlConfig)
-
-	return nil
+	return yamlConfig, true, nil
 }
 
 // read external, hosts and chains, and render config via CNP and EE drivers
-func (sfcCtrlPlugin *SfcControllerPluginHandler) copyYamlConfigToRamCache() error {
+func (plugin *SfcControllerPluginHandler) copyYamlConfigToRamCache(yamlConfig *YamlConfig) error {
 
-	for _, ee := range sfcCtrlPlugin.yamlConfig.EEs {
-		sfcCtrlPlugin.ramConfigCache.EEs[ee.Name] = ee
-		log.Debugf("copyYamlConfigToRamCache: ee: ", ee)
+	for _, ee := range yamlConfig.EEs {
+		plugin.ramConfigCache.EEs[ee.Name] = ee
+		plugin.Log.Debugf("copyYamlConfigToRamCache: ee: ", ee)
 	}
-	for _, he := range sfcCtrlPlugin.yamlConfig.HEs {
-		sfcCtrlPlugin.ramConfigCache.HEs[he.Name] = he
-		log.Debugf("copyYamlConfigToRamCache: he: ", he)
+	for _, he := range yamlConfig.HEs {
+		plugin.ramConfigCache.HEs[he.Name] = he
+		plugin.Log.Debugf("copyYamlConfigToRamCache: he: ", he)
 	}
-	for _, sfc := range sfcCtrlPlugin.yamlConfig.SFCs {
-		sfcCtrlPlugin.ramConfigCache.SFCs[sfc.Name] = sfc
-		log.Debugf("copyYamlConfigToRamCache: sfc: ", sfc)
-		log.Debugf("copyYamlConfigToRamCache: num_chain_elements=%d", len(sfc.GetElements()))
+	for _, sfc := range yamlConfig.SFCs {
+		plugin.ramConfigCache.SFCs[sfc.Name] = sfc
+		plugin.Log.Debugf("copyYamlConfigToRamCache: sfc: ", sfc)
+		plugin.Log.Debugf("copyYamlConfigToRamCache: num_chain_elements=%d", len(sfc.GetElements()))
 		for i, sfcChainElement := range sfc.GetElements() {
-			log.Debugf("copyYamlConfigToRamCache: sfc_chain_element[%d]=", i, sfcChainElement)
+			plugin.Log.Debugf("copyYamlConfigToRamCache: sfc_chain_element[%d]=", i, sfcChainElement)
 		}
 	}
 

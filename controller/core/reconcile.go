@@ -31,56 +31,56 @@ import (
 type ReconcileVppLabelsMapType map[string]struct{}
 
 // ReconcileInit: initialize the map of all etcd vpp/agent labels
-func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileInit() error {
+func (plugin *SfcControllerPluginHandler) ReconcileInit() error {
 
-	sfcCtrlPlugin.ReconcileVppLabelsMap = make(ReconcileVppLabelsMapType)
+	plugin.ReconcileVppLabelsMap = make(ReconcileVppLabelsMapType)
 
 	return nil
 }
 
 // ReconcileStart: init the reconcile procedure for all plugins
-func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileStart() error {
+func (plugin *SfcControllerPluginHandler) ReconcileStart() error {
 
-	log.Info("ReconcileStart: enter ...")
-	defer log.Info("ReconcileStart: exit ...")
+	plugin.Log.Info("ReconcileStart: enter ...")
+	defer plugin.Log.Info("ReconcileStart: exit ...")
 
-	for k, _ := range sfcCtrlPlugin.ReconcileVppLabelsMap {
-		delete(sfcCtrlPlugin.ReconcileVppLabelsMap, k)
+	for k, _ := range plugin.ReconcileVppLabelsMap {
+		delete(plugin.ReconcileVppLabelsMap, k)
 	}
-	sfcCtrlPlugin.ReconcileLoadAllVppLabels()
+	plugin.ReconcileLoadAllVppLabels()
 
-	sfcCtrlPlugin.CNPDriver.ReconcileStart(sfcCtrlPlugin.ReconcileVppLabelsMap)
+	plugin.CNPDriver.ReconcileStart(plugin.ReconcileVppLabelsMap)
 
 	return nil
 }
 
 // ReconcileEnd: perform post processing of the reconcile procedure
-func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileEnd() error {
+func (plugin *SfcControllerPluginHandler) ReconcileEnd() error {
 
-	log.Info("ReconcileEnd: begin ...")
-	defer log.Info("ReconcileEnd: exit ...")
+	plugin.Log.Info("ReconcileEnd: begin ...")
+	defer plugin.Log.Info("ReconcileEnd: exit ...")
 
-	sfcCtrlPlugin.CNPDriver.ReconcileEnd()
+	plugin.CNPDriver.ReconcileEnd()
 
 	return nil
 }
 
 // ReconcileLoadAllVppLabels: retrieve all vpp lavels from the etcd datastore
-func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileLoadAllVppLabels() {
+func (plugin *SfcControllerPluginHandler) ReconcileLoadAllVppLabels() {
 
-	log.Info("ReconcileLoadAllVppLabels: begin ...")
-	defer log.Info("ReconcileLoadAllVppLabels: exit ...")
+	plugin.Log.Info("ReconcileLoadAllVppLabels: begin ...")
+	defer plugin.Log.Info("ReconcileLoadAllVppLabels: exit ...")
 
-	keyIter, err := sfcCtrlPlugin.db.ListKeys(utils.GetVppAgentPrefix())
+	keyIter, err := plugin.db.ListKeys(utils.GetVppAgentPrefix())
 	if err == nil {
 
 		for {
 			if key, _, done := keyIter.GetNext(); !done {
 				label := utils.GetVppEtcdlabel(key)
-				_, exists := sfcCtrlPlugin.ReconcileVppLabelsMap[label]
+				_, exists := plugin.ReconcileVppLabelsMap[label]
 				if !exists {
-					log.Info("ReconcileLoadAllVppLabels: adding label to reconcile label map: ", label)
-					sfcCtrlPlugin.ReconcileVppLabelsMap[label] = struct{}{}
+					plugin.Log.Info("ReconcileLoadAllVppLabels: adding label to reconcile label map: ", label)
+					plugin.ReconcileVppLabelsMap[label] = struct{}{}
 				}
 				continue
 			}
