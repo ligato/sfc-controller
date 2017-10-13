@@ -85,7 +85,9 @@ func (plugin *SfcControllerPluginHandler) renderExternalEntity(ee *controller.Ex
 		plugin.Log.Infof("WireInternalsForExternalEntity: ee:'%s'", ee.Name)
 		plugin.CNPDriver.WireInternalsForExternalEntity(ee)
 
-		plugin.ExtEntityDriver.WireInternalsForExternalEntity(ee)
+		if plugin.ExtEntityDriver != nil {
+			plugin.ExtEntityDriver.WireInternalsForExternalEntity(ee)
+		}
 	}
 
 	if wireToOtherEntities {
@@ -95,7 +97,9 @@ func (plugin *SfcControllerPluginHandler) renderExternalEntity(ee *controller.Ex
 
 			// call the external entity api to queue a msg so that the external router config will be sent to the router
 			// this will be replace perhaps by a watcher in the ext-ent driver
-			plugin.ExtEntityDriver.WireHostEntityToExternalEntity(&he, ee)
+			if plugin.ExtEntityDriver != nil {
+				plugin.ExtEntityDriver.WireHostEntityToExternalEntity(&he, ee)
+			}
 		}
 	}
 

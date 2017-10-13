@@ -26,7 +26,7 @@ import (
 // HostEntityIdxRW thread-safe access to RAM Cache
 type HostEntityIdxRW interface {
 	GetHostEntity(hostEntityName string) (entity *controller.HostEntity, found bool)
-	PutHostEntity(*controller.HostEntity)
+	PutHostEntity(*controller.HostEntity) error
 	ListHostEntities() []*controller.HostEntity
 	ValidateHostEntity(*controller.HostEntity) error
 }
@@ -100,19 +100,10 @@ func (plugin *SfcControllerRPC) processHostEntityPost(formatter *render.Render, 
 		formatter.JSON(w, http.StatusBadRequest, "json name does not match url name")
 		return
 	}
-	plugin.SFCNorthbound.PutHostEntity(&he)
-
-	//TODO do this outside rest package (watcher)
-	//if err := sfcplg.DatastoreHostEntityCreate(&he); err != nil {
-	//	formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
-	//	return
-	//}
-
-	//TODO do this outside rest package (watcher)
-	//if err := sfcplg.renderHostEntity(&he, true, true); err != nil {
-	//	formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
-	//	return
-	//}
+	if err := plugin.SFCNorthbound.PutHostEntity(&he); err != nil {
+		formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
+		return
+	}
 
 	formatter.JSON(w, http.StatusOK, nil)
 }

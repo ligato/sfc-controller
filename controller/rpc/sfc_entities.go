@@ -26,7 +26,7 @@ import (
 // SFCEntityIdxRW thread-safe access to RAM Cache
 type SFCEntityIdxRW interface {
 	GetSFCEntity(sfcName string) (entity *controller.SfcEntity, found bool)
-	PutSFCEntity(*controller.SfcEntity)
+	PutSFCEntity(*controller.SfcEntity) error
 	ListSFCEntities() []*controller.SfcEntity
 	ValidateSFCEntity(*controller.SfcEntity) error
 }
@@ -102,19 +102,10 @@ func (plugin *SfcControllerRPC) processSfcChainPost(formatter *render.Render, w 
 		return
 	}
 
-	plugin.SFCNorthbound.PutSFCEntity(&sfc)
-
-	//TODO do this outside rest package (watcher)
-	//if err := sfcplg.DatastoreSfcEntityCreate(&sfc); err != nil {
-	//	formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
-	//	return
-	//}
-
-	//TODO do this outside rest package (watcher)
-	//if err := sfcplg.renderServiceFunctionEntity(&sfc); err != nil {
-	//	formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
-	//	return
-	//}
+	if err := plugin.SFCNorthbound.PutSFCEntity(&sfc); err != nil {
+		formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
+		return
+	}
 
 	formatter.JSON(w, http.StatusOK, nil)
 }

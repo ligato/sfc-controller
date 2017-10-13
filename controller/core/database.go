@@ -316,11 +316,20 @@ func (plugin *SfcControllerPluginHandler) GetExternalEntity(externalEntityName s
 }
 
 // PutExternalEntity updates RAM cache & ETCD
-func (plugin *SfcControllerPluginHandler) PutExternalEntity(ee *controller.ExternalEntity) {
-	//TODO - do this thread safe
+func (plugin *SfcControllerPluginHandler) PutExternalEntity(ee *controller.ExternalEntity) error {
+	if err := plugin.DatastoreExternalEntityPut(ee); err != nil {
+		return err
+	}
+
+	//TODO - do this thread safe using sync.Map
 	plugin.ramConfigCache.EEs[ee.Name] = *ee
-	plugin.DatastoreExternalEntityPut(ee)
-	//TODO fire event go channel (to process this using watcher pattern)
+
+	//TODO do this outside rest package (watcher)
+	if err := plugin.renderExternalEntity(ee, true, true); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ListExternalEntities lists RAM cache
@@ -341,11 +350,21 @@ func (plugin *SfcControllerPluginHandler) GetHostEntity(hostEntityName string) (
 }
 
 // PutHostEntity updates RAM cache & ETCD
-func (plugin *SfcControllerPluginHandler) PutHostEntity(he *controller.HostEntity) {
-	//TODO - do this thread safe
-	plugin.ramConfigCache.HEs[he.Name] = *he
+func (plugin *SfcControllerPluginHandler) PutHostEntity(he *controller.HostEntity) error {
 	//TODO fire event go channel (to process this using watcher pattern)
-	plugin.DatastoreHostEntityPut(he)
+	if err := plugin.DatastoreHostEntityPut(he); err != nil {
+		return err
+	}
+
+	//TODO - do this thread safe using sync.Map
+	plugin.ramConfigCache.HEs[he.Name] = *he
+
+	//TODO do this outside rest package (watcher)
+	if err := plugin.renderHostEntity(he, true, true); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ListHostEntities lists RAM cache
@@ -366,11 +385,21 @@ func (plugin *SfcControllerPluginHandler) GetSFCEntity(sfcName string) (entity *
 }
 
 // PutHostEntity updates RAM cache & ETCD
-func (plugin *SfcControllerPluginHandler) PutSFCEntity(sfc *controller.SfcEntity) {
-	//TODO - do this thread safe
-	plugin.ramConfigCache.SFCs[sfc.Name] = *sfc
+func (plugin *SfcControllerPluginHandler) PutSFCEntity(sfc *controller.SfcEntity) error {
 	//TODO fire event go channel (to process this using watcher pattern)
-	plugin.DatastoreSfcEntityPut(sfc)
+	if err := plugin.DatastoreSfcEntityPut(sfc); err != nil {
+		return err
+	}
+
+	//TODO - do this thread safe using sync.Map
+	plugin.ramConfigCache.SFCs[sfc.Name] = *sfc
+
+	//TODO do this outside this package (watcher)
+	if err := plugin.renderServiceFunctionEntity(sfc); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // ListHostEntities lists RAM cache

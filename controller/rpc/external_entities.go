@@ -26,7 +26,7 @@ import (
 // ExternalEntityIdxRW thread-safe access to RAM Cache
 type ExternalEntityIdxRW interface {
 	GetExternalEntity(externalEntityName string) (entity *controller.ExternalEntity, found bool)
-	PutExternalEntity(*controller.ExternalEntity)
+	PutExternalEntity(*controller.ExternalEntity) error
 	ListExternalEntities() []*controller.ExternalEntity
 	ValidateExternalEntity(*controller.ExternalEntity) error
 }
@@ -102,19 +102,10 @@ func (plugin *SfcControllerRPC) processExternalEntityPost(formatter *render.Rend
 		return
 	}
 
-	plugin.SFCNorthbound.PutExternalEntity(&ee)
-
-	//TODO do this outside rest package (watcher)
-	//if err := sfcplg.DatastoreExternalEntityCreate(&ee); err != nil {
-	//	formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
-	//	return
-	//}
-
-	//TODO do this outside rest package (watcher)
-	//if err := sfcplg.renderExternalEntity(&ee, true, true); err != nil {
-	//	formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
-	//	return
-	//}
+	if err := plugin.SFCNorthbound.PutExternalEntity(&ee); err != nil {
+		formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
+		return
+	}
 
 	formatter.JSON(w, http.StatusOK, nil)
 }

@@ -28,10 +28,10 @@ func Test(t *testing.T) {
 				suite := &basicTCSuite{T: t}
 				suite.TC01ResyncEmptyVpp1Agent(&sfctestdata.VPP1MEMIF2_Loopback_VETH, VPP1MEMIF2_Loopback_VETH...)
 			})
-/*			t.Run("TC02HTTPPost", func(t *testing.T) {
+			t.Run("TC02HTTPPost", func(t *testing.T) {
 				suite := &basicTCSuite{T: t}
 				suite.TC02HTTPPost(&sfctestdata.VPP1MEMIF2_Loopback_VETH, VPP1MEMIF2_Loopback_VETH...)
-			})*/
+			})
 		})
 		doneChan <- struct{}{}
 	}()
