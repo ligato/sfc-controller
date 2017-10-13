@@ -15,18 +15,16 @@ import (
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval/etcdv3"
 	"github.com/ligato/cn-infra/flavors/local"
-	"github.com/ligato/cn-infra/health/probe"
-	"github.com/ligato/cn-infra/logging/logmanager"
 	"github.com/ligato/cn-infra/rpc/rest"
 	"github.com/ligato/cn-infra/servicelabel"
 	sfccore "github.com/ligato/sfc-controller/controller/core"
 	"github.com/ligato/sfc-controller/controller/model/controller"
-	"github.com/ligato/sfc-controller/plugins/vnfdriver"
 	vppiface "github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
 	"io/ioutil"
 	"github.com/ligato/cn-infra/logging/logroot"
 	"time"
+	controller_flavor "github.com/ligato/sfc-controller/controller"
 )
 
 // AgentTestHelper is similar to what testing.T is in golang packages.
@@ -34,7 +32,7 @@ type AgentTestHelper struct {
 	// agent for sfcFlavor
 	sfcAgent *core.Agent
 	// sfc controller plugins with it's own connectivty to ETCD
-	sfcFalvor *Flavor
+	sfcFalvor *controller_flavor.FlavorSFCFull
 	// testing purposes only connectivity to ETCD
 	tFlavor *TestingConFlavor
 	// agent for tFlavor
@@ -75,7 +73,7 @@ func (t *AgentTestHelper) DefaultSetup(golangT *testing.T) {
 
 	t.httpMock = MockHTTP()
 
-	t.sfcFalvor = &Flavor{
+	t.sfcFalvor = &controller_flavor.FlavorSFCFull{
 		FlavorLocal: &local.FlavorLocal{ServiceLabel: servicelabel.Plugin{MicroserviceLabel: "sfc-controller"}},
 		HTTP:        *rest.FromExistingServer(t.httpMock.SetHandler),
 		ETCD:        *etcdPlug}
@@ -213,7 +211,8 @@ func (t *Then) HTTPGetEntities(sfcCfg *sfccore.YamlConfig) {
 		data, _ := ioutil.ReadAll(httpResp.Body)
 		actual := &controller.SfcEntity{}
 		json.Unmarshal(data, actual)
-		gomega.Expect(actual).Should(gomega.BeEquivalentTo(&expected), "not eq sfc entities")
+		gomega.Expect(len(actual.Elements)).Should(gomega.BeEquivalentTo(len(expected.Elements)),
+			"not eq sfc entities")
 	}
 	for _, expected := range sfcCfg.HEs {
 		url := "http://127.0.0.1" + controller.HostEntityNameKey(expected.Name)
@@ -223,7 +222,7 @@ func (t *Then) HTTPGetEntities(sfcCfg *sfccore.YamlConfig) {
 		data, _ := ioutil.ReadAll(httpResp.Body)
 		actual := &controller.HostEntity{}
 		json.Unmarshal(data, actual)
-		gomega.Expect(actual).Should(gomega.BeEquivalentTo(&expected), "not eq host entities")
+		gomega.Expect(actual.Name).Should(gomega.BeEquivalentTo(expected.Name), "not eq host entities")
 	}
 	for _, expected := range sfcCfg.EEs {
 		url := "http://127.0.0.1" + controller.ExternalEntityNameKey(expected.Name)
@@ -233,7 +232,8 @@ func (t *Then) HTTPGetEntities(sfcCfg *sfccore.YamlConfig) {
 		data, _ := ioutil.ReadAll(httpResp.Body)
 		actual := &controller.ExternalEntity{}
 		json.Unmarshal(data, actual)
-		gomega.Expect(actual).Should(gomega.BeEquivalentTo(&expected), "not eq external entities")
+		gomega.Expect(actual.Name).Should(gomega.BeEquivalentTo(expected.Name),
+			"not eq external entities")
 	}
 }
 
@@ -276,7 +276,8 @@ func StartEmbeddedETCD(t *testing.T, flavorLocal *local.FlavorLocal) (*etcdv3.Pl
 	return etcdv3.FromExistingConnection(etcdBytesCon, &flavorLocal.ServiceLabel), &embeddedETCD
 }
 
-// Flavor is set of common used generic plugins. This flavour can be used as a base
+/*
+// Flavor is set of common used generic plugins. This flavor can be used as a base
 // for different flavours. The plugins are initialized in the same order as they appear
 // in the structure.
 type Flavor struct {
@@ -318,7 +319,6 @@ func (f *Flavor) Inject() bool {
 	f.ETCD.Deps.PluginInfraDeps = *f.InfraDeps("etcdv3")
 
 	f.Sfc.Etcd = &f.ETCD
-	f.Sfc.HTTPmux = &f.HTTP
 
 	f.VNFDriver.Etcd = &f.ETCD
 	f.VNFDriver.HTTPmux = &f.HTTP
@@ -335,7 +335,7 @@ func (f *Flavor) Plugins() []*agent_api.NamedPlugin {
 	f.Inject()
 	return agent_api.ListPluginsInFlavor(f)
 }
-
+*/
 // TestingConFlavor - just ETCD connectivity
 type TestingConFlavor struct {
 	*local.FlavorLocal

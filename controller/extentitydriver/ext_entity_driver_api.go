@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/ligato/sfc-controller/controller/utils"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
 	"strings"
 	"time"
 
@@ -41,11 +40,12 @@ const (
 )
 
 type EEOperation struct {
-	ee  controller.ExternalEntity
-	he  controller.HostEntity
-	op  int
-	vni uint32
-	sr  *l3.StaticRoutes_Route
+	ee      controller.ExternalEntity
+	he      controller.HostEntity
+	op      int
+	vni     uint32
+	prefix  string
+	nextHop string
 }
 
 // external entity configuration
@@ -60,23 +60,19 @@ var EEOperationChannel chan *EEOperation = make(chan *EEOperation, 100)
 
 var log = logroot.StandardLogger()
 
-func SfcExternalEntityDriverInit() {
-	go processEEOperationChannel()
-}
-
-// called from the sfcctlr l2 driver to configure the bridge, vxlan tunnel, and static route
-func SfcCtlrL2WireExternalEntityToHostEntity(ee controller.ExternalEntity, he controller.HostEntity,
-	vni uint32, sr *l3.StaticRoutes_Route) error {
+// WireHostEntityToExternalEntity configures the bridge, vxlan tunnel, and static route
+func (plugin *Plugin) WireHostEntityToExternalEntity(he *controller.HostEntity, ee *controller.ExternalEntity) error {
 
 	switch ee.EeDriverType {
 	case controller.ExtEntDriverType_EE_DRIVER_TYPE_IOSXE_SSH:
 
 		eeOp := &EEOperation{
-			ee:  ee,
-			he:  he,
-			op:  EE_OP_SFC_CTLR_L2_EE_TO_HE_SSH,
-			vni: vni,
-			sr:  sr,
+			ee:      *ee,
+			he:      *he,
+			op:      EE_OP_SFC_CTLR_L2_EE_TO_HE_SSH,
+			vni:     he.Vni,
+			prefix:  he.LoopbackIpv4,
+			nextHop: he.EthIpv4,
 		}
 
 		EEOperationChannel <- eeOp
@@ -84,20 +80,20 @@ func SfcCtlrL2WireExternalEntityToHostEntity(ee controller.ExternalEntity, he co
 		return nil
 
 	default:
-		log.Infof("SfcCtlrL2WireExternalEntityToHostEntity: NO Driver configured: ee: %s, he: %s, vni: %d, static route: %s",
-			ee.Name, he.Name, vni, sr.String())
+		log.Infof("WireHostEntityToExternalEntity: NO Driver configured: ee: %s, he: %s, vni: %d, static route: %s -> %s",
+			ee.Name, he.Name, he.Vni, he.LoopbackIpv4, he.EthIpv4)
 	}
 	return nil
 }
 
-// called from the sfcctlr l2 driver to configure basic entities in prep for connecting to all hosts
-func SfcCtlrL2WireExternalEntityInternals(ee controller.ExternalEntity) error {
+// WireInternalsForExternalEntity configures basic entities in prep for connecting to all hosts
+func (plugin *Plugin) WireInternalsForExternalEntity(ee *controller.ExternalEntity) error {
 
 	switch ee.EeDriverType {
 	case controller.ExtEntDriverType_EE_DRIVER_TYPE_IOSXE_SSH:
 
 		eeOp := &EEOperation{
-			ee: ee,
+			ee: *ee,
 			op: EE_OP_SFC_CTLR_L2_EE_INTERNALS_SSH,
 		}
 
@@ -106,7 +102,7 @@ func SfcCtlrL2WireExternalEntityInternals(ee controller.ExternalEntity) error {
 		return nil
 
 	default:
-		log.Infof("SfcCtlrL2WireExternalEntityInternals: NO Driver configured: ee: %s", ee.Name)
+		log.Infof("WireInternalsForExternalEntity: NO Driver configured: ee: %s", ee.Name)
 	}
 	return nil
 }
@@ -121,7 +117,7 @@ func processEEOperationChannel() {
 
 		switch eeOp.op {
 		case EE_OP_SFC_CTLR_L2_EE_TO_HE_SSH:
-			sfcCtlrL2WireExternalEntityToHostEntityUsingCli(&eeOp.ee, &eeOp.he, eeOp.vni, eeOp.sr)
+			sfcCtlrL2WireExternalEntityToHostEntityUsingCli(&eeOp.ee, &eeOp.he, eeOp.vni, eeOp.prefix, eeOp.nextHop)
 		case EE_OP_SFC_CTLR_L2_EE_INTERNALS_SSH:
 			sfcCtlrL2WireExternalEntityInternalsUsingCli(&eeOp.ee)
 
@@ -130,10 +126,10 @@ func processEEOperationChannel() {
 }
 
 func sfcCtlrL2WireExternalEntityToHostEntityUsingCli(ee *controller.ExternalEntity, he *controller.HostEntity,
-	vni uint32, sr *l3.StaticRoutes_Route) error {
+	vni uint32, prefix string, nextHop string) error {
 
-	log.Infof("sfcCtlrL2WireExternalEntityToHostEntityUsingCli: creating an ssh session (dstIP:%s) ee: %s, he: %s, vni: %d, bd: %s, static route: %s",
-		ee.MgmntIpAddress, ee.Name, he.Name, vni, sr.String())
+	log.Infof("sfcCtlrL2WireExternalEntityToHostEntityUsingCli: creating an ssh session (dstIP:%s) ee: %s, he: %s, vni: %d, bd: %s, static route: %s -> %s",
+		ee.MgmntIpAddress, ee.Name, he.Name, vni, prefix, nextHop)
 
 	s, err := connectToRouter(ee.MgmntIpAddress, ee.MgmntPort, ee.BasicAuthUser, ee.BasicAuthPasswd)
 	if err != nil {
@@ -143,11 +139,11 @@ func sfcCtlrL2WireExternalEntityToHostEntityUsingCli(ee *controller.ExternalEnti
 	defer s.Close()
 
 	// configure static route
-	ip := utils.TruncateString(sr.DstIpAddr, strings.Index(sr.DstIpAddr, "/"))
+	ip := utils.TruncateString(prefix, strings.Index(prefix, "/"))
 	err = s.AddStaticRoute(
 		&iosxe.StaticRoute{
 			ip + "/32",
-			sr.NextHopAddr,
+			nextHop,
 			"",
 		})
 	if err != nil {

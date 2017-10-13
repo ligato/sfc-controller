@@ -28,7 +28,10 @@ import (
 	"time"
 	"github.com/ligato/sfc-controller/controller/cnpdriver"
 	"github.com/ligato/sfc-controller/controller/rpc"
+	"github.com/ligato/sfc-controller/controller/extentitydriver"
 )
+
+var checkPlugin agent_api.Plugin
 
 // NewAgent returns a new instance of the Agent with plugins.
 // <opts> example NewAgent(WithCustomPlugin(func(flavor *FlavorSFCFull) {
@@ -92,9 +95,10 @@ type FlavorSFCFull struct {
 	LogMngRPC logmanager.Plugin
 	ETCD      etcdv3.Plugin
 
-	Sfc       core.SfcControllerPluginHandler
-	SfcRPC    rpc.SfcControllerRPC
-	VNFDriver vnfdriver.Plugin
+	Sfc          core.SfcControllerPluginHandler
+	SfcRPC       rpc.SfcControllerRPC
+	VNFDriver    vnfdriver.Plugin
+	ExtEntDriver extentitydriver.Plugin
 
 	injected bool
 }
@@ -129,17 +133,24 @@ func (f *FlavorSFCFull) Inject() bool {
 
 	f.ETCD.Deps.PluginInfraDeps = *f.InfraDeps("etcdv3")
 
-	if f.Sfc.CNPDriver == nil {
-		f.Sfc.CNPDriver = cnpdriver.NewSfcCtlrL2CNPDriver("sfcctlrl2", f.ETCD.NewBroker)
+	if f.Sfc.Deps.CNPDriver == nil {
+		f.Sfc.Deps.CNPDriver = cnpdriver.NewSfcCtlrL2CNPDriver("sfcctlrl2", f.ETCD.NewBroker)
+	}
+	if f.Sfc.Deps.ExtEntityDriver == nil {
+		f.Sfc.Deps.ExtEntityDriver = &f.ExtEntDriver
 	}
 
+	checkPlugin = &f.Sfc
 	f.Sfc.Deps.PluginInfraDeps = *f.InfraDeps("sfc",
 		local.WithConf("Name of a sfc config (yaml) file to load at startup", "sfc.conf"))
 	f.Sfc.Deps.Etcd = &f.ETCD
+
+	checkPlugin = &f.SfcRPC
 	f.SfcRPC.Deps.HTTP = &f.HTTP
 	f.SfcRPC.Deps.PluginLogDeps = *f.LogDeps("sfc-rpc")
 	f.SfcRPC.Deps.SFCNorthbound = &f.Sfc
 
+	checkPlugin = &f.VNFDriver
 	f.VNFDriver.Etcd = &f.ETCD
 	f.VNFDriver.HTTPmux = &f.HTTP
 

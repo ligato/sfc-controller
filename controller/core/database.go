@@ -382,3 +382,30 @@ func (plugin *SfcControllerPluginHandler) ListSFCEntities() []*controller.SfcEnt
 	}
 	return ret
 }
+
+// WatchHostEntity allows other plugins to receive Host Entity northbound configuration changes
+func (plugin *SfcControllerPluginHandler) WatchHostEntity(subscriberName string,
+	callback func(*controller.HostEntity) error) error {
+
+	plugin.ramConfigCache.watcherHEs[subscriberName] = callback
+
+	return nil
+}
+
+// WatchSFCEntity allows other plugins to receive SFC Entity northbound configuration changes
+func (plugin *SfcControllerPluginHandler) WatchSFCEntity(subscriberName string,
+	callback func(*controller.SfcEntity) error) error {
+
+	plugin.ramConfigCache.watcherSFCs[subscriberName] = callback
+
+	return nil
+}
+
+// WatchExternalEntity allows other plugins to receive External Entity northbound configuration changes
+func (plugin *SfcControllerPluginHandler) WatchExternalEntity(subscriberName string,
+	callback func(*controller.ExternalEntity) error) error {
+
+	plugin.ramConfigCache.watcherEEs[subscriberName] = callback
+
+	return nil
+}

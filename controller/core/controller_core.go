@@ -23,6 +23,7 @@ import (
 	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/namsral/flag"
 	"github.com/ligato/cn-infra/flavors/local"
+	"github.com/ligato/sfc-controller/controller/cnpdriver"
 )
 
 var (
@@ -64,6 +65,9 @@ type SfcControllerPluginHandler struct {
 type Deps struct {
 	Etcd keyval.KvProtoPlugin //inject
 	local.PluginInfraDeps
+
+	CNPDriver       cnpdriver.SfcControllerCNPDriverAPI
+	ExtEntityDriver cnpdriver.WireExtEntity
 }
 
 // sequencer groups all sequences needed for model/controller/controller.proto
@@ -107,21 +111,21 @@ func (plugin *SfcControllerPluginHandler) Init() error {
 			plugin.Log.Error("error copying config to ram cache: ", err)
 			return err
 		}
-
-		if err := plugin.validateRamCache(); err != nil {
-			plugin.Log.Error("error validating ram cache: ", err)
-			return err
-		}
-
-		if err := plugin.WriteRamCacheToEtcd(); err != nil {
-			plugin.Log.Error("error writing ram config to etcd datastore: ", err)
-			return err
-		}
 	} else { // read config database into ramCache
 		if err := plugin.ReadEtcdDatastoreIntoRamCache(); err != nil {
 			plugin.Log.Error("error reading etcd config into ram cache: ", err)
 			return err
 		}
+	}
+
+	if err := plugin.validateRamCache(); err != nil {
+		plugin.Log.Error("error validating ram cache: ", err)
+		return err
+	}
+
+	if err := plugin.WriteRamCacheToEtcd(); err != nil {
+		plugin.Log.Error("error writing ram config to etcd datastore: ", err)
+		return err
 	}
 
 	if err := plugin.renderConfigFromRamCache(); err != nil {

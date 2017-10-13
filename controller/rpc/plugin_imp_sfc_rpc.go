@@ -49,7 +49,7 @@ type SFCNorthboundRW interface {
 }
 
 // Init registers the handler funcs for GET and POST, TODO PUT/DELETE
-func (plugin *SfcControllerRPC) Init() {
+func (plugin *SfcControllerRPC) Init() error {
 	plugin.Log.Infof("InitHttpHandlers: registering controller URLs")
 
 	url := fmt.Sprintf(controller.ExternalEntityKeyPrefix()+"{%s}", entityName)
@@ -64,4 +64,6 @@ func (plugin *SfcControllerRPC) Init() {
 	url = fmt.Sprintf(controller.SfcEntityKeyPrefix()+"{%s}", entityName)
 	plugin.HTTP.RegisterHTTPHandler(url, plugin.sfcChainHandler, "GET", "POST")
 	plugin.HTTP.RegisterHTTPHandler(controller.SfcEntityHttpPrefix(), plugin.sfcChainsHandler, "GET")
+
+	return nil
 }

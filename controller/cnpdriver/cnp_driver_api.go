@@ -36,10 +36,22 @@ type SfcControllerCNPDriverAPI interface {
 	GetName() string
 	ReconcileStart(vppEtcdLabels map[string]struct{}) error
 	ReconcileEnd() error
-	WireHostEntityToDestinationHostEntity(sh *controller.HostEntity, dh *controller.HostEntity) error
-	WireHostEntityToExternalEntity(he *controller.HostEntity, ee *controller.ExternalEntity) error
-	WireInternalsForHostEntity(he *controller.HostEntity) error
-	WireInternalsForExternalEntity(ee *controller.ExternalEntity) error
+
+	WireHostEntity
+	WireExtEntity
 	WireSfcEntity(sfc *controller.SfcEntity) error
+
 	Dump()
+}
+
+// WireExtEntity defines methods for wiring/rendering Ext. Entity configuration from SFC Controller model
+type WireExtEntity interface {
+	WireHostEntityToExternalEntity(he *controller.HostEntity, ee *controller.ExternalEntity) error
+	WireInternalsForExternalEntity(ee *controller.ExternalEntity) error
+}
+
+// WireHostEntity defines methods for wiring/rendering Host Entity configuration from SFC Controller model
+type WireHostEntity interface {
+	WireHostEntityToDestinationHostEntity(sh *controller.HostEntity, dh *controller.HostEntity) error
+	WireInternalsForHostEntity(he *controller.HostEntity) error
 }
