@@ -19,7 +19,6 @@ import (
 	"testing"
 
 	"github.com/ligato/cn-infra/logging"
-	log "github.com/ligato/cn-infra/logging/logrus"
 
 	"github.com/ligato/sfc-controller/controller/extentitydriver/iosxecfg/model/iosxe"
 )
