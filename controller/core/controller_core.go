@@ -57,7 +57,6 @@ type SfcControllerPluginHandler struct {
 	ramConfigCache        SfcControllerCacheType
 	controllerReady       bool
 	db                    keyval.ProtoBroker
-	ReconcileVppLabelsMap ReconcileVppLabelsMapType
 	seq                   sequencer
 }
 
@@ -95,8 +94,6 @@ func (plugin *SfcControllerPluginHandler) Init() error {
 	if cleanSfcDatastore {
 		plugin.DatastoreClean()
 	}
-
-	plugin.ReconcileInit()
 
 	plugin.ReconcileStart()
 

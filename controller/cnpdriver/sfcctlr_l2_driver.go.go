@@ -144,7 +144,7 @@ func (cnpd *sfcCtlrL2CNPDriver) GetName() string {
 }
 
 // Perform start processing for the reconcile of the CNP datastore
-func (cnpd *sfcCtlrL2CNPDriver) ReconcileStart(vppEtcdLabels map[string]struct{}) error {
+func (cnpd *sfcCtlrL2CNPDriver) ReconcileStart() error {
 
 	// The reconcile for the l2 overlay data structures consists of all the types of objects that are created as a
 	// result of processing the EEs, HEs, and SFCs.  These are interfaces, bridged domains, and static routes, etc.
@@ -175,14 +175,44 @@ func (cnpd *sfcCtlrL2CNPDriver) ReconcileStart(vppEtcdLabels map[string]struct{}
 
 	cnpd.reconcileStateSet(true)
 
-	for vppEtdLabel, _ := range vppEtcdLabels {
+	vppLabels := cnpd.reconcileLoadAllVppLabels()
+	for vppEtdLabel, _ := range vppLabels {
 		cnpd.reconcileLoadInterfacesIntoCache(vppEtdLabel)
 		cnpd.reconcileLoadLinuxInterfacesIntoCache(vppEtdLabel)
 		cnpd.reconcileLoadBridgeDomainsIntoCache(vppEtdLabel)
 		cnpd.reconcileLoadStaticRoutesIntoCache(vppEtdLabel)
 	}
+	//TODO delete obsolete vppLabels
 
 	return nil
+}
+
+// ReconcileVppLabelsMapType: track all the vpp agents in etcd
+type ReconcileVppLabelsMapType map[string]struct{}
+
+// ReconcileLoadAllVppLabels: retrieve all vpp lavels from the etcd datastore
+func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadAllVppLabels() ReconcileVppLabelsMapType {
+	ret := make(ReconcileVppLabelsMapType)
+
+	keyIter, err := cnpd.db.ListKeys(utils.GetVppAgentPrefix())
+	if err == nil {
+
+		for {
+			if key, _, done := keyIter.GetNext(); !done {
+				label := utils.GetVppEtcdlabel(key)
+				_, exists := ret[label]
+				if !exists {
+					log.Info("ReconcileLoadAllVppLabels: adding label to reconcile label map: ", label)
+					ret[label] = struct{}{}
+				}
+				continue
+			}
+			break
+		}
+
+	}
+
+	return ret
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) reconcileStateSet(state bool) {

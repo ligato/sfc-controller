@@ -34,7 +34,7 @@ import (
 // l3 and l2 overlays.
 type SfcControllerCNPDriverAPI interface {
 	GetName() string
-	ReconcileStart(vppEtcdLabels map[string]struct{}) error
+	ReconcileStart() error
 	ReconcileEnd() error
 
 	WireHostEntity

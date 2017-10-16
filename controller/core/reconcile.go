@@ -23,33 +23,13 @@
 // This module drives the resync for the plugins.
 package core
 
-import (
-	"github.com/ligato/sfc-controller/controller/utils"
-)
-
-// ReconcileVppLabelsMapType: track all the vpp agents in etcd
-type ReconcileVppLabelsMapType map[string]struct{}
-
-// ReconcileInit: initialize the map of all etcd vpp/agent labels
-func (plugin *SfcControllerPluginHandler) ReconcileInit() error {
-
-	plugin.ReconcileVppLabelsMap = make(ReconcileVppLabelsMapType)
-
-	return nil
-}
-
 // ReconcileStart: init the reconcile procedure for all plugins
 func (plugin *SfcControllerPluginHandler) ReconcileStart() error {
 
 	plugin.Log.Info("ReconcileStart: enter ...")
 	defer plugin.Log.Info("ReconcileStart: exit ...")
 
-	for k, _ := range plugin.ReconcileVppLabelsMap {
-		delete(plugin.ReconcileVppLabelsMap, k)
-	}
-	plugin.ReconcileLoadAllVppLabels()
-
-	plugin.CNPDriver.ReconcileStart(plugin.ReconcileVppLabelsMap)
+	plugin.CNPDriver.ReconcileStart()
 
 	return nil
 }
@@ -63,29 +43,4 @@ func (plugin *SfcControllerPluginHandler) ReconcileEnd() error {
 	plugin.CNPDriver.ReconcileEnd()
 
 	return nil
-}
-
-// ReconcileLoadAllVppLabels: retrieve all vpp lavels from the etcd datastore
-func (plugin *SfcControllerPluginHandler) ReconcileLoadAllVppLabels() {
-
-	plugin.Log.Info("ReconcileLoadAllVppLabels: begin ...")
-	defer plugin.Log.Info("ReconcileLoadAllVppLabels: exit ...")
-
-	keyIter, err := plugin.db.ListKeys(utils.GetVppAgentPrefix())
-	if err == nil {
-
-		for {
-			if key, _, done := keyIter.GetNext(); !done {
-				label := utils.GetVppEtcdlabel(key)
-				_, exists := plugin.ReconcileVppLabelsMap[label]
-				if !exists {
-					plugin.Log.Info("ReconcileLoadAllVppLabels: adding label to reconcile label map: ", label)
-					plugin.ReconcileVppLabelsMap[label] = struct{}{}
-				}
-				continue
-			}
-			break
-		}
-
-	}
 }
