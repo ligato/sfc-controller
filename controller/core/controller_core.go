@@ -26,15 +26,15 @@ import (
 	"github.com/ligato/sfc-controller/controller/cnpdriver"
 )
 
+const CleanSfcDatastoreFlagName = "clean"
+
 var (
 	cleanSfcDatastore bool // cli flag - see RegisterFlags
 )
 
-// Init is the Go init() function for the sfcCtrlPlugin. It should
-// contain the boiler plate initialization code that is executed
-// when the sfcCtrlPlugin is loaded into the Agent.
+// init just declares flag CleanSfcDatastoreFlagName
 func init() {
-	flag.BoolVar(&cleanSfcDatastore, "clean", false,
+	flag.BoolVar(&cleanSfcDatastore, CleanSfcDatastoreFlagName, false,
 		"Clean the SFC datastore entries")
 
 }

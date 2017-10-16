@@ -5,7 +5,6 @@ import (
 	"os/signal"
 	"testing"
 	"github.com/ligato/sfc-controller/tests/go/itest/sfctestdata"
-	//"github.com/ligato/sfc-controller/tests/go/itest/vpptestdata"
 	"github.com/ligato/sfc-controller/tests/go/itest/vpptestdata"
 	"github.com/ligato/sfc-controller/tests/go/itest/linuxtestdata"
 	"github.com/golang/protobuf/proto"
@@ -31,6 +30,14 @@ func Test(t *testing.T) {
 			t.Run("TC02HTTPPost", func(t *testing.T) {
 				suite := &basicTCSuite{T: t}
 				suite.TC02HTTPPost(&sfctestdata.VPP1MEMIF2_Loopback_VETH, VPP1MEMIF2_Loopback_VETH...)
+			})
+			t.Run("TC03CleanupAtStartupFlag", func(t *testing.T) {
+				suite := &basicTCSuite{T: t}
+				suite.TC03CleanupAtStartupFlag(&sfctestdata.VPP1MEMIF2_Loopback_VETH)
+			})
+			t.Run("TC04LoadConfigFile", func(t *testing.T) {
+				suite := &basicTCSuite{T: t}
+				suite.TC04LoadConfigFile(&sfctestdata.VPP1MEMIF2_Loopback_VETH)
 			})
 		})
 		doneChan <- struct{}{}

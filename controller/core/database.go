@@ -122,7 +122,11 @@ func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityDeleteAll() err
 	return plugin.DatastoreExternalEntityIterate(func(name string, ee *controller.ExternalEntity) {
 		key := controller.ExternalEntityNameKey(name)
 		plugin.Log.Infof("DatastoreExternalEntityDeleteAll: deleting ee: '%s': ", key, *ee)
-		plugin.db.Delete(key)
+		if existed, err := plugin.db.Delete(key); err != nil {
+			plugin.Log.Error("xxx deleted SFCs failed ", err)
+		} else {
+			plugin.Log.Info("xxx deleted SFCs existed=", existed)
+		}
 	})
 }
 
@@ -194,7 +198,11 @@ func (plugin *SfcControllerPluginHandler) DatastoreHostEntityDeleteAll() error {
 	return plugin.DatastoreHostEntityIterate(func(name string, he *controller.HostEntity) {
 		key := controller.HostEntityNameKey(name)
 		plugin.Log.Infof("DatastoreHostsEntityDeleteAll: deleting he: '%s': ", key, *he)
-		plugin.db.Delete(key)
+		if existed, err := plugin.db.Delete(key); err != nil {
+			plugin.Log.Error("xxx deleted SFCs failed ", err)
+		} else {
+			plugin.Log.Info("xxx deleted SFCs existed=", existed)
+		}
 	})
 }
 
@@ -270,7 +278,11 @@ func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityDeleteAll() error {
 	return plugin.DatastoreSfcEntityIterate(func(name string, sfc *controller.SfcEntity) {
 		key := controller.SfcEntityNameKey(name)
 		plugin.Log.Infof("DatastoreSfcEntityDeleteAll: deleting sfc: '%s': ", key, *sfc)
-		plugin.db.Delete(key) //TODO move to DatastoreSfcEntityDelete
+		if existed, err := plugin.db.Delete(key); err != nil {
+			plugin.Log.Error("xxx deleted SFCs failed ", err)
+		} else {
+			plugin.Log.Info("xxx deleted SFCs existed=", existed)
+		}
 	})
 }
 

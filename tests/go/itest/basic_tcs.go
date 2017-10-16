@@ -48,3 +48,28 @@ func (t *basicTCSuite) TC02HTTPPost(sfcCfg *sfccore.YamlConfig, vppAgentCfg ... 
 	t.Then.VppAgentCfgContains("HOST-1", vppAgentCfg...)
 	t.Then.HTTPGetEntities(sfcCfg)
 }
+
+// TC03CleanupAtStartupFlag checks that SFC Controller deletes existing ETCD configuration at startup
+// if the clean config was set
+func (t *basicTCSuite) TC03CleanupAtStartupFlag(etcdConfig *sfccore.YamlConfig) {
+	t.DefaultSetup()
+	defer t.Teardown()
+
+	t.Given.EmptyETCD()
+	t.Given.ConfigSFCviaETCD(etcdConfig)
+	t.Given.SetFlagCleanConfigSFC()
+	t.Given.StartAgent()
+	t.Then.ConfigSFCisEmpty("HOST-1")
+}
+
+// TC04LoadConfigFile checks that SFC Controller loads the configuration from config (ETCD is empty)
+func (t *basicTCSuite) TC04LoadConfigFile(sfcCfg *sfccore.YamlConfig, vppAgentCfg ... proto.Message) {
+	t.DefaultSetup()
+	defer t.Teardown()
+
+	t.Given.EmptyETCD()
+	t.Given.ConfigSFCviaFile(sfcCfg)
+	t.Given.StartAgent()
+	t.Then.VppAgentCfgContains("HOST-1", vppAgentCfg...)
+	t.Then.HTTPGetEntities(sfcCfg)
+}

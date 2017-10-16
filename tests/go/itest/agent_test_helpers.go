@@ -15,16 +15,18 @@ import (
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval/etcdv3"
 	"github.com/ligato/cn-infra/flavors/local"
+	"github.com/ligato/cn-infra/logging/logroot"
 	"github.com/ligato/cn-infra/rpc/rest"
 	"github.com/ligato/cn-infra/servicelabel"
+	controller_flavor "github.com/ligato/sfc-controller/controller"
 	sfccore "github.com/ligato/sfc-controller/controller/core"
 	"github.com/ligato/sfc-controller/controller/model/controller"
 	vppiface "github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
+	"github.com/namsral/flag"
 	"io/ioutil"
-	"github.com/ligato/cn-infra/logging/logroot"
+	"strings"
 	"time"
-	controller_flavor "github.com/ligato/sfc-controller/controller"
 )
 
 // AgentTestHelper is similar to what testing.T is in golang packages.
@@ -85,6 +87,30 @@ func (t *AgentTestHelper) DefaultSetup(golangT *testing.T) {
 	}
 
 	t.sfcAgent = core.NewAgent(logroot.StandardLogger(), 2000*time.Second, t.sfcFalvor.Plugins()...)
+}
+
+// PluginConfigMock contains fields that are returned by Getters()
+type PluginConfigMock struct {
+	Data       interface{}
+	ConfigName string
+}
+
+// GetValue returns mock.Data (previously set value)
+func (mock *PluginConfigMock) GetValue(data interface{}) (found bool, err error) {
+	serialized, err := json.Marshal(mock.Data)
+	if err != nil {
+		return false, err
+	}
+	err = json.Unmarshal(serialized, data)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// GetConfigName returns mock.ConfigName (previously set value)
+func (mock *PluginConfigMock) GetConfigName() string {
+	return mock.ConfigName
 }
 
 // StartAgent in test (if there is error than panic => fail test)
@@ -148,7 +174,7 @@ func (t *Given) ConfigSFCviaREST(cfg *sfccore.YamlConfig) {
 	}
 }
 
-// VppAgentcCfgContains
+// VppAgentcCfgContains checks for existence vpp-agent iface/bd/...
 func (t *Then) VppAgentCfgContains(micorserviceLabel string, interfaceBDEtc ...proto.Message) {
 	db := t.agentT.tFlavor.ETCD.NewBroker(servicelabel.GetDifferentAgentPrefix(micorserviceLabel))
 
@@ -172,6 +198,49 @@ func (t *Then) VppAgentCfgContains(micorserviceLabel string, interfaceBDEtc ...p
 			gomega.Expect(err).Should(gomega.BeNil(), "error reading "+key)
 			gomega.Expect(bdActual).Should(gomega.BeEquivalentTo(bdExpected), "error reading "+key)
 		}
+	}
+}
+
+// SetFlagCleanConfigSFC TODO
+func (t *Given) SetFlagCleanConfigSFC() {
+	flag.Set(sfccore.CleanSfcDatastoreFlagName, "true")
+}
+
+// ConfigSFCviaFile mocks SFC Controller PluginConfig (it overrides originally injected one)
+func (t *Given) ConfigSFCviaFile(cfg *sfccore.YamlConfig) {
+	t.agentT.sfcFalvor.Sfc.Deps.PluginConfig = &PluginConfigMock{Data: cfg}
+}
+
+// ConfigSFCisEmpty TODO
+func (t *Then) ConfigSFCisEmpty(micorserviceLabel string) {
+	const EMPTY_ARRAY = "[]"
+	{ //SFCs
+		url := "http://127.0.0.1/sfc-controller/api/v1/SFCs"
+		httpResp, err := t.agentT.httpMock.NewRequest("GET", url, nil)
+		gomega.Expect(err).Should(gomega.BeNil(), "error reading getting SFC entities")
+		gomega.Expect(httpResp.StatusCode).Should(gomega.BeEquivalentTo(200), "not HTTP 200")
+		data, _ := ioutil.ReadAll(httpResp.Body)
+		fmt.Println("xxx httpResp.Body SFCs ", string(data))
+		gomega.Expect(strings.Trim(string(data), " \n")).
+			Should(gomega.BeEquivalentTo(EMPTY_ARRAY), "no SFCs CFG are expected")
+	}
+	{ //HEs
+		url := "http://127.0.0.1/sfc-controller/api/v1/HEs"
+		httpResp, err := t.agentT.httpMock.NewRequest("GET", url, nil)
+		gomega.Expect(err).Should(gomega.BeNil(), "error reading getting HE entities")
+		gomega.Expect(httpResp.StatusCode).Should(gomega.BeEquivalentTo(200), "not HTTP 200")
+		data, _ := ioutil.ReadAll(httpResp.Body)
+		gomega.Expect(strings.Trim(string(data), " \n")).
+			Should(gomega.BeEquivalentTo(EMPTY_ARRAY), "no HEs CFG are expected")
+	}
+	{ //EEs
+		url := "http://127.0.0.1/sfc-controller/api/v1/EEs"
+		httpResp, err := t.agentT.httpMock.NewRequest("GET", url, nil)
+		gomega.Expect(err).Should(gomega.BeNil(), "error reading getting EE entities")
+		gomega.Expect(httpResp.StatusCode).Should(gomega.BeEquivalentTo(200), "not HTTP 200")
+		data, _ := ioutil.ReadAll(httpResp.Body)
+		gomega.Expect(strings.Trim(string(data), " \n")).
+			Should(gomega.BeEquivalentTo(EMPTY_ARRAY), "no EEs CFG are expected")
 	}
 }
 
