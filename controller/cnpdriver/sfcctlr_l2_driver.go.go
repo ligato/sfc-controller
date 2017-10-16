@@ -223,7 +223,7 @@ func (cnpd *sfcCtlrL2CNPDriver) ReconcileEnd() error {
 	for key := range cnpd.reconcileAfter.ifs {
 		afterIF := cnpd.reconcileAfter.ifs[key]
 		log.Info("ReconcileEnd: add i/f key to etcd: ", key, afterIF)
-		err := cnpd.db.Put(key, &afterIF)
+		err := cnpd.db.Put(key, &afterIF)//TODO do not update the thing that are the same
 		if err != nil {
 			log.Error("ReconcileEnd: error storing i/f: '%s'", key, err)
 			return err

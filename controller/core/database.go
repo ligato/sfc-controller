@@ -26,6 +26,7 @@ package core
 
 import (
 	"github.com/ligato/sfc-controller/controller/model/controller"
+	"github.com/ligato/cn-infra/datasync"
 )
 
 // flush the ram cache to the sfc cache to the tree in etcd
@@ -70,19 +71,14 @@ func (plugin *SfcControllerPluginHandler) ReadEtcdDatastoreIntoRamCache() error 
 	return nil
 }
 
-// clear the sfc tree in etcd
+// DatastoreClean clears the sfc tree in etcd (EEs, HEs, SFCs)
 func (plugin *SfcControllerPluginHandler) DatastoreClean() error {
+	plugin.Log.Infof("DatastoreClean: clearing etc tree - begin")
 
-	plugin.Log.Infof("DatastoreClean: clearing etc tree")
-
-	if err := plugin.DatastoreExternalEntityDeleteAll(); err != nil {
-		plugin.Log.Error("DatastoreClean: DatastoreExternalEntityDeleteAll: ", err)
-	}
-	if err := plugin.DatastoreHostEntityDeleteAll(); err != nil {
-		plugin.Log.Error("DatastoreClean: DatastoreHostEntityDeleteAll: ", err)
-	}
-	if err := plugin.DatastoreSfcEntityDeleteAll(); err != nil {
-		plugin.Log.Error("DatastoreClean: DatastoreSfcEntityDeleteAll: ", err)
+	if existed, err := plugin.db.Delete(controller.SfcControllerPrefix(), datasync.WithPrefix()); err != nil {
+		return err
+	} else {
+		plugin.Log.Info("DatastoreClean: clearing etc tree SUCCESSFUL; existed=", existed)
 	}
 
 	return nil
@@ -110,23 +106,6 @@ func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityRetrieveAllInto
 	return plugin.DatastoreExternalEntityIterate(func(key string, ee *controller.ExternalEntity) {
 		plugin.ramConfigCache.EEs[key] = *ee
 		plugin.Log.Infof("DatastoreExternalEntityRetrieveAllIntoRamCache: adding ee: '%s': ", key, *ee)
-	})
-}
-
-// remove the specified entities from the sfc db in etcd
-func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityDeleteAll() error {
-
-	plugin.Log.Info("DatastoreExternalEntityDeleteAll: begin ...")
-	defer plugin.Log.Info("DatastoreExternalEntityDeleteAll: exit ...")
-
-	return plugin.DatastoreExternalEntityIterate(func(name string, ee *controller.ExternalEntity) {
-		key := controller.ExternalEntityNameKey(name)
-		plugin.Log.Infof("DatastoreExternalEntityDeleteAll: deleting ee: '%s': ", key, *ee)
-		if existed, err := plugin.db.Delete(key); err != nil {
-			plugin.Log.Error("xxx deleted SFCs failed ", err)
-		} else {
-			plugin.Log.Info("xxx deleted SFCs existed=", existed)
-		}
 	})
 }
 
@@ -189,23 +168,6 @@ func (plugin *SfcControllerPluginHandler) DatastoreHostEntityRetrieveAllIntoRamC
 	})
 }
 
-// remove the specified entities from the sfc db in etcd
-func (plugin *SfcControllerPluginHandler) DatastoreHostEntityDeleteAll() error {
-
-	plugin.Log.Info("DatastoreHostEntityDeleteAll: begin ...")
-	defer plugin.Log.Info("DatastoreHostEntityDeleteAll: exit ...")
-
-	return plugin.DatastoreHostEntityIterate(func(name string, he *controller.HostEntity) {
-		key := controller.HostEntityNameKey(name)
-		plugin.Log.Infof("DatastoreHostsEntityDeleteAll: deleting he: '%s': ", key, *he)
-		if existed, err := plugin.db.Delete(key); err != nil {
-			plugin.Log.Error("xxx deleted SFCs failed ", err)
-		} else {
-			plugin.Log.Info("xxx deleted SFCs existed=", existed)
-		}
-	})
-}
-
 // iterate over the set of specified entities in the sfc tree in etcd
 func (plugin *SfcControllerPluginHandler) DatastoreHostEntityIterate(actionFunc func(key string,
 	he *controller.HostEntity)) error {
@@ -264,25 +226,6 @@ func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityRetrieveAllIntoRamCa
 	return plugin.DatastoreSfcEntityIterate(func(key string, sfc *controller.SfcEntity) {
 		plugin.ramConfigCache.SFCs[key] = *sfc
 		plugin.Log.Infof("DatastoreSfcEntityRetrieveAllIntoRamCache: adding sfc: '%s': ", key, *sfc)
-	})
-}
-
-// remove the specified entities from the sfc db in etcd
-func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityDeleteAll() error {
-
-	//TODO DELETE ALL could delete all key by prefixes db.Delete(prefix, WithPrefix())
-
-	plugin.Log.Info("DatastoreSfcEntityDeleteAll: begin ...")
-	defer plugin.Log.Info("DatastoreSfcEntityDeleteAll: exit ...")
-
-	return plugin.DatastoreSfcEntityIterate(func(name string, sfc *controller.SfcEntity) {
-		key := controller.SfcEntityNameKey(name)
-		plugin.Log.Infof("DatastoreSfcEntityDeleteAll: deleting sfc: '%s': ", key, *sfc)
-		if existed, err := plugin.db.Delete(key); err != nil {
-			plugin.Log.Error("xxx deleted SFCs failed ", err)
-		} else {
-			plugin.Log.Info("xxx deleted SFCs existed=", existed)
-		}
 	})
 }
 
