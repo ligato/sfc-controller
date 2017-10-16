@@ -19,7 +19,6 @@ package core
 
 import (
 	"github.com/ligato/sfc-controller/controller/model/controller"
-	"os"
 )
 
 // Render the config: note that because we are wiring everything, we wire only one end when we
@@ -31,39 +30,34 @@ func (plugin *SfcControllerPluginHandler) renderConfigFromRamCache() error {
 	plugin.Log.Infof("render host entities from ram cache")
 	for _, he := range plugin.ramConfigCache.HEs {
 		if err := plugin.renderHostEntity(&he, true, false); err != nil {
-			plugin.Log.Error("Error rendering host entity:", he)
-			os.Exit(1)
+			return err
 		}
 	}
 
 	plugin.Log.Infof("render external entities from ram cache")
 	for _, ee := range plugin.ramConfigCache.EEs {
 		if err := plugin.renderExternalEntity(&ee, true, false); err != nil {
-			plugin.Log.Error("Error rendering external entity:", ee)
-			os.Exit(1)
+			return err
 		}
 	}
 
 	for _, he := range plugin.ramConfigCache.HEs {
 		if err := plugin.renderHostEntity(&he, false, true); err != nil {
-			plugin.Log.Error("Error rendering host entity:", he)
-			os.Exit(1)
+			return err
 		}
 	}
 
 	plugin.Log.Infof("render external entities from ram cache")
 	for _, ee := range plugin.ramConfigCache.EEs {
 		if err := plugin.renderExternalEntity(&ee, false, true); err != nil {
-			plugin.Log.Error("Error rendering external entity:", ee)
-			os.Exit(1)
+			return err
 		}
 	}
 
 	plugin.Log.Infof("render sfc's from ram cache")
 	for _, sfc := range plugin.ramConfigCache.SFCs {
 		if err := plugin.renderServiceFunctionEntity(&sfc); err != nil {
-			plugin.Log.Error("Error rendering service function chain:", sfc)
-			os.Exit(1)
+			return err
 		}
 	}
 
