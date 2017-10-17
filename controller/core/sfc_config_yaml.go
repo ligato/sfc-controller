@@ -50,15 +50,18 @@ func (plugin *SfcControllerPluginHandler) readConfigFromFile() (
 func (plugin *SfcControllerPluginHandler) copyYamlConfigToRamCache(yamlConfig *YamlConfig) error {
 
 	for _, ee := range yamlConfig.EEs {
-		plugin.ramConfigCache.EEs[ee.Name] = ee
+		copy := ee
+		plugin.ramConfigCache.EEs.Put(&copy)
 		plugin.Log.Debugf("copyYamlConfigToRamCache: ee: ", ee)
 	}
 	for _, he := range yamlConfig.HEs {
-		plugin.ramConfigCache.HEs[he.Name] = he
+		copy := he
+		plugin.ramConfigCache.HEs.Put(&copy)
 		plugin.Log.Debugf("copyYamlConfigToRamCache: he: ", he)
 	}
 	for _, sfc := range yamlConfig.SFCs {
-		plugin.ramConfigCache.SFCs[sfc.Name] = sfc
+		copy := sfc
+		plugin.ramConfigCache.SFCs.Put(&copy)
 		plugin.Log.Debugf("copyYamlConfigToRamCache: sfc: ", sfc)
 		plugin.Log.Debugf("copyYamlConfigToRamCache: num_chain_elements=%d", len(sfc.GetElements()))
 		for i, sfcChainElement := range sfc.GetElements() {

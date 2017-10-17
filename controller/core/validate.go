@@ -24,18 +24,18 @@ import (
 
 func (plugin *SfcControllerPluginHandler) validateRamCache() error {
 
-	for _, ee := range plugin.ramConfigCache.EEs {
-		if err := plugin.ValidateExternalEntity(&ee); err != nil {
+	for _, ee := range plugin.ramConfigCache.EEs.ListValues() {
+		if err := plugin.ValidateExternalEntity(ee); err != nil {
 			return err
 		}
 	}
-	for _, he := range plugin.ramConfigCache.HEs {
-		if err := plugin.ValidateHostEntity(&he); err != nil {
+	for _, he := range plugin.ramConfigCache.HEs.ListValues() {
+		if err := plugin.ValidateHostEntity(he); err != nil {
 			return err
 		}
 	}
-	for _, sfc := range plugin.ramConfigCache.SFCs {
-		if err := plugin.ValidateSFCEntity(&sfc); err != nil {
+	for _, sfc := range plugin.ramConfigCache.SFCs.ListValues() {
+		if err := plugin.ValidateSFCEntity(sfc); err != nil {
 			return err
 		}
 	}
@@ -66,13 +66,27 @@ func (plugin *SfcControllerPluginHandler) ValidateHostEntity(he *controller.Host
 	}
 
 	if he.Vni == 0 { // if not supplied, generate one
-		plugin.seq.VLanID++ //TODO it would be nice to check if we do not have already this one (next phase)
-		he.Vni = plugin.seq.VLanID
+		vlandID := plugin.seq.incrementVLanID()
+		for {
+			if found := plugin.ramConfigCache.HEs.LookupByVlandId(vlandID); len(found) == 0 {
+				he.Vni = vlandID
+				break
+			}
+		}
 	}
 
 	if he.LoopbackMacAddr == "" { // if not supplied, generate one
-		plugin.seq.MacInstanceID++ //TODO it would be nice to check if we do not have already this one (next phase)
-		he.LoopbackMacAddr = formatMacAddress(plugin.seq.MacInstanceID)
+		for {
+			macAddr := plugin.seq.incrementMacAddr()
+
+			foundSFCs := plugin.ramConfigCache.SFCs.LookupByMacAddr(macAddr);
+			foundHEs := plugin.ramConfigCache.HEs.LookupByMacAddr(macAddr);
+
+			if  len(foundHEs) == 0 && len(foundSFCs) == 0 {
+				he.LoopbackMacAddr = macAddr
+				break
+			}
+		}
 	}
 
 	return nil
@@ -110,23 +124,45 @@ func (plugin *SfcControllerPluginHandler) ValidateSFCEntity(sfc *controller.SfcE
 	// the sfc controller can be responsible for managing the mac and ip addresses if not provided t
 	// TODO: figure out how ipam, and macam should be done, for now just start at 1 and go up :-(
 	if sfc.SfcIpv4Prefix == "" {
-		plugin.seq.IPInstanceID++ //TODO it would be nice to check if we do not have already this one (next phase)
-		sfc.SfcIpv4Prefix = formatIpv4Address(plugin.seq.IPInstanceID)
-	}
 
-	if sfc.SfcIpv4PrefixLen == 0 {
-		sfc.SfcIpv4PrefixLen = 24 //TODO it would be nice to check if we do not have already this one (next phase)
+		var ipAddrPrefixLen uint32 = 24
+		if sfc.SfcIpv4PrefixLen != 0 {
+			ipAddrPrefixLen = sfc.SfcIpv4PrefixLen
+		} else {
+			sfc.SfcIpv4PrefixLen = ipAddrPrefixLen
+		}
+
+		for {
+			ipAddr := plugin.seq.incrementIPAddr()
+
+			found := plugin.ramConfigCache.SFCs.LookupByIpAddr(fmt.Sprintf("%s/%d", ipAddr, ipAddrPrefixLen))
+			if len(found) == 0 {
+				sfc.SfcIpv4Prefix = ipAddr
+				break
+			}
+		}
 	}
 
 	for _, sfcEl := range sfc.Elements {
 		if sfcEl.MacAddr == "" {
-			plugin.seq.MacInstanceID++ //TODO it would be nice to check if we do not have already this one (next phase)
-			sfcEl.MacAddr = formatMacAddress(plugin.seq.MacInstanceID)
+			for {
+				macAddr := plugin.seq.incrementMacAddr()
+				if found := plugin.ramConfigCache.SFCs.LookupByMacAddr(macAddr); len(found) == 0 {
+					sfcEl.MacAddr = macAddr
+					break
+				}
+			}
 		}
 
 		if sfcEl.PortId == 0 { // if not supplied, generate one
-			plugin.seq.PortID++ //TODO it would be nice to check if we do not have already this one (next phase)
-			sfcEl.PortId = plugin.seq.PortID
+			for {
+				portID := plugin.seq.incrementPortID()
+
+				if found := plugin.ramConfigCache.SFCs.LookupByPortId(portID); len(found) == 0 {
+					sfcEl.PortId = portID
+					break
+				}
+			}
 		}
 	}
 
@@ -139,4 +175,36 @@ func formatMacAddress(macInstanceId uint32) string {
 
 func formatIpv4Address(ipInstanceId uint32) string {
 	return "10.0.0." + fmt.Sprintf("%d", ipInstanceId)
+}
+
+// sequencer groups all sequences needed for model/controller/controller.proto
+type sequencer struct {
+	VLanID        uint32
+	PortID        uint32
+	MacInstanceID uint32
+	IPInstanceID  uint32
+}
+
+// incrementVLanID increments VLanID seqencer and returns incremented value
+func (seq *sequencer) incrementVLanID() uint32 {
+	seq.VLanID++
+	return seq.VLanID
+}
+
+// incrementPortID increments PortID seqencer and returns incremented value
+func (seq *sequencer) incrementPortID() uint32 {
+	seq.PortID++
+	return seq.PortID
+}
+
+// incrementMacInstanceID increments MacInstanceID seqencer and returns incremented value
+func (seq *sequencer) incrementMacAddr() string {
+	seq.MacInstanceID++
+	return formatMacAddress(seq.MacInstanceID)
+}
+
+// incrementIPInstanceID increments IPInstanceID seqencer and returns incremented value
+func (seq *sequencer) incrementIPAddr() string {
+	seq.IPInstanceID++
+	return formatIpv4Address(seq.IPInstanceID)
 }

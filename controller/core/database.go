@@ -32,18 +32,18 @@ import (
 // flush the ram cache to the sfc cache to the tree in etcd
 func (plugin *SfcControllerPluginHandler) WriteRamCacheToEtcd() error {
 
-	for _, ee := range plugin.ramConfigCache.EEs {
-		if err := plugin.DatastoreExternalEntityPut(&ee); err != nil {
+	for _, ee := range plugin.ramConfigCache.EEs.ListValues() {
+		if err := plugin.DatastoreExternalEntityPut(ee); err != nil {
 			return err
 		}
 	}
-	for _, he := range plugin.ramConfigCache.HEs {
-		if err := plugin.DatastoreHostEntityPut(&he); err != nil {
+	for _, he := range plugin.ramConfigCache.HEs.ListValues() {
+		if err := plugin.DatastoreHostEntityPut(he); err != nil {
 			return err
 		}
 	}
-	for _, sfc := range plugin.ramConfigCache.SFCs {
-		if err := plugin.DatastoreSfcEntityPut(&sfc); err != nil {
+	for _, sfc := range plugin.ramConfigCache.SFCs.ListValues() {
+		if err := plugin.DatastoreSfcEntityPut(sfc); err != nil {
 			return err
 		}
 	}
@@ -104,7 +104,7 @@ func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityPut(ee *control
 func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityRetrieveAllIntoRamCache() error {
 
 	return plugin.DatastoreExternalEntityIterate(func(key string, ee *controller.ExternalEntity) {
-		plugin.ramConfigCache.EEs[key] = *ee
+		plugin.ramConfigCache.EEs.Put(ee)
 		plugin.Log.Infof("DatastoreExternalEntityRetrieveAllIntoRamCache: adding ee: '%s': ", key, *ee)
 	})
 }
@@ -137,10 +137,12 @@ func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityIterate(actionF
 	return nil
 }
 
-// Delete the specified entity from the sfc db in the etcd tree
+// DatastoreExternalEntityDelete - Delete the specified entity from the sfc db in the etcd tree
 func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityDelete(ee *controller.ExternalEntity) error {
-
-	return nil
+	key := controller.ExternalEntityNameKey(ee.Name)
+	plugin.Log.Infof("DatastoreSfcEntityDelete: deleteing key: '%s'", key)
+	_, err := plugin.db.Delete(key)
+	return err
 }
 
 // create the specified entity in the sfc db in etcd
@@ -163,7 +165,7 @@ func (plugin *SfcControllerPluginHandler) DatastoreHostEntityPut(he *controller.
 func (plugin *SfcControllerPluginHandler) DatastoreHostEntityRetrieveAllIntoRamCache() error {
 
 	return plugin.DatastoreHostEntityIterate(func(key string, he *controller.HostEntity) {
-		plugin.ramConfigCache.HEs[key] = *he
+		plugin.ramConfigCache.HEs.Put(he)
 		plugin.Log.Infof("DatastoreHostEntityRetrieveAllIntoRamCache: adding he: '%s': ", key, *he)
 	})
 }
@@ -197,10 +199,12 @@ func (plugin *SfcControllerPluginHandler) DatastoreHostEntityIterate(actionFunc 
 	return nil
 }
 
-// Delete the specified entity from the sfc db in the etcd tree
-func (plugin *SfcControllerPluginHandler) DatastoreHostEntityDelete(ee *controller.HostEntity) error {
-
-	return nil
+// DatastoreHostEntityDelete - Delete the specified entity from the sfc db in the etcd tree
+func (plugin *SfcControllerPluginHandler) DatastoreHostEntityDelete(he *controller.HostEntity) error {
+	key := controller.ExternalEntityNameKey(he.Name)
+	plugin.Log.Infof("DatastoreSfcEntityDelete: deleteing key: '%s'", key)
+	_, err := plugin.db.Delete(key)
+	return err
 }
 
 // create the specified entity in the sfc db in etcd
@@ -224,7 +228,7 @@ func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityPut(sfc *controller.
 func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityRetrieveAllIntoRamCache() error {
 
 	return plugin.DatastoreSfcEntityIterate(func(key string, sfc *controller.SfcEntity) {
-		plugin.ramConfigCache.SFCs[key] = *sfc
+		plugin.ramConfigCache.SFCs.Put(sfc)
 		plugin.Log.Infof("DatastoreSfcEntityRetrieveAllIntoRamCache: adding sfc: '%s': ", key, *sfc)
 	})
 }
@@ -258,16 +262,18 @@ func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityIterate(actionFunc f
 	return nil
 }
 
-// Delete the specified entity from the sfc db in the etcd tree
-func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityDelete(ee *controller.HostEntity) error {
-	return nil
+// DatastoreSfcEntityDelete - Delete the specified entity from the sfc db in the etcd tree
+func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityDelete(sfc *controller.SfcEntity) error {
+	key := controller.SfcEntityNameKey(sfc.Name)
+	plugin.Log.Infof("DatastoreSfcEntityDelete: deleteing key: '%s'", key)
+	_, err := plugin.db.Delete(key)
+	return err
 }
 
 // GetExternalEntity gets from RAM cache
 func (plugin *SfcControllerPluginHandler) GetExternalEntity(externalEntityName string) (entity *controller.ExternalEntity, found bool) {
-	//TODO - do this thread safe
-	ee, found := plugin.ramConfigCache.EEs[externalEntityName]
-	return &ee, found
+	ee, found := plugin.ramConfigCache.EEs.GetValue(externalEntityName)
+	return ee, found
 }
 
 // PutExternalEntity updates RAM cache & ETCD
@@ -276,8 +282,7 @@ func (plugin *SfcControllerPluginHandler) PutExternalEntity(ee *controller.Exter
 		return err
 	}
 
-	//TODO - do this thread safe using sync.Map
-	plugin.ramConfigCache.EEs[ee.Name] = *ee
+	plugin.ramConfigCache.EEs.Put(ee)
 
 	//TODO do this outside rest package (watcher)
 	if err := plugin.renderExternalEntity(ee, true, true); err != nil {
@@ -289,19 +294,17 @@ func (plugin *SfcControllerPluginHandler) PutExternalEntity(ee *controller.Exter
 
 // ListExternalEntities lists RAM cache
 func (plugin *SfcControllerPluginHandler) ListExternalEntities() []*controller.ExternalEntity {
-	//TODO - do this thread safe
 	ret := []*controller.ExternalEntity{}
-	for _, ee := range plugin.ramConfigCache.EEs {
-		ret = append(ret, &ee)
+	for _, ee := range plugin.ramConfigCache.EEs.ListValues() {
+		ret = append(ret, ee)
 	}
 	return ret
 }
 
 // GetHostEntity gets from RAM cache
 func (plugin *SfcControllerPluginHandler) GetHostEntity(hostEntityName string) (entity *controller.HostEntity, found bool) {
-	//TODO - do this thread safe
-	he, found := plugin.ramConfigCache.HEs[hostEntityName]
-	return &he, found
+	he, found := plugin.ramConfigCache.HEs.GetValue(hostEntityName)
+	return he, found
 }
 
 // PutHostEntity updates RAM cache & ETCD
@@ -311,8 +314,7 @@ func (plugin *SfcControllerPluginHandler) PutHostEntity(he *controller.HostEntit
 		return err
 	}
 
-	//TODO - do this thread safe using sync.Map
-	plugin.ramConfigCache.HEs[he.Name] = *he
+	plugin.ramConfigCache.HEs.Put(he)
 
 	//TODO do this outside rest package (watcher)
 	if err := plugin.renderHostEntity(he, true, true); err != nil {
@@ -324,30 +326,27 @@ func (plugin *SfcControllerPluginHandler) PutHostEntity(he *controller.HostEntit
 
 // ListHostEntities lists RAM cache
 func (plugin *SfcControllerPluginHandler) ListHostEntities() []*controller.HostEntity {
-	//TODO - do this thread safe
 	ret := []*controller.HostEntity{}
-	for _, he := range plugin.ramConfigCache.HEs {
-		ret = append(ret, &he)
+	for _, he := range plugin.ramConfigCache.HEs.ListValues() {
+		ret = append(ret, he)
 	}
 	return ret
 }
 
 // GetSFCEntity gets from RAM cache
 func (plugin *SfcControllerPluginHandler) GetSFCEntity(sfcName string) (entity *controller.SfcEntity, found bool) {
-	//TODO - do this thread safe
-	sfc, found := plugin.ramConfigCache.SFCs[sfcName]
-	return &sfc, found
+	sfc, found := plugin.ramConfigCache.SFCs.GetValue(sfcName)
+	return sfc, found
 }
 
-// PutHostEntity updates RAM cache & ETCD
+// PutSFCEntity updates RAM cache & ETCD
 func (plugin *SfcControllerPluginHandler) PutSFCEntity(sfc *controller.SfcEntity) error {
 	//TODO fire event go channel (to process this using watcher pattern)
 	if err := plugin.DatastoreSfcEntityPut(sfc); err != nil {
 		return err
 	}
 
-	//TODO - do this thread safe using sync.Map
-	plugin.ramConfigCache.SFCs[sfc.Name] = *sfc
+	plugin.ramConfigCache.SFCs.Put(sfc)
 
 	//TODO do this outside this package (watcher)
 	if err := plugin.renderServiceFunctionEntity(sfc); err != nil {
@@ -357,39 +356,11 @@ func (plugin *SfcControllerPluginHandler) PutSFCEntity(sfc *controller.SfcEntity
 	return nil
 }
 
-// ListHostEntities lists RAM cache
+// ListSFCEntities lists RAM cache
 func (plugin *SfcControllerPluginHandler) ListSFCEntities() []*controller.SfcEntity {
-	//TODO - do this thread safe
 	ret := []*controller.SfcEntity{}
-	for _, sfc := range plugin.ramConfigCache.SFCs {
-		ret = append(ret, &sfc)
+	for _, sfc := range plugin.ramConfigCache.SFCs.ListValues() {
+		ret = append(ret, sfc)
 	}
 	return ret
-}
-
-// WatchHostEntity allows other plugins to receive Host Entity northbound configuration changes
-func (plugin *SfcControllerPluginHandler) WatchHostEntity(subscriberName string,
-	callback func(*controller.HostEntity) error) error {
-
-	plugin.ramConfigCache.watcherHEs[subscriberName] = callback
-
-	return nil
-}
-
-// WatchSFCEntity allows other plugins to receive SFC Entity northbound configuration changes
-func (plugin *SfcControllerPluginHandler) WatchSFCEntity(subscriberName string,
-	callback func(*controller.SfcEntity) error) error {
-
-	plugin.ramConfigCache.watcherSFCs[subscriberName] = callback
-
-	return nil
-}
-
-// WatchExternalEntity allows other plugins to receive External Entity northbound configuration changes
-func (plugin *SfcControllerPluginHandler) WatchExternalEntity(subscriberName string,
-	callback func(*controller.ExternalEntity) error) error {
-
-	plugin.ramConfigCache.watcherEEs[subscriberName] = callback
-
-	return nil
 }

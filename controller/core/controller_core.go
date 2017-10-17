@@ -20,10 +20,10 @@ package core
 
 import (
 	"github.com/ligato/cn-infra/db/keyval"
-	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/namsral/flag"
 	"github.com/ligato/cn-infra/flavors/local"
 	"github.com/ligato/sfc-controller/controller/cnpdriver"
+	"github.com/ligato/sfc-controller/controller/controlleridxmap"
 )
 
 const CleanSfcDatastoreFlagName = "clean"
@@ -39,14 +39,11 @@ func init() {
 
 }
 
-// ram cache of controller entities indexed by entity name
+// SfcControllerCacheType - ram cache of controller entities indexed by entity name
 type SfcControllerCacheType struct {
-	EEs         map[string /*EE name*/ ]controller.ExternalEntity
-	HEs         map[string /*HE name*/ ]controller.HostEntity
-	SFCs        map[string /*SFC name*/ ]controller.SfcEntity
-	watcherEEs  map[string /*subscriber name*/ ]func(*controller.ExternalEntity) error
-	watcherHEs  map[string /*subscriber name*/ ]func(*controller.HostEntity) error
-	watcherSFCs map[string /*subscriber name*/ ]func(*controller.SfcEntity) error
+	EEs  controlleridxmap.ExternalEntityIdxMapRW
+	HEs  controlleridxmap.HostEntityIdxMapRW
+	SFCs controlleridxmap.SfcEntityIdxMapRW
 }
 
 // SfcControllerPluginHandler glues together:
@@ -54,10 +51,10 @@ type SfcControllerCacheType struct {
 type SfcControllerPluginHandler struct {
 	Deps
 
-	ramConfigCache        SfcControllerCacheType
-	controllerReady       bool
-	db                    keyval.ProtoBroker
-	seq                   sequencer
+	ramConfigCache  SfcControllerCacheType
+	controllerReady bool
+	db              keyval.ProtoBroker
+	seq             sequencer
 }
 
 // Deps are SfcControllerPluginHandler injected dependencies
@@ -67,14 +64,6 @@ type Deps struct {
 
 	CNPDriver       cnpdriver.SfcControllerCNPDriverAPI
 	ExtEntityDriver cnpdriver.WireExtEntity
-}
-
-// sequencer groups all sequences needed for model/controller/controller.proto
-type sequencer struct {
-	VLanID        uint32
-	PortID        uint32
-	MacInstanceID uint32
-	IPInstanceID  uint32
 }
 
 // Init the controller, read the db, reconcile/resync, render config to etcd
@@ -139,13 +128,9 @@ func (plugin *SfcControllerPluginHandler) Init() error {
 
 // create the ram cache
 func (plugin *SfcControllerPluginHandler) initRamCache() {
-	plugin.ramConfigCache.EEs = make(map[string]controller.ExternalEntity)
-	plugin.ramConfigCache.HEs = make(map[string]controller.HostEntity)
-	plugin.ramConfigCache.SFCs = make(map[string]controller.SfcEntity)
-
-	plugin.ramConfigCache.watcherEEs = make(map[string]func(*controller.ExternalEntity) error)
-	plugin.ramConfigCache.watcherHEs = make(map[string]func(*controller.HostEntity) error)
-	plugin.ramConfigCache.watcherSFCs = make(map[string]func(*controller.SfcEntity) error)
+	plugin.ramConfigCache.EEs = controlleridxmap.NewExternalEntityMap(plugin.PluginName)
+	plugin.ramConfigCache.HEs = controlleridxmap.NewHostEntityMap(plugin.PluginName)
+	plugin.ramConfigCache.SFCs = controlleridxmap.NewSfcEntityMap(plugin.PluginName)
 }
 
 // Dump the command line flags

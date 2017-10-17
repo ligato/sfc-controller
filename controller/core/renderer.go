@@ -28,35 +28,35 @@ import (
 func (plugin *SfcControllerPluginHandler) renderConfigFromRamCache() error {
 
 	plugin.Log.Infof("render host entities from ram cache")
-	for _, he := range plugin.ramConfigCache.HEs {
-		if err := plugin.renderHostEntity(&he, true, false); err != nil {
+	for _, he := range plugin.ramConfigCache.HEs.ListValues() {
+		if err := plugin.renderHostEntity(he, true, false); err != nil {
 			return err
 		}
 	}
 
 	plugin.Log.Infof("render external entities from ram cache")
-	for _, ee := range plugin.ramConfigCache.EEs {
-		if err := plugin.renderExternalEntity(&ee, true, false); err != nil {
+	for _, ee := range plugin.ramConfigCache.EEs.ListValues() {
+		if err := plugin.renderExternalEntity(ee, true, false); err != nil {
 			return err
 		}
 	}
 
-	for _, he := range plugin.ramConfigCache.HEs {
-		if err := plugin.renderHostEntity(&he, false, true); err != nil {
+	for _, he := range plugin.ramConfigCache.HEs.ListValues() {
+		if err := plugin.renderHostEntity(he, false, true); err != nil {
 			return err
 		}
 	}
 
 	plugin.Log.Infof("render external entities from ram cache")
-	for _, ee := range plugin.ramConfigCache.EEs {
-		if err := plugin.renderExternalEntity(&ee, false, true); err != nil {
+	for _, ee := range plugin.ramConfigCache.EEs.ListValues() {
+		if err := plugin.renderExternalEntity(ee, false, true); err != nil {
 			return err
 		}
 	}
 
 	plugin.Log.Infof("render sfc's from ram cache")
-	for _, sfc := range plugin.ramConfigCache.SFCs {
-		if err := plugin.renderServiceFunctionEntity(&sfc); err != nil {
+	for _, sfc := range plugin.ramConfigCache.SFCs.ListValues() {
+		if err := plugin.renderServiceFunctionEntity(sfc); err != nil {
 			return err
 		}
 	}
@@ -85,14 +85,14 @@ func (plugin *SfcControllerPluginHandler) renderExternalEntity(ee *controller.Ex
 	}
 
 	if wireToOtherEntities {
-		for _, he := range plugin.ramConfigCache.HEs {
+		for _, he := range plugin.ramConfigCache.HEs.ListValues() {
 			plugin.Log.Infof("WireHostEntityToExternalEntity: he:'%s' to ee:'%s'", he.Name, ee.Name)
-			plugin.CNPDriver.WireHostEntityToExternalEntity(&he, ee)
+			plugin.CNPDriver.WireHostEntityToExternalEntity(he, ee)
 
 			// call the external entity api to queue a msg so that the external router config will be sent to the router
 			// this will be replace perhaps by a watcher in the ext-ent driver
 			if plugin.ExtEntityDriver != nil {
-				plugin.ExtEntityDriver.WireHostEntityToExternalEntity(&he, ee)
+				plugin.ExtEntityDriver.WireHostEntityToExternalEntity(he, ee)
 			}
 		}
 	}
@@ -114,20 +114,20 @@ func (plugin *SfcControllerPluginHandler) renderHostEntity(sh *controller.HostEn
 	}
 
 	if wireToOtherEntities {
-		for _, ee := range plugin.ramConfigCache.EEs {
+		for _, ee := range plugin.ramConfigCache.EEs.ListValues() {
 			plugin.Log.Infof("WireHostEntityToExternalEntity: he:'%s' to ee:'%s'/'%s'",
 				sh.Name, ee.Name, ee.MgmntIpAddress)
-			plugin.CNPDriver.WireHostEntityToExternalEntity(sh, &ee)
+			plugin.CNPDriver.WireHostEntityToExternalEntity(sh, ee)
 		}
 
-		for _, dh := range plugin.ramConfigCache.HEs {
-			if *sh != dh {
+		for _, dh := range plugin.ramConfigCache.HEs.ListValues() {
+			if sh != dh {
 				plugin.Log.Infof("WireHostEntityToDestinationHostEntity: sh:'%s' to dh:'%s'",
 					sh.Name, dh.Name)
-				plugin.CNPDriver.WireHostEntityToDestinationHostEntity(sh, &dh)
+				plugin.CNPDriver.WireHostEntityToDestinationHostEntity(sh, dh)
 				plugin.Log.Infof("WireHostEntityToDestinationHostEntity: dh:'%s' to sh:'%s'",
 					dh.Name, sh.Name)
-				plugin.CNPDriver.WireHostEntityToDestinationHostEntity(&dh, sh)
+				plugin.CNPDriver.WireHostEntityToDestinationHostEntity(dh, sh)
 			}
 		}
 	}
