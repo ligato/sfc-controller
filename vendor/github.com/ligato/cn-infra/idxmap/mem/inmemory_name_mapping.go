@@ -70,12 +70,17 @@ func NewNamedMapping(logger logging.Logger, owner core.PluginName, title string,
 // If there is an already stored item with that name, it gets overwritten.
 func (mem *memNamedMapping) Put(name string, value interface{}) {
 	mem.access.Lock()
-	defer mem.access.Unlock()
-
+	ok := false
+	defer func() {
+		if !ok {
+			mem.access.Unlock()
+		}
+	}()
 	mem.putNameToIdx(name, value)
+	ok = true
+	mem.access.Unlock()
 
 	mem.publishToChannel(name, value)
-
 }
 
 // Delete removes an item associated with the given <name> from the mapping.

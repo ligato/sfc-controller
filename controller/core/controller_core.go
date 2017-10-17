@@ -120,6 +120,7 @@ func (plugin *SfcControllerPluginHandler) Init() error {
 	}
 
 	plugin.ReconcileEnd()
+	plugin.subscribeForWatchingEvents()
 
 	plugin.controllerReady = true
 

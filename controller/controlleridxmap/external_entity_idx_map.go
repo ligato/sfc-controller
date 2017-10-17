@@ -29,7 +29,7 @@ type ExternalEntityIdxMap interface {
 	// of type interface{}.
 	GetMapping() idxmap.NamedMapping
 
-	// GetValue looks up previously stored status by plugin name in the mapping.
+	// GetValue looks up previously stored entity by it's name.
 	GetValue(entityName string) (data *controller.ExternalEntity, exists bool)
 
 	// ListValues all stored External Entities
@@ -37,7 +37,15 @@ type ExternalEntityIdxMap interface {
 
 	// WatchNameToIdx allows to subscribe for watching changes in externalEntityMap
 	// mapping.
-	WatchNameToIdx(subscriber core.PluginName, pluginChannel chan ExternalEntityEvent)
+	WatchNameToIdx(subscriber core.PluginName, pluginChannel func(*ExternalEntityEvent))
+}
+
+// ToChanExternalEntityEvent is helper function that enables to receive events from WatchNameToIdx into channel
+// instead of direct callback
+func ToChanExternalEntityEvent(channel chan *ExternalEntityEvent) func(*ExternalEntityEvent) {
+	return func(event *ExternalEntityEvent) {
+		channel <- event
+	}
 }
 
 // ExternalEntityIdxMapRW exposes not only ExternalEntityIdxMap but also write methods.
@@ -54,7 +62,7 @@ type ExternalEntityIdxMapRW interface {
 // NewExternalEntityMap is a constructor for ExternalEntityIdxMapRW.
 func NewExternalEntityMap(owner core.PluginName) ExternalEntityIdxMapRW {
 	return &externalEntityMap{mapping: mem.NewNamedMapping(logroot.StandardLogger(),
-		owner, "plugin status", IndexExternalEntity)}
+		owner, controller.ExternalEntityKeyPrefix(), IndexExternalEntity)}
 }
 
 // externalEntityMap is a type-safe implementation of ExternalEntityIdxMap(RW).
@@ -136,11 +144,11 @@ func (swi *externalEntityMap) castdata(meta interface{}) *controller.ExternalEnt
 }
 
 // WatchNameToIdx allows to subscribe for watching changes in externalEntityMap mapping
-func (swi *externalEntityMap) WatchNameToIdx(subscriber core.PluginName, pluginChannel chan ExternalEntityEvent) {
+func (swi *externalEntityMap) WatchNameToIdx(subscriber core.PluginName, callback func(*ExternalEntityEvent)) {
 	swi.mapping.Watch(subscriber, func(event idxmap.NamedMappingGenericEvent) {
-		pluginChannel <- ExternalEntityEvent{
+		callback(&ExternalEntityEvent{
 			NamedMappingEvent: event.NamedMappingEvent,
 			Value:             swi.castdata(event.Value),
-		}
+		})
 	})
 }

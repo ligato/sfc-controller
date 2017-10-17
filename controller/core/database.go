@@ -284,11 +284,6 @@ func (plugin *SfcControllerPluginHandler) PutExternalEntity(ee *controller.Exter
 
 	plugin.ramConfigCache.EEs.Put(ee)
 
-	//TODO do this outside rest package (watcher)
-	if err := plugin.renderExternalEntity(ee, true, true); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -316,11 +311,6 @@ func (plugin *SfcControllerPluginHandler) PutHostEntity(he *controller.HostEntit
 
 	plugin.ramConfigCache.HEs.Put(he)
 
-	//TODO do this outside rest package (watcher)
-	if err := plugin.renderHostEntity(he, true, true); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -347,11 +337,6 @@ func (plugin *SfcControllerPluginHandler) PutSFCEntity(sfc *controller.SfcEntity
 	}
 
 	plugin.ramConfigCache.SFCs.Put(sfc)
-
-	//TODO do this outside this package (watcher)
-	if err := plugin.renderServiceFunctionEntity(sfc); err != nil {
-		return err
-	}
 
 	return nil
 }

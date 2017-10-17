@@ -30,7 +30,7 @@ type SfcEntityIdxMap interface {
 	// of type interface{}.
 	GetMapping() idxmap.NamedMapping
 
-	// GetValue looks up previously stored status by plugin name in the mapping.
+	// GetValue looks up previously stored entity by it's name.
 	GetValue(entityName string) (data *controller.SfcEntity, exists bool)
 
 	// ListValues all stored SFC Entities
@@ -47,7 +47,15 @@ type SfcEntityIdxMap interface {
 
 	// WatchNameToIdx allows to subscribe for watching changes in sfcEntityMap
 	// mapping.
-	WatchNameToIdx(subscriber core.PluginName, pluginChannel chan SfcEntityEvent)
+	WatchNameToIdx(subscriber core.PluginName, callback func(*SfcEntityEvent))
+}
+
+// ToChanSfcEntityEvent is helper function that enables to receive events from WatchNameToIdx into channel
+// instead of direct callback
+func ToChanSfcEntityEvent(channel chan *SfcEntityEvent) func(*SfcEntityEvent) {
+	return func(event *SfcEntityEvent) {
+		channel <- event
+	}
 }
 
 // SfcEntityIdxMapRW exposes not only SfcEntityIdxMap but also write methods.
@@ -198,11 +206,11 @@ func (swi *sfcEntityMap) castdata(meta interface{}) *controller.SfcEntity {
 }
 
 // WatchNameToIdx allows to subscribe for watching changes in sfcEntityMap mapping
-func (swi *sfcEntityMap) WatchNameToIdx(subscriber core.PluginName, pluginChannel chan SfcEntityEvent) {
+func (swi *sfcEntityMap) WatchNameToIdx(subscriber core.PluginName, callback func(*SfcEntityEvent)) {
 	swi.mapping.Watch(subscriber, func(event idxmap.NamedMappingGenericEvent) {
-		pluginChannel <- SfcEntityEvent{
+		callback(&SfcEntityEvent{
 			NamedMappingEvent: event.NamedMappingEvent,
 			Value:             swi.castdata(event.Value),
-		}
+		})
 	})
 }

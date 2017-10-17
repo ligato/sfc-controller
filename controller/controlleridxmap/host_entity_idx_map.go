@@ -30,7 +30,7 @@ type HostEntityIdxMap interface {
 	// of type interface{}.
 	GetMapping() idxmap.NamedMapping
 
-	// GetValue looks up previously stored status by plugin name in the mapping.
+	// GetValue looks up previously stored entity by it's name.
 	GetValue(entityName string) (data *controller.HostEntity, exists bool)
 
 	// ListValues all values stored Host Entities
@@ -44,7 +44,17 @@ type HostEntityIdxMap interface {
 
 	// WatchNameToIdx allows to subscribe for watching changes in hostEntityMap
 	// mapping.
-	WatchNameToIdx(subscriber core.PluginName, pluginChannel chan HostEntityEvent)
+	// <subscriber> caller of the API
+	// <pluginChannel>
+	WatchNameToIdx(subscriber core.PluginName, callback func(*HostEntityEvent))
+}
+
+// ToChanHostEntityEvent is helper function that enables to receive events from WatchNameToIdx into channel
+// instead of direct callback
+func ToChanHostEntityEvent(channel chan *HostEntityEvent) func(*HostEntityEvent) {
+	return func(event *HostEntityEvent) {
+		channel <- event
+	}
 }
 
 // HostEntityIdxMapRW exposes not only HostEntityIdxMap but also write methods.
@@ -158,11 +168,11 @@ func (swi *hostEntityMap) castdata(meta interface{}) *controller.HostEntity {
 }
 
 // WatchNameToIdx allows to subscribe for watching changes in hostEntityMap mapping
-func (swi *hostEntityMap) WatchNameToIdx(subscriber core.PluginName, pluginChannel chan HostEntityEvent) {
+func (swi *hostEntityMap) WatchNameToIdx(subscriber core.PluginName, callback func(*HostEntityEvent)) {
 	swi.mapping.Watch(subscriber, func(event idxmap.NamedMappingGenericEvent) {
-		pluginChannel <- HostEntityEvent{
+		callback(&HostEntityEvent{
 			NamedMappingEvent: event.NamedMappingEvent,
 			Value:             swi.castdata(event.Value),
-		}
+		})
 	})
 }
