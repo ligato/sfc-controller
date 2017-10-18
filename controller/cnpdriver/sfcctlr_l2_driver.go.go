@@ -42,16 +42,18 @@ import (
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
 	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/model/interfaces"
 	"strings"
+	"github.com/ligato/cn-infra/flavors/local"
 )
 
 var (
 	log = logroot.StandardLogger()
 )
 
-type sfcCtlrL2CNPDriver struct {
+type L2Driver struct {
+	Deps
+
 	dbFactory           func(string) keyval.ProtoBroker
 	db                  keyval.ProtoBroker
-	name                string
 	l2CNPEntityCache    l2CNPEntityCacheType
 	l2CNPStateCache     l2CNPStateCacheType
 	reconcileBefore     reconcileCacheType
@@ -100,20 +102,24 @@ func NewRemoteClientTxn(microserviceLabel string, dbFactory func(string) keyval.
 // NewSfcCtlrL2CNPDriver creates new driver/mode for Native SFC Controller L2 Container Networking Policy
 // <name> of the driver/plugin
 // <dbFactory> returns new instance of DataBroker for accessing key-val DB (ETCD)
-func NewSfcCtlrL2CNPDriver(name string, dbFactory func(string) keyval.ProtoBroker) *sfcCtlrL2CNPDriver {
+func (cnpd *L2Driver) Init( /*name string, dbFactory func(string) keyval.ProtoBroker*/) error {
 
-	cnpd := &sfcCtlrL2CNPDriver{}
-	cnpd.name = "Sfc Controller L2 Plugin: " + name
-	cnpd.dbFactory = dbFactory
-	cnpd.db = dbFactory(keyval.Root)
+	cnpd.dbFactory = cnpd.Deps.Etcd.NewBroker
+	cnpd.db = cnpd.dbFactory(keyval.Root)
 
 	cnpd.initL2CNPCache()
 	cnpd.initReconcileCache()
 
-	return cnpd
+	return nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) initL2CNPCache() {
+// Deps are L2Driver injected dependencies
+type Deps struct {
+	local.PluginLogDeps       //inject
+	Etcd keyval.KvProtoPlugin //inject
+}
+
+func (cnpd *L2Driver) initL2CNPCache() {
 	cnpd.l2CNPStateCache.HEToEEs = make(map[string]map[string]*heToEEStateType)
 	cnpd.l2CNPStateCache.HE = make(map[string]*heStateType)
 
@@ -123,7 +129,7 @@ func (cnpd *sfcCtlrL2CNPDriver) initL2CNPCache() {
 
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) initReconcileCache() error {
+func (cnpd *L2Driver) initReconcileCache() error {
 
 	cnpd.reconcileBefore.ifs = make(map[string]interfaces.Interfaces_Interface)
 	cnpd.reconcileBefore.lifs = make(map[string]linuxIntf.LinuxInterfaces_Interface)
@@ -139,12 +145,12 @@ func (cnpd *sfcCtlrL2CNPDriver) initReconcileCache() error {
 }
 
 // Return user friendly name for this plugin
-func (cnpd *sfcCtlrL2CNPDriver) GetName() string {
-	return cnpd.name
+func (cnpd *L2Driver) GetName() string {
+	return string(cnpd.Deps.PluginName)
 }
 
 // Perform start processing for the reconcile of the CNP datastore
-func (cnpd *sfcCtlrL2CNPDriver) ReconcileStart() error {
+func (cnpd *L2Driver) ReconcileStart() error {
 
 	// The reconcile for the l2 overlay data structures consists of all the types of objects that are created as a
 	// result of processing the EEs, HEs, and SFCs.  These are interfaces, bridged domains, and static routes, etc.
@@ -191,7 +197,7 @@ func (cnpd *sfcCtlrL2CNPDriver) ReconcileStart() error {
 type ReconcileVppLabelsMapType map[string]struct{}
 
 // ReconcileLoadAllVppLabels: retrieve all vpp lavels from the etcd datastore
-func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadAllVppLabels() ReconcileVppLabelsMapType {
+func (cnpd *L2Driver) reconcileLoadAllVppLabels() ReconcileVppLabelsMapType {
 	ret := make(ReconcileVppLabelsMapType)
 
 	keyIter, err := cnpd.db.ListKeys(utils.GetVppAgentPrefix())
@@ -215,12 +221,12 @@ func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadAllVppLabels() ReconcileVppLabelsMa
 	return ret
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) reconcileStateSet(state bool) {
+func (cnpd *L2Driver) reconcileStateSet(state bool) {
 	cnpd.reconcileInProgress = state
 }
 
 // Perform end processing for the reconcile of the CNP datastore
-func (cnpd *sfcCtlrL2CNPDriver) ReconcileEnd() error {
+func (cnpd *L2Driver) ReconcileEnd() error {
 
 	log.Info("ReconcileEnd: begin ...")
 	log.Infof("ReconcileEnd: reconcileBefore", cnpd.reconcileBefore)
@@ -339,7 +345,7 @@ func (cnpd *sfcCtlrL2CNPDriver) ReconcileEnd() error {
 }
 
 // Perform CNP specific wiring for "connecting" a source host to a dest host
-func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToDestinationHostEntity(sh *controller.HostEntity,
+func (cnpd *L2Driver) WireHostEntityToDestinationHostEntity(sh *controller.HostEntity,
 	dh *controller.HostEntity) error {
 
 	// might have to create a vxlan tunnel i/f and assoc it to the e/w bridge on each of the hosts
@@ -349,7 +355,7 @@ func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToDestinationHostEntity(sh *contro
 
 // Perform CNP specific wiring for "connecting" an external router to a host server, called from
 // WireHostEntityToExternalEntity after host is wired to ee
-func (cnpd *sfcCtlrL2CNPDriver) wireExternalEntityToHostEntity(ee *controller.ExternalEntity,
+func (cnpd *L2Driver) wireExternalEntityToHostEntity(ee *controller.ExternalEntity,
 	he *controller.HostEntity) error {
 
 	log.Infof("wireExternalEntityToHostEntity: he", he)
@@ -405,7 +411,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireExternalEntityToHostEntity(ee *controller.Ex
 }
 
 // Perform CNP specific wiring for "connecting" a host server to an external router
-func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToExternalEntity(he *controller.HostEntity,
+func (cnpd *L2Driver) WireHostEntityToExternalEntity(he *controller.HostEntity,
 	ee *controller.ExternalEntity) error {
 
 	cnpd.l2CNPEntityCache.HEs[he.Name] = *he
@@ -484,7 +490,7 @@ func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToExternalEntity(he *controller.Ho
 }
 
 // Perform CNP specific wiring for "preparing" a host server example: create an east-west bridge
-func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEntity) error {
+func (cnpd *L2Driver) WireInternalsForHostEntity(he *controller.HostEntity) error {
 
 	cnpd.l2CNPEntityCache.HEs[he.Name] = *he
 
@@ -528,12 +534,12 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 }
 
 // WireInternalsForExternalEntity does nothing
-func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForExternalEntity(ee *controller.ExternalEntity) error {
+func (cnpd *L2Driver) WireInternalsForExternalEntity(ee *controller.ExternalEntity) error {
 	return nil
 }
 
 // WireSfcEntity - Perform CNP specific wiring for inter-container wiring, and container to external router wiring
-func (cnpd *sfcCtlrL2CNPDriver) WireSfcEntity(sfc *controller.SfcEntity) error {
+func (cnpd *L2Driver) WireSfcEntity(sfc *controller.SfcEntity) error {
 
 	var err error = nil
 	// the semantic difference between a north_south vs an east-west sfc entity, it what is the bridge that
@@ -568,7 +574,7 @@ func (cnpd *sfcCtlrL2CNPDriver) WireSfcEntity(sfc *controller.SfcEntity) error {
 }
 
 // for now, ensure there is only one ee ... as each container will be wirred to it
-func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.SfcEntity) error {
+func (cnpd *L2Driver) wireSfcNorthSouthVXLANElements(sfc *controller.SfcEntity) error {
 
 	eeCount := 0
 	eeName := ""
@@ -672,7 +678,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 }
 
 // north/south NIC type, memIfs/cntrs connect to physical NIC
-func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.SfcEntity) error {
+func (cnpd *L2Driver) wireSfcNorthSouthNICElements(sfc *controller.SfcEntity) error {
 
 	heCount := 0
 	var he *controller.SfcEntity_SfcElement
@@ -830,7 +836,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 // host it has been deployed on.  Questions: ip addressing, mac addresses for memIf's.  Am I using one space for
 // the system .... ie each memIf in each container will have a unique ip address in the 10.*.*.* space, and a unique
 // macAddress in the 02:*:*:*:*:* space.  Also, is east-west bridge connected via vxLan's?
-func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntity) error {
+func (cnpd *L2Driver) wireSfcEastWestElements(sfc *controller.SfcEntity) error {
 
 	prevMemIfName := ""
 
@@ -936,7 +942,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 }
 
 // createMemIfPair creates memif pair and returns vswitch-end memif interface name
-func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostName string,
+func (cnpd *L2Driver) createMemIfPair(sfc *controller.SfcEntity, hostName string,
 	vnfChainElement *controller.SfcEntity_SfcElement, generateAddresses bool) (string, error) {
 
 	log.Infof("createMemIfPair: vnf: '%s', host: '%s'", vnfChainElement.Container, hostName)
@@ -964,7 +970,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 }
 
 // createMemIfPairAndAddToBridge creates a memif pair and adds the vswitch-end interface into the provided bridge domain
-func (cnpd *sfcCtlrL2CNPDriver) createMemIfPairAndAddToBridge(sfc *controller.SfcEntity, hostName string,
+func (cnpd *L2Driver) createMemIfPairAndAddToBridge(sfc *controller.SfcEntity, hostName string,
 	bd *l2.BridgeDomains_BridgeDomain, vnfChainElement *controller.SfcEntity_SfcElement, generateAddresses bool) error {
 
 	memIfName, err := cnpd.createMemIfPair(sfc, hostName, vnfChainElement, generateAddresses)
@@ -988,7 +994,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPairAndAddToBridge(sfc *controller.Sf
 	return nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity,
+func (cnpd *L2Driver) createAFPacketVEthPair(sfc *controller.SfcEntity,
 	vnfChainElement *controller.SfcEntity_SfcElement) (string, error) {
 
 	log.Infof("createAFPacketVEthPair: vnf: '%s', host: '%s'", vnfChainElement.Container,
@@ -1038,7 +1044,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 	return afPktIf2.Name, nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPairAndAddToBridge(sfc *controller.SfcEntity,
+func (cnpd *L2Driver) createAFPacketVEthPairAndAddToBridge(sfc *controller.SfcEntity,
 	bd *l2.BridgeDomains_BridgeDomain, vnfChainElement *controller.SfcEntity_SfcElement) error {
 
 	log.Infof("createAFPacketVEthPairAndAddToBridge: vnf: '%s', host: '%s'", vnfChainElement.Container,
@@ -1065,7 +1071,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPairAndAddToBridge(sfc *contro
 	return nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) bridgedDomainCreateWithIfs(etcdVppSwitchKey string, bdName string,
+func (cnpd *L2Driver) bridgedDomainCreateWithIfs(etcdVppSwitchKey string, bdName string,
 	ifs []*l2.BridgeDomains_BridgeDomain_Interfaces) (*l2.BridgeDomains_BridgeDomain, error) {
 
 	bd := &l2.BridgeDomains_BridgeDomain{
@@ -1099,7 +1105,7 @@ func (cnpd *sfcCtlrL2CNPDriver) bridgedDomainCreateWithIfs(etcdVppSwitchKey stri
 }
 
 // using the existing bridge, append the new if to the existing ifs in the bridge
-func (cnpd *sfcCtlrL2CNPDriver) bridgedDomainAssociateWithIfs(etcdVppSwitchKey string,
+func (cnpd *L2Driver) bridgedDomainAssociateWithIfs(etcdVppSwitchKey string,
 	bd *l2.BridgeDomains_BridgeDomain,
 	ifs []*l2.BridgeDomains_BridgeDomain_Interfaces) error {
 
@@ -1124,12 +1130,12 @@ func (cnpd *sfcCtlrL2CNPDriver) bridgedDomainAssociateWithIfs(etcdVppSwitchKey s
 	return nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) reconcileBridgeDomain(etcdVppSwitchKey string, bd *l2.BridgeDomains_BridgeDomain) {
+func (cnpd *L2Driver) reconcileBridgeDomain(etcdVppSwitchKey string, bd *l2.BridgeDomains_BridgeDomain) {
 	bdKey := utils.L2BridgeDomainKey(etcdVppSwitchKey, bd.Name)
 	cnpd.reconcileAfter.bds[bdKey] = *bd
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) vxLanCreate(etcdVppSwitchKey string, ifname string, vni uint32,
+func (cnpd *L2Driver) vxLanCreate(etcdVppSwitchKey string, ifname string, vni uint32,
 	srcStr string, dstStr string) (*interfaces.Interfaces_Interface, error) {
 
 	src := stripSlashAndSubnetIpv4Address(srcStr)
@@ -1165,7 +1171,7 @@ func (cnpd *sfcCtlrL2CNPDriver) vxLanCreate(etcdVppSwitchKey string, ifname stri
 	return iface, nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) memIfCreate(etcdPrefix string, memIfName string, memifID uint32, isMaster bool,
+func (cnpd *L2Driver) memIfCreate(etcdPrefix string, memIfName string, memifID uint32, isMaster bool,
 	ipv4 string, macAddress string) (*interfaces.Interfaces_Interface, error) {
 
 	memIf := &interfaces.Interfaces_Interface{
@@ -1205,12 +1211,12 @@ func (cnpd *sfcCtlrL2CNPDriver) memIfCreate(etcdPrefix string, memIfName string,
 	return memIf, nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) reconcileInterface(etcdVppSwitchKey string, currIf *interfaces.Interfaces_Interface) {
+func (cnpd *L2Driver) reconcileInterface(etcdVppSwitchKey string, currIf *interfaces.Interfaces_Interface) {
 	ifKey := utils.InterfaceKey(etcdVppSwitchKey, currIf.Name)
 	cnpd.reconcileAfter.ifs[ifKey] = *currIf
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) createEthernet(etcdPrefix string, ifname string, ipv4Addr string) error {
+func (cnpd *L2Driver) createEthernet(etcdPrefix string, ifname string, ipv4Addr string) error {
 
 	iface := &interfaces.Interfaces_Interface{
 		Name:        ifname,
@@ -1243,7 +1249,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createEthernet(etcdPrefix string, ifname string,
 	return nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) afPacketCreate(etcdPrefix string, ifName string, hostIfName string,
+func (cnpd *L2Driver) afPacketCreate(etcdPrefix string, ifName string, hostIfName string,
 	ipv4 string, macAddress string) (*interfaces.Interfaces_Interface, error) {
 
 	afPacketIf := &interfaces.Interfaces_Interface{
@@ -1281,7 +1287,7 @@ func (cnpd *sfcCtlrL2CNPDriver) afPacketCreate(etcdPrefix string, ifName string,
 	return afPacketIf, nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) createLoopback(etcdPrefix string, ifname string, physAddr string, ipv4Addr string) error {
+func (cnpd *L2Driver) createLoopback(etcdPrefix string, ifname string, physAddr string, ipv4Addr string) error {
 
 	iface := &interfaces.Interfaces_Interface{
 		Name:        ifname,
@@ -1314,7 +1320,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createLoopback(etcdPrefix string, ifname string,
 	return nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) vEthIfCreate(etcdPrefix string, ifname string, peerIfName string, container string,
+func (cnpd *L2Driver) vEthIfCreate(etcdPrefix string, ifname string, peerIfName string, container string,
 	physAddr string, ipv4Addr string) error {
 
 	ifs := linuxIntf.LinuxInterfaces{}
@@ -1357,14 +1363,14 @@ func (cnpd *sfcCtlrL2CNPDriver) vEthIfCreate(etcdPrefix string, ifname string, p
 	return nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) reconcileLinuxInterface(etcdPrefix string, ifname string,
+func (cnpd *L2Driver) reconcileLinuxInterface(etcdPrefix string, ifname string,
 	currIf *linuxIntf.LinuxInterfaces_Interface) {
 
 	ifKey := utils.LinuxInterfaceKey(etcdPrefix, ifname)
 	cnpd.reconcileAfter.lifs[ifKey] = *currIf
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) createStaticRoute(etcdPrefix string, description string, destIpv4AddrStr string,
+func (cnpd *L2Driver) createStaticRoute(etcdPrefix string, description string, destIpv4AddrStr string,
 	netHopIpv4Addr string, outGoingIf string) (*l3.StaticRoutes_Route, error) {
 
 	sr := &l3.StaticRoutes_Route{
@@ -1395,14 +1401,14 @@ func (cnpd *sfcCtlrL2CNPDriver) createStaticRoute(etcdPrefix string, description
 	return sr, nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) reconcileStaticRoute(etcdPrefix string, sr *l3.StaticRoutes_Route) {
+func (cnpd *L2Driver) reconcileStaticRoute(etcdPrefix string, sr *l3.StaticRoutes_Route) {
 
 	destIpAddr, _, _ := addrs.ParseIPWithPrefix(sr.DstIpAddr)
 	key := utils.L3RouteKey(etcdPrefix, sr.VrfId, destIpAddr, sr.NextHopAddr)
 	cnpd.reconcileAfter.l3Routes[key] = *sr
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) createXConnectPair(etcdPrefix, if1, if2 string) error {
+func (cnpd *L2Driver) createXConnectPair(etcdPrefix, if1, if2 string) error {
 
 	err := cnpd.createXConnect(etcdPrefix, if1, if2)
 	if err != nil {
@@ -1417,7 +1423,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createXConnectPair(etcdPrefix, if1, if2 string) 
 	return nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) createXConnect(etcdPrefix, rxIf, txIf string) error {
+func (cnpd *L2Driver) createXConnect(etcdPrefix, rxIf, txIf string) error {
 
 	xconn := &l2.XConnectPairs_XConnectPair{
 		ReceiveInterface:  rxIf,
@@ -1436,7 +1442,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createXConnect(etcdPrefix, rxIf, txIf string) er
 	return nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) createCustomLabel(etcdPrefix string, ci *controller.CustomInfoType) error {
+func (cnpd *L2Driver) createCustomLabel(etcdPrefix string, ci *controller.CustomInfoType) error {
 
 	if ci != nil && ci.Label != "" {
 		key := utils.CustomInfoKey(etcdPrefix)
@@ -1456,13 +1462,13 @@ func (cnpd *sfcCtlrL2CNPDriver) createCustomLabel(etcdPrefix string, ci *control
 }
 
 // Debug dump routine
-func (cnpd *sfcCtlrL2CNPDriver) Dump() {
+func (cnpd *L2Driver) Dump() {
 
 	log.Println(cnpd.l2CNPEntityCache)
 	log.Println(cnpd.l2CNPStateCache)
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) getHEToEEState(heName string, eeName string) *heToEEStateType {
+func (cnpd *L2Driver) getHEToEEState(heName string, eeName string) *heToEEStateType {
 
 	eeMap, exists := cnpd.l2CNPStateCache.HEToEEs[heName]
 	if !exists {
@@ -1477,7 +1483,7 @@ func stripSlashAndSubnetIpv4Address(ipAndSubnetStr string) string {
 	return strs[0]
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadInterfacesIntoCache(etcdVppLabel string) error {
+func (cnpd *L2Driver) reconcileLoadInterfacesIntoCache(etcdVppLabel string) error {
 
 	kvi, err := cnpd.db.ListValues(utils.InterfacePrefixKey(etcdVppLabel))
 	if err != nil {
@@ -1503,7 +1509,7 @@ func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadInterfacesIntoCache(etcdVppLabel st
 	return nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadLinuxInterfacesIntoCache(etcdVppLabel string) error {
+func (cnpd *L2Driver) reconcileLoadLinuxInterfacesIntoCache(etcdVppLabel string) error {
 
 	kvi, err := cnpd.db.ListValues(utils.LinuxInterfacePrefixKey(etcdVppLabel))
 	if err != nil {
@@ -1530,7 +1536,7 @@ func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadLinuxInterfacesIntoCache(etcdVppLab
 	return nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadBridgeDomainsIntoCache(etcdVppLabel string) error {
+func (cnpd *L2Driver) reconcileLoadBridgeDomainsIntoCache(etcdVppLabel string) error {
 
 	kvi, err := cnpd.db.ListValues(utils.L2BridgeDomainKeyPrefix(etcdVppLabel))
 	if err != nil {
@@ -1556,7 +1562,7 @@ func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadBridgeDomainsIntoCache(etcdVppLabel
 	return nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadStaticRoutesIntoCache(etcdVppLabel string) error {
+func (cnpd *L2Driver) reconcileLoadStaticRoutesIntoCache(etcdVppLabel string) error {
 
 	kvi, err := cnpd.db.ListValues(utils.L3RouteKeyPrefix(etcdVppLabel))
 	if err != nil {

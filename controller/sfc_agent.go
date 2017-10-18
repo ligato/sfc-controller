@@ -59,7 +59,7 @@ func NewAgent(opts ...agent_api.Option) *agent_api.Agent {
 	}
 
 	if agentCoreLogger == nil {
-		agentCoreLogger = flavor.LoggerFor("agent_core")
+		agentCoreLogger = flavor.LoggerFor("agentcore")
 	}
 
 	return agent_api.NewAgent(agentCoreLogger, maxStartup, plugins...)
@@ -98,6 +98,7 @@ type FlavorSFCFull struct {
 	Sfc          core.SfcControllerPluginHandler
 	SfcRPC       rpc.SfcControllerRPC
 	VNFDriver    vnfdriver.Plugin
+	L2Driver     cnpdriver.SfcControllerCNPDriverAPI
 	ExtEntDriver extentitydriver.Plugin
 
 	injected bool
@@ -133,8 +134,13 @@ func (f *FlavorSFCFull) Inject() bool {
 
 	f.ETCD.Deps.PluginInfraDeps = *f.InfraDeps("etcdv3", local.WithConf())
 
+	if f.L2Driver == nil {
+		l2Driver := &cnpdriver.L2Driver{}
+		l2Driver.Deps.PluginLogDeps = *f.LogDeps("sfc-l2-plugin")
+		f.L2Driver = l2Driver
+	}
 	if f.Sfc.Deps.CNPDriver == nil {
-		f.Sfc.Deps.CNPDriver = cnpdriver.NewSfcCtlrL2CNPDriver("sfcctlrl2", f.ETCD.NewBroker)
+		f.Sfc.Deps.CNPDriver = f.L2Driver
 	}
 	if f.Sfc.Deps.ExtEntityDriver == nil {
 		f.Sfc.Deps.ExtEntityDriver = &f.ExtEntDriver
