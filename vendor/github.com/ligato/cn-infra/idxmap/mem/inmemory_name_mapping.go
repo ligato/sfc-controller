@@ -44,7 +44,7 @@ type memNamedMapping struct {
 	// indexes is a register of secondary indexes
 	indexes map[string] /* index name */ map[string] /* index value */ *nameSet
 	// subscribers to whom notifications are delivered
-	subscribers map[core.PluginName]func(idxmap.NamedMappingGenericEvent)
+	subscribers sync.Map //map[core.PluginName]func(idxmap.NamedMappingGenericEvent)
 	owner       core.PluginName
 	title       string
 }
@@ -60,7 +60,6 @@ func NewNamedMapping(logger logging.Logger, owner core.PluginName, title string,
 	mem.nameToIdx = map[string]*mappingItem{}
 	mem.indexes = map[string]map[string]*nameSet{}
 	mem.createIndexes = indexFunction
-	mem.subscribers = map[core.PluginName]func(idxmap.NamedMappingGenericEvent){}
 	mem.owner = owner
 	mem.title = title
 	return &mem
@@ -69,32 +68,17 @@ func NewNamedMapping(logger logging.Logger, owner core.PluginName, title string,
 // Put adds an item to the mapping associated with the <name>.
 // If there is an already stored item with that name, it gets overwritten.
 func (mem *memNamedMapping) Put(name string, value interface{}) {
-	mem.access.Lock()
-	ok := false
-	defer func() {
-		if !ok {
-			mem.access.Unlock()
-		}
-	}()
-	mem.putNameToIdx(name, value)
-	ok = true
-	mem.access.Unlock()
+	mem.putNameToIdxSync(name, value)
 
 	mem.publishToChannel(name, value)
+
 }
 
 // Delete removes an item associated with the given <name> from the mapping.
 func (mem *memNamedMapping) Delete(name string) (value interface{}, found bool) {
-	mem.access.Lock()
-	defer mem.access.Unlock()
+	item, found := mem.removeNameIdxSync(name)
 
-	item, found := mem.nameToIdx[name]
-	if found {
-		value = item.value
-
-		mem.publishDelToChannel(name, item.value) //TODO improve and not send nil
-		mem.removeNameIdx(name)
-	}
+	mem.publishDelToChannel(name, item.value) //TODO improve and not send nil
 
 	return value, found
 }
@@ -153,13 +137,9 @@ func (mem *memNamedMapping) ListNames(field string, value string) []string {
 // When an item is added or removed, the given <callback> is triggered.
 func (mem *memNamedMapping) Watch(subscriber core.PluginName, callback func(idxmap.NamedMappingGenericEvent)) error {
 	mem.Debug("Watch ", subscriber)
-	mem.access.Lock()
-	defer mem.access.Unlock()
 
-	_, found := mem.subscribers[subscriber]
-	if !found {
-		mem.subscribers[subscriber] = callback
-	} else {
+	_, found := mem.subscribers.LoadOrStore(subscriber, callback)
+	if found {
 		return fmt.Errorf("Already registered channel per subscriber ")
 	}
 	return nil
@@ -205,10 +185,22 @@ func (mem *memNamedMapping) removeIndexes(item *mappingItem, name string) {
 	}
 }
 
-func (mem *memNamedMapping) removeNameIdx(name string) {
-	item := mem.nameToIdx[name]
-	mem.removeIndexes(item, name)
+func (mem *memNamedMapping) removeNameIdx(name string) (item *mappingItem, found bool) {
+	item, found = mem.nameToIdx[name]
+	if found {
+		item := mem.nameToIdx[name]
+		mem.removeIndexes(item, name)
+	}
+
 	delete(mem.nameToIdx, name)
+
+	return item, found
+}
+
+func (mem *memNamedMapping) removeNameIdxSync(name string) (item *mappingItem, found bool) {
+	mem.access.Lock()
+	defer mem.access.Unlock()
+	return mem.removeNameIdx(name)
 }
 
 func (mem *memNamedMapping) putNameToIdx(name string, metadata interface{}) {
@@ -222,8 +214,18 @@ func (mem *memNamedMapping) putNameToIdx(name string, metadata interface{}) {
 	mem.updateIndexes(item, name)
 }
 
+func (mem *memNamedMapping) putNameToIdxSync(name string, metadata interface{}) {
+	mem.access.Lock()
+	defer mem.access.Unlock()
+
+	mem.putNameToIdx(name, metadata)
+}
+
 func (mem *memNamedMapping) publishToChannel(name string, value interface{}) {
-	for subscriber, clb := range mem.subscribers {
+	mem.subscribers.Range(func(key, val interface{}) bool {
+		subscriber := key.(core.PluginName)
+		clb := val.(func(idxmap.NamedMappingGenericEvent))
+
 		if clb != nil {
 			dto := idxmap.NamedMappingGenericEvent{NamedMappingEvent: idxmap.NamedMappingEvent{
 				Owner:         mem.owner,
@@ -235,11 +237,16 @@ func (mem *memNamedMapping) publishToChannel(name string, value interface{}) {
 			mem.Debug("publish write to ", subscriber, dto)
 			clb(dto)
 		}
-	}
+
+		return true
+	})
 }
 
 func (mem *memNamedMapping) publishDelToChannel(name string, value interface{}) {
-	for subscriber, clb := range mem.subscribers {
+	mem.subscribers.Range(func(key, val interface{}) bool {
+		subscriber := key.(core.PluginName)
+		clb := val.(func(idxmap.NamedMappingGenericEvent))
+
 		if clb != nil {
 			dto := idxmap.NamedMappingGenericEvent{NamedMappingEvent: idxmap.NamedMappingEvent{
 				Owner:         mem.owner,
@@ -251,7 +258,9 @@ func (mem *memNamedMapping) publishDelToChannel(name string, value interface{}) 
 			mem.Debug("publish del to ", subscriber, dto)
 			clb(dto)
 		}
-	}
+
+		return true
+	})
 }
 
 // nameSet is a simple implementation of a set holding names of type string
