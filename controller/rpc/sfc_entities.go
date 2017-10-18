@@ -26,6 +26,7 @@ import (
 // SFCEntityIdxRW thread-safe access to RAM Cache
 type SFCEntityIdxRW interface {
 	GetSFCEntity(sfcName string) (entity *controller.SfcEntity, found bool)
+	DeleteSFCEntity(sfcName string) (found bool, err error)
 	PutSFCEntity(*controller.SfcEntity) error
 	ListSFCEntities() []*controller.SfcEntity
 	ValidateSFCEntity(*controller.SfcEntity) error
@@ -67,8 +68,16 @@ func (plugin *SfcControllerRPC) sfcChainHandler(formatter *render.Render) http.H
 			} else {
 				formatter.JSON(w, http.StatusNotFound, "sfc chain does not fouind:"+vars[entityName])
 			}
-			return
-		case "POST":
+		case "DELETE":
+			vars := mux.Vars(req)
+			if exists, err := plugin.SFCNorthbound.DeleteSFCEntity(vars[entityName]); err != nil {
+				formatter.JSON(w, http.StatusInternalServerError, "error deleting sfc entity: "+vars[entityName]+" "+err.Error())
+			} else if exists {
+				formatter.JSON(w, http.StatusOK, "deleted: "+vars[entityName])
+			} else {
+				formatter.JSON(w, http.StatusNotFound, "sfc entity does not found: "+vars[entityName])
+			}
+		case "POST", "PUT":
 			plugin.processSfcChainPost(formatter, w, req)
 		}
 	}

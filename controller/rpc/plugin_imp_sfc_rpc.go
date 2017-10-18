@@ -53,16 +53,16 @@ func (plugin *SfcControllerRPC) Init() error {
 	plugin.Log.Infof("InitHttpHandlers: registering controller URLs")
 
 	url := fmt.Sprintf(controller.ExternalEntityKeyPrefix()+"{%s}", entityName)
-	plugin.HTTP.RegisterHTTPHandler(url, plugin.externalEntityHandler, "GET", "POST")
+	plugin.HTTP.RegisterHTTPHandler(url, plugin.externalEntityHandler, "GET", "POST", "PUT", "DELETE")
 	plugin.HTTP.RegisterHTTPHandler(controller.ExternalEntitiesHttpPrefix(),
 		plugin.externalEntitiesHandler, "GET")
 
 	url = fmt.Sprintf(controller.HostEntityKeyPrefix()+"{%s}", entityName)
-	plugin.HTTP.RegisterHTTPHandler(url, plugin.hostEntityHandler, "GET", "POST")
+	plugin.HTTP.RegisterHTTPHandler(url, plugin.hostEntityHandler, "GET", "POST", "PUT", "DELETE")
 	plugin.HTTP.RegisterHTTPHandler(controller.HostEntitiesHttpPrefix(), plugin.hostEntitiesHandler, "GET")
 
 	url = fmt.Sprintf(controller.SfcEntityKeyPrefix()+"{%s}", entityName)
-	plugin.HTTP.RegisterHTTPHandler(url, plugin.sfcChainHandler, "GET", "POST")
+	plugin.HTTP.RegisterHTTPHandler(url, plugin.sfcChainHandler, "GET", "POST", "PUT", "DELETE")
 	plugin.HTTP.RegisterHTTPHandler(controller.SfcEntityHttpPrefix(), plugin.sfcChainsHandler, "GET")
 
 	return nil

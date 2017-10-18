@@ -25,8 +25,8 @@ package core
 // to CRUD sntities of type host, exteranl, and sfc  The ETCD keys are defined in keys_controller.go
 
 import (
-	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/ligato/cn-infra/datasync"
+	"github.com/ligato/sfc-controller/controller/model/controller"
 )
 
 // flush the ram cache to the sfc cache to the tree in etcd
@@ -138,11 +138,11 @@ func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityIterate(actionF
 }
 
 // DatastoreExternalEntityDelete - Delete the specified entity from the sfc db in the etcd tree
-func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityDelete(ee *controller.ExternalEntity) error {
-	key := controller.ExternalEntityNameKey(ee.Name)
+func (plugin *SfcControllerPluginHandler) DatastoreExternalEntityDelete(extEntityName string) (found bool, err error) {
+	key := controller.ExternalEntityNameKey(extEntityName)
 	plugin.Log.Infof("DatastoreSfcEntityDelete: deleteing key: '%s'", key)
-	_, err := plugin.db.Delete(key)
-	return err
+	found, err = plugin.db.Delete(key)
+	return found, err
 }
 
 // create the specified entity in the sfc db in etcd
@@ -200,11 +200,11 @@ func (plugin *SfcControllerPluginHandler) DatastoreHostEntityIterate(actionFunc 
 }
 
 // DatastoreHostEntityDelete - Delete the specified entity from the sfc db in the etcd tree
-func (plugin *SfcControllerPluginHandler) DatastoreHostEntityDelete(he *controller.HostEntity) error {
-	key := controller.ExternalEntityNameKey(he.Name)
+func (plugin *SfcControllerPluginHandler) DatastoreHostEntityDelete(hostEntityName string) (found bool, err error) {
+	key := controller.ExternalEntityNameKey(hostEntityName)
 	plugin.Log.Infof("DatastoreSfcEntityDelete: deleteing key: '%s'", key)
-	_, err := plugin.db.Delete(key)
-	return err
+	found, err = plugin.db.Delete(key)
+	return found, err
 }
 
 // create the specified entity in the sfc db in etcd
@@ -263,17 +263,24 @@ func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityIterate(actionFunc f
 }
 
 // DatastoreSfcEntityDelete - Delete the specified entity from the sfc db in the etcd tree
-func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityDelete(sfc *controller.SfcEntity) error {
-	key := controller.SfcEntityNameKey(sfc.Name)
+func (plugin *SfcControllerPluginHandler) DatastoreSfcEntityDelete(sfcEntityName string) (found bool, err error) {
+	key := controller.SfcEntityNameKey(sfcEntityName)
 	plugin.Log.Infof("DatastoreSfcEntityDelete: deleteing key: '%s'", key)
-	_, err := plugin.db.Delete(key)
-	return err
+	found, err = plugin.db.Delete(key)
+	return found, err
 }
 
 // GetExternalEntity gets from RAM cache
 func (plugin *SfcControllerPluginHandler) GetExternalEntity(externalEntityName string) (entity *controller.ExternalEntity, found bool) {
 	ee, found := plugin.ramConfigCache.EEs.GetValue(externalEntityName)
 	return ee, found
+}
+
+// DeleteExternalEntity - deletes from data store & RAM cache
+func (plugin *SfcControllerPluginHandler) DeleteExternalEntity(externalEntityName string) (found bool, err error) {
+	found, err = plugin.DatastoreExternalEntityDelete(externalEntityName)
+	plugin.ramConfigCache.EEs.Delete(externalEntityName)
+	return found, err
 }
 
 // PutExternalEntity updates RAM cache & ETCD
@@ -302,6 +309,13 @@ func (plugin *SfcControllerPluginHandler) GetHostEntity(hostEntityName string) (
 	return he, found
 }
 
+// DeleteHostEntity - deletes from data store & RAM cache
+func (plugin *SfcControllerPluginHandler) DeleteHostEntity(hostEntityName string) (found bool, err error) {
+	found, err = plugin.DatastoreHostEntityDelete(hostEntityName)
+	plugin.ramConfigCache.EEs.Delete(hostEntityName)
+	return found, err
+}
+
 // PutHostEntity updates RAM cache & ETCD
 func (plugin *SfcControllerPluginHandler) PutHostEntity(he *controller.HostEntity) error {
 	//TODO fire event go channel (to process this using watcher pattern)
@@ -327,6 +341,13 @@ func (plugin *SfcControllerPluginHandler) ListHostEntities() []*controller.HostE
 func (plugin *SfcControllerPluginHandler) GetSFCEntity(sfcName string) (entity *controller.SfcEntity, found bool) {
 	sfc, found := plugin.ramConfigCache.SFCs.GetValue(sfcName)
 	return sfc, found
+}
+
+// DeleteSFCEntity gets from RAM cache
+func (plugin *SfcControllerPluginHandler) DeleteSFCEntity(sfcName string) (found bool, err error) {
+	found, err = plugin.DatastoreSfcEntityDelete(sfcName)
+	plugin.ramConfigCache.SFCs.Delete(sfcName)
+	return found, err
 }
 
 // PutSFCEntity updates RAM cache & ETCD

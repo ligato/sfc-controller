@@ -26,6 +26,7 @@ import (
 // HostEntityIdxRW thread-safe access to RAM Cache
 type HostEntityIdxRW interface {
 	GetHostEntity(hostEntityName string) (entity *controller.HostEntity, found bool)
+	DeleteHostEntity(hostEntityName string) (found bool, err error)
 	PutHostEntity(*controller.HostEntity) error
 	ListHostEntities() []*controller.HostEntity
 	ValidateHostEntity(*controller.HostEntity) error
@@ -62,12 +63,20 @@ func (plugin *SfcControllerRPC) hostEntityHandler(formatter *render.Render) http
 		case "GET":
 			vars := mux.Vars(req)
 			if he, exists := plugin.SFCNorthbound.GetHostEntity(vars[entityName]); exists {
-		formatter.JSON(w, http.StatusOK, he)
-		} else {
-		formatter.JSON(w, http.StatusNotFound, "host entity does not found:"+vars[entityName])
-		}
-			return
-		case "POST":
+				formatter.JSON(w, http.StatusOK, he)
+			} else {
+				formatter.JSON(w, http.StatusNotFound, "host entity does not found:"+vars[entityName])
+			}
+		case "DELETE":
+			vars := mux.Vars(req)
+			if exists, err := plugin.SFCNorthbound.DeleteHostEntity(vars[entityName]);  err != nil {
+				formatter.JSON(w, http.StatusInternalServerError, "error deleting host entity: "+vars[entityName]+" "+err.Error())
+			} else if exists {
+				formatter.JSON(w, http.StatusOK, "deleted: "+vars[entityName])
+			} else {
+				formatter.JSON(w, http.StatusNotFound, "host entity does not found: "+vars[entityName])
+			}
+		case "POST", "PUT":
 			plugin.processHostEntityPost(formatter, w, req)
 		}
 	}

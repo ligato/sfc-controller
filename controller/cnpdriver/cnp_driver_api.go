@@ -39,9 +39,15 @@ type SfcControllerCNPDriverAPI interface {
 
 	WireHostEntity
 	WireExtEntity
-	WireSfcEntity(sfc *controller.SfcEntity) error
+	WireSfcEntity
 
 	Dump()
+}
+
+// WireSfcEntity defines methods for wiring/rendering SFC Entity configuration from SFC Controller model
+type WireSfcEntity interface {
+	WireSfcEntity(sfc *controller.SfcEntity) error
+	//TODO DeleteSfcEntity(sfc *controller.SfcEntity) error
 }
 
 // WireExtEntity defines methods for wiring/rendering Ext. Entity configuration from SFC Controller model

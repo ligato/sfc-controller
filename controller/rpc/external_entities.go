@@ -26,6 +26,7 @@ import (
 // ExternalEntityIdxRW thread-safe access to RAM Cache
 type ExternalEntityIdxRW interface {
 	GetExternalEntity(externalEntityName string) (entity *controller.ExternalEntity, found bool)
+	DeleteExternalEntity(externalEntityName string) (found bool, err error)
 	PutExternalEntity(*controller.ExternalEntity) error
 	ListExternalEntities() []*controller.ExternalEntity
 	ValidateExternalEntity(*controller.ExternalEntity) error
@@ -65,10 +66,20 @@ func (plugin *SfcControllerRPC) externalEntityHandler(formatter *render.Render) 
 			if ee, exists := plugin.SFCNorthbound.GetExternalEntity(vars[entityName]); exists {
 				formatter.JSON(w, http.StatusOK, ee)
 			} else {
-				formatter.JSON(w, http.StatusNotFound, "external entity does not found:"+vars[entityName])
+				formatter.JSON(w, http.StatusNotFound, "external entity does not found: "+vars[entityName])
 			}
 			return
-		case "POST":
+		case "DELETE":
+			vars := mux.Vars(req)
+
+			if exists, err := plugin.SFCNorthbound.DeleteExternalEntity(vars[entityName]); err != nil {
+				formatter.JSON(w, http.StatusInternalServerError, "error deleting: "+vars[entityName]+" "+err.Error())
+			} else if exists {
+				formatter.JSON(w, http.StatusOK, "deleted: "+vars[entityName])
+			} else {
+				formatter.JSON(w, http.StatusNotFound, "external entity does not found: "+vars[entityName])
+			}
+		case "POST", "PUT":
 			plugin.processExternalEntityPost(formatter, w, req)
 		}
 	}

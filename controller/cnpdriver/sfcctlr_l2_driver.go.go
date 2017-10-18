@@ -253,7 +253,7 @@ func (cnpd *sfcCtlrL2CNPDriver) ReconcileEnd() error {
 	for key := range cnpd.reconcileAfter.ifs {
 		afterIF := cnpd.reconcileAfter.ifs[key]
 		log.Info("ReconcileEnd: add i/f key to etcd: ", key, afterIF)
-		err := cnpd.db.Put(key, &afterIF)//TODO do not update the thing that are the same
+		err := cnpd.db.Put(key, &afterIF) //TODO do not update the thing that are the same
 		if err != nil {
 			log.Error("ReconcileEnd: error storing i/f: '%s'", key, err)
 			return err
@@ -368,7 +368,6 @@ func (cnpd *sfcCtlrL2CNPDriver) wireExternalEntityToHostEntity(ee *controller.Ex
 	}
 
 	//bdName := "BD_E2H_" + ee.Name + "_" + he.Name
-
 	// create the vxlan i'f before the BD
 	//ifName := "IF_VXLAN_E2H_" + ee.Name + "_" + he.Name
 	tmpVlanid := heToEEState.vlanIf.Vxlan.Vni // use the same id as the reverse direction
@@ -533,7 +532,7 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForExternalEntity(ee *controller.Ex
 	return nil
 }
 
-// Perform CNP specific wiring for inter-container wiring, and container to external router wiring
+// WireSfcEntity - Perform CNP specific wiring for inter-container wiring, and container to external router wiring
 func (cnpd *sfcCtlrL2CNPDriver) WireSfcEntity(sfc *controller.SfcEntity) error {
 
 	var err error = nil

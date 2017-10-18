@@ -21,20 +21,23 @@ import (
 func (plugin *SfcControllerPluginHandler) subscribeForWatchingEvents() {
 	// TODO make this async (once we want resync also for ETCD & router reconnect)
 	plugin.ramConfigCache.HEs.WatchNameToIdx(plugin.PluginName, func(event *controlleridxmap.HostEntityEvent) {
-		//TODO event.Del
-		if err := plugin.renderHostEntity(event.Value, true, true); err != nil {
+		if event.Del {
+			plugin.Log.Warn("Delete Host Entity from vpp-agent not implemented")
+		} else if err := plugin.renderHostEntity(event.Value, true, true); err != nil {
 			plugin.Log.Error("error rendering Host Entity: ", err)
 		}
 	})
 	plugin.ramConfigCache.EEs.WatchNameToIdx(plugin.PluginName, func(event *controlleridxmap.ExternalEntityEvent) {
-		//TODO event.Del
-		if err := plugin.renderExternalEntity(event.Value, true, true); err != nil {
+		if event.Del {
+			plugin.Log.Warn("Delete External Entity from vpp-agent not implemented")
+		} else if err := plugin.renderExternalEntity(event.Value, true, true); err != nil {
 			plugin.Log.Error("error rendering External Entity: ", err)
 		}
 	})
 	plugin.ramConfigCache.SFCs.WatchNameToIdx(plugin.PluginName, func(event *controlleridxmap.SfcEntityEvent) {
-		//TODO event.Del
-		if err := plugin.renderServiceFunctionEntity(event.Value); err != nil {
+		if event.Del {
+			plugin.Log.Warn("Delete SFC Entity from vpp-agent not implemented")
+		} else if err := plugin.renderServiceFunctionEntity(event.Value); err != nil {
 			plugin.Log.Error("error rendering SFC Entity: ", err)
 		}
 	})
