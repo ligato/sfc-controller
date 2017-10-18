@@ -21,8 +21,6 @@ import (
 	agent_api "github.com/ligato/cn-infra/core"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/logging/logroot"
-	"github.com/namsral/flag"
-
 	"github.com/ligato/sfc-controller/controller"
 )
 
@@ -32,9 +30,6 @@ var log = logroot.StandardLogger()
 // contain the boiler plate initialization code that is executed
 // when the plugin is loaded into the Agent.
 func init() {
-	flag.String("etcdv3-config", "etcd.conf",
-		"Location of the Etcd configuration file; also set via 'ETCDV3_CONFIG' env variable.")
-
 	log.SetLevel(logging.DebugLevel)
 	//TODO with Lukas pluginapi.RegisterLogger(PluginID, log.StandardLogger())
 }

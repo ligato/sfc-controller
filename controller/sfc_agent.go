@@ -131,7 +131,7 @@ func (f *FlavorSFCFull) Inject() bool {
 	f.HealthRPC.Deps.HTTP = &f.HTTP
 	f.HealthRPC.Deps.StatusCheck = &f.StatusCheck
 
-	f.ETCD.Deps.PluginInfraDeps = *f.InfraDeps("etcdv3")
+	f.ETCD.Deps.PluginInfraDeps = *f.InfraDeps("etcdv3", local.WithConf())
 
 	if f.Sfc.Deps.CNPDriver == nil {
 		f.Sfc.Deps.CNPDriver = cnpdriver.NewSfcCtlrL2CNPDriver("sfcctlrl2", f.ETCD.NewBroker)
