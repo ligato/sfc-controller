@@ -95,11 +95,11 @@ type FlavorSFCFull struct {
 	LogMngRPC logmanager.Plugin
 	ETCD      etcdv3.Plugin
 
-	Sfc          core.SfcControllerPluginHandler
-	SfcRPC       rpc.SfcControllerRPC
 	VNFDriver    vnfdriver.Plugin
 	L2Driver     cnpdriver.SfcControllerCNPDriverAPI
-	ExtEntDriver extentitydriver.Plugin
+	ExtEntDriver cnpdriver.WireExtEntity
+	Sfc          core.SfcControllerPluginHandler
+	SfcRPC       rpc.SfcControllerRPC
 
 	injected bool
 }
@@ -134,16 +134,21 @@ func (f *FlavorSFCFull) Inject() bool {
 
 	f.ETCD.Deps.PluginInfraDeps = *f.InfraDeps("etcdv3", local.WithConf())
 
-	if f.L2Driver == nil {
-		l2Driver := &cnpdriver.L2Driver{}
-		l2Driver.Deps.PluginLogDeps = *f.LogDeps("sfc-l2-plugin")
-		f.L2Driver = l2Driver
-	}
 	if f.Sfc.Deps.CNPDriver == nil {
+		if f.L2Driver == nil {
+			l2Driver := &cnpdriver.L2Driver{}
+			l2Driver.Deps.PluginLogDeps = *f.LogDeps("sfc-l2-plugin")
+			l2Driver.Deps.Etcd = &f.ETCD
+			f.L2Driver = l2Driver
+		}
+
 		f.Sfc.Deps.CNPDriver = f.L2Driver
 	}
 	if f.Sfc.Deps.ExtEntityDriver == nil {
-		f.Sfc.Deps.ExtEntityDriver = &f.ExtEntDriver
+		if f.ExtEntDriver == nil {
+			f.ExtEntDriver = &extentitydriver.Plugin{}
+		}
+		f.Sfc.Deps.ExtEntityDriver = f.ExtEntDriver
 	}
 
 	checkPlugin = &f.Sfc
