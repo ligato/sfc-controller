@@ -96,7 +96,7 @@ type FlavorSFCFull struct {
 	ETCD      etcdv3.Plugin
 
 	VNFDriver    vnfdriver.Plugin
-	L2Driver     cnpdriver.SfcControllerCNPDriverAPI
+	CNPDDriver   cnpdriver.SfcControllerCNPDriverAPI
 	ExtEntDriver cnpdriver.WireExtEntity
 	Sfc          core.SfcControllerPluginHandler
 	SfcRPC       rpc.SfcControllerRPC
@@ -135,14 +135,14 @@ func (f *FlavorSFCFull) Inject() bool {
 	f.ETCD.Deps.PluginInfraDeps = *f.InfraDeps("etcdv3", local.WithConf())
 
 	if f.Sfc.Deps.CNPDriver == nil {
-		if f.L2Driver == nil {
+		if f.CNPDDriver == nil {
 			l2Driver := &cnpdriver.L2Driver{}
 			l2Driver.Deps.PluginLogDeps = *f.LogDeps("sfc-l2-plugin")
 			l2Driver.Deps.Etcd = &f.ETCD
-			f.L2Driver = l2Driver
+			f.CNPDDriver = l2Driver
 		}
 
-		f.Sfc.Deps.CNPDriver = f.L2Driver
+		f.Sfc.Deps.CNPDriver = f.CNPDDriver
 	}
 	if f.Sfc.Deps.ExtEntityDriver == nil {
 		if f.ExtEntDriver == nil {
