@@ -28,6 +28,13 @@ import (
 // both ends at that time.  See the http handler for an example of how the renderEE is done.
 func (sfcCtrlPlugin *SfcControllerPluginHandler) renderConfigFromRamCache() error {
 
+
+	log.Infof("render system parameters from ram cache")
+	if err := sfcCtrlPlugin.renderSystemParameters(&sfcCtrlPlugin.ramConfigCache.SysParms); err != nil {
+		log.Error("Error rendering sys parms:", sfcCtrlPlugin.ramConfigCache.SysParms)
+		os.Exit(1)
+	}
+
 	log.Infof("render host entities from ram cache")
 	for _, he := range sfcCtrlPlugin.ramConfigCache.HEs {
 		if err := sfcCtrlPlugin.renderHostEntity(&he, true, false); err != nil {
@@ -70,6 +77,17 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderConfigFromRamCache() erro
 	sfcCtrlPlugin.cnpDriverPlugin.Dump()
 
 	return nil
+}
+
+// For this ee, find all host entities and effect external entity to host wiring.  Will need a "session"
+// per external entity, and this session will be used to communicate wiring configuration.  Also, if the
+// configOnlyEE is false, then from each host entity, wire from host to this ee.
+func (sfcCtrlPlugin *SfcControllerPluginHandler) renderSystemParameters(sp *controller.SystemParameters) error {
+
+	log.Infof("renderSystemParameters: sp: ", *sp)
+
+	return sfcCtrlPlugin.cnpDriverPlugin.SetSystemParameters(sp)
+
 }
 
 // For this ee, find all host entities and effect external entity to host wiring.  Will need a "session"

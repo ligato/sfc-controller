@@ -24,6 +24,10 @@ import (
 
 func (sfcCtrlPlugin *SfcControllerPluginHandler) validateRamCache() error {
 
+	if err := sfcCtrlPlugin.validateSystemParameters(&sfcCtrlPlugin.ramConfigCache.SysParms); err != nil {
+		return err
+	}
+
 	for _, ee := range sfcCtrlPlugin.ramConfigCache.EEs {
 		if err := sfcCtrlPlugin.validateEE(&ee); err != nil {
 			return err
@@ -38,6 +42,18 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) validateRamCache() error {
 		if err := sfcCtrlPlugin.validateSFC(&sfc); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// validate the system parameters
+func (sfcCtrlPlugin *SfcControllerPluginHandler) validateSystemParameters(sp *controller.SystemParameters) error {
+
+	if sp.Mtu == 0 {
+		log.Info("validateSystemParameters: sys mtu = 0, defaulting ot 1500")
+		sp.Mtu = 1500 // if not provided, default it to 1500
+		return nil
 	}
 
 	return nil

@@ -87,9 +87,10 @@ type l2CNPStateCacheType struct {
 }
 
 type l2CNPEntityCacheType struct {
-	EEs  map[string]controller.ExternalEntity
-	HEs  map[string]controller.HostEntity
-	SFCs map[string]controller.SfcEntity
+	EEs      map[string]controller.ExternalEntity
+	HEs      map[string]controller.HostEntity
+	SFCs     map[string]controller.SfcEntity
+	SysParms controller.SystemParameters
 }
 
 // maps of ETCD entries indexed by ETCD vpp label
@@ -165,6 +166,12 @@ func (cnpd *sfcCtlrL2CNPDriver) DeinitPlugin() error {
 // Return user friendly name for this plugin
 func (cnpd *sfcCtlrL2CNPDriver) GetName() string {
 	return cnpd.name
+}
+
+// SetSystemParameters caches the current settings for the system
+func (cnpd *sfcCtlrL2CNPDriver) SetSystemParameters(sp *controller.SystemParameters) error {
+	cnpd.l2CNPEntityCache.SysParms = *sp
+	return nil
 }
 
 // Perform start processing for the reconcile of the CNP datastore
@@ -497,9 +504,10 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 	heState = &heStateType{}
 	cnpd.l2CNPStateCache.HE[he.Name] = heState
 
+	mtu := cnpd.l2CNPEntityCache.SysParms.Mtu
 	// configure the nic/ethernet
 	if he.EthIfName != "" {
-		if err := cnpd.createEthernet(he.Name, he.EthIfName, he.EthIpv4); err != nil {
+		if err := cnpd.createEthernet(he.Name, he.EthIfName, he.EthIpv4, mtu); err != nil {
 			log.Error("WireInternalsForHostEntity: error creating ethernet i/f: '%s'", he.EthIfName)
 			return err
 		}
@@ -517,9 +525,11 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 			loopbackMacAddress = he.LoopbackMacAddr
 		}
 
+		mtu := cnpd.l2CNPEntityCache.SysParms.Mtu
+
 		// configure loopback interface
 		loopIfName := "IF_LOOPBACK_H_" + he.Name
-		if err := cnpd.createLoopback(he.Name, loopIfName, loopbackMacAddress, he.LoopbackIpv4); err != nil {
+		if err := cnpd.createLoopback(he.Name, loopIfName, loopbackMacAddress, he.LoopbackIpv4, mtu); err != nil {
 			log.Error("WireInternalsForHostEntity: error creating loopback i/f: '%s'", loopIfName)
 			return err
 		}
@@ -730,8 +740,10 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 				return err
 			}
 
+			mtu := cnpd.l2CNPEntityCache.SysParms.Mtu
+
 			// physical NIC
-			if err := cnpd.createEthernet(he.Container, he.PortLabel, ""); err != nil {
+			if err := cnpd.createEthernet(he.Container, he.PortLabel, "", mtu); err != nil {
 				log.Error("wireSfcNorthSouthNICElements: error creating ethernet i/f: '%s'", he.PortLabel)
 				return err
 			}
@@ -785,8 +797,10 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 				return err
 			}
 
+			mtu := cnpd.l2CNPEntityCache.SysParms.Mtu
+
 			// physical NIC
-			if err := cnpd.createEthernet(he.Container, he.PortLabel, ""); err != nil {
+			if err := cnpd.createEthernet(he.Container, he.PortLabel, "", mtu); err != nil {
 				log.Error("wireSfcNorthSouthNICElements: error creating ethernet i/f: '%s'", he.PortLabel)
 				return err
 			}
@@ -983,10 +997,12 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 		macAddress = vnfChainElement.MacAddr
 	}
 
+	mtu := cnpd.getMtu(vnfChainElement.Mtu)
+
 	// create a memif in the vnf container
 	memIfName := vnfChainElement.PortLabel
 	if _, err := cnpd.memIfCreate(vnfChainElement.Container, memIfName, cnpd.seq.MemIfID,
-		false, ipv4Address, macAddress); err != nil {
+		false, ipv4Address, macAddress, mtu); err != nil {
 		log.Error("createMemIfPair: error creating memIf for container: '%s'", memIfName)
 		return "", err
 	}
@@ -994,7 +1010,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 	// now create a memif for the vpp switch
 	memIfName = "IF_MEMIF_VSWITCH_" + vnfChainElement.Container + "_" + vnfChainElement.PortLabel
 	memIf, err := cnpd.memIfCreate(vnfChainElement.EtcdVppSwitchKey, memIfName, cnpd.seq.MemIfID,
-		true, "", "")
+		true, "", "", mtu)
 	if err != nil {
 		log.Error("createMemIfPair: error creating memIf for vpp switch: '%s'", memIf.Name)
 		return "", err
@@ -1079,10 +1095,12 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 		return "", err
 	}
 
+	mtu := cnpd.getMtu(vnfChainElement.Mtu)
+
 	// create af_packet for the vnf -end of the veth
 	if vnfChainElement.Type == controller.SfcElementType_CONTAINER_AGENT_VPP_AFP {
 		afPktIf1, err := cnpd.afPacketCreate(vnfChainElement.Container, vnfChainElement.PortLabel,
-			veth1Name, "", "")
+			veth1Name, "", "", mtu)
 		if err != nil {
 			log.Error("createAFPacketVEthPair: error creating afpacket for vpp switch: '%s'", afPktIf1.Name)
 			return "", err
@@ -1091,7 +1109,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 
 	// create af_packet for the vswitch -end of the veth
 	afPktName := "IF_AFPIF_VSWITCH_" + vnfChainElement.Container + "_" + vnfChainElement.PortLabel
-	afPktIf2, err := cnpd.afPacketCreate(vnfChainElement.EtcdVppSwitchKey, afPktName, veth2Name, "", "")
+	afPktIf2, err := cnpd.afPacketCreate(vnfChainElement.EtcdVppSwitchKey, afPktName, veth2Name,
+		"", "", mtu)
 	if err != nil {
 		log.Error("createAFPacketVEthPair: error creating afpacket for vpp switch: '%s'", afPktIf2.Name)
 		return "", err
@@ -1228,14 +1247,14 @@ func (cnpd *sfcCtlrL2CNPDriver) vxLanCreate(etcdVppSwitchKey string, ifname stri
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) memIfCreate(etcdPrefix string, memIfName string, memifID uint32, isMaster bool,
-	ipv4 string, macAddress string) (*interfaces.Interfaces_Interface, error) {
+	ipv4 string, macAddress string, mtu uint32) (*interfaces.Interfaces_Interface, error) {
 
 	memIf := &interfaces.Interfaces_Interface{
 		Name:        memIfName,
 		Type:        interfaces.InterfaceType_MEMORY_INTERFACE,
 		Enabled:     true,
 		PhysAddress: macAddress,
-		Mtu:         1500,
+		Mtu:         mtu,
 		Memif: &interfaces.Interfaces_Interface_Memif{
 			Id:             memifID,
 			Master:         isMaster,
@@ -1272,14 +1291,14 @@ func (cnpd *sfcCtlrL2CNPDriver) reconcileInterface(etcdVppSwitchKey string, curr
 	cnpd.reconcileAfter.ifs[ifKey] = *currIf
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) createEthernet(etcdPrefix string, ifname string, ipv4Addr string) error {
+func (cnpd *sfcCtlrL2CNPDriver) createEthernet(etcdPrefix string, ifname string, ipv4Addr string, mtu uint32) error {
 
 	iface := &interfaces.Interfaces_Interface{
 		Name:        ifname,
 		Type:        interfaces.InterfaceType_ETHERNET_CSMACD,
 		Enabled:     true,
 		PhysAddress: "",
-		Mtu:         1500,
+		Mtu:         mtu,
 	}
 	if ipv4Addr != "" {
 		iface.IpAddresses = make([]string, 1)
@@ -1306,14 +1325,14 @@ func (cnpd *sfcCtlrL2CNPDriver) createEthernet(etcdPrefix string, ifname string,
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) afPacketCreate(etcdPrefix string, ifName string, hostIfName string,
-	ipv4 string, macAddress string) (*interfaces.Interfaces_Interface, error) {
+	ipv4 string, macAddress string, mtu uint32) (*interfaces.Interfaces_Interface, error) {
 
 	afPacketIf := &interfaces.Interfaces_Interface{
 		Name:        ifName,
 		Type:        interfaces.InterfaceType_AF_PACKET_INTERFACE,
 		Enabled:     true,
 		PhysAddress: macAddress,
-		Mtu:         1500,
+		Mtu:         mtu,
 		Afpacket: &interfaces.Interfaces_Interface_Afpacket{
 			HostIfName: hostIfName,
 		},
@@ -1343,14 +1362,15 @@ func (cnpd *sfcCtlrL2CNPDriver) afPacketCreate(etcdPrefix string, ifName string,
 	return afPacketIf, nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) createLoopback(etcdPrefix string, ifname string, physAddr string, ipv4Addr string) error {
+func (cnpd *sfcCtlrL2CNPDriver) createLoopback(etcdPrefix string, ifname string, physAddr string, ipv4Addr string,
+	mtu uint32) error {
 
 	iface := &interfaces.Interfaces_Interface{
 		Name:        ifname,
 		Type:        interfaces.InterfaceType_SOFTWARE_LOOPBACK,
 		Enabled:     true,
 		PhysAddress: physAddr,
-		Mtu:         1500,
+		Mtu:         mtu,
 	}
 	if ipv4Addr != "" {
 		iface.IpAddresses = make([]string, 1)
@@ -1531,6 +1551,16 @@ func (cnpd *sfcCtlrL2CNPDriver) getHEToEEState(heName string, eeName string) *he
 		return nil
 	}
 	return eeMap[eeName]
+}
+
+func (cnpd *sfcCtlrL2CNPDriver) getMtu(mtu uint32) uint32 {
+
+	log.Info("getMtu: ", mtu);
+	if mtu == 0 {
+		mtu = cnpd.l2CNPEntityCache.SysParms.Mtu
+		log.Info("getMtu: replacing with system value: ", mtu);
+	}
+	return mtu
 }
 
 func formatMacAddress(macInstanceId uint32) string {

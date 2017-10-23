@@ -9,6 +9,7 @@ It is generated from these files:
 	controller.proto
 
 It has these top-level messages:
+	SystemParameters
 	ExternalEntity
 	HostEntity
 	CustomInfoType
@@ -46,26 +47,26 @@ type SfcType int32
 const (
 	SfcType_SFC_UNKNOWN_TYPE   SfcType = 0
 	SfcType_SFC_NS_VXLAN       SfcType = 1
-	SfcType_SFC_EW_BD          SfcType = 2
 	SfcType_SFC_NS_NIC_BD      SfcType = 3
 	SfcType_SFC_NS_NIC_L2XCONN SfcType = 4
+	SfcType_SFC_EW_BD          SfcType = 2
 	SfcType_SFC_EW_L2XCONN     SfcType = 5
 )
 
 var SfcType_name = map[int32]string{
 	0: "SFC_UNKNOWN_TYPE",
 	1: "SFC_NS_VXLAN",
-	2: "SFC_EW_BD",
 	3: "SFC_NS_NIC_BD",
 	4: "SFC_NS_NIC_L2XCONN",
+	2: "SFC_EW_BD",
 	5: "SFC_EW_L2XCONN",
 }
 var SfcType_value = map[string]int32{
 	"SFC_UNKNOWN_TYPE":   0,
 	"SFC_NS_VXLAN":       1,
-	"SFC_EW_BD":          2,
 	"SFC_NS_NIC_BD":      3,
 	"SFC_NS_NIC_L2XCONN": 4,
+	"SFC_EW_BD":          2,
 	"SFC_EW_L2XCONN":     5,
 }
 
@@ -107,6 +108,14 @@ var SfcElementType_value = map[string]int32{
 func (x SfcElementType) String() string {
 	return proto.EnumName(SfcElementType_name, int32(x))
 }
+
+type SystemParameters struct {
+	Mtu uint32 `protobuf:"varint,1,opt,name=mtu,proto3" json:"mtu,omitempty"`
+}
+
+func (m *SystemParameters) Reset()         { *m = SystemParameters{} }
+func (m *SystemParameters) String() string { return proto.CompactTextString(m) }
+func (*SystemParameters) ProtoMessage()    {}
 
 type ExternalEntity struct {
 	Name            string                        `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -221,6 +230,7 @@ type SfcEntity_SfcElement struct {
 	MacAddr          string          `protobuf:"bytes,5,opt,name=mac_addr,proto3" json:"mac_addr,omitempty"`
 	Type             SfcElementType  `protobuf:"varint,6,opt,name=type,proto3,enum=controller.SfcElementType" json:"type,omitempty"`
 	CustomInfo       *CustomInfoType `protobuf:"bytes,7,opt,name=custom_info" json:"custom_info,omitempty"`
+	Mtu              uint32          `protobuf:"varint,8,opt,name=mtu,proto3" json:"mtu,omitempty"`
 }
 
 func (m *SfcEntity_SfcElement) Reset()         { *m = SfcEntity_SfcElement{} }

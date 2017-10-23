@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package controller;
 
+message SystemParameters {
+    uint32 mtu = 1; // optional, overrrides default 1500
+};
+
 enum ExtEntDriverType {
     EE_DRIVER_TYPE_UNKNOWN = 0;
     EE_DRIVER_TYPE_IOSXE_SSH = 1;
@@ -84,6 +88,7 @@ message SfcEntity {
         string mac_addr = 5;              // optional, if provided, this overrides what mac the if is given
         SfcElementType type = 6;
         CustomInfoType custom_info = 7;   // opaque string ... possibly json for app specific information
+        uint32 mtu = 8;                   // if provided, this overrides system value
     };
     repeated SfcElement elements = 7;
 };
