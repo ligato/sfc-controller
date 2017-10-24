@@ -53,8 +53,7 @@ endef
 # run code analysis
 define lint_only
    @echo "# running code analysis"
-    @./scripts/golint.sh
-    @./scripts/govet.sh
+    @./scripts/static_analysis.sh golint vet
     @echo "# done"
 endef
 
@@ -169,7 +168,11 @@ lint:
 
 # report suspicious constructs using go vet tool
 govet:
-	@./scripts/govet.sh
+	@./scripts/static_analysis.sh vet
+
+# format code using gofmt tool
+format:
+	@./scripts/gofmt.sh
 
 # validate links in markdown files
 check_links:
