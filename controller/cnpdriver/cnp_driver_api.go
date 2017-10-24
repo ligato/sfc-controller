@@ -51,6 +51,7 @@ type SfcControllerCNPDriverAPI interface {
 	WireInternalsForHostEntity(he *controller.HostEntity) error
 	WireInternalsForExternalEntity(ee *controller.ExternalEntity) error
 	WireSfcEntity(sfc *controller.SfcEntity) error
+	SetSystemParameters(sp *controller.SystemParameters) error
 	Dump()
 }
 

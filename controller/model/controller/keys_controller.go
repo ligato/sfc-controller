@@ -18,6 +18,10 @@ func SfcControllerPrefix() string {
 	return "/sfc-controller/api/v1/"
 }
 
+func SystemParametersKey() string {
+	return SfcControllerPrefix() + "SP"
+}
+
 func ExternalEntityKeyPrefix() string {
 	return SfcControllerPrefix() + "EE/"
 }

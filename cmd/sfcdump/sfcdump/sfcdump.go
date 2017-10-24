@@ -36,7 +36,7 @@ import (
 )
 
 var (
-	etcdVppLabelMap = make(map[string]interface{})
+	EtcdVppLabelMap = make(map[string]interface{})
 	log             = logroot.StandardLogger()
 )
 
@@ -47,10 +47,11 @@ func SfcDump() keyval.ProtoBroker {
 
 	_, db := createEtcdClient()
 
+	sfcDatastoreSystemParametersDump(db)
 	sfcDatastoreHostEntityDumpAll(db)
 	sfcDatastoreExternalEntityDumpAll(db)
 	sfcDatastoreSfcEntityDumpAll(db)
-	for k := range etcdVppLabelMap {
+	for k := range EtcdVppLabelMap {
 		fmt.Println("ETCD VPP LABEL: ", k)
 		vnfDatastoreCustomLabelsDumpAll(db, k)
 		vnfDatastoreInterfacesDumpAll(db, k)
@@ -61,6 +62,30 @@ func SfcDump() keyval.ProtoBroker {
 	}
 
 	return db
+}
+
+func sfcDatastoreSystemParametersDump(db keyval.ProtoBroker) error {
+
+	kvi, err := db.ListValues(controller.SystemParametersKey())
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
+
+	for {
+		kv, allReceived := kvi.GetNext()
+		if allReceived {
+			return nil
+		}
+		entry := &controller.SystemParameters{}
+		err := kv.GetValue(entry)
+		if err != nil {
+			log.Fatal(err)
+			return nil
+		}
+		fmt.Println("SysParms: ", kv.GetKey(), entry)
+	}
+	return nil
 }
 
 func sfcDatastoreSfcEntityDumpAll(db keyval.ProtoBroker) error {
@@ -84,10 +109,10 @@ func sfcDatastoreSfcEntityDumpAll(db keyval.ProtoBroker) error {
 		}
 		for _, sfcChainElement := range sfc.GetElements() {
 			if sfcChainElement.EtcdVppSwitchKey != "" {
-				etcdVppLabelMap[sfcChainElement.EtcdVppSwitchKey] = sfcChainElement.EtcdVppSwitchKey
+				EtcdVppLabelMap[sfcChainElement.EtcdVppSwitchKey] = sfcChainElement.EtcdVppSwitchKey
 			}
 			if sfcChainElement.Container != "" {
-				etcdVppLabelMap[sfcChainElement.Container] = sfcChainElement.Container
+				EtcdVppLabelMap[sfcChainElement.Container] = sfcChainElement.Container
 			}
 		}
 		fmt.Println("SFC: ", kv.GetKey(), sfc)
@@ -114,7 +139,7 @@ func sfcDatastoreExternalEntityDumpAll(db keyval.ProtoBroker) error {
 			log.Fatal(err)
 			return nil
 		}
-		etcdVppLabelMap[entry.Name] = entry.Name
+		EtcdVppLabelMap[entry.Name] = entry.Name
 		fmt.Println("EE: ", kv.GetKey(), entry)
 	}
 	return nil
@@ -139,7 +164,7 @@ func sfcDatastoreHostEntityDumpAll(db keyval.ProtoBroker) error {
 			log.Fatal(err)
 			return nil
 		}
-		etcdVppLabelMap[entry.Name] = entry.Name
+		EtcdVppLabelMap[entry.Name] = entry.Name
 		fmt.Println("HE: ", kv.GetKey(), entry)
 	}
 	return nil

@@ -74,9 +74,10 @@ func init() {
 
 // ram cache of controller entities indexed by entity name
 type SfcControllerCacheType struct {
-	EEs  map[string]controller.ExternalEntity
-	HEs  map[string]controller.HostEntity
-	SFCs map[string]controller.SfcEntity
+	EEs      map[string]controller.ExternalEntity
+	HEs      map[string]controller.HostEntity
+	SFCs     map[string]controller.SfcEntity
+	SysParms controller.SystemParameters
 }
 
 type SfcControllerPluginHandler struct {

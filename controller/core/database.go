@@ -31,6 +31,10 @@ import (
 // flush the ram cache to the sfc cache to the tree in etcd
 func (sfcCtrlPlugin *SfcControllerPluginHandler) WriteRamCacheToEtcd() error {
 
+	sp := &sfcCtrlPlugin.ramConfigCache.SysParms
+	if err := sfcCtrlPlugin.DatastoreSystemParametersCreate(sp); err != nil {
+		return err
+	}
 	for _, ee := range sfcCtrlPlugin.ramConfigCache.EEs {
 		if err := sfcCtrlPlugin.DatastoreExternalEntityCreate(&ee); err != nil {
 			return err
@@ -55,6 +59,9 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) ReadEtcdDatastoreIntoRamCache()
 
 	log.Infof("ReadEtcdDatastoreIntoRamCache: start ...")
 
+	if err := sfcCtrlPlugin.DatastoreSystemParametersRetrieveIntoRamCache(); err != nil {
+		return err
+	}
 	if err := sfcCtrlPlugin.DatastoreExternalEntityRetrieveAllIntoRamCache(); err != nil {
 		return err
 	}
@@ -75,6 +82,9 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreReInitialize() error {
 
 	log.Infof("DatastoreReInitialize: clearing etc tree")
 
+	if err := sfcCtrlPlugin.DatastoreSystemParametersDelete(); err != nil {
+		log.Error("DatastoreReInitialize: DatastoreSystemParametersDelete: ", err)
+	}
 	if err := sfcCtrlPlugin.DatastoreExternalEntityDeleteAll(); err != nil {
 		log.Error("DatastoreReInitialize: DatastoreExternalEntityDeleteAll: ", err)
 	}
@@ -321,6 +331,62 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityUpdate(ee *co
 
 // Delete the specified entity from the sfc db in the etcd tree
 func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSfcEntityDelete(ee *controller.HostEntity) error {
+
+	return nil
+}
+
+// create the specified entity in the sfc db in etcd
+func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSystemParametersCreate(sp *controller.SystemParameters) error {
+
+	name := controller.SystemParametersKey()
+
+	log.Infof("DatastoreSystemParametersCreate: setting key: '%s'", name)
+
+	err := sfcCtrlPlugin.db.Put(name, sp)
+	if err != nil {
+		log.Error("DatastoreSystemParametersCreate: error storing key: '%s'", name)
+		log.Error("DatastoreSystemParametersCreate: databroker put: ", err)
+		return err
+	}
+	return nil
+}
+
+// pull the specified entities from the sfc db in etcd into the sfc ram cache
+func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSystemParametersRetrieveIntoRamCache() error {
+
+	kvi, err := sfcCtrlPlugin.db.ListValues(controller.SystemParametersKey())
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
+
+	for {
+		kv, allReceived := kvi.GetNext()
+		if allReceived {
+			return nil
+		}
+		sp := &controller.SystemParameters{}
+		err := kv.GetValue(sp)
+		if err != nil {
+			log.Fatal(err)
+			return nil
+		}
+		log.Infof("DatastoreSystemParametersRetrieveIntoRamCache: sp: '%s': ", sp)
+		sfcCtrlPlugin.ramConfigCache.SysParms = *sp
+	}
+
+	return nil
+}
+
+// remove the system parms from db in etcd
+func (sfcCtrlPlugin *SfcControllerPluginHandler) DatastoreSystemParametersDelete() error {
+
+	log.Info("DatastoreSystemParametersDelete: begin ...")
+	defer log.Info("DatastoreSystemParametersDelete: exit ...")
+
+	key := controller.SystemParametersKey()
+	log.Infof("DatastoreSystemParametersDelete: deleting sp: '%s': ", key)
+	sfcCtrlPlugin.db.Delete(key)
 
 	return nil
 }

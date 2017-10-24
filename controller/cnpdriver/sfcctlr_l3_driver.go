@@ -58,6 +58,11 @@ func (cnpd *sfcCtlrL3CNPDriver) ReconcileEnd() error {
 	return nil
 }
 
+// SetSystemParameters caches the current settings for the system
+func (cnpd *sfcCtlrL3CNPDriver) SetSystemParameters(sp *controller.SystemParameters) error {
+	return nil
+}
+
 // Perform CNP specific wiring for "connecting" an external router to a host server
 func (cnpd *sfcCtlrL3CNPDriver) wireExternalEntityToHostEntity(ee *controller.ExternalEntity, he *controller.HostEntity) error {
 

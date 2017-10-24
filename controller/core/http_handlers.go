@@ -44,6 +44,9 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) InitHttpHandlers() {
 
 	log.Infof("InitHttpHandlers: registering controller URLs. sfcplug:", sfcplg)
 
+	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.SystemParametersKey(),
+		systemParametersHandler, "GET", "POST")
+
 	url := fmt.Sprintf(controller.ExternalEntityKeyPrefix()+"{%s}", entityName)
 	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(url, externalEntityHandler, "GET", "POST")
 	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.ExternalEntitiesHttpPrefix(),
@@ -306,6 +309,60 @@ func processSfcChainPost(formatter *render.Render, w http.ResponseWriter, req *h
 	}
 
 	if err := sfcplg.renderServiceFunctionEntity(&sfc); err != nil {
+		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
+		return
+	}
+
+	formatter.JSON(w, http.StatusOK, nil)
+}
+
+// Example curl invocations: for obtaining the system parameters
+//   - GET:  curl -X GET http://localhost:9191/sfc_controller/api/v1/SP
+//   - POST: curl -v -X POST -d '{"mtu":1500}' http://localhost:9191/sfc_controller/api/v1/SP
+func systemParametersHandler(formatter *render.Render) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, req *http.Request) {
+		log.Debugf("System Parameters HTTP handler: Method %s, URL: %s", req.Method, req.URL)
+		switch req.Method {
+		case "GET":
+
+			formatter.JSON(w, http.StatusOK, sfcplg.ramConfigCache.SysParms)
+			return
+		case "POST":
+			processSystemParametersPost(formatter, w, req)
+		}
+	}
+}
+
+// create the system parameters
+func processSystemParametersPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		log.Debugf("Can't read body, error '%s'", err)
+		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
+		return
+	}
+	var sp controller.SystemParameters
+	err = json.Unmarshal(body, &sp)
+	if err != nil {
+		log.Debugf("Can't parse body, error '%s'", err)
+		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
+		return
+	}
+
+	if err := sfcplg.validateSystemParameters(&sp); err != nil {
+		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
+		return
+	}
+
+	sfcplg.ramConfigCache.SysParms = sp
+
+	if err := sfcplg.DatastoreSystemParametersCreate(&sp); err != nil {
+		formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
+		return
+	}
+
+	if err := sfcplg.renderSystemParameters(&sp); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
