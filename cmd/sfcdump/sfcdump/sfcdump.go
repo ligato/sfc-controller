@@ -36,7 +36,7 @@ import (
 )
 
 var (
-	EtcdVppLabelMap = make(map[string]interface{})
+	etcdVppLabelMap = make(map[string]interface{})
 	log             = logroot.StandardLogger()
 )
 
@@ -51,7 +51,7 @@ func SfcDump() keyval.ProtoBroker {
 	sfcDatastoreHostEntityDumpAll(db)
 	sfcDatastoreExternalEntityDumpAll(db)
 	sfcDatastoreSfcEntityDumpAll(db)
-	for k := range EtcdVppLabelMap {
+	for k := range etcdVppLabelMap {
 		fmt.Println("ETCD VPP LABEL: ", k)
 		vnfDatastoreCustomLabelsDumpAll(db, k)
 		vnfDatastoreInterfacesDumpAll(db, k)
@@ -85,7 +85,6 @@ func sfcDatastoreSystemParametersDump(db keyval.ProtoBroker) error {
 		}
 		fmt.Println("SysParms: ", kv.GetKey(), entry)
 	}
-	return nil
 }
 
 func sfcDatastoreSfcEntityDumpAll(db keyval.ProtoBroker) error {
@@ -109,15 +108,14 @@ func sfcDatastoreSfcEntityDumpAll(db keyval.ProtoBroker) error {
 		}
 		for _, sfcChainElement := range sfc.GetElements() {
 			if sfcChainElement.EtcdVppSwitchKey != "" {
-				EtcdVppLabelMap[sfcChainElement.EtcdVppSwitchKey] = sfcChainElement.EtcdVppSwitchKey
+				etcdVppLabelMap[sfcChainElement.EtcdVppSwitchKey] = sfcChainElement.EtcdVppSwitchKey
 			}
 			if sfcChainElement.Container != "" {
-				EtcdVppLabelMap[sfcChainElement.Container] = sfcChainElement.Container
+				etcdVppLabelMap[sfcChainElement.Container] = sfcChainElement.Container
 			}
 		}
 		fmt.Println("SFC: ", kv.GetKey(), sfc)
 	}
-	return nil
 }
 
 func sfcDatastoreExternalEntityDumpAll(db keyval.ProtoBroker) error {
@@ -139,10 +137,9 @@ func sfcDatastoreExternalEntityDumpAll(db keyval.ProtoBroker) error {
 			log.Fatal(err)
 			return nil
 		}
-		EtcdVppLabelMap[entry.Name] = entry.Name
+		etcdVppLabelMap[entry.Name] = entry.Name
 		fmt.Println("EE: ", kv.GetKey(), entry)
 	}
-	return nil
 }
 
 func sfcDatastoreHostEntityDumpAll(db keyval.ProtoBroker) error {
@@ -164,10 +161,9 @@ func sfcDatastoreHostEntityDumpAll(db keyval.ProtoBroker) error {
 			log.Fatal(err)
 			return nil
 		}
-		EtcdVppLabelMap[entry.Name] = entry.Name
+		etcdVppLabelMap[entry.Name] = entry.Name
 		fmt.Println("HE: ", kv.GetKey(), entry)
 	}
-	return nil
 }
 
 func vnfDatastoreInterfacesDumpAll(db keyval.ProtoBroker, etcdVppLabel string) error {
@@ -191,7 +187,6 @@ func vnfDatastoreInterfacesDumpAll(db keyval.ProtoBroker, etcdVppLabel string) e
 		}
 		fmt.Println("Interface: ", kv.GetKey(), entry)
 	}
-	return nil
 }
 
 func vnfDatastoreLinuxInterfacesDumpAll(db keyval.ProtoBroker, etcdVppLabel string) error {
@@ -215,7 +210,6 @@ func vnfDatastoreLinuxInterfacesDumpAll(db keyval.ProtoBroker, etcdVppLabel stri
 		}
 		fmt.Println("Linux i/f: ", kv.GetKey(), entry)
 	}
-	return nil
 }
 
 func vnfDatastoreInterfaceStatesDumpAll(db keyval.ProtoBroker, etcdVppLabel string) error {
@@ -239,7 +233,6 @@ func vnfDatastoreInterfaceStatesDumpAll(db keyval.ProtoBroker, etcdVppLabel stri
 		}
 		fmt.Println("Interface state: ", kv.GetKey(), entry)
 	}
-	return nil
 }
 
 func vnfDatastoreBridgesDumpAll(db keyval.ProtoBroker, etcdVppLabel string) error {
@@ -263,7 +256,6 @@ func vnfDatastoreBridgesDumpAll(db keyval.ProtoBroker, etcdVppLabel string) erro
 		}
 		fmt.Println("BD: ", kv.GetKey(), entry)
 	}
-	return nil
 }
 
 func vnfDatastoreL3RoutesDumpAll(db keyval.ProtoBroker, etcdVppLabel string) error {
@@ -287,7 +279,6 @@ func vnfDatastoreL3RoutesDumpAll(db keyval.ProtoBroker, etcdVppLabel string) err
 		}
 		fmt.Println("Static route: ", kv.GetKey(), entry)
 	}
-	return nil
 }
 
 func vnfDatastoreCustomLabelsDumpAll(db keyval.ProtoBroker, etcdVppLabel string) error {
@@ -314,7 +305,6 @@ func vnfDatastoreCustomLabelsDumpAll(db keyval.ProtoBroker, etcdVppLabel string)
 		}
 		fmt.Println("Custom Info: ", kv.GetKey(), entry)
 	}
-	return nil
 }
 
 func createEtcdClient() (*etcdv3.BytesConnectionEtcd, keyval.ProtoBroker) {

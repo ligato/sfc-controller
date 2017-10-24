@@ -206,7 +206,7 @@ func (cnpd *sfcCtlrL2CNPDriver) ReconcileStart(vppEtcdLabels map[string]struct{}
 
 	cnpd.reconcileStateSet(true)
 
-	for vppEtdLabel, _ := range vppEtcdLabels {
+	for vppEtdLabel := range vppEtcdLabels {
 		cnpd.reconcileLoadInterfacesIntoCache(vppEtdLabel)
 		cnpd.reconcileLoadLinuxInterfacesIntoCache(vppEtdLabel)
 		cnpd.reconcileLoadBridgeDomainsIntoCache(vppEtdLabel)
@@ -558,7 +558,7 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForExternalEntity(ee *controller.Ex
 // Perform CNP specific wiring for inter-container wiring, and container to external router wiring
 func (cnpd *sfcCtlrL2CNPDriver) WireSfcEntity(sfc *controller.SfcEntity) error {
 
-	var err error = nil
+	var err error
 	// the semantic difference between a north_south vs an east-west sfc entity, it what is the bridge that
 	// the memIf/afPkt if's will be associated.
 	switch sfc.Type {
@@ -1479,8 +1479,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createStaticRoute(etcdPrefix string, description
 
 func (cnpd *sfcCtlrL2CNPDriver) reconcileStaticRoute(etcdPrefix string, sr *l3.StaticRoutes_Route) {
 
-	destIpAddr, _, _ := addrs.ParseIPWithPrefix(sr.DstIpAddr)
-	key := utils.L3RouteKey(etcdPrefix, sr.VrfId, destIpAddr, sr.NextHopAddr)
+	destIPAddr, _, _ := addrs.ParseIPWithPrefix(sr.DstIpAddr)
+	key := utils.L3RouteKey(etcdPrefix, sr.VrfId, destIPAddr, sr.NextHopAddr)
 	cnpd.reconcileAfter.l3Routes[key] = *sr
 }
 
@@ -1563,12 +1563,12 @@ func (cnpd *sfcCtlrL2CNPDriver) getMtu(mtu uint32) uint32 {
 	return mtu
 }
 
-func formatMacAddress(macInstanceId uint32) string {
-	return "02:00:00:00:00:" + fmt.Sprintf("%02X", macInstanceId)
+func formatMacAddress(macInstanceID uint32) string {
+	return "02:00:00:00:00:" + fmt.Sprintf("%02X", macInstanceID)
 }
 
-func formatIpv4Address(ipInstanceId uint32) string {
-	return "10.0.0." + fmt.Sprintf("%d", ipInstanceId)
+func formatIpv4Address(ipInstanceID uint32) string {
+	return "10.0.0." + fmt.Sprintf("%d", ipInstanceID)
 }
 
 // if the ip address has a /xx subnet attached, it is stripped off
@@ -1600,7 +1600,6 @@ func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadInterfacesIntoCache(etcdVppLabel st
 		fmt.Println("reconcileLoadInterfacesIntoCache: adding Interface: ", etcdVppLabel, kv.GetKey(), entry)
 		cnpd.reconcileBefore.ifs[kv.GetKey()] = *entry
 	}
-	return nil
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadLinuxInterfacesIntoCache(etcdVppLabel string) error {
@@ -1627,7 +1626,6 @@ func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadLinuxInterfacesIntoCache(etcdVppLab
 		cnpd.reconcileBefore.lifs[kv.GetKey()] = *entry
 
 	}
-	return nil
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadBridgeDomainsIntoCache(etcdVppLabel string) error {
@@ -1653,7 +1651,6 @@ func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadBridgeDomainsIntoCache(etcdVppLabel
 			etcdVppLabel, kv.GetKey(), entry)
 		cnpd.reconcileBefore.bds[kv.GetKey()] = *entry
 	}
-	return nil
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadStaticRoutesIntoCache(etcdVppLabel string) error {
@@ -1678,5 +1675,4 @@ func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadStaticRoutesIntoCache(etcdVppLabel 
 		fmt.Println("reconcileLoadStaticRoutesIntoCache: adding static route: ", etcdVppLabel, kv.GetKey(), entry)
 		cnpd.reconcileBefore.l3Routes[kv.GetKey()] = *entry
 	}
-	return nil
 }

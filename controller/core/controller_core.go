@@ -33,7 +33,7 @@ import (
 	"os"
 )
 
-// Plugin identifier (must be unique throughout the system)
+// PluginID is plugin identifier (must be unique throughout the system)
 const PluginID core.PluginName = "SfcController"
 
 var (
@@ -43,7 +43,7 @@ var (
 	log               = logroot.StandardLogger()
 )
 
-// Add command line flags here.
+// RegisterFlags add command line flags.
 func RegisterFlags() {
 	flag.StringVar(&cnpDriverName, "cnp-driver", "sfcctlrl2",
 		"Container Networking Policy driver: sfcctlrl2, sfcctlrl3")
@@ -53,7 +53,7 @@ func RegisterFlags() {
 		"Clean the SFC datastore entries")
 }
 
-// Dump the command line flags
+// LogFlags dumps the command line flags
 func LogFlags() {
 	log.Debugf("LogFlags:")
 	log.Debugf("\tcnpDriver:'%s'", cnpDriverName)
@@ -72,7 +72,7 @@ func init() {
 
 }
 
-// ram cache of controller entities indexed by entity name
+// SfcControllerCacheType is ram cache of controller entities indexed by entity name
 type SfcControllerCacheType struct {
 	EEs      map[string]controller.ExternalEntity
 	HEs      map[string]controller.HostEntity
@@ -80,6 +80,7 @@ type SfcControllerCacheType struct {
 	SysParms controller.SystemParameters
 }
 
+// SfcControllerPluginHandler is handle for SfcControllerPlugin
 type SfcControllerPluginHandler struct {
 	Etcd    *etcdv3.Plugin
 	HTTPmux *rest.Plugin
@@ -97,7 +98,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 
 	sfcCtrlPlugin.db = sfcCtrlPlugin.Etcd.NewBroker(keyval.Root)
 
-	sfcCtrlPlugin.InitRamCache()
+	sfcCtrlPlugin.InitRAMCache()
 
 	extentitydriver.SfcExternalEntityDriverInit()
 
@@ -114,7 +115,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 	}
 
 	// register northbound controller API's
-	sfcCtrlPlugin.InitHttpHandlers()
+	sfcCtrlPlugin.InitHTTPHandlers()
 
 	sfcCtrlPlugin.cnpDriverPlugin, err = cnpdriver.RegisterCNPDriverPlugin(cnpDriverName,
 		func(prefix string) keyval.ProtoBroker { return sfcCtrlPlugin.Etcd.NewBroker(prefix) })
@@ -130,7 +131,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 	sfcCtrlPlugin.ReconcileStart()
 
 	// read config database into ramCache
-	if err := sfcCtrlPlugin.ReadEtcdDatastoreIntoRamCache(); err != nil {
+	if err := sfcCtrlPlugin.ReadEtcdDatastoreIntoRAMCache(); err != nil {
 		log.Error("error reading etcd config into ram cache: ", err)
 		os.Exit(1)
 	}
@@ -145,24 +146,24 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 			os.Exit(1)
 		}
 
-		if err := sfcCtrlPlugin.copyYamlConfigToRamCache(); err != nil {
+		if err := sfcCtrlPlugin.copyYamlConfigToRAMCache(); err != nil {
 			log.Error("error copying config to ram cache: ", err)
 			os.Exit(1)
 		}
 
-		if err := sfcCtrlPlugin.validateRamCache(); err != nil {
+		if err := sfcCtrlPlugin.validateRAMCache(); err != nil {
 			log.Error("error validating ram cache: ", err)
 			os.Exit(1)
 		}
 
-		if err := sfcCtrlPlugin.WriteRamCacheToEtcd(); err != nil {
+		if err := sfcCtrlPlugin.WriteRAMCacheToEtcd(); err != nil {
 			log.Error("error writing ram config to etcd datastore: ", err)
 			os.Exit(1)
 		}
 
 	}
 
-	if err = sfcCtrlPlugin.renderConfigFromRamCache(); err != nil {
+	if err = sfcCtrlPlugin.renderConfigFromRAMCache(); err != nil {
 		log.Error("error copying config to ram cache: ", err)
 		os.Exit(1)
 	}
@@ -174,14 +175,14 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 	return nil
 }
 
-// create the ram cache
-func (sfcCtrlPlugin *SfcControllerPluginHandler) InitRamCache() {
+// InitRAMCache creates the ram cache
+func (sfcCtrlPlugin *SfcControllerPluginHandler) InitRAMCache() {
 	sfcCtrlPlugin.ramConfigCache.EEs = make(map[string]controller.ExternalEntity)
 	sfcCtrlPlugin.ramConfigCache.HEs = make(map[string]controller.HostEntity)
 	sfcCtrlPlugin.ramConfigCache.SFCs = make(map[string]controller.SfcEntity)
 }
 
-// perform close down procedures
+// Close performs close down procedures
 func (sfcCtrlPlugin *SfcControllerPluginHandler) Close() error {
 	return safeclose.Close(extentitydriver.EEOperationChannel)
 }

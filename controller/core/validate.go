@@ -22,7 +22,7 @@ import (
 	"github.com/ligato/sfc-controller/controller/model/controller"
 )
 
-func (sfcCtrlPlugin *SfcControllerPluginHandler) validateRamCache() error {
+func (sfcCtrlPlugin *SfcControllerPluginHandler) validateRAMCache() error {
 
 	if err := sfcCtrlPlugin.validateSystemParameters(&sfcCtrlPlugin.ramConfigCache.SysParms); err != nil {
 		return err

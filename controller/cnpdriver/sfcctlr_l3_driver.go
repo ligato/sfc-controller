@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// The IPV6 L3 CNP implemetation ... coming soon
+// Package cnpdriver contains the IPV6 L3 CNP implemetation ... coming soon
 package cnpdriver
 
 import (
@@ -25,7 +25,7 @@ type sfcCtlrL3CNPDriver struct {
 	name string
 }
 
-// Init the driver/mode for Native SFC Controller L3 Container Networking Policy
+// NewSfcCtlrL3CNPDriver initializes the driver/mode for Native SFC Controller L3 Container Networking Policy
 func NewSfcCtlrL3CNPDriver(name string) *sfcCtlrL3CNPDriver {
 
 	cnpd := &sfcCtlrL3CNPDriver{}

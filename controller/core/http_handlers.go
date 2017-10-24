@@ -37,12 +37,12 @@ var ()
 
 var sfcplg *SfcControllerPluginHandler
 
-// InitHttpHandlers: register the handler funcs for GET and POST, TODO PUT/DELETE
-func (sfcCtrlPlugin *SfcControllerPluginHandler) InitHttpHandlers() {
+// InitHTTPHandlers : register the handler funcs for GET and POST, TODO PUT/DELETE
+func (sfcCtrlPlugin *SfcControllerPluginHandler) InitHTTPHandlers() {
 
 	sfcplg = sfcCtrlPlugin
 
-	log.Infof("InitHttpHandlers: registering controller URLs. sfcplug:", sfcplg)
+	log.Infof("InitHTTPHandlers: registering controller URLs. sfcplug:", sfcplg)
 
 	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.SystemParametersKey(),
 		systemParametersHandler, "GET", "POST")

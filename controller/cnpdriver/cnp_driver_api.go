@@ -34,7 +34,7 @@ var (
 	cnpDriverName       string
 )
 
-// Each Container Networking Policy (CNP) Driver implements this interface.  As n/b api's
+// SfcControllerCNPDriverAPI is interface that is implemented by each Container Networking Policy (CNP) Driver.  As n/b api's
 // are invoked, the sfc controller will call methods on this interface for the
 // registered plugin to effect the inter-host, intra-host network connectivity.  As well,
 // as host-external entity wiring.
@@ -55,7 +55,7 @@ type SfcControllerCNPDriverAPI interface {
 	Dump()
 }
 
-// Register the container networking policy driver mode: example: sfcctlr layer 2, ...
+// RegisterCNPDriverPlugin registers the container networking policy driver mode: example: sfcctlr layer 2, ...
 func RegisterCNPDriverPlugin(name string, dbFactory func(string) keyval.ProtoBroker) (SfcControllerCNPDriverAPI, error) {
 
 	var cnpDriverAPI SfcControllerCNPDriverAPI

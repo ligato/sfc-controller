@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This external entity driver is used to configure external routers.
+// Package extentitydriver represents external entity driver that is used to configure external routers.
 package extentitydriver
 
 import (
@@ -31,13 +31,13 @@ import (
 
 // TODO: make these constants configurable in the controller NB API?
 const (
-	VxlanSourceLoopbackId       = 0
+	VxlanSourceLoopbackID       = 0
 	BridgeDomainServiceInstance = 20
 )
 
 const (
-	EE_OP_SFC_CTLR_L2_EE_TO_HE_SSH     = 1
-	EE_OP_SFC_CTLR_L2_EE_INTERNALS_SSH = 2
+	eeOpSFCCtlrL2EEToHESSH      = 1
+	eeOpSFCCtlrL2EEInternalsSSH = 2
 )
 
 type EEOperation struct {
@@ -74,7 +74,7 @@ func SfcCtlrL2WireExternalEntityToHostEntity(ee controller.ExternalEntity, he co
 		eeOp := &EEOperation{
 			ee:  ee,
 			he:  he,
-			op:  EE_OP_SFC_CTLR_L2_EE_TO_HE_SSH,
+			op:  eeOpSFCCtlrL2EEToHESSH,
 			vni: vni,
 			sr:  sr,
 		}
@@ -98,7 +98,7 @@ func SfcCtlrL2WireExternalEntityInternals(ee controller.ExternalEntity) error {
 
 		eeOp := &EEOperation{
 			ee: ee,
-			op: EE_OP_SFC_CTLR_L2_EE_INTERNALS_SSH,
+			op: eeOpSFCCtlrL2EEInternalsSSH,
 		}
 
 		EEOperationChannel <- eeOp
@@ -120,9 +120,9 @@ func processEEOperationChannel() {
 		}
 
 		switch eeOp.op {
-		case EE_OP_SFC_CTLR_L2_EE_TO_HE_SSH:
+		case eeOpSFCCtlrL2EEToHESSH:
 			sfcCtlrL2WireExternalEntityToHostEntityUsingCli(&eeOp.ee, &eeOp.he, eeOp.vni, eeOp.sr)
-		case EE_OP_SFC_CTLR_L2_EE_INTERNALS_SSH:
+		case eeOpSFCCtlrL2EEInternalsSSH:
 			sfcCtlrL2WireExternalEntityInternalsUsingCli(&eeOp.ee)
 
 		}
@@ -159,7 +159,7 @@ func sfcCtlrL2WireExternalEntityToHostEntityUsingCli(ee *controller.ExternalEnti
 
 	// configure vxlan - NVE interface
 	eeCfg.nveInterface.Vxlan = append(eeCfg.nveInterface.Vxlan, &iosxe.Interface_Vxlan{
-		SrcInterfaceName: fmt.Sprintf("Loopback%d", VxlanSourceLoopbackId),
+		SrcInterfaceName: fmt.Sprintf("Loopback%d", VxlanSourceLoopbackID),
 		Vni:              vni,
 		DstAddress:       ip,
 	})
@@ -337,12 +337,12 @@ func configureEEHostBD(s *iosxecfg.Session, eeCfg *eeConfig, hostBd *controller.
 func configureEEHostVxlan(s *iosxecfg.Session, eeCfg *eeConfig, hostVxlan *controller.ExternalEntity_HostVxlan) error {
 
 	// TODO: remove after resync is implemented
-	s.DeleteInterface(&iosxe.Interface{Name: fmt.Sprintf("Loopback%d", VxlanSourceLoopbackId),
+	s.DeleteInterface(&iosxe.Interface{Name: fmt.Sprintf("Loopback%d", VxlanSourceLoopbackID),
 		Type: iosxe.InterfaceType_SOFTWARE_LOOPBACK})
 
 	// create source loopback interface
 	err := s.AddInterface(&iosxe.Interface{
-		Name:        fmt.Sprintf("Loopback%d", VxlanSourceLoopbackId),
+		Name:        fmt.Sprintf("Loopback%d", VxlanSourceLoopbackID),
 		Type:        iosxe.InterfaceType_SOFTWARE_LOOPBACK,
 		Decription:  "source interface for the VXLAN tunnel",
 		IpAddress:   hostVxlan.SourceIpv4,

@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 )
 
+// YamlConfig is container struct for yaml config file
 type YamlConfig struct {
 	Version     string                        `json:"sfc_controller_config_version"`
 	Description string                        `json:"description"`
@@ -54,25 +55,25 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) readConfigFromFile(fpath string
 }
 
 // read external, hosts and chains, and render config via CNP and EE drivers
-func (sfcCtrlPlugin *SfcControllerPluginHandler) copyYamlConfigToRamCache() error {
+func (sfcCtrlPlugin *SfcControllerPluginHandler) copyYamlConfigToRAMCache() error {
 
 	sfcCtrlPlugin.ramConfigCache.SysParms = sfcCtrlPlugin.yamlConfig.SysParms
-	log.Debugf("copyYamlConfigToRamCache: sp: ", sfcCtrlPlugin.yamlConfig.SysParms)
+	log.Debugf("copyYamlConfigToRAMCache: sp: ", sfcCtrlPlugin.yamlConfig.SysParms)
 
 	for _, ee := range sfcCtrlPlugin.yamlConfig.EEs {
 		sfcCtrlPlugin.ramConfigCache.EEs[ee.Name] = ee
-		log.Debugf("copyYamlConfigToRamCache: ee: ", ee)
+		log.Debugf("copyYamlConfigToRAMCache: ee: ", ee)
 	}
 	for _, he := range sfcCtrlPlugin.yamlConfig.HEs {
 		sfcCtrlPlugin.ramConfigCache.HEs[he.Name] = he
-		log.Debugf("copyYamlConfigToRamCache: he: ", he)
+		log.Debugf("copyYamlConfigToRAMCache: he: ", he)
 	}
 	for _, sfc := range sfcCtrlPlugin.yamlConfig.SFCs {
 		sfcCtrlPlugin.ramConfigCache.SFCs[sfc.Name] = sfc
-		log.Debugf("copyYamlConfigToRamCache: sfc: ", sfc)
-		log.Debugf("copyYamlConfigToRamCache: num_chain_elements=%d", len(sfc.GetElements()))
+		log.Debugf("copyYamlConfigToRAMCache: sfc: ", sfc)
+		log.Debugf("copyYamlConfigToRAMCache: num_chain_elements=%d", len(sfc.GetElements()))
 		for i, sfcChainElement := range sfc.GetElements() {
-			log.Debugf("copyYamlConfigToRamCache: sfc_chain_element[%d]=", i, sfcChainElement)
+			log.Debugf("copyYamlConfigToRAMCache: sfc_chain_element[%d]=", i, sfcChainElement)
 		}
 	}
 
