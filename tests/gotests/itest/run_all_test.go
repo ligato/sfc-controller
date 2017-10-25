@@ -4,10 +4,10 @@ import (
 	"os"
 	"os/signal"
 	"testing"
-	"github.com/ligato/sfc-controller/tests/go/itest/sfctestdata"
-	//"github.com/ligato/sfc-controller/tests/go/itest/vpptestdata"
-	"github.com/ligato/sfc-controller/tests/go/itest/vpptestdata"
-	"github.com/ligato/sfc-controller/tests/go/itest/linuxtestdata"
+	"github.com/ligato/sfc-controller/tests/gotests/itest/sfctestdata"
+	//"github.com/ligato/sfc-controller/tests/gotests/itest/vpptestdata"
+	"github.com/ligato/sfc-controller/tests/gotests/itest/vpptestdata"
+	"github.com/ligato/sfc-controller/tests/gotests/itest/linuxtestdata"
 	"github.com/golang/protobuf/proto"
 )
 
