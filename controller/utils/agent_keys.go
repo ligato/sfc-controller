@@ -26,6 +26,7 @@ import (
 // this must match what utils the vpp-agent uses
 var agentPrefix = "/vnf-agent/"
 
+// GetVppEtcdlabel extracts from db key VppEtcd label
 func GetVppEtcdlabel(key string) string {
 	strs := strings.Split(key, "/")
 	if len(strs) < 3 {
@@ -34,55 +35,68 @@ func GetVppEtcdlabel(key string) string {
 	return strs[2]
 }
 
+// GetVppAgentPrefix provides vpp agent prefix for db keys
 func GetVppAgentPrefix() string {
 	return agentPrefix
 }
 
+// InterfaceStateKey constructs interface state db key
 func InterfaceStateKey(vppLabel string, ifaceLabel string) string {
 	return agentPrefix + vppLabel + "/" + interfaces.InterfaceStateKey(ifaceLabel)
 }
 
+// InterfaceStatePrefixKey constructs interface state prefix db key
 func InterfaceStatePrefixKey(vppLabel string) string {
 	return agentPrefix + vppLabel + "/" + interfaces.InterfaceStateKeyPrefix()
 }
 
+// InterfaceKey constructs interface db key
 func InterfaceKey(vppLabel string, ifaceLabel string) string {
 	return agentPrefix + vppLabel + "/" + interfaces.InterfaceKey(ifaceLabel)
 }
 
+// InterfacePrefixKey constructs interface prefix db key
 func InterfacePrefixKey(vppLabel string) string {
 	return agentPrefix + vppLabel + "/" + interfaces.InterfaceKeyPrefix()
 }
 
+// LinuxInterfaceKey constructs Linux interface db key
 func LinuxInterfaceKey(vppLabel string, ifaceLabel string) string {
 	return agentPrefix + vppLabel + "/" + linuxIntf.InterfaceKey(ifaceLabel)
 }
 
+// LinuxInterfacePrefixKey constructs Linux interface prefix db key
 func LinuxInterfacePrefixKey(vppLabel string) string {
 	return agentPrefix + vppLabel + "/" + linuxIntf.InterfaceKeyPrefix()
 }
 
+// L2BridgeDomainKey constructs L2 bridge domain db key
 func L2BridgeDomainKey(vppLabel string, bdName string) string {
 	return agentPrefix + vppLabel + "/" + l2.BridgeDomainKey(bdName)
 }
 
+// L2BridgeDomainKeyPrefix constructs L2 bridge domain db key prefix
 func L2BridgeDomainKeyPrefix(vppLabel string) string {
 	return agentPrefix + vppLabel + "/" + l2.BridgeDomainKeyPrefix()
 }
 
+// L2XConnectKey constructs L2 XConnect db key
 func L2XConnectKey(vppLabel string, rxIf string) string {
 	return agentPrefix + vppLabel + "/" + l2.XConnectKey(rxIf)
 }
 
+// L3RouteKeyPrefix constructs L3 route db key prefix
 func L3RouteKeyPrefix(vppLabel string) string {
 	//return agentPrefix + vppLabel + "/" + l3.RouteKeyPrefix()
 	return agentPrefix + vppLabel + "/" + l3.VrfKeyPrefix()
 }
 
+// L3RouteKey constructs L3 route db key
 func L3RouteKey(vppLabel string, vrf uint32, destNet *net.IPNet, nextHop string) string {
 	return agentPrefix + vppLabel + "/" + l3.RouteKey(vrf, destNet, nextHop)
 }
 
+// CustomInfoKey constructs custom info db key
 func CustomInfoKey(vppLabel string) string {
 	return agentPrefix + vppLabel + "/" + "vpp/config/v1/custom"
 }

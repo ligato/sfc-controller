@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package core: The reconcile process "resyncs" the configuration stored in
+// Package core : The reconcile process "resyncs" the configuration stored in
 // the database, and the provided config yaml file (if there is one).  It is
 // possible to start with an empty database if desired by providing the -clean
 // command line arg. The resync procedure loads the configuration into a
@@ -27,10 +27,10 @@ import (
 	"github.com/ligato/sfc-controller/controller/utils"
 )
 
-// ReconcileVppLabelsMapType: track all the vpp agents in etcd
+// ReconcileVppLabelsMapType : track all the vpp agents in etcd
 type ReconcileVppLabelsMapType map[string]struct{}
 
-// ReconcileInit: initialize the map of all etcd vpp/agent labels
+// ReconcileInit : initialize the map of all etcd vpp/agent labels
 func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileInit() error {
 
 	sfcCtrlPlugin.ReconcileVppLabelsMap = make(ReconcileVppLabelsMapType)
@@ -38,13 +38,13 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileInit() error {
 	return nil
 }
 
-// ReconcileStart: init the reconcile procedure for all plguins
+// ReconcileStart : init the reconcile procedure for all plguins
 func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileStart() error {
 
 	log.Info("ReconcileStart: enter ...")
 	defer log.Info("ReconcileStart: exit ...")
 
-	for k, _ := range sfcCtrlPlugin.ReconcileVppLabelsMap {
+	for k := range sfcCtrlPlugin.ReconcileVppLabelsMap {
 		delete(sfcCtrlPlugin.ReconcileVppLabelsMap, k)
 	}
 	sfcCtrlPlugin.ReconcileLoadAllVppLabels()
@@ -54,7 +54,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileStart() error {
 	return nil
 }
 
-// ReconcileEnd: perform post processing of the reconcile procedure
+// ReconcileEnd : perform post processing of the reconcile procedure
 func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileEnd() error {
 
 	log.Info("ReconcileEnd: begin ...")
@@ -65,7 +65,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileEnd() error {
 	return nil
 }
 
-// ReconcileLoadAllVppLabels: retrieve all vpp lavels from the etcd datastore
+// ReconcileLoadAllVppLabels : retrieve all vpp lavels from the etcd datastore
 func (sfcCtrlPlugin *SfcControllerPluginHandler) ReconcileLoadAllVppLabels() {
 
 	log.Info("ReconcileLoadAllVppLabels: begin ...")

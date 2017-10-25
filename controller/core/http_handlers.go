@@ -37,28 +37,28 @@ var ()
 
 var sfcplg *SfcControllerPluginHandler
 
-// InitHttpHandlers: register the handler funcs for GET and POST, TODO PUT/DELETE
-func (sfcCtrlPlugin *SfcControllerPluginHandler) InitHttpHandlers() {
+// InitHTTPHandlers : register the handler funcs for GET and POST, TODO PUT/DELETE
+func (sfcCtrlPlugin *SfcControllerPluginHandler) InitHTTPHandlers() {
 
 	sfcplg = sfcCtrlPlugin
 
-	log.Infof("InitHttpHandlers: registering controller URLs. sfcplug:", sfcplg)
+	log.Infof("InitHTTPHandlers: registering controller URLs. sfcplug:", sfcplg)
 
 	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.SystemParametersKey(),
 		systemParametersHandler, "GET", "POST")
 
 	url := fmt.Sprintf(controller.ExternalEntityKeyPrefix()+"{%s}", entityName)
 	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(url, externalEntityHandler, "GET", "POST")
-	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.ExternalEntitiesHttpPrefix(),
+	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.ExternalEntitiesHTTPPrefix(),
 		externalEntitiesHandler, "GET")
 
 	url = fmt.Sprintf(controller.HostEntityKeyPrefix()+"{%s}", entityName)
 	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(url, hostEntityHandler, "GET", "POST")
-	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.HostEntitiesHttpPrefix(), hostEntitiesHandler, "GET")
+	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.HostEntitiesHTTPPrefix(), hostEntitiesHandler, "GET")
 
 	url = fmt.Sprintf(controller.SfcEntityKeyPrefix()+"{%s}", entityName)
 	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(url, sfcChainHandler, "GET", "POST")
-	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.SfcEntityHttpPrefix(), sfcChainsHandler, "GET")
+	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.SfcEntityHTTPPrefix(), sfcChainsHandler, "GET")
 }
 
 // Example curl invocations: for obtaining ALL external_entities

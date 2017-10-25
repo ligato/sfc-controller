@@ -4,10 +4,10 @@ import (
 	"os"
 	"os/signal"
 	"testing"
-	"github.com/ligato/sfc-controller/tests/go/itest/sfctestdata"
-	//"github.com/ligato/sfc-controller/tests/go/itest/vpptestdata"
-	"github.com/ligato/sfc-controller/tests/go/itest/vpptestdata"
-	"github.com/ligato/sfc-controller/tests/go/itest/linuxtestdata"
+	"github.com/ligato/sfc-controller/tests/gotests/itest/sfctestdata"
+	//"github.com/ligato/sfc-controller/tests/gotests/itest/vpptestdata"
+	"github.com/ligato/sfc-controller/tests/gotests/itest/vpptestdata"
+	"github.com/ligato/sfc-controller/tests/gotests/itest/linuxtestdata"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -17,20 +17,20 @@ func Test(t *testing.T) {
 
 	go func() {
 		t.Run("basic_tcs", func(t *testing.T) {
-			VPP1MEMIF2_Loopback_VETH := []proto.Message{&vpptestdata.VPP1MEMIF1,
+			VPP1MEMIF2LoopbackVETH := []proto.Message{&vpptestdata.VPP1MEMIF1,
 				&vpptestdata.VPP1MEMIF2,
 				&vpptestdata.Agent1Afpacket01,
 				&vpptestdata.Agent1Loopback,
 				&linuxtestdata.Agent1Veth01,
-				&vpptestdata.BD_INTERNAL_EW_HOST1}
+				&vpptestdata.BDINTERNALEWHOST1}
 
 			t.Run("TC01ResyncEmptyVpp1Agent", func(t *testing.T) {
 				suite := &basicTCSuite{T: t}
-				suite.TC01ResyncEmptyVpp1Agent(&sfctestdata.VPP1MEMIF2_Loopback_VETH, VPP1MEMIF2_Loopback_VETH...)
+				suite.TC01ResyncEmptyVpp1Agent(&sfctestdata.VPP1MEMIF2LoopbackVETH, VPP1MEMIF2LoopbackVETH...)
 			})
 			t.Run("TC02HTTPPost", func(t *testing.T) {
 				suite := &basicTCSuite{T: t}
-				suite.TC02HTTPPost(&sfctestdata.VPP1MEMIF2_Loopback_VETH, VPP1MEMIF2_Loopback_VETH...)
+				suite.TC02HTTPPost(&sfctestdata.VPP1MEMIF2LoopbackVETH, VPP1MEMIF2LoopbackVETH...)
 			})
 		})
 		doneChan <- struct{}{}

@@ -14,43 +14,57 @@
 
 package controller
 
+// SfcControllerPrefix provides sfc controller prefix
 func SfcControllerPrefix() string {
 	return "/sfc-controller/api/v1/"
 }
 
+// SystemParametersKey provides sfc controller's system parameter key
 func SystemParametersKey() string {
 	return SfcControllerPrefix() + "SP"
 }
 
+// ExternalEntityKeyPrefix provides sfc controller's external entity key prefix
 func ExternalEntityKeyPrefix() string {
 	return SfcControllerPrefix() + "EE/"
 }
-func ExternalEntitiesHttpPrefix() string {
+
+// ExternalEntitiesHTTPPrefix provides sfc controller's external entity HTTP prefix
+func ExternalEntitiesHTTPPrefix() string {
 	return SfcControllerPrefix() + "EEs"
 }
 
+// ExternalEntityNameKey provides sfc controller's external entity name key prefix
 func ExternalEntityNameKey(name string) string {
 	return ExternalEntityKeyPrefix() + name
 }
 
+// HostEntityKeyPrefix provides sfc controller's host entity key prefix
 func HostEntityKeyPrefix() string {
 	return SfcControllerPrefix() + "HE/"
 }
-func HostEntitiesHttpPrefix() string {
+
+// HostEntitiesHTTPPrefix provides sfc controller's host entities HTTP prefix
+func HostEntitiesHTTPPrefix() string {
 	return SfcControllerPrefix() + "HEs"
 }
 
+// HostEntityNameKey provides sfc controller's host entity name key
 func HostEntityNameKey(name string) string {
 	return HostEntityKeyPrefix() + name
 }
 
+// SfcEntityKeyPrefix provides sfc controller's sfc entity key prefix
 func SfcEntityKeyPrefix() string {
 	return SfcControllerPrefix() + "SFC/"
 }
-func SfcEntityHttpPrefix() string {
+
+// SfcEntityHTTPPrefix provides sfc controller's sfc entity HTTP prefix
+func SfcEntityHTTPPrefix() string {
 	return SfcControllerPrefix() + "SFCs"
 }
 
+// SfcEntityNameKey provides sfc controller's sfc entity name key prefix
 func SfcEntityNameKey(name string) string {
 	return SfcEntityKeyPrefix() + name
 }

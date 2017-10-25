@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package core: The renderer uses the config for hosts, external entites,
+// Package core : The renderer uses the config for hosts, external entites,
 // and SFC's and invokes the registered CNP driver.  Driver API's are invoked
 // for wiring hosts to hosts, hosts to external routers, and the SFC's.
 package core
@@ -26,7 +26,7 @@ import (
 // process all hosts -> EEs, as when we process all EE -> Hosts, we will program the other end
 // at that time.  BUT, when an individual REST call is made to add a new HOST, we will process
 // both ends at that time.  See the http handler for an example of how the renderEE is done.
-func (sfcCtrlPlugin *SfcControllerPluginHandler) renderConfigFromRamCache() error {
+func (sfcCtrlPlugin *SfcControllerPluginHandler) renderConfigFromRAMCache() error {
 
 
 	log.Infof("render system parameters from ram cache")

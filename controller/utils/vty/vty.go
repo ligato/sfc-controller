@@ -142,8 +142,6 @@ func readUntilShell(rChan chan string, errChan chan error) (string, error) {
 			return "", err
 		}
 	}
-
-	return "", nil
 }
 
 // readLines reads the lines from provided reader and sends them into the provided channel.

@@ -20,14 +20,14 @@ endef
 # run all tests
 define test_only
 	@echo "# running unit tests"
-	@go test ./tests/go/itest
+	@go test ./tests/gotests/itest
 	@echo "# done"
 endef
 
 # run all tests with coverage
 define test_cover_only
 	@echo "# running unit tests with coverage analysis"
-	@go test -covermode=count -coverprofile=${COVER_DIR}coverage_unit1.out ./tests/go/itest
+	@go test -covermode=count -coverprofile=${COVER_DIR}coverage_unit1.out ./tests/gotests/itest
 	@echo "# merging coverage results"
     @cd vendor/github.com/wadey/gocovmerge && go install -v
     @gocovmerge ${COVER_DIR}coverage_unit1.out  > ${COVER_DIR}coverage.out
@@ -53,8 +53,7 @@ endef
 # run code analysis
 define lint_only
    @echo "# running code analysis"
-    @./scripts/golint.sh
-    @./scripts/govet.sh
+    @./scripts/static_analysis.sh golint vet
     @echo "# done"
 endef
 
@@ -169,7 +168,11 @@ lint:
 
 # report suspicious constructs using go vet tool
 govet:
-	@./scripts/govet.sh
+	@./scripts/static_analysis.sh vet
+
+# format code using gofmt tool
+format:
+	@./scripts/gofmt.sh
 
 # validate links in markdown files
 check_links:

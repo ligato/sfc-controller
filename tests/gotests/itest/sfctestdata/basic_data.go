@@ -5,7 +5,8 @@ import (
 	"github.com/ligato/sfc-controller/controller/model/controller"
 )
 
-var VPP1MEMIF2_Loopback_VETH = sfccore.YamlConfig{
+// VPP1MEMIF2LoopbackVETH are test data with 2 memif poiting to loopback VETH
+var VPP1MEMIF2LoopbackVETH = sfccore.YamlConfig{
 	HEs: []controller.HostEntity{{
 		Name: "HOST-1",
 		//mgmnt_ip_address: "192.168.0.1",
