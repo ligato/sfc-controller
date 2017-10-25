@@ -119,30 +119,30 @@ func (s *Session) DumpBridgeDomains() (map[uint32]*iosxe.BridgeDomain, error) {
 		return bds, err
 	}
 
-	var bdId uint32
+	var bdID uint32
 
 	for _, line := range strings.Split(strings.TrimSuffix(resp, "\n"), "\n") {
-		if _, err := fmt.Sscanf(line, "bridge-domain %d", &bdId); err == nil {
+		if _, err := fmt.Sscanf(line, "bridge-domain %d", &bdID); err == nil {
 			// create bridge domain
-			bds[bdId] = &iosxe.BridgeDomain{Id: bdId}
+			bds[bdID] = &iosxe.BridgeDomain{Id: bdID}
 		} else {
 			// fill in bridge domain details
-			if _, ok := bds[bdId]; !ok {
-				log.Debug("non-existing bridge domain %d", bdId)
+			if _, ok := bds[bdID]; !ok {
+				log.Debug("non-existing bridge domain %d", bdID)
 				continue
 			}
 
 			// VNI
 			var vni uint32
 			if _, err := fmt.Sscanf(line, "member vni %d", &vni); err == nil {
-				bds[bdId].Vni = append(bds[bdId].Vni, vni)
+				bds[bdID].Vni = append(bds[bdID].Vni, vni)
 			}
 
 			// service instance
 			var ifName string
 			var si uint32
 			if _, err := fmt.Sscanf(line, "member %s service-instance %d", &ifName, &si); err == nil {
-				bds[bdId].Interfaces = append(bds[bdId].Interfaces, &iosxe.BridgeDomain_Interface{
+				bds[bdID].Interfaces = append(bds[bdID].Interfaces, &iosxe.BridgeDomain_Interface{
 					Name:            ifName,
 					ServiceInstance: si,
 				})

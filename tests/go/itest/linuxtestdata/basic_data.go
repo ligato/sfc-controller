@@ -4,6 +4,7 @@ import (
 	"github.com/ligato/vpp-agent/plugins/linuxplugin/model/interfaces"
 )
 
+// Agent1Veth01 are test data for VETH interface for agent1 test data
 var Agent1Veth01 = interfaces.LinuxInterfaces_Interface{
 	Name:        "agent1_afpacket",
 	Enabled:     true,

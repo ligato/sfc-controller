@@ -40,6 +40,7 @@ const (
 	eeOpSFCCtlrL2EEInternalsSSH = 2
 )
 
+// EEOperation is external entity operation
 type EEOperation struct {
 	ee  controller.ExternalEntity
 	he  controller.HostEntity
@@ -56,15 +57,17 @@ type eeConfig struct {
 
 var eeConfigCache map[string]*eeConfig // map of external entity configurations indexed by ee mgmt IP address
 
-var EEOperationChannel chan *EEOperation = make(chan *EEOperation, 100)
+// EEOperationChannel is channel for external entity operations
+var EEOperationChannel = make(chan *EEOperation, 100)
 
 var log = logroot.StandardLogger()
 
+// SfcExternalEntityDriverInit starts process for EEOperationChannel
 func SfcExternalEntityDriverInit() {
 	go processEEOperationChannel()
 }
 
-// called from the sfcctlr l2 driver to configure the bridge, vxlan tunnel, and static route
+// SfcCtlrL2WireExternalEntityToHostEntity (called from the sfcctlr l2 driver) configures the bridge, vxlan tunnel, and static route
 func SfcCtlrL2WireExternalEntityToHostEntity(ee controller.ExternalEntity, he controller.HostEntity,
 	vni uint32, sr *l3.StaticRoutes_Route) error {
 
@@ -90,7 +93,7 @@ func SfcCtlrL2WireExternalEntityToHostEntity(ee controller.ExternalEntity, he co
 	return nil
 }
 
-// called from the sfcctlr l2 driver to configure basic entities in prep for connecting to all hosts
+// SfcCtlrL2WireExternalEntityInternals (called from the sfcctlr l2 driver) configures basic entities in prep for connecting to all hosts
 func SfcCtlrL2WireExternalEntityInternals(ee controller.ExternalEntity) error {
 
 	switch ee.EeDriverType {
@@ -239,10 +242,9 @@ func connectToRouter(host string, port uint32, userName string, password string)
 		s, err := iosxecfg.NewSSHSession(host, port, userName, password)
 		if err == nil {
 			return s, nil
-		} else {
-			log.Debugf("Connection to the router %s failed, retrying...", host)
-			time.Sleep(500 * time.Millisecond)
 		}
+		log.Debugf("Connection to the router %s failed, retrying...", host)
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 

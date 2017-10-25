@@ -150,7 +150,7 @@ func (t *Given) ConfigSFCviaREST(cfg *sfccore.YamlConfig) {
 	}
 }
 
-// VppAgentcCfgContains
+// VppAgentCfgContains checks whether agent config contains given interfaces and/or bridge domains
 func (t *Then) VppAgentCfgContains(micorserviceLabel string, interfaceBDEtc ...proto.Message) {
 	db := t.agentT.tFlavor.ETCD.NewBroker(servicelabel.GetDifferentAgentPrefix(micorserviceLabel))
 
@@ -177,7 +177,7 @@ func (t *Then) VppAgentCfgContains(micorserviceLabel string, interfaceBDEtc ...p
 	}
 }
 
-// HTTPGet simulates the HTTP call
+// HTTPGetEntities simulates the HTTP call
 func (t *Then) HTTPGetEntities(sfcCfg *sfccore.YamlConfig) {
 	{ //SFCs
 		url := "http://127.0.0.1/sfc-controller/api/v1/SFCs"

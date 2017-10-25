@@ -49,16 +49,16 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) InitHTTPHandlers() {
 
 	url := fmt.Sprintf(controller.ExternalEntityKeyPrefix()+"{%s}", entityName)
 	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(url, externalEntityHandler, "GET", "POST")
-	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.ExternalEntitiesHttpPrefix(),
+	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.ExternalEntitiesHTTPPrefix(),
 		externalEntitiesHandler, "GET")
 
 	url = fmt.Sprintf(controller.HostEntityKeyPrefix()+"{%s}", entityName)
 	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(url, hostEntityHandler, "GET", "POST")
-	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.HostEntitiesHttpPrefix(), hostEntitiesHandler, "GET")
+	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.HostEntitiesHTTPPrefix(), hostEntitiesHandler, "GET")
 
 	url = fmt.Sprintf(controller.SfcEntityKeyPrefix()+"{%s}", entityName)
 	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(url, sfcChainHandler, "GET", "POST")
-	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.SfcEntityHttpPrefix(), sfcChainsHandler, "GET")
+	sfcCtrlPlugin.HTTPmux.RegisterHTTPHandler(controller.SfcEntityHTTPPrefix(), sfcChainsHandler, "GET")
 }
 
 // Example curl invocations: for obtaining ALL external_entities
