@@ -5,10 +5,11 @@ language: go
 go_import_path: github.com/ligato/cn-infra
 
 go:
-  - 1.8.x
+  - 1.9.x
 
 before_install:
-  - go get -v github.com/golang/lint/golint
+  - go get -u -f "github.com/alecthomas/gometalinter"
+  - gometalinter --install
   - go get github.com/mattn/goveralls
   - sudo apt-get install npm && npm install -g markdown-link-check
 

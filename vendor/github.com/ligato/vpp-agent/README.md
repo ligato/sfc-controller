@@ -62,6 +62,7 @@ The set of plugins in the VPP Agent is as follows:
 * [CN-Infra datasync][12] - data synchronization after HA events
 * [CN-Infra core][13] - lifecycle management of plugins (loading, 
   initialization, unloading)
+* [RESTAPI](plugins/restplugin) - allows to run VPP CLI commands and also provides API to expose existing Northbound objects
 
 ## Tools
 The VPP agent repository also contains tools for building and troubleshooting 
@@ -97,7 +98,7 @@ docker exec -it vpp agentctl -h
 3. Check the configuration (using agentctl or directly using VPP console):
 ```
 docker exec -it vpp agentctl -e 172.17.0.1:2379 show
-docker exec -it vpp vppctl
+docker exec -it vpp vppctl -s localhost:5002
 ```
 
 ## Documentation

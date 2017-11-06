@@ -8,14 +8,16 @@ import (
 	"github.com/ligato/vpp-agent/clientv1/linux/remoteclient"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
 	"github.com/ligato/sfc-controller/plugins/vnfdriver/model/vnf"
+	"strconv"
 )
 
 func (p *Plugin) renderVNF(vnf *vnf.VnfEntity) error {
 
-	log.Debugf("Rendering VNF entity '%s', container '%s'", vnf.Name, vnf.Container)
+	log.Debugf("Rendering VNF entity '%s', container '%s', 'perf-hack:%d/%d", vnf.Name, vnf.Container,
+		vnf.VnfContainerHack, vnf.VnfRepeatCount)
 
 	for _, l2xconn := range vnf.L2Xconnects {
-		err := p.renderVnfL2XConnect(vnf.Container, l2xconn)
+		err := p.renderVnfL2XConnect(vnf.Container, l2xconn, vnf.VnfRepeatCount, vnf.VnfContainerHack)
 		if err != nil {
 			return err
 		}
@@ -24,7 +26,16 @@ func (p *Plugin) renderVNF(vnf *vnf.VnfEntity) error {
 	return nil
 }
 
-func (p *Plugin) renderVnfL2XConnect(vppLabel string, l2xconn *vnf.VnfEntity_L2XConnect) error {
+func (p *Plugin) renderVnfL2XConnect(vppLabel string, l2xconn *vnf.VnfEntity_L2XConnect, vnfRepeatCount uint32,
+	vnfContgainerHack bool) error {
+
+	if vnfContgainerHack == true {
+		if vnfRepeatCount == 0 {
+			return nil
+		}
+	} else {
+		vnfRepeatCount = 1
+	}
 
 	if len(l2xconn.PortLabels) != 2 {
 		err := fmt.Errorf("Incorrect count of port labels for l2xconnect: %d", len(l2xconn.PortLabels))
@@ -32,19 +43,26 @@ func (p *Plugin) renderVnfL2XConnect(vppLabel string, l2xconn *vnf.VnfEntity_L2X
 		return err
 	}
 
-	log.Debugf("Rendering VNF l2xconnect ports: '%s' <-> '%s' for VPP '%s'",
-		l2xconn.PortLabels[0], l2xconn.PortLabels[1], vppLabel)
+	for repeatCount := uint32(1); repeatCount <= vnfRepeatCount; repeatCount++ {
 
-	// l2xconnect port0 -> port1
-	err := p.createXConnectPair(vppLabel, l2xconn.PortLabels[0], l2xconn.PortLabels[1])
-	if err != nil {
-		return err
-	}
+		newVppLabel := vppLabel
+		if vnfContgainerHack == true {
+			newVppLabel = vppLabel + "-" + strconv.Itoa(int(repeatCount)-1)
+		}
+		log.Debugf("Rendering VNF l2xconnect ports: '%s' <-> '%s' for VPP '%s'",
+			l2xconn.PortLabels[0], l2xconn.PortLabels[1], newVppLabel)
 
-	// l2xconnect port1 -> port0
-	err = p.createXConnectPair(vppLabel, l2xconn.PortLabels[1], l2xconn.PortLabels[0])
-	if err != nil {
-		return err
+		// l2xconnect port0 -> port1
+		err := p.createXConnectPair(newVppLabel, l2xconn.PortLabels[0], l2xconn.PortLabels[1])
+		if err != nil {
+			return err
+		}
+
+		// l2xconnect port1 -> port0
+		err = p.createXConnectPair(newVppLabel, l2xconn.PortLabels[1], l2xconn.PortLabels[0])
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

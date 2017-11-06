@@ -32,11 +32,11 @@ import (
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
-	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/model/interfaces"
+	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/ifplugin/model/interfaces"
 )
 
 var (
-	etcdVppLabelMap = make(map[string]interface{})
+	EtcdVppLabelMap = make(map[string]interface{}) // keep this global as an upstream private project uses this
 	log             = logroot.StandardLogger()
 )
 
@@ -51,7 +51,7 @@ func SfcDump() keyval.ProtoBroker {
 	sfcDatastoreHostEntityDumpAll(db)
 	sfcDatastoreExternalEntityDumpAll(db)
 	sfcDatastoreSfcEntityDumpAll(db)
-	for k := range etcdVppLabelMap {
+	for k := range EtcdVppLabelMap {
 		fmt.Println("ETCD VPP LABEL: ", k)
 		vnfDatastoreCustomLabelsDumpAll(db, k)
 		vnfDatastoreInterfacesDumpAll(db, k)
@@ -108,10 +108,10 @@ func sfcDatastoreSfcEntityDumpAll(db keyval.ProtoBroker) error {
 		}
 		for _, sfcChainElement := range sfc.GetElements() {
 			if sfcChainElement.EtcdVppSwitchKey != "" {
-				etcdVppLabelMap[sfcChainElement.EtcdVppSwitchKey] = sfcChainElement.EtcdVppSwitchKey
+				EtcdVppLabelMap[sfcChainElement.EtcdVppSwitchKey] = sfcChainElement.EtcdVppSwitchKey
 			}
 			if sfcChainElement.Container != "" {
-				etcdVppLabelMap[sfcChainElement.Container] = sfcChainElement.Container
+				EtcdVppLabelMap[sfcChainElement.Container] = sfcChainElement.Container
 			}
 		}
 		fmt.Println("SFC: ", kv.GetKey(), sfc)
@@ -137,7 +137,7 @@ func sfcDatastoreExternalEntityDumpAll(db keyval.ProtoBroker) error {
 			log.Fatal(err)
 			return nil
 		}
-		etcdVppLabelMap[entry.Name] = entry.Name
+		EtcdVppLabelMap[entry.Name] = entry.Name
 		fmt.Println("EE: ", kv.GetKey(), entry)
 	}
 }
@@ -161,7 +161,7 @@ func sfcDatastoreHostEntityDumpAll(db keyval.ProtoBroker) error {
 			log.Fatal(err)
 			return nil
 		}
-		etcdVppLabelMap[entry.Name] = entry.Name
+		EtcdVppLabelMap[entry.Name] = entry.Name
 		fmt.Println("HE: ", kv.GetKey(), entry)
 	}
 }
@@ -202,7 +202,7 @@ func vnfDatastoreLinuxInterfacesDumpAll(db keyval.ProtoBroker, etcdVppLabel stri
 		if allReceived {
 			return nil
 		}
-		entry := &linuxIntf.LinuxInterfaces{}
+		entry := &linuxIntf.LinuxInterfaces_Interface{}
 		err := kv.GetValue(entry)
 		if err != nil {
 			log.Fatal(err)

@@ -51,6 +51,8 @@ const (
 	SfcType_SFC_NS_NIC_L2XCONN SfcType = 4
 	SfcType_SFC_EW_BD          SfcType = 2
 	SfcType_SFC_EW_L2XCONN     SfcType = 5
+	SfcType_SFC_EW_MEMIF       SfcType = 6
+	SfcType_SFC_EW_VETH        SfcType = 7
 )
 
 var SfcType_name = map[int32]string{
@@ -60,6 +62,8 @@ var SfcType_name = map[int32]string{
 	4: "SFC_NS_NIC_L2XCONN",
 	2: "SFC_EW_BD",
 	5: "SFC_EW_L2XCONN",
+	6: "SFC_EW_MEMIF",
+	7: "SFC_EW_VETH",
 }
 var SfcType_value = map[string]int32{
 	"SFC_UNKNOWN_TYPE":   0,
@@ -68,6 +72,8 @@ var SfcType_value = map[string]int32{
 	"SFC_NS_NIC_L2XCONN": 4,
 	"SFC_EW_BD":          2,
 	"SFC_EW_L2XCONN":     5,
+	"SFC_EW_MEMIF":       6,
+	"SFC_EW_VETH":        7,
 }
 
 func (x SfcType) String() string {
@@ -77,32 +83,32 @@ func (x SfcType) String() string {
 type SfcElementType int32
 
 const (
-	SfcElementType_ELEMENT_UNKNOWN             SfcElementType = 0
-	SfcElementType_EXTERNAL_ENTITY             SfcElementType = 1
-	SfcElementType_CONTAINER_AGENT_VPP_MEMIF   SfcElementType = 2
-	SfcElementType_CONTAINER_AGENT_NOVPP_AFP   SfcElementType = 3
-	SfcElementType_CONTAINER_AGENT_NOVPP_MEMIF SfcElementType = 4
-	SfcElementType_HOST_ENTITY                 SfcElementType = 5
-	SfcElementType_CONTAINER_AGENT_VPP_AFP     SfcElementType = 6
+	SfcElementType_ELEMENT_UNKNOWN         SfcElementType = 0
+	SfcElementType_EXTERNAL_ENTITY         SfcElementType = 1
+	SfcElementType_VPP_CONTAINER_MEMIF     SfcElementType = 2
+	SfcElementType_NON_VPP_CONTAINER_AFP   SfcElementType = 3
+	SfcElementType_NON_VPP_CONTAINER_MEMIF SfcElementType = 4
+	SfcElementType_HOST_ENTITY             SfcElementType = 5
+	SfcElementType_VPP_CONTAINER_AFP       SfcElementType = 6
 )
 
 var SfcElementType_name = map[int32]string{
 	0: "ELEMENT_UNKNOWN",
 	1: "EXTERNAL_ENTITY",
-	2: "CONTAINER_AGENT_VPP_MEMIF",
-	3: "CONTAINER_AGENT_NOVPP_AFP",
-	4: "CONTAINER_AGENT_NOVPP_MEMIF",
+	2: "VPP_CONTAINER_MEMIF",
+	3: "NON_VPP_CONTAINER_AFP",
+	4: "NON_VPP_CONTAINER_MEMIF",
 	5: "HOST_ENTITY",
-	6: "CONTAINER_AGENT_VPP_AFP",
+	6: "VPP_CONTAINER_AFP",
 }
 var SfcElementType_value = map[string]int32{
-	"ELEMENT_UNKNOWN":             0,
-	"EXTERNAL_ENTITY":             1,
-	"CONTAINER_AGENT_VPP_MEMIF":   2,
-	"CONTAINER_AGENT_NOVPP_AFP":   3,
-	"CONTAINER_AGENT_NOVPP_MEMIF": 4,
-	"HOST_ENTITY":                 5,
-	"CONTAINER_AGENT_VPP_AFP":     6,
+	"ELEMENT_UNKNOWN":         0,
+	"EXTERNAL_ENTITY":         1,
+	"VPP_CONTAINER_MEMIF":     2,
+	"NON_VPP_CONTAINER_AFP":   3,
+	"NON_VPP_CONTAINER_MEMIF": 4,
+	"HOST_ENTITY":             5,
+	"VPP_CONTAINER_AFP":       6,
 }
 
 func (x SfcElementType) String() string {
@@ -188,6 +194,7 @@ type HostEntity struct {
 	EthIpv4         string `protobuf:"bytes,3,opt,name=eth_ipv4,proto3" json:"eth_ipv4,omitempty"`
 	LoopbackMacAddr string `protobuf:"bytes,4,opt,name=loopback_mac_addr,proto3" json:"loopback_mac_addr,omitempty"`
 	LoopbackIpv4    string `protobuf:"bytes,5,opt,name=loopback_ipv4,proto3" json:"loopback_ipv4,omitempty"`
+	Mtu             uint32 `protobuf:"varint,6,opt,name=mtu,proto3" json:"mtu,omitempty"`
 }
 
 func (m *HostEntity) Reset()         { *m = HostEntity{} }
@@ -203,12 +210,12 @@ func (m *CustomInfoType) String() string { return proto.CompactTextString(m) }
 func (*CustomInfoType) ProtoMessage()    {}
 
 type SfcEntity struct {
-	Name             string                  `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Description      string                  `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	Type             SfcType                 `protobuf:"varint,3,opt,name=type,proto3,enum=controller.SfcType" json:"type,omitempty"`
-	SfcIpv4Prefix    string                  `protobuf:"bytes,4,opt,name=sfc_ipv4_prefix,proto3" json:"sfc_ipv4_prefix,omitempty"`
-	SfcIpv4PrefixLen uint32                  `protobuf:"varint,5,opt,name=sfc_ipv4_prefix_len,proto3" json:"sfc_ipv4_prefix_len,omitempty"`
-	Elements         []*SfcEntity_SfcElement `protobuf:"bytes,7,rep,name=elements" json:"elements,omitempty"`
+	Name           string                  `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description    string                  `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Type           SfcType                 `protobuf:"varint,3,opt,name=type,proto3,enum=controller.SfcType" json:"type,omitempty"`
+	SfcIpv4Prefix  string                  `protobuf:"bytes,4,opt,name=sfc_ipv4_prefix,proto3" json:"sfc_ipv4_prefix,omitempty"`
+	VnfRepeatCount uint32                  `protobuf:"varint,6,opt,name=vnf_repeat_count,proto3" json:"vnf_repeat_count,omitempty"`
+	Elements       []*SfcEntity_SfcElement `protobuf:"bytes,7,rep,name=elements" json:"elements,omitempty"`
 }
 
 func (m *SfcEntity) Reset()         { *m = SfcEntity{} }

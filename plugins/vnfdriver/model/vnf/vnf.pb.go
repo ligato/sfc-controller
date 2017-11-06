@@ -19,9 +19,11 @@ import proto "github.com/gogo/protobuf/proto"
 var _ = proto.Marshal
 
 type VnfEntity struct {
-	Name        string                  `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Container   string                  `protobuf:"bytes,2,opt,name=container,proto3" json:"container,omitempty"`
-	L2Xconnects []*VnfEntity_L2XConnect `protobuf:"bytes,3,rep,name=l2xconnects" json:"l2xconnects,omitempty"`
+	Name             string                  `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Container        string                  `protobuf:"bytes,2,opt,name=container,proto3" json:"container,omitempty"`
+	VnfContainerHack bool                    `protobuf:"varint,3,opt,name=vnf_container_hack,proto3" json:"vnf_container_hack,omitempty"`
+	VnfRepeatCount   uint32                  `protobuf:"varint,4,opt,name=vnf_repeat_count,proto3" json:"vnf_repeat_count,omitempty"`
+	L2Xconnects      []*VnfEntity_L2XConnect `protobuf:"bytes,5,rep,name=l2xconnects" json:"l2xconnects,omitempty"`
 }
 
 func (m *VnfEntity) Reset()         { *m = VnfEntity{} }

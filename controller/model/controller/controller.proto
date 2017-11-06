@@ -44,29 +44,33 @@ message HostEntity {
     string eth_ipv4 = 3;
     string loopback_mac_addr = 4;
     string loopback_ipv4 = 5;
+    uint32 mtu = 6;                   // if provided, this overrides system value
 };
 
 enum SfcType {
     SFC_UNKNOWN_TYPE = 0;
 
-    SFC_NS_VXLAN = 1;  /* VXLAN-based north-south SFC */
+    SFC_NS_VXLAN = 1;        // VXLAN-based north-south SFC
 
-    SFC_NS_NIC_BD = 3;       /* physial NIC-based north-south SFC - bridge domain -based */
-    SFC_NS_NIC_L2XCONN = 4;  /* physial NIC-based north-south SFC - l2xconnect -based */
+    SFC_NS_NIC_BD = 3;       // physial NIC-based north-south SFC - bridge domain -based
+    SFC_NS_NIC_L2XCONN = 4;  // physial NIC-based north-south SFC - l2xconnect -based
 
-    SFC_EW_BD = 2;       /* bridge domain -based east-west SFC */
-    SFC_EW_L2XCONN = 5;  /* l2xconnect -based east-west SFC */
+    SFC_EW_BD = 2;           // bridge domain -based east-west SFC
+    SFC_EW_L2XCONN = 5;      // l2xconnect -based east-west SFC
+
+    SFC_EW_MEMIF = 6;        // each container pair is wired via memif's
+    SFC_EW_VETH = 7;         // each container pair is wired via veths's
 };
 
 enum SfcElementType {
     ELEMENT_UNKNOWN = 0;
     EXTERNAL_ENTITY = 1;
-    CONTAINER_AGENT_VPP_MEMIF = 2;
-    CONTAINER_AGENT_NOVPP_AFP = 3;
-    CONTAINER_AGENT_NOVPP_MEMIF = 4;
+    VPP_CONTAINER_MEMIF = 2;
+    NON_VPP_CONTAINER_AFP = 3;
+    NON_VPP_CONTAINER_MEMIF = 4;
 
     HOST_ENTITY = 5;
-    CONTAINER_AGENT_VPP_AFP = 6;
+    VPP_CONTAINER_AFP = 6;
 };
 
 message CustomInfoType {
@@ -77,8 +81,8 @@ message SfcEntity {
     string name = 1;
     string description = 2;
     SfcType type = 3;
-    string sfc_ipv4_prefix = 4;     // optional field allowing east-west memIFs to use a fixed prefix
-    uint32 sfc_ipv4_prefix_len = 5; // otherwise, controller will manage a 10.X.X.X addr space
+    string sfc_ipv4_prefix = 4;     // optional field allowing east-west ifs to use a prefix eg 10.1.2.0/24
+    uint32 vnf_repeat_count = 6;    // hack for perf testing, if > 0, more vnfs are inserted into chain
 
     message SfcElement {
         string container = 1;

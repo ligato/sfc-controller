@@ -41,8 +41,9 @@ import (
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
-	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/model/interfaces"
+	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/ifplugin/model/interfaces"
 	"strings"
+	"strconv"
 )
 
 var (
@@ -504,7 +505,8 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 	heState = &heStateType{}
 	cnpd.l2CNPStateCache.HE[he.Name] = heState
 
-	mtu := cnpd.l2CNPEntityCache.SysParms.Mtu
+	mtu := cnpd.getMtu(he.Mtu)
+
 	// configure the nic/ethernet
 	if he.EthIfName != "" {
 		if err := cnpd.createEthernet(he.Name, he.EthIfName, he.EthIpv4, mtu); err != nil {
@@ -525,7 +527,7 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 			loopbackMacAddress = he.LoopbackMacAddr
 		}
 
-		mtu := cnpd.l2CNPEntityCache.SysParms.Mtu
+		mtu := cnpd.getMtu(he.Mtu)
 
 		// configure loopback interface
 		loopIfName := "IF_LOOPBACK_H_" + he.Name
@@ -575,6 +577,8 @@ func (cnpd *sfcCtlrL2CNPDriver) WireSfcEntity(sfc *controller.SfcEntity) error {
 		cnpd.l2CNPEntityCache.SFCs[sfc.Name] = *sfc
 		err = cnpd.wireSfcNorthSouthNICElements(sfc)
 
+	case controller.SfcType_SFC_EW_MEMIF:
+		fallthrough
 	case controller.SfcType_SFC_EW_BD:
 		fallthrough
 	case controller.SfcType_SFC_EW_L2XCONN:
@@ -634,9 +638,9 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 
 		switch sfcEntityElement.Type {
 
-		case controller.SfcElementType_CONTAINER_AGENT_VPP_AFP:
+		case controller.SfcElementType_VPP_CONTAINER_AFP:
 			fallthrough
-		case controller.SfcElementType_CONTAINER_AGENT_NOVPP_AFP:
+		case controller.SfcElementType_NON_VPP_CONTAINER_AFP:
 
 			if _, exists := cnpd.l2CNPEntityCache.HEs[sfcEntityElement.EtcdVppSwitchKey]; !exists {
 				err := fmt.Errorf("wireSfcNorthSouthVXLANElements: cannot find host '%s' for this sfc: '%s'",
@@ -661,9 +665,9 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 				return err
 			}
 
-		case controller.SfcElementType_CONTAINER_AGENT_VPP_MEMIF:
+		case controller.SfcElementType_VPP_CONTAINER_MEMIF:
 			fallthrough
-		case controller.SfcElementType_CONTAINER_AGENT_NOVPP_MEMIF:
+		case controller.SfcElementType_NON_VPP_CONTAINER_MEMIF:
 
 			if _, exists := cnpd.l2CNPEntityCache.HEs[sfcEntityElement.EtcdVppSwitchKey]; !exists {
 				err := fmt.Errorf("wireSfcNorthSouthVXLANElements: cannot find host '%s' for this sfc: '%s'",
@@ -730,9 +734,9 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 
 		switch sfcEntityElement.Type {
 
-		case controller.SfcElementType_CONTAINER_AGENT_VPP_AFP:
+		case controller.SfcElementType_VPP_CONTAINER_AFP:
 			fallthrough
-		case controller.SfcElementType_CONTAINER_AGENT_NOVPP_AFP:
+		case controller.SfcElementType_NON_VPP_CONTAINER_AFP:
 
 			if _, exists := cnpd.l2CNPEntityCache.HEs[sfcEntityElement.EtcdVppSwitchKey]; !exists {
 				err := fmt.Errorf("wireSfcNorthSouthNICElements: cannot find host '%s' for this sfc: '%s'",
@@ -740,8 +744,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 				return err
 			}
 
-			mtu := cnpd.l2CNPEntityCache.SysParms.Mtu
-
+			mtu := cnpd.getMtu(he.Mtu)
 			// physical NIC
 			if err := cnpd.createEthernet(he.Container, he.PortLabel, "", mtu); err != nil {
 				log.Error("wireSfcNorthSouthNICElements: error creating ethernet i/f: '%s'", he.PortLabel)
@@ -787,9 +790,9 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 				return err
 			}
 
-		case controller.SfcElementType_CONTAINER_AGENT_VPP_MEMIF:
+		case controller.SfcElementType_VPP_CONTAINER_MEMIF:
 			fallthrough
-		case controller.SfcElementType_CONTAINER_AGENT_NOVPP_MEMIF:
+		case controller.SfcElementType_NON_VPP_CONTAINER_MEMIF:
 
 			if _, exists := cnpd.l2CNPEntityCache.HEs[sfcEntityElement.EtcdVppSwitchKey]; !exists {
 				err := fmt.Errorf("wireSfcNorthSouthNICElements: cannot find host '%s' for this sfc: '%s'",
@@ -797,8 +800,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 				return err
 			}
 
-			mtu := cnpd.l2CNPEntityCache.SysParms.Mtu
-
+			mtu := cnpd.getMtu(he.Mtu)
 			// physical NIC
 			if err := cnpd.createEthernet(he.Container, he.PortLabel, "", mtu); err != nil {
 				log.Error("wireSfcNorthSouthNICElements: error creating ethernet i/f: '%s'", he.PortLabel)
@@ -861,6 +863,14 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 
 	prevMemIfName := ""
 
+	if sfc.Type == controller.SfcType_SFC_EW_MEMIF {
+		if len(sfc.GetElements())%2 != 0 {
+			err := fmt.Errorf("wireSfcEastWestElements: e-w memif sfc should have pairs of entries: '%s'", sfc.Name)
+			log.Error(err.Error())
+			return err
+		}
+	}
+
 	for i, sfcEntityElement := range sfc.GetElements() {
 
 		log.Infof("wireSfcEastWestElements: sfc entity element[%d]: ", i, sfcEntityElement)
@@ -872,9 +882,9 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 			log.Error(err.Error())
 			return err
 
-		case controller.SfcElementType_CONTAINER_AGENT_VPP_AFP:
+		case controller.SfcElementType_VPP_CONTAINER_AFP:
 			fallthrough
-		case controller.SfcElementType_CONTAINER_AGENT_NOVPP_AFP:
+		case controller.SfcElementType_NON_VPP_CONTAINER_AFP:
 			// the container has which host it is assoc'ed with, get the host e/w bridge
 			heState, exists := cnpd.l2CNPStateCache.HE[sfcEntityElement.EtcdVppSwitchKey]
 			if !exists {
@@ -913,9 +923,9 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 				return err
 			}
 
-		case controller.SfcElementType_CONTAINER_AGENT_VPP_MEMIF:
+		case controller.SfcElementType_VPP_CONTAINER_MEMIF:
 			fallthrough
-		case controller.SfcElementType_CONTAINER_AGENT_NOVPP_MEMIF:
+		case controller.SfcElementType_NON_VPP_CONTAINER_MEMIF:
 
 			// the container has which host it is assoc'ed with, get the host e/w bridge
 			heState, exists := cnpd.l2CNPStateCache.HE[sfcEntityElement.EtcdVppSwitchKey]
@@ -924,7 +934,18 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 					sfcEntityElement.EtcdVppSwitchKey, sfc.Name)
 				return err
 			}
-			if sfc.Type == controller.SfcType_SFC_EW_BD {
+
+			if sfc.Type == controller.SfcType_SFC_EW_MEMIF {
+				if i%2 == 0 {
+					// need to create an inter-container memif, use the left of the pair to create the pair
+					if err := cnpd.createOneOrMoreInterContainerMemIfPairs(sfc.Elements[i], sfc.Elements[i+1],
+						sfc.VnfRepeatCount); err != nil {
+						log.Error("wireSfcEastWestElements: error creating memIf pair: sfc: '%s', Container: '%s', i='%d'",
+							sfc.Name, sfcEntityElement.Container, i)
+						return err
+					}
+				}
+			} else if sfc.Type == controller.SfcType_SFC_EW_BD {
 				// bridge domain -based wiring
 				if err := cnpd.createMemIfPairAndAddToBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, heState.bd,
 					sfcEntityElement, true); err != nil {
@@ -962,6 +983,81 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 	return nil
 }
 
+// createOneOrMoreInterContainerMemIfPairs creates memif pair and returns vswitch-end memif interface name
+func (cnpd *sfcCtlrL2CNPDriver) createOneOrMoreInterContainerMemIfPairs(vnfElement1 *controller.SfcEntity_SfcElement,
+	vnfElement2 *controller.SfcEntity_SfcElement, vnfRepeatCount uint32) error {
+
+	log.Infof("createInterContainerMemIfPair: vnf1: '%s', vnf2: '%s', repeatCount: '%d'",
+		vnfElement1.Container, vnfElement2.Container, vnfRepeatCount)
+
+	vnf1Port := ""
+	vnf2Port := ""
+	mtu := cnpd.getMtu(vnfElement1.Mtu)
+	container1Name := ""
+	container2Name := ""
+
+	for repeatCount := uint32(0); repeatCount <= vnfRepeatCount; repeatCount++ {
+
+		cnpd.seq.MemIfID++
+
+		if repeatCount == 0 {
+			container1Name = vnfElement1.Container
+			vnf1Port = vnfElement1.PortLabel
+		} else {
+			container1Name = "vnfx-" + strconv.Itoa(int(repeatCount-1))
+			vnf1Port = vnfElement1.PortLabel
+		}
+		if repeatCount == vnfRepeatCount {
+			container2Name = vnfElement2.Container
+			vnf2Port = vnfElement2.PortLabel
+		} else {
+			container2Name = "vnfx-" + strconv.Itoa(int(repeatCount))
+			vnf2Port = vnfElement2.PortLabel
+		}
+
+		// create a memif in the vnf container 1
+		if err := cnpd.createInterContainerMemIfPair(
+				container1Name, vnf1Port,
+				container2Name, vnf2Port,
+				mtu,
+				cnpd.seq.MemIfID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// createInterContainerMemIfPair creates memif pair and returns vswitch-end memif interface name
+func (cnpd *sfcCtlrL2CNPDriver) createInterContainerMemIfPair(
+	vnf1Container string, vnf1Port string,
+	vnf2Container string, vnf2Port string,
+    mtu uint32,
+	memIFID uint32) error {
+
+	log.Infof("createInterContainerMemIfPair: vnf1: '%s'/'%s', vnf2: '%s'/'%s', memIfID: '%d'",
+		vnf1Container, vnf1Port, vnf2Container, vnf2Port, memIFID)
+
+	// create a memif in the vnf container 1
+	if _, err := cnpd.memIfCreate(vnf1Container, vnf1Port, memIFID,true, "", "", mtu);
+		err != nil {
+		log.Error("createInterContainerMemIfPair: error creating memIf for container: '%s'/'%s', memIF: '%d'",
+			vnf1Container, vnf1Port, memIFID)
+		return err
+	}
+
+	// create a memif in the vnf container 2
+	if _, err := cnpd.memIfCreate(vnf2Container, vnf2Port, memIFID,false, "", "", mtu);
+		err != nil {
+
+		log.Error("createInterContainerMemIfPair: error creating memIf for container: '%s'/'%s', memIF: '%d'",
+			vnf1Container, vnf1Port, memIFID)
+		return err
+	}
+
+	return nil
+}
+
 // createMemIfPair creates memif pair and returns vswitch-end memif interface name
 func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostName string,
 	vnfChainElement *controller.SfcEntity_SfcElement, generateAddresses bool) (string, error) {
@@ -982,6 +1078,10 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 			if sfc.SfcIpv4Prefix == "" {
 				cnpd.seq.IPInstanceID++
 				ipv4Address = formatIpv4Address(cnpd.seq.IPInstanceID) + "/24"
+			} else {
+				// still need to do ipam, but I will fill in the last octet with the instance id for now
+				cnpd.seq.IPInstanceID++
+				ipv4Address = formatIpv4AddressFromSfcPrefix(sfc.SfcIpv4Prefix, cnpd.seq.IPInstanceID)
 			}
 		}
 	} else {
@@ -1054,7 +1154,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 	var ipv4Address string
 
 	// the sfc controller can be responsible for managing the mac and ip addresses if not provided t
-	if vnfChainElement.Type != controller.SfcElementType_CONTAINER_AGENT_VPP_AFP {
+	if vnfChainElement.Type != controller.SfcElementType_VPP_CONTAINER_AFP {
 		// no IP address in case that VPP is also on the SFC entity side
 
 		// TODO: figure out how ipam, and macam should be done, for now just start at 1 and increment :-(
@@ -1062,6 +1162,10 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 			if sfc.SfcIpv4Prefix == "" {
 				cnpd.seq.IPInstanceID++
 				ipv4Address = formatIpv4Address(cnpd.seq.IPInstanceID) + "/24"
+			} else {
+				// still need to do ipam, but I will fill in the last octet with the instance id for now
+				cnpd.seq.IPInstanceID++
+				ipv4Address = formatIpv4AddressFromSfcPrefix(sfc.SfcIpv4Prefix, cnpd.seq.IPInstanceID)
 			}
 		} else {
 			ipv4Address = vnfChainElement.Ipv4Addr + "/24"
@@ -1075,6 +1179,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 		macAddress = vnfChainElement.MacAddr
 	}
 
+	mtu := cnpd.getMtu(vnfChainElement.Mtu)
+
 	// Create a VETH if for the vnf container. VETH will get created by the agent from a more privileged vswitch.
 	// Note: In Linux kernel the length of an interface name is limited by the constant IFNAMSIZ.
 	//       In most distributions this is 16 characters including the terminating NULL character.
@@ -1082,23 +1188,22 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 	veth2Name := utils.TruncateString(vnfChainElement.Container, 7) + "_" +
 		utils.TruncateString(vnfChainElement.PortLabel, 7)
 	if err := cnpd.vEthIfCreate(vnfChainElement.EtcdVppSwitchKey, veth1Name, veth2Name, vnfChainElement.Container,
-		macAddress, ipv4Address); err != nil {
+		macAddress, ipv4Address, mtu); err != nil {
 		log.Error("createAFPacketVEthPair: error creating veth if '%s' for container: '%s'", veth1Name,
 			vnfChainElement.Container)
 		return "", err
 	}
 	// Configure opposite side of the VETH interface for the vpp switch
 	if err := cnpd.vEthIfCreate(vnfChainElement.EtcdVppSwitchKey, veth2Name, veth1Name, vnfChainElement.EtcdVppSwitchKey,
-		"", ""); err != nil {
+		"", "", mtu); err != nil {
 		log.Error("createAFPacketVEthPair: error creating veth if '%s' for container: '%s'", veth2Name,
 			vnfChainElement.EtcdVppSwitchKey)
 		return "", err
 	}
 
-	mtu := cnpd.getMtu(vnfChainElement.Mtu)
 
 	// create af_packet for the vnf -end of the veth
-	if vnfChainElement.Type == controller.SfcElementType_CONTAINER_AGENT_VPP_AFP {
+	if vnfChainElement.Type == controller.SfcElementType_VPP_CONTAINER_AFP {
 		afPktIf1, err := cnpd.afPacketCreate(vnfChainElement.Container, vnfChainElement.PortLabel,
 			veth1Name, "", "", mtu)
 		if err != nil {
@@ -1397,38 +1502,38 @@ func (cnpd *sfcCtlrL2CNPDriver) createLoopback(etcdPrefix string, ifname string,
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) vEthIfCreate(etcdPrefix string, ifname string, peerIfName string, container string,
-	physAddr string, ipv4Addr string) error {
+	physAddr string, ipv4Addr string, mtu uint32) error {
 
-	ifs := linuxIntf.LinuxInterfaces{}
-	ifs.Interface = make([]*linuxIntf.LinuxInterfaces_Interface, 1)
 
-	ifs.Interface[0] = new(linuxIntf.LinuxInterfaces_Interface)
-	ifs.Interface[0].Name = ifname
-	ifs.Interface[0].Type = linuxIntf.LinuxInterfaces_VETH
-	ifs.Interface[0].Enabled = true
-	ifs.Interface[0].PhysAddress = physAddr
-
-	ifs.Interface[0].Namespace = new(linuxIntf.LinuxInterfaces_Interface_Namespace)
-	ifs.Interface[0].Namespace.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_MICROSERVICE_REF_NS
-	ifs.Interface[0].Namespace.Microservice = container
-
-	ifs.Interface[0].Mtu = 1500
-	if ipv4Addr != "" {
-		ifs.Interface[0].IpAddresses = make([]string, 1)
-		ifs.Interface[0].IpAddresses[0] = ipv4Addr
+	linuxif := &linuxIntf.LinuxInterfaces_Interface{
+		Name: ifname,
+		Type: linuxIntf.LinuxInterfaces_VETH,
+		Enabled: true,
+		PhysAddress: physAddr,
+		HostIfName: ifname,
+		Mtu: mtu,
+		Namespace: &linuxIntf.LinuxInterfaces_Interface_Namespace{
+			Type:linuxIntf.LinuxInterfaces_Interface_Namespace_MICROSERVICE_REF_NS,
+			Microservice: container,
+		},
+		Veth: &linuxIntf.LinuxInterfaces_Interface_Veth{
+			PeerIfName: peerIfName,
+		},
 	}
 
-	ifs.Interface[0].Veth = new(linuxIntf.LinuxInterfaces_Interface_Veth)
-	ifs.Interface[0].Veth.PeerIfName = peerIfName
+	if ipv4Addr != "" {
+		linuxif.IpAddresses = make([]string, 1)
+		linuxif.IpAddresses[0] = ipv4Addr
+	}
 
 	if cnpd.reconcileInProgress {
-		cnpd.reconcileLinuxInterface(etcdPrefix, ifname, ifs.Interface[0])
+		cnpd.reconcileLinuxInterface(etcdPrefix, ifname, linuxif)
 	}
 
-	log.Println(ifs)
+	log.Println(linuxif)
 
 	rc := NewRemoteClientTxn(etcdPrefix, cnpd.dbFactory)
-	err := rc.Put().LinuxInterface(ifs.Interface[0]).Send().ReceiveReply()
+	err := rc.Put().LinuxInterface(linuxif).Send().ReceiveReply()
 
 	if err != nil {
 		log.Error("createLoopback: databroker.Store: ", err)
@@ -1555,10 +1660,10 @@ func (cnpd *sfcCtlrL2CNPDriver) getHEToEEState(heName string, eeName string) *he
 
 func (cnpd *sfcCtlrL2CNPDriver) getMtu(mtu uint32) uint32 {
 
-	log.Info("getMtu: ", mtu);
+	log.Info("getMtu: ", mtu)
 	if mtu == 0 {
 		mtu = cnpd.l2CNPEntityCache.SysParms.Mtu
-		log.Info("getMtu: replacing with system value: ", mtu);
+		log.Info("getMtu: replacing with system value: ", mtu)
 	}
 	return mtu
 }
@@ -1575,6 +1680,14 @@ func formatIpv4Address(ipInstanceID uint32) string {
 func stripSlashAndSubnetIpv4Address(ipAndSubnetStr string) string {
 	strs := strings.Split(ipAndSubnetStr, "/")
 	return strs[0]
+}
+
+func formatIpv4AddressFromSfcPrefix(ipAndSubnetStr string ,ipInstanceID uint32) string {
+	strs := strings.Split(ipAndSubnetStr, "/")
+	octets := strings.Split(strs[0], ".")
+	log.Info("formatIpv4AddressFromSfcPrefix: ", strs, octets, ipInstanceID)
+	return octets[0] + "." + octets[1] + "." + octets[2] + "." +
+		fmt.Sprintf("%d", ipInstanceID) + "/" + strs[1]
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadInterfacesIntoCache(etcdVppLabel string) error {

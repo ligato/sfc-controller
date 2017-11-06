@@ -1,7 +1,7 @@
 package linuxtestdata
 
 import (
-	"github.com/ligato/vpp-agent/plugins/linuxplugin/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/linuxplugin/ifplugin/model/interfaces"
 )
 
 // Agent1Veth01 are test data for VETH interface for agent1 test data

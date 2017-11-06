@@ -1,0 +1,16 @@
+vnf_plugin_config_version: 1
+description: Demo VNF config for demo-toplogy6
+
+vnf_entities:
+  - name: vnf1
+    container: vnf1
+    l2xconnects:
+      - port_labels:
+        - port1
+        - port2
+  - name: vnf2
+    container: vnf2
+    l2xconnects:
+      - port_labels:
+        - port1
+        - port2

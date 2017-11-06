@@ -1,5 +1,5 @@
 sfc_controller_config_version: 1
-description: Demo topology 1
+description: Demo topology 2
 
 host_entities:
     - name: vswitch
@@ -7,7 +7,7 @@ host_entities:
 sfc_entities:
     - name: vswitch-vnf1
       description: vswitch to VNF1 - memif
-      type: 3
+      type: 4
       elements:
           - container: vswitch
             port_label: FortyGigabitEthernet89/0/0
@@ -20,7 +20,7 @@ sfc_entities:
 
     - name: vswitch-vnf2
       description: VNF2 to vswitch - memif
-      type: 3
+      type: 4
       elements:
           - container: vswitch
             port_label: FortyGigabitEthernet89/0/1
@@ -32,8 +32,8 @@ sfc_entities:
             type: 2
 
     - name: vnf1-vnf2
-      description: vnf1 to vnf2 via vswitch - memifs
-      type: 2
+      description: vnf1 to vnf2 via vswitch - memifs, l2x the vswitch memifs
+      type: 5
       elements:
           - container: vnf1
             port_label: port2

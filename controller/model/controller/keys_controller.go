@@ -16,7 +16,7 @@ package controller
 
 // SfcControllerPrefix provides sfc controller prefix
 func SfcControllerPrefix() string {
-	return "/sfc-controller/api/v1/"
+	return "/sfc-controller/v1/"
 }
 
 // SystemParametersKey provides sfc controller's system parameter key

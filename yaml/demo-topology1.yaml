@@ -6,8 +6,8 @@ host_entities:
 
 sfc_entities:
     - name: vswitch-vnf1
-      description: vswitch to VNF1 - memif
-      type: 3
+      description: vswitch to VNF1 port 1 memif, l2 xconn of eth to vswitch memif
+      type: 4
       elements:
           - container: vswitch
             port_label: FortyGigabitEthernet89/0/0
@@ -19,8 +19,8 @@ sfc_entities:
             type: 2
 
     - name: vnf1-vswitch
-      description: VNF1 to vswitch - memif
-      type: 3
+      description: vswitch to VNF1 port 2 memif, l2 xconn of eth to vswitch memif
+      type: 4
       elements:
           - container: vswitch
             port_label: FortyGigabitEthernet89/0/1

@@ -7,7 +7,7 @@ host_entities:
 sfc_entities:
     - name: vswitch-vnf1
       description: vswitch to VNF1 - veth
-      type: 3
+      type: 4
       elements:
           - container: vswitch
             port_label: FortyGigabitEthernet89/0/0
@@ -20,7 +20,7 @@ sfc_entities:
 
     - name: vnf1-vswitch
       description: VNF1 to vswitch - veth
-      type: 3
+      type: 4
       elements:
           - container: vswitch
             port_label: FortyGigabitEthernet89/0/1
