@@ -14,6 +14,7 @@ define generate_sources
         @echo "# generating sources"
         @go generate -v
         @cd plugins/vnfdriver && go generate -v
+        @cd controller/cnpdriver/l2driver && go generate -v
         @echo "# done"
 endef
 

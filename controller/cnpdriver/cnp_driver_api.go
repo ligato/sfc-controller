@@ -26,12 +26,15 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ligato/cn-infra/db/keyval"
+	"github.com/ligato/cn-infra/logging/logroot"
 	"github.com/ligato/sfc-controller/controller/model/controller"
+	"github.com/ligato/sfc-controller/controller/cnpdriver/l2driver"
 )
 
 var (
 	cnpDriverRegistered = false
 	cnpDriverName       string
+	log = logroot.StandardLogger()
 )
 
 // SfcControllerCNPDriverAPI is interface that is implemented by each Container Networking Policy (CNP) Driver.  As n/b api's
@@ -46,6 +49,7 @@ type SfcControllerCNPDriverAPI interface {
 	GetName() string
 	ReconcileStart(vppEtcdLabels map[string]struct{}) error
 	ReconcileEnd() error
+	DatastoreReInitialize() error
 	WireHostEntityToDestinationHostEntity(sh *controller.HostEntity, dh *controller.HostEntity) error
 	WireHostEntityToExternalEntity(he *controller.HostEntity, ee *controller.ExternalEntity) error
 	WireInternalsForHostEntity(he *controller.HostEntity) error
@@ -70,9 +74,7 @@ func RegisterCNPDriverPlugin(name string, dbFactory func(string) keyval.ProtoBro
 
 	switch name {
 	case "sfcctlrl2":
-		cnpDriverAPI = NewSfcCtlrL2CNPDriver(name, dbFactory)
-	case "sfcctlrl3":
-		cnpDriverAPI = NewSfcCtlrL3CNPDriver(name)
+		cnpDriverAPI = l2driver.NewSfcCtlrL2CNPDriver(name, dbFactory)
 	default:
 		errMsg := fmt.Sprintf("RegisterCNPDriverPlugin: CNPDriver '%s' not recognized", name)
 		log.Error(errMsg)

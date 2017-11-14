@@ -65,6 +65,9 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) InitHTTPHandlers() {
 //   - GET:  curl -v http://localhost:9191/sfc_controller/api/v1/config/EEs
 func externalEntitiesHandler(formatter *render.Render) http.HandlerFunc {
 
+	sfcplg.HttpMutex.Lock()
+	defer sfcplg.HttpMutex.Unlock()
+
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("External Entities HTTP handler: Method %s, URL: %s, sfcPlugin", req.Method, req.URL, sfcplg)
 
@@ -84,6 +87,9 @@ func externalEntitiesHandler(formatter *render.Render) http.HandlerFunc {
 //   - GET:  curl -X GET http://localhost:9191/sfc_controller/api/v1/EE/<entityName>
 //   - POST: curl -v -X POST -d '{"counter":30}' http://localhost:9191/example/test
 func externalEntityHandler(formatter *render.Render) http.HandlerFunc {
+
+	sfcplg.HttpMutex.Lock()
+	defer sfcplg.HttpMutex.Unlock()
 
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("External Entity HTTP handler: Method %s, URL: %s", req.Method, req.URL)
@@ -150,6 +156,9 @@ func processExternalEntityPost(formatter *render.Render, w http.ResponseWriter, 
 //   - GET:  curl -v http://localhost:9191/sfc_controller/api/v1/config/HEs
 func hostEntitiesHandler(formatter *render.Render) http.HandlerFunc {
 
+	sfcplg.HttpMutex.Lock()
+	defer sfcplg.HttpMutex.Unlock()
+
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("Host Entities HTTP handler: Method %s, URL: %s", req.Method, req.URL)
 
@@ -169,6 +178,9 @@ func hostEntitiesHandler(formatter *render.Render) http.HandlerFunc {
 //   - GET:  curl -v http://localhost:9191/sfc_controller/api/v1/config/HEs/<hostName>
 //   - POST: curl -v -X POST -d '{"counter":30}' http://localhost:9191/example/test
 func hostEntityHandler(formatter *render.Render) http.HandlerFunc {
+
+	sfcplg.HttpMutex.Lock()
+	defer sfcplg.HttpMutex.Unlock()
 
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("Host Entity HTTP handler: Method %s, URL: %s", req.Method, req.URL)
@@ -235,6 +247,9 @@ func processHostEntityPost(formatter *render.Render, w http.ResponseWriter, req 
 //   - POST: not supported
 func sfcChainsHandler(formatter *render.Render) http.HandlerFunc {
 
+	sfcplg.HttpMutex.Lock()
+	defer sfcplg.HttpMutex.Unlock()
+
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("SFC Chains HTTP handler: Method %s, URL: %s", req.Method, req.URL)
 
@@ -254,6 +269,9 @@ func sfcChainsHandler(formatter *render.Render) http.HandlerFunc {
 //   - GET:  curl -v http://localhost:9191/sfc_controller/api/v1/config/SFCs/<chainName>
 //   - POST: curl -v -X POST -d '{"counter":30}' http://localhost:9191/example/test
 func sfcChainHandler(formatter *render.Render) http.HandlerFunc {
+
+	sfcplg.HttpMutex.Lock()
+	defer sfcplg.HttpMutex.Unlock()
 
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("SFC Chain HTTP handler: Method %s, URL: %s", req.Method, req.URL)
@@ -320,6 +338,9 @@ func processSfcChainPost(formatter *render.Render, w http.ResponseWriter, req *h
 //   - GET:  curl -X GET http://localhost:9191/sfc_controller/api/v1/SP
 //   - POST: curl -v -X POST -d '{"mtu":1500}' http://localhost:9191/sfc_controller/api/v1/SP
 func systemParametersHandler(formatter *render.Render) http.HandlerFunc {
+
+	sfcplg.HttpMutex.Lock()
+	defer sfcplg.HttpMutex.Unlock()
 
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("System Parameters HTTP handler: Method %s, URL: %s", req.Method, req.URL)

@@ -31,6 +31,7 @@ import (
 	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/namsral/flag"
 	"os"
+	"sync"
 )
 
 // PluginID is plugin identifier (must be unique throughout the system)
@@ -82,9 +83,9 @@ type SfcControllerCacheType struct {
 
 // SfcControllerPluginHandler is handle for SfcControllerPlugin
 type SfcControllerPluginHandler struct {
-	Etcd    *etcdv3.Plugin
-	HTTPmux *rest.Plugin
-
+	Etcd                  *etcdv3.Plugin
+	HTTPmux               *rest.Plugin
+	HttpMutex             sync.Mutex
 	cnpDriverPlugin       cnpdriver.SfcControllerCNPDriverAPI
 	yamlConfig            *YamlConfig
 	ramConfigCache        SfcControllerCacheType
@@ -109,10 +110,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 	// Flag variables registered in init() are ready to use in InitPlugin()
 	LogFlags()
 
-	// if -clean then remove the sfc controller datastore, reconcile will remove all extraneous i/f's, BD's etc
-	if cleanSfcDatastore {
-		sfcCtrlPlugin.DatastoreReInitialize()
-	}
+
 
 	// register northbound controller API's
 	sfcCtrlPlugin.InitHTTPHandlers()
@@ -125,6 +123,16 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 	}
 
 	log.Infof("CNP Driver: %s", sfcCtrlPlugin.cnpDriverPlugin.GetName())
+
+	// if -clean then remove the sfc controller datastore, reconcile will remove all extraneous i/f's, BD's etc
+	if cleanSfcDatastore {
+		if sfcCtrlPlugin.DatastoreReInitialize() != nil {
+			os.Exit(1)
+		}
+		if sfcCtrlPlugin.cnpDriverPlugin.DatastoreReInitialize() != nil {
+			os.Exit(1)
+		}
+	}
 
 	sfcCtrlPlugin.ReconcileInit()
 
@@ -140,7 +148,6 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 	// Note that there may already be already an existing database so the policy is that the config yaml
 	// file will replace any conflicting entries in the database.
 	if sfcConfigFile != "" {
-
 		if err := sfcCtrlPlugin.readConfigFromFile(sfcConfigFile); err != nil {
 			log.Error("error loading config: ", err)
 			os.Exit(1)
@@ -160,7 +167,12 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 			log.Error("error writing ram config to etcd datastore: ", err)
 			os.Exit(1)
 		}
-
+	} else {
+		// this must be called so validation and defaulting of sys parameters takes place
+		if err := sfcCtrlPlugin.validateRAMCache(); err != nil {
+			log.Error("error validating ram cache: ", err)
+			os.Exit(1)
+		}
 	}
 
 	if err = sfcCtrlPlugin.renderConfigFromRAMCache(); err != nil {

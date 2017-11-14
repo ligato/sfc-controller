@@ -55,6 +55,11 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) validateSystemParameters(sp *co
 		sp.Mtu = 1500 // if not provided, default it to 1500
 		return nil
 	}
+	if sp.StartingVlanId == 0 {
+		log.Info("validateSystemParameters: sys starting vlan_id = 0, defaulting ot 5000")
+		sp.StartingVlanId = 5000 // if not provided, default it to 5000
+		return nil
+	}
 
 	return nil
 }

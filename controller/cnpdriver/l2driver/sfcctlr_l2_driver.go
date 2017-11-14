@@ -24,7 +24,9 @@
 // allocated and tracked by this module and stored in the ETCD datastore so
 // upon sfc ctlr restart, we dont lose track of any "tracked" resource.
 
-package cnpdriver
+//go:generate protoc --proto_path=model --gogo_out=model model/l2.proto
+
+package l2driver
 
 import (
 	"errors"
@@ -32,7 +34,7 @@ import (
 	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/cn-infra/logging/logroot"
 	"github.com/ligato/cn-infra/servicelabel"
-	"github.com/ligato/cn-infra/utils/addrs"
+	l2driver "github.com/ligato/sfc-controller/controller/cnpdriver/l2driver/model"
 	"github.com/ligato/sfc-controller/controller/extentitydriver"
 	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/ligato/sfc-controller/controller/utils"
@@ -42,8 +44,8 @@ import (
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
 	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/ifplugin/model/interfaces"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 var (
@@ -94,14 +96,6 @@ type l2CNPEntityCacheType struct {
 	SysParms controller.SystemParameters
 }
 
-// maps of ETCD entries indexed by ETCD vpp label
-type reconcileCacheType struct {
-	ifs      map[string]interfaces.Interfaces_Interface
-	lifs     map[string]linuxIntf.LinuxInterfaces_Interface
-	bds      map[string]l2.BridgeDomains_BridgeDomain
-	l3Routes map[string]l3.StaticRoutes_Route
-}
-
 // NewRemoteClientTxn new vpp-agent remote client instance on top of key-val DB (ETCD)
 // <microserviceLabel> that identifies a specific vpp-agent that needs to be configured
 // <dbFactory> returns new instance of DataBroker for accessing key-val DB (ETCD)
@@ -124,8 +118,6 @@ func NewSfcCtlrL2CNPDriver(name string, dbFactory func(string) keyval.ProtoBroke
 	cnpd.initL2CNPCache()
 	cnpd.initReconcileCache()
 
-	cnpd.seq.VLanID = 4999
-
 	return cnpd
 }
 
@@ -137,21 +129,6 @@ func (cnpd *sfcCtlrL2CNPDriver) initL2CNPCache() {
 	cnpd.l2CNPEntityCache.HEs = make(map[string]controller.HostEntity)
 	cnpd.l2CNPEntityCache.SFCs = make(map[string]controller.SfcEntity)
 
-}
-
-func (cnpd *sfcCtlrL2CNPDriver) initReconcileCache() error {
-
-	cnpd.reconcileBefore.ifs = make(map[string]interfaces.Interfaces_Interface)
-	cnpd.reconcileBefore.lifs = make(map[string]linuxIntf.LinuxInterfaces_Interface)
-	cnpd.reconcileBefore.bds = make(map[string]l2.BridgeDomains_BridgeDomain)
-	cnpd.reconcileBefore.l3Routes = make(map[string]l3.StaticRoutes_Route)
-
-	cnpd.reconcileAfter.ifs = make(map[string]interfaces.Interfaces_Interface)
-	cnpd.reconcileAfter.lifs = make(map[string]linuxIntf.LinuxInterfaces_Interface)
-	cnpd.reconcileAfter.bds = make(map[string]l2.BridgeDomains_BridgeDomain)
-	cnpd.reconcileAfter.l3Routes = make(map[string]l3.StaticRoutes_Route)
-
-	return nil
 }
 
 // Perform plugin specific initializations
@@ -172,169 +149,8 @@ func (cnpd *sfcCtlrL2CNPDriver) GetName() string {
 // SetSystemParameters caches the current settings for the system
 func (cnpd *sfcCtlrL2CNPDriver) SetSystemParameters(sp *controller.SystemParameters) error {
 	cnpd.l2CNPEntityCache.SysParms = *sp
-	return nil
-}
-
-// Perform start processing for the reconcile of the CNP datastore
-func (cnpd *sfcCtlrL2CNPDriver) ReconcileStart(vppEtcdLabels map[string]struct{}) error {
-
-	// The reconcile for the l2 overlay data structures consists of all the types of objects that are created as a
-	// result of processing the EEs, HEs, and SFCs.  These are interfaces, bridged domains, and static routes, etc.
-	// When reconcile starts, we read all of these from ETCD and store them in the reconcile "before" cache.
-	// Then as the configuration is processed, the "new" objects are added to a reconcile "after" cache.  When all
-	// the configuration is processed, a post processing of the before and after caches is performed.
-	// All entries in the before cache are processed one-by-one.  If the before entry is not in the after cache, then
-	// clearly it is not needed and removed from ETCD.  If it is in the after cache, then there are two cases.
-	// If the entries match, it is removed from the after cache and ETCD is not "touched".  If the entries are
-	// different, it remains in the after cache and awaits "after" cache post processing.  Once all the before
-	// entries have been processed, the after cache is processed.  If there are entries in this cache, they are
-	// all written to ETCD.
-
-	// The reason for this reconcile approach is as follows: some ETCD entries will be added and updated multiple
-	// times during processing of the configuration and there is NO sense continually changing ETCD for an entry
-	// until it is fully modified by the configuration processing.  This is why an "after" cache is maintained.  Then
-	// post processing will ensure the "final" values of an object are written only ONCE to the ETCD cache.
-	// An example of this is bridge domains.  Initially for a host, a default east-west BD is added to the system,
-	// then as interfaces are associated with the BD, the BD is updated.  If we tried to continually update the
-	// ETCD entry for this BD as we went along, we would improperly set the BD to interim configs until it all
-	// the config is performed and the BD reaches its final config.  This would have bad effects on the vpp-agents
-	// as they would be forced to react to each BD change and data flow would be affected.  The goal of the
-	// reconcile resync is to ONLY make changes if there are new and/or obselete configs.  Existing configs should
-	// reamin un-affected by the resync process.
-
-	log.Info("ReconcileStart: begin ...")
-	defer log.Info("ReconcileStart: exit ...")
-
-	cnpd.reconcileStateSet(true)
-
-	for vppEtdLabel := range vppEtcdLabels {
-		cnpd.reconcileLoadInterfacesIntoCache(vppEtdLabel)
-		cnpd.reconcileLoadLinuxInterfacesIntoCache(vppEtdLabel)
-		cnpd.reconcileLoadBridgeDomainsIntoCache(vppEtdLabel)
-		cnpd.reconcileLoadStaticRoutesIntoCache(vppEtdLabel)
-	}
-
-	return nil
-}
-
-func (cnpd *sfcCtlrL2CNPDriver) reconcileStateSet(state bool) {
-	cnpd.reconcileInProgress = state
-}
-
-// Perform end processing for the reconcile of the CNP datastore
-func (cnpd *sfcCtlrL2CNPDriver) ReconcileEnd() error {
-
-	log.Info("ReconcileEnd: begin ...")
-	log.Infof("ReconcileEnd: reconcileBefore", cnpd.reconcileBefore)
-	log.Infof("ReconcileEnd: reconcileAfter", cnpd.reconcileAfter)
-	defer cnpd.reconcileStateSet(false)
-	defer log.Info("ReconcileEnd: exit ...")
-
-	// 1) For each entry in the before cache, look it up in the after cache
-	//    if it is not in the after cache, delete it from ETCD, and from the after cache
-	//    if it is in the after cache, the compare the entry
-	//        if equal, remove from the after cache
-	//        if not equal do nothing
-	// 2) I am using the String() method to convert the entry then comparing strings (inefficient/ok?)
-
-	// Interfaces: traverse the before cache
-	for key := range cnpd.reconcileBefore.ifs {
-		beforeIF := cnpd.reconcileBefore.ifs[key]
-		afterIF, existsInAfterCache := cnpd.reconcileAfter.ifs[key]
-		if !existsInAfterCache {
-			exists, err := cnpd.db.Delete(key)
-			log.Info("ReconcileEnd: remove i/f key from etcd and reconcile cache: ", key, exists, err)
-			delete(cnpd.reconcileAfter.ifs, key)
-		} else {
-			if beforeIF.String() == afterIF.String() {
-				delete(cnpd.reconcileAfter.ifs, key)
-			}
-		}
-	}
-	// Interfaces: now post process the after cache
-	for key := range cnpd.reconcileAfter.ifs {
-		afterIF := cnpd.reconcileAfter.ifs[key]
-		log.Info("ReconcileEnd: add i/f key to etcd: ", key, afterIF)
-		err := cnpd.db.Put(key, &afterIF)
-		if err != nil {
-			log.Error("ReconcileEnd: error storing i/f: '%s'", key, err)
-			return err
-		}
-	}
-
-	// Linux Interfaces: traverse the before cache
-	for key := range cnpd.reconcileBefore.lifs {
-		beforeIF := cnpd.reconcileBefore.lifs[key]
-		afterIF, existsInAfterCache := cnpd.reconcileAfter.lifs[key]
-		if !existsInAfterCache {
-			exists, err := cnpd.db.Delete(key)
-			log.Info("ReconcileEnd: remove linux i/f key from etcd and reconcile cache: ", key, exists, err)
-			delete(cnpd.reconcileAfter.ifs, key)
-		} else {
-			if beforeIF.String() == afterIF.String() {
-				delete(cnpd.reconcileAfter.lifs, key)
-			}
-		}
-	}
-	// Linux Interfaces: now post process the after cache
-	for key := range cnpd.reconcileAfter.lifs {
-		afterIF := cnpd.reconcileAfter.lifs[key]
-		log.Info("ReconcileEnd: add linux i/f key to etcd: ", key, afterIF)
-		err := cnpd.db.Put(key, &afterIF)
-		if err != nil {
-			log.Error("ReconcileEnd: error storing i/f: '%s'", key, err)
-			return err
-		}
-	}
-
-	// Bridge Domains: traverse the before cache
-	for key := range cnpd.reconcileBefore.bds {
-		beforeBD := cnpd.reconcileBefore.bds[key]
-		afterBD, existsInAfterCache := cnpd.reconcileAfter.bds[key]
-		if !existsInAfterCache {
-			exists, err := cnpd.db.Delete(key)
-			log.Info("ReconcileEnd: remove BD key from etcd and reconcile cache: ", key, exists, err)
-			delete(cnpd.reconcileAfter.bds, key)
-		} else {
-			if beforeBD.String() == afterBD.String() {
-				delete(cnpd.reconcileAfter.bds, key)
-			}
-		}
-	}
-	// Bridge Domains: now post process the after cache
-	for key := range cnpd.reconcileAfter.bds {
-		afterBD := cnpd.reconcileAfter.bds[key]
-		log.Info("ReconcileEnd: add BD key to etcd: ", key, afterBD)
-		err := cnpd.db.Put(key, &afterBD)
-		if err != nil {
-			log.Error("ReconcileEnd: error storing BD: '%s'", key, err)
-			return err
-		}
-	}
-
-	// Static Routes: traverse the before cache
-	for key := range cnpd.reconcileBefore.l3Routes {
-		beforeSR := cnpd.reconcileBefore.l3Routes[key]
-		afterSR, existsInAfterCache := cnpd.reconcileAfter.l3Routes[key]
-		if !existsInAfterCache {
-			exists, err := cnpd.db.Delete(key)
-			log.Info("ReconcileEnd: remove static route key from etcd and reconcile cache: ", key, exists, err)
-			delete(cnpd.reconcileAfter.l3Routes, key)
-		} else {
-			if beforeSR.String() == afterSR.String() {
-				delete(cnpd.reconcileAfter.l3Routes, key)
-			}
-		}
-	}
-	// Static Routes: now post process the after cache
-	for key := range cnpd.reconcileAfter.l3Routes {
-		afterSR := cnpd.reconcileAfter.l3Routes[key]
-		log.Info("ReconcileEnd: add static route key to etcd: ", key, afterSR)
-		err := cnpd.db.Put(key, &afterSR)
-		if err != nil {
-			log.Error("ReconcileEnd: error storing static route: '%s'", key, err)
-			return err
-		}
+	if cnpd.seq.VLanID != 0 { // only init if this is the first time being set
+		cnpd.seq.VLanID = cnpd.l2CNPEntityCache.SysParms.StartingVlanId - 1
 	}
 
 	return nil
@@ -443,8 +259,17 @@ func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToExternalEntity(he *controller.Ho
 
 	// create the vxlan i'f before the BD
 	ifName := "IF_VXLAN_H2E_" + he.Name + "_" + ee.Name
-	cnpd.seq.VLanID++ // track these at some point
-	vlanIf, err := cnpd.vxLanCreate(he.Name, ifName, cnpd.seq.VLanID, he.LoopbackIpv4, ee.HostVxlan.SourceIpv4)
+
+	var vlanID uint32
+
+	he2eeID, err := cnpd.DatastoreHE2EEIDsRetrieve(he.Name, ee.Name)
+	if he2eeID == nil || he2eeID.VlanId == 0 {
+		cnpd.seq.VLanID++
+		vlanID = cnpd.seq.VLanID
+	} else {
+		vlanID = he2eeID.VlanId
+	}
+	vlanIf, err := cnpd.vxLanCreate(he.Name, ifName, vlanID, he.LoopbackIpv4, ee.HostVxlan.SourceIpv4)
 	if err != nil {
 		log.Error("WireHostEntityToExternalEntity: error creating vxlan: '%s'", ifName)
 		return err
@@ -485,9 +310,13 @@ func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToExternalEntity(he *controller.Ho
 		he.Name, ee.Name, vlanIf.Name, bd.Name, sr.String())
 
 	cnpd.wireExternalEntityToHostEntity(ee, he)
-	//txn.Commit()
 
-	return nil
+	key, he2eeID, err := cnpd.DatastoreHE2EEIDsCreate(he.Name, ee.Name, vlanID)
+	if err == nil && cnpd.reconcileInProgress {
+		cnpd.reconcileAfter.he2eeIDs[key] = *he2eeID
+	}
+
+	return err
 }
 
 // Perform CNP specific wiring for "preparing" a host server example: create an east-west bridge
@@ -515,14 +344,23 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 		}
 	}
 
+	var heID *l2driver.HEIDs
+	var loopbackMacAddrId uint32
+
 	if he.LoopbackIpv4 != "" { // if configured, then create a loop back address
 
 		var loopbackMacAddress string
 
 		if he.LoopbackMacAddr == "" { // if not supplied, generate one
-			cnpd.seq.MacInstanceID++
-			loopbackMacAddress = formatMacAddress(cnpd.seq.MacInstanceID)
-
+			heID, _ = cnpd.DatastoreHEIDsRetrieve(he.Name)
+			if heID == nil || heID.LoopbackMacAddrId == 0 {
+				cnpd.seq.MacInstanceID++
+				loopbackMacAddress = formatMacAddress(cnpd.seq.MacInstanceID)
+				loopbackMacAddrId = cnpd.seq.MacInstanceID
+			} else {
+				loopbackMacAddress = formatMacAddress(heID.LoopbackMacAddrId)
+				loopbackMacAddrId = heID.LoopbackMacAddrId
+			}
 		} else {
 			loopbackMacAddress = he.LoopbackMacAddr
 		}
@@ -546,7 +384,12 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 
 	heState.bd = bd
 
-	return nil
+	key, heID, err := cnpd.DatastoreHEIDsCreate(he.Name, loopbackMacAddrId)
+	if err == nil && cnpd.reconcileInProgress {
+		cnpd.reconcileAfter.heIDs[key] = *heID
+	}
+
+	return err
 }
 
 // Perform CNP specific wiring for "preparing" an external entity
@@ -938,7 +781,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 			if sfc.Type == controller.SfcType_SFC_EW_MEMIF {
 				if i%2 == 0 {
 					// need to create an inter-container memif, use the left of the pair to create the pair
-					if err := cnpd.createOneOrMoreInterContainerMemIfPairs(sfc.Elements[i], sfc.Elements[i+1],
+					if err := cnpd.createOneOrMoreInterContainerMemIfPairs(sfc.Name, sfc.Elements[i], sfc.Elements[i+1],
 						sfc.VnfRepeatCount); err != nil {
 						log.Error("wireSfcEastWestElements: error creating memIf pair: sfc: '%s', Container: '%s', i='%d'",
 							sfc.Name, sfcEntityElement.Container, i)
@@ -984,11 +827,14 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 }
 
 // createOneOrMoreInterContainerMemIfPairs creates memif pair and returns vswitch-end memif interface name
-func (cnpd *sfcCtlrL2CNPDriver) createOneOrMoreInterContainerMemIfPairs(vnfElement1 *controller.SfcEntity_SfcElement,
-	vnfElement2 *controller.SfcEntity_SfcElement, vnfRepeatCount uint32) error {
+func (cnpd *sfcCtlrL2CNPDriver) createOneOrMoreInterContainerMemIfPairs(
+	sfcName string,
+	vnfElement1 *controller.SfcEntity_SfcElement,
+	vnfElement2 *controller.SfcEntity_SfcElement,
+	vnfRepeatCount uint32) error {
 
-	log.Infof("createInterContainerMemIfPair: vnf1: '%s', vnf2: '%s', repeatCount: '%d'",
-		vnfElement1.Container, vnfElement2.Container, vnfRepeatCount)
+	log.Infof("createInterContainerMemIfPair: sfc: '%s', vnf1: '%s', vnf2: '%s', repeatCount: '%d'",
+		sfcName, vnfElement1.Container, vnfElement2.Container, vnfRepeatCount)
 
 	vnf1Port := ""
 	vnf2Port := ""
@@ -997,8 +843,6 @@ func (cnpd *sfcCtlrL2CNPDriver) createOneOrMoreInterContainerMemIfPairs(vnfEleme
 	container2Name := ""
 
 	for repeatCount := uint32(0); repeatCount <= vnfRepeatCount; repeatCount++ {
-
-		cnpd.seq.MemIfID++
 
 		if repeatCount == 0 {
 			container1Name = vnfElement1.Container
@@ -1015,13 +859,29 @@ func (cnpd *sfcCtlrL2CNPDriver) createOneOrMoreInterContainerMemIfPairs(vnfEleme
 			vnf2Port = vnfElement2.PortLabel
 		}
 
-		// create a memif in the vnf container 1
+		var memifID uint32
+
+		sfcID, _ := cnpd.DatastoreSFCIDsRetrieve(sfcName, container1Name, vnf1Port)
+		if sfcID == nil || sfcID.MemifId == 0 {
+			cnpd.seq.MemIfID++
+			memifID = cnpd.seq.MemIfID
+		} else {
+			memifID = sfcID.MemifId
+		}
+
+		// create a memif in the vnf container
 		if err := cnpd.createInterContainerMemIfPair(
-				container1Name, vnf1Port,
-				container2Name, vnf2Port,
-				mtu,
-				cnpd.seq.MemIfID); err != nil {
+			sfcName,
+			container1Name, vnf1Port,
+			container2Name, vnf2Port,
+			mtu,
+			memifID); err != nil {
 			return err
+		}
+
+		key, sfcID, err := cnpd.DatastoreSFCIDsCreate(sfcName, container1Name, vnf1Port, 0, 0, memifID)
+		if err == nil && cnpd.reconcileInProgress {
+			cnpd.reconcileAfter.sfcIDs[key] = *sfcID
 		}
 	}
 
@@ -1030,25 +890,24 @@ func (cnpd *sfcCtlrL2CNPDriver) createOneOrMoreInterContainerMemIfPairs(vnfEleme
 
 // createInterContainerMemIfPair creates memif pair and returns vswitch-end memif interface name
 func (cnpd *sfcCtlrL2CNPDriver) createInterContainerMemIfPair(
+	sfcName string,
 	vnf1Container string, vnf1Port string,
 	vnf2Container string, vnf2Port string,
-    mtu uint32,
+	mtu uint32,
 	memIFID uint32) error {
 
 	log.Infof("createInterContainerMemIfPair: vnf1: '%s'/'%s', vnf2: '%s'/'%s', memIfID: '%d'",
 		vnf1Container, vnf1Port, vnf2Container, vnf2Port, memIFID)
 
 	// create a memif in the vnf container 1
-	if _, err := cnpd.memIfCreate(vnf1Container, vnf1Port, memIFID,true, "", "", mtu);
-		err != nil {
+	if _, err := cnpd.memIfCreate(vnf1Container, vnf1Port, memIFID, true, "", "", mtu); err != nil {
 		log.Error("createInterContainerMemIfPair: error creating memIf for container: '%s'/'%s', memIF: '%d'",
 			vnf1Container, vnf1Port, memIFID)
 		return err
 	}
 
 	// create a memif in the vnf container 2
-	if _, err := cnpd.memIfCreate(vnf2Container, vnf2Port, memIFID,false, "", "", mtu);
-		err != nil {
+	if _, err := cnpd.memIfCreate(vnf2Container, vnf2Port, memIFID, false, "", "", mtu); err != nil {
 
 		log.Error("createInterContainerMemIfPair: error creating memIf for container: '%s'/'%s', memIF: '%d'",
 			vnf1Container, vnf1Port, memIFID)
@@ -1064,9 +923,17 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 
 	log.Infof("createMemIfPair: vnf: '%s', host: '%s'", vnfChainElement.Container, hostName)
 
-	// for now just incr the memIfIndex for each pair of memIfs (vnf, vswitch)
-	// vswitch is master of the (vswitch/vnf) pair
-	cnpd.seq.MemIfID++
+	var memifID uint32
+	var macAddrID uint32
+	var ipID uint32
+
+	sfcID, err := cnpd.DatastoreSFCIDsRetrieve(sfc.Name, vnfChainElement.Container, vnfChainElement.PortLabel)
+	if sfcID == nil || sfcID.MemifId == 0 {
+		cnpd.seq.MemIfID++
+		memifID = cnpd.seq.MemIfID
+	} else {
+		memifID = sfcID.MemifId
+	}
 
 	var macAddress string
 	var ipv4Address string
@@ -1075,13 +942,16 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 	// TODO: figure out how ipam, and macam should be done, for now just start at 1 and go up :-(
 	if vnfChainElement.Ipv4Addr == "" {
 		if generateAddresses {
-			if sfc.SfcIpv4Prefix == "" {
-				cnpd.seq.IPInstanceID++
-				ipv4Address = formatIpv4Address(cnpd.seq.IPInstanceID) + "/24"
-			} else {
+			if sfc.SfcIpv4Prefix != "" {
 				// still need to do ipam, but I will fill in the last octet with the instance id for now
-				cnpd.seq.IPInstanceID++
-				ipv4Address = formatIpv4AddressFromSfcPrefix(sfc.SfcIpv4Prefix, cnpd.seq.IPInstanceID)
+				if sfcID == nil || sfcID.IpId == 0 {
+					cnpd.seq.IPInstanceID++
+					ipv4Address = formatIpv4AddressFromSfcPrefix(sfc.SfcIpv4Prefix, cnpd.seq.IPInstanceID)
+					ipID = cnpd.seq.IPInstanceID
+				} else {
+					ipv4Address = formatIpv4AddressFromSfcPrefix(sfc.SfcIpv4Prefix, sfcID.IpId)
+					ipID = sfcID.IpId
+				}
 			}
 		}
 	} else {
@@ -1090,8 +960,14 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 
 	if vnfChainElement.MacAddr == "" {
 		if generateAddresses {
-			cnpd.seq.MacInstanceID++
-			macAddress = formatMacAddress(cnpd.seq.MacInstanceID)
+			if sfcID == nil || sfcID.MacAddrId == 0 {
+				cnpd.seq.MacInstanceID++
+				macAddress = formatMacAddress(cnpd.seq.MacInstanceID)
+				macAddrID = cnpd.seq.MacInstanceID
+			} else {
+				macAddress = formatMacAddress(sfcID.MacAddrId)
+				macAddrID = sfcID.MacAddrId
+			}
 		}
 	} else {
 		macAddress = vnfChainElement.MacAddr
@@ -1101,7 +977,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 
 	// create a memif in the vnf container
 	memIfName := vnfChainElement.PortLabel
-	if _, err := cnpd.memIfCreate(vnfChainElement.Container, memIfName, cnpd.seq.MemIfID,
+	if _, err := cnpd.memIfCreate(vnfChainElement.Container, memIfName, memifID,
 		false, ipv4Address, macAddress, mtu); err != nil {
 		log.Error("createMemIfPair: error creating memIf for container: '%s'", memIfName)
 		return "", err
@@ -1109,14 +985,20 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 
 	// now create a memif for the vpp switch
 	memIfName = "IF_MEMIF_VSWITCH_" + vnfChainElement.Container + "_" + vnfChainElement.PortLabel
-	memIf, err := cnpd.memIfCreate(vnfChainElement.EtcdVppSwitchKey, memIfName, cnpd.seq.MemIfID,
+	memIf, err := cnpd.memIfCreate(vnfChainElement.EtcdVppSwitchKey, memIfName, memifID,
 		true, "", "", mtu)
 	if err != nil {
 		log.Error("createMemIfPair: error creating memIf for vpp switch: '%s'", memIf.Name)
 		return "", err
 	}
 
-	return memIfName, nil
+	key, sfcID, err := cnpd.DatastoreSFCIDsCreate(sfc.Name, vnfChainElement.Container, vnfChainElement.PortLabel,
+		ipID, macAddrID, memifID)
+	if err == nil && cnpd.reconcileInProgress {
+		cnpd.reconcileAfter.sfcIDs[key] = *sfcID
+	}
+
+	return memIfName, err
 }
 
 // createMemIfPairAndAddToBridge creates a memif pair and adds the vswitch-end interface into the provided bridge domain
@@ -1139,8 +1021,6 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPairAndAddToBridge(sfc *controller.Sf
 		return err
 	}
 
-	log.Infof("createMemIfPairAndAddToBridge: he-ee state:", cnpd.l2CNPStateCache.HEToEEs)
-
 	return nil
 }
 
@@ -1150,31 +1030,43 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 	log.Infof("createAFPacketVEthPair: vnf: '%s', host: '%s'", vnfChainElement.Container,
 		vnfChainElement.EtcdVppSwitchKey)
 
+	var macAddrID uint32
+	var ipID uint32
 	var macAddress string
 	var ipv4Address string
 
+	sfcID, err := cnpd.DatastoreSFCIDsRetrieve(sfc.Name, vnfChainElement.Container, vnfChainElement.PortLabel)
+
 	// the sfc controller can be responsible for managing the mac and ip addresses if not provided t
 	if vnfChainElement.Type != controller.SfcElementType_VPP_CONTAINER_AFP {
-		// no IP address in case that VPP is also on the SFC entity side
+		// no IP address in case that VPP is also on the vnf side of the vnf-vswitch entry
 
 		// TODO: figure out how ipam, and macam should be done, for now just start at 1 and increment :-(
 		if vnfChainElement.Ipv4Addr == "" {
-			if sfc.SfcIpv4Prefix == "" {
-				cnpd.seq.IPInstanceID++
-				ipv4Address = formatIpv4Address(cnpd.seq.IPInstanceID) + "/24"
-			} else {
+			if sfc.SfcIpv4Prefix != "" {
 				// still need to do ipam, but I will fill in the last octet with the instance id for now
-				cnpd.seq.IPInstanceID++
-				ipv4Address = formatIpv4AddressFromSfcPrefix(sfc.SfcIpv4Prefix, cnpd.seq.IPInstanceID)
+				if sfcID == nil || sfcID.IpId == 0 {
+					cnpd.seq.IPInstanceID++
+					ipv4Address = formatIpv4AddressFromSfcPrefix(sfc.SfcIpv4Prefix, cnpd.seq.IPInstanceID)
+					ipID = cnpd.seq.IPInstanceID
+				} else {
+					ipv4Address = formatIpv4AddressFromSfcPrefix(sfc.SfcIpv4Prefix, sfcID.IpId)
+					ipID = sfcID.IpId
+				}
 			}
 		} else {
 			ipv4Address = vnfChainElement.Ipv4Addr + "/24"
 		}
 	}
 	if vnfChainElement.MacAddr == "" {
-		cnpd.seq.MacInstanceID++
-		macAddress = formatMacAddress(cnpd.seq.MacInstanceID)
-
+		if sfcID == nil || sfcID.MacAddrId == 0 {
+			cnpd.seq.MacInstanceID++
+			macAddress = formatMacAddress(cnpd.seq.MacInstanceID)
+			macAddrID = cnpd.seq.MacInstanceID
+		} else {
+			macAddress = formatMacAddress(sfcID.MacAddrId)
+			macAddrID = sfcID.MacAddrId
+		}
 	} else {
 		macAddress = vnfChainElement.MacAddr
 	}
@@ -1201,7 +1093,6 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 		return "", err
 	}
 
-
 	// create af_packet for the vnf -end of the veth
 	if vnfChainElement.Type == controller.SfcElementType_VPP_CONTAINER_AFP {
 		afPktIf1, err := cnpd.afPacketCreate(vnfChainElement.Container, vnfChainElement.PortLabel,
@@ -1219,6 +1110,12 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 	if err != nil {
 		log.Error("createAFPacketVEthPair: error creating afpacket for vpp switch: '%s'", afPktIf2.Name)
 		return "", err
+	}
+
+	key, sfcID, err := cnpd.DatastoreSFCIDsCreate(sfc.Name, vnfChainElement.Container, vnfChainElement.PortLabel,
+		ipID, macAddrID, 0)
+	if err == nil && cnpd.reconcileInProgress {
+		cnpd.reconcileAfter.sfcIDs[key] = *sfcID
 	}
 
 	return afPktIf2.Name, nil
@@ -1245,8 +1142,6 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPairAndAddToBridge(sfc *contro
 		log.Error("createAFPacketVEthPairAndAddToBridge: error creating BD: '%s'", bd.Name)
 		return err
 	}
-
-	log.Infof("createAFPacketVEthPairAndAddToBridge: he-ee state:", cnpd.l2CNPStateCache.HEToEEs)
 
 	return nil
 }
@@ -1289,7 +1184,19 @@ func (cnpd *sfcCtlrL2CNPDriver) bridgedDomainAssociateWithIfs(etcdVppSwitchKey s
 	bd *l2.BridgeDomains_BridgeDomain,
 	ifs []*l2.BridgeDomains_BridgeDomain_Interfaces) error {
 
-	bd.Interfaces = append(bd.Interfaces, ifs...)
+	// only add the interface to bd array if it is not already in the bridge's interface array
+	for _, iface := range ifs {
+		found := false
+		for _, bi := range bd.Interfaces {
+			if bi.Name == iface.Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			bd.Interfaces = append(bd.Interfaces, iface)
+		}
+	}
 
 	if cnpd.reconcileInProgress {
 		cnpd.reconcileBridgeDomain(etcdVppSwitchKey, bd)
@@ -1308,11 +1215,6 @@ func (cnpd *sfcCtlrL2CNPDriver) bridgedDomainAssociateWithIfs(etcdVppSwitchKey s
 	}
 
 	return nil
-}
-
-func (cnpd *sfcCtlrL2CNPDriver) reconcileBridgeDomain(etcdVppSwitchKey string, bd *l2.BridgeDomains_BridgeDomain) {
-	bdKey := utils.L2BridgeDomainKey(etcdVppSwitchKey, bd.Name)
-	cnpd.reconcileAfter.bds[bdKey] = *bd
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) vxLanCreate(etcdVppSwitchKey string, ifname string, vni uint32,
@@ -1389,11 +1291,6 @@ func (cnpd *sfcCtlrL2CNPDriver) memIfCreate(etcdPrefix string, memIfName string,
 	}
 
 	return memIf, nil
-}
-
-func (cnpd *sfcCtlrL2CNPDriver) reconcileInterface(etcdVppSwitchKey string, currIf *interfaces.Interfaces_Interface) {
-	ifKey := utils.InterfaceKey(etcdVppSwitchKey, currIf.Name)
-	cnpd.reconcileAfter.ifs[ifKey] = *currIf
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) createEthernet(etcdPrefix string, ifname string, ipv4Addr string, mtu uint32) error {
@@ -1504,16 +1401,15 @@ func (cnpd *sfcCtlrL2CNPDriver) createLoopback(etcdPrefix string, ifname string,
 func (cnpd *sfcCtlrL2CNPDriver) vEthIfCreate(etcdPrefix string, ifname string, peerIfName string, container string,
 	physAddr string, ipv4Addr string, mtu uint32) error {
 
-
 	linuxif := &linuxIntf.LinuxInterfaces_Interface{
-		Name: ifname,
-		Type: linuxIntf.LinuxInterfaces_VETH,
-		Enabled: true,
+		Name:        ifname,
+		Type:        linuxIntf.LinuxInterfaces_VETH,
+		Enabled:     true,
 		PhysAddress: physAddr,
-		HostIfName: ifname,
-		Mtu: mtu,
+		HostIfName:  ifname,
+		Mtu:         mtu,
 		Namespace: &linuxIntf.LinuxInterfaces_Interface_Namespace{
-			Type:linuxIntf.LinuxInterfaces_Interface_Namespace_MICROSERVICE_REF_NS,
+			Type:         linuxIntf.LinuxInterfaces_Interface_Namespace_MICROSERVICE_REF_NS,
 			Microservice: container,
 		},
 		Veth: &linuxIntf.LinuxInterfaces_Interface_Veth{
@@ -1528,27 +1424,20 @@ func (cnpd *sfcCtlrL2CNPDriver) vEthIfCreate(etcdPrefix string, ifname string, p
 
 	if cnpd.reconcileInProgress {
 		cnpd.reconcileLinuxInterface(etcdPrefix, ifname, linuxif)
-	}
+	} else {
 
-	log.Println(linuxif)
+		log.Println(linuxif)
 
-	rc := NewRemoteClientTxn(etcdPrefix, cnpd.dbFactory)
-	err := rc.Put().LinuxInterface(linuxif).Send().ReceiveReply()
+		rc := NewRemoteClientTxn(etcdPrefix, cnpd.dbFactory)
+		err := rc.Put().LinuxInterface(linuxif).Send().ReceiveReply()
 
-	if err != nil {
-		log.Error("createLoopback: databroker.Store: ", err)
-		return err
-
+		if err != nil {
+			log.Error("createLoopback: databroker.Store: ", err)
+			return err
+		}
 	}
 
 	return nil
-}
-
-func (cnpd *sfcCtlrL2CNPDriver) reconcileLinuxInterface(etcdPrefix string, ifname string,
-	currIf *linuxIntf.LinuxInterfaces_Interface) {
-
-	ifKey := utils.LinuxInterfaceKey(etcdPrefix, ifname)
-	cnpd.reconcileAfter.lifs[ifKey] = *currIf
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) createStaticRoute(etcdPrefix string, description string, destIpv4AddrStr string,
@@ -1580,13 +1469,6 @@ func (cnpd *sfcCtlrL2CNPDriver) createStaticRoute(etcdPrefix string, description
 	}
 
 	return sr, nil
-}
-
-func (cnpd *sfcCtlrL2CNPDriver) reconcileStaticRoute(etcdPrefix string, sr *l3.StaticRoutes_Route) {
-
-	destIPAddr, _, _ := addrs.ParseIPWithPrefix(sr.DstIpAddr)
-	key := utils.L3RouteKey(etcdPrefix, sr.VrfId, destIPAddr, sr.NextHopAddr)
-	cnpd.reconcileAfter.l3Routes[key] = *sr
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) createXConnectPair(etcdPrefix, if1, if2 string) error {
@@ -1644,7 +1526,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createCustomLabel(etcdPrefix string, ci *control
 
 // Debug dump routine
 func (cnpd *sfcCtlrL2CNPDriver) Dump() {
-
+	log.Println(cnpd.seq)
 	log.Println(cnpd.l2CNPEntityCache)
 	log.Println(cnpd.l2CNPStateCache)
 }
@@ -1672,120 +1554,18 @@ func formatMacAddress(macInstanceID uint32) string {
 	return "02:00:00:00:00:" + fmt.Sprintf("%02X", macInstanceID)
 }
 
-func formatIpv4Address(ipInstanceID uint32) string {
-	return "10.0.0." + fmt.Sprintf("%d", ipInstanceID)
-}
-
 // if the ip address has a /xx subnet attached, it is stripped off
 func stripSlashAndSubnetIpv4Address(ipAndSubnetStr string) string {
 	strs := strings.Split(ipAndSubnetStr, "/")
 	return strs[0]
 }
 
-func formatIpv4AddressFromSfcPrefix(ipAndSubnetStr string ,ipInstanceID uint32) string {
+func formatIpv4AddressFromSfcPrefix(ipAndSubnetStr string, ipInstanceID uint32) string {
 	strs := strings.Split(ipAndSubnetStr, "/")
 	octets := strings.Split(strs[0], ".")
-	log.Info("formatIpv4AddressFromSfcPrefix: ", strs, octets, ipInstanceID)
-	return octets[0] + "." + octets[1] + "." + octets[2] + "." +
+	newStr := octets[0] + "." + octets[1] + "." + octets[2] + "." +
 		fmt.Sprintf("%d", ipInstanceID) + "/" + strs[1]
-}
-
-func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadInterfacesIntoCache(etcdVppLabel string) error {
-
-	kvi, err := cnpd.db.ListValues(utils.InterfacePrefixKey(etcdVppLabel))
-	if err != nil {
-		log.Fatal(err)
-		return nil
-	}
-
-	for {
-		kv, allReceived := kvi.GetNext()
-		if allReceived {
-			return nil
-		}
-		entry := &interfaces.Interfaces_Interface{}
-		err := kv.GetValue(entry)
-		if err != nil {
-			log.Fatal(err)
-			return nil
-		}
-
-		fmt.Println("reconcileLoadInterfacesIntoCache: adding Interface: ", etcdVppLabel, kv.GetKey(), entry)
-		cnpd.reconcileBefore.ifs[kv.GetKey()] = *entry
-	}
-}
-
-func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadLinuxInterfacesIntoCache(etcdVppLabel string) error {
-
-	kvi, err := cnpd.db.ListValues(utils.LinuxInterfacePrefixKey(etcdVppLabel))
-	if err != nil {
-		log.Fatal(err)
-		return nil
-	}
-
-	for {
-		kv, allReceived := kvi.GetNext()
-		if allReceived {
-			return nil
-		}
-		entry := &linuxIntf.LinuxInterfaces_Interface{}
-		err := kv.GetValue(entry)
-		if err != nil {
-			log.Fatal(err)
-			return nil
-		}
-		fmt.Println("reconcileLoadLinuxInterfacesIntoCache: adding linux nterface: ",
-			etcdVppLabel, kv.GetKey(), entry)
-		cnpd.reconcileBefore.lifs[kv.GetKey()] = *entry
-
-	}
-}
-
-func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadBridgeDomainsIntoCache(etcdVppLabel string) error {
-
-	kvi, err := cnpd.db.ListValues(utils.L2BridgeDomainKeyPrefix(etcdVppLabel))
-	if err != nil {
-		log.Fatal(err)
-		return nil
-	}
-
-	for {
-		kv, allReceived := kvi.GetNext()
-		if allReceived {
-			return nil
-		}
-		entry := &l2.BridgeDomains_BridgeDomain{}
-		err := kv.GetValue(entry)
-		if err != nil {
-			log.Fatal(err)
-			return nil
-		}
-		fmt.Println("reconcileLoadBridgeDomainsIntoCache: adding bridge doamin: ",
-			etcdVppLabel, kv.GetKey(), entry)
-		cnpd.reconcileBefore.bds[kv.GetKey()] = *entry
-	}
-}
-
-func (cnpd *sfcCtlrL2CNPDriver) reconcileLoadStaticRoutesIntoCache(etcdVppLabel string) error {
-
-	kvi, err := cnpd.db.ListValues(utils.L3RouteKeyPrefix(etcdVppLabel))
-	if err != nil {
-		log.Fatal(err)
-		return nil
-	}
-
-	for {
-		kv, allReceived := kvi.GetNext()
-		if allReceived {
-			return nil
-		}
-		entry := &l3.StaticRoutes_Route{}
-		err := kv.GetValue(entry)
-		if err != nil {
-			log.Fatal(err)
-			return nil
-		}
-		fmt.Println("reconcileLoadStaticRoutesIntoCache: adding static route: ", etcdVppLabel, kv.GetKey(), entry)
-		cnpd.reconcileBefore.l3Routes[kv.GetKey()] = *entry
-	}
+	log.Info("formatIpv4AddressFromSfcPrefix: ", strs, octets, ipInstanceID)
+	log.Info("formatIpv4AddressFromSfcPrefix: result ip addr: ", newStr)
+	return newStr
 }

@@ -116,7 +116,8 @@ func (x SfcElementType) String() string {
 }
 
 type SystemParameters struct {
-	Mtu uint32 `protobuf:"varint,1,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	Mtu            uint32 `protobuf:"varint,1,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	StartingVlanId uint32 `protobuf:"varint,2,opt,name=starting_vlan_id,proto3" json:"starting_vlan_id,omitempty"`
 }
 
 func (m *SystemParameters) Reset()         { *m = SystemParameters{} }

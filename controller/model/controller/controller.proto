@@ -4,6 +4,7 @@ package controller;
 
 message SystemParameters {
     uint32 mtu = 1; // optional, overrrides default 1500
+    uint32 starting_vlan_id = 2; // optional, overrrides default 5000
 };
 
 enum ExtEntDriverType {

@@ -79,9 +79,6 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderConfigFromRAMCache() erro
 	return nil
 }
 
-// For this ee, find all host entities and effect external entity to host wiring.  Will need a "session"
-// per external entity, and this session will be used to communicate wiring configuration.  Also, if the
-// configOnlyEE is false, then from each host entity, wire from host to this ee.
 func (sfcCtrlPlugin *SfcControllerPluginHandler) renderSystemParameters(sp *controller.SystemParameters) error {
 
 	log.Infof("renderSystemParameters: sp: ", *sp)
