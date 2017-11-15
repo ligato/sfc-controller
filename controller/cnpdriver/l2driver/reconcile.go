@@ -192,6 +192,8 @@ func (cnpd *sfcCtlrL2CNPDriver) ReconcileEnd() error {
 			log.Info("ReconcileEnd: remove BD key from etcd and reconcile cache: ", key, exists, err)
 			delete(cnpd.reconcileAfter.bds, key)
 		} else {
+			cnpd.sortBridgedInterfaces(beforeBD.Interfaces)
+			cnpd.sortBridgedInterfaces(afterBD.Interfaces)
 			if beforeBD.String() == afterBD.String() {
 				delete(cnpd.reconcileAfter.bds, key)
 			}
@@ -215,9 +217,10 @@ func (cnpd *sfcCtlrL2CNPDriver) ReconcileEnd() error {
 		if !existsInAfterCache {
 			exists, err := cnpd.db.Delete(key)
 			log.Info("ReconcileEnd: remove static route key from etcd and reconcile cache: ", key, exists, err)
+			log.Info("ReconcileEnd: remove static route before entry: ", beforeSR)
 			delete(cnpd.reconcileAfter.l3Routes, key)
 		} else {
-			if beforeSR.String() == afterSR.String() {
+			if beforeSR == afterSR {
 				delete(cnpd.reconcileAfter.l3Routes, key)
 			}
 		}

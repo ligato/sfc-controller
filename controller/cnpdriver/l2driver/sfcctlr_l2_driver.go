@@ -46,6 +46,7 @@ import (
 	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/ifplugin/model/interfaces"
 	"strconv"
 	"strings"
+	"sort"
 )
 
 var (
@@ -1217,6 +1218,9 @@ func (cnpd *sfcCtlrL2CNPDriver) bridgedDomainAssociateWithIfs(etcdVppSwitchKey s
 	return nil
 }
 
+
+
+
 func (cnpd *sfcCtlrL2CNPDriver) vxLanCreate(etcdVppSwitchKey string, ifname string, vni uint32,
 	srcStr string, dstStr string) (*interfaces.Interfaces_Interface, error) {
 
@@ -1568,4 +1572,13 @@ func formatIpv4AddressFromSfcPrefix(ipAndSubnetStr string, ipInstanceID uint32) 
 	log.Info("formatIpv4AddressFromSfcPrefix: ", strs, octets, ipInstanceID)
 	log.Info("formatIpv4AddressFromSfcPrefix: result ip addr: ", newStr)
 	return newStr
+}
+
+type ByIfName []*l2.BridgeDomains_BridgeDomain_Interfaces
+func (a ByIfName) Len() int { return len(a) }
+func (a ByIfName) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a ByIfName) Less(i, j int) bool { return a[i].Name < a[j].Name }
+
+func (cnpd *sfcCtlrL2CNPDriver) sortBridgedInterfaces(ifs []*l2.BridgeDomains_BridgeDomain_Interfaces) {
+		sort.Sort(ByIfName(ifs))
 }

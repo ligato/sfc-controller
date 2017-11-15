@@ -125,15 +125,21 @@ func processExternalEntityPost(formatter *render.Render, w http.ResponseWriter, 
 		return
 	}
 
-	if err := sfcplg.validateEE(&ee); err != nil {
-		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
+	vars := mux.Vars(req)
+	if vars[entityName] != ee.Name {
+		formatter.JSON(w, http.StatusBadRequest, "json name does not matach url name")
 		return
 	}
 
-	vars := mux.Vars(req)
+	if existing, exists := sfcplg.ramConfigCache.EEs[vars[entityName]]; exists {
+		if ee.String() == existing.String() {
+			formatter.JSON(w, http.StatusOK, "OK")
+			return
+		}
+	}
 
-	if vars[entityName] != ee.Name {
-		formatter.JSON(w, http.StatusBadRequest, "json name does not matach url name")
+	if err := sfcplg.validateEE(&ee); err != nil {
+		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
 
@@ -149,7 +155,7 @@ func processExternalEntityPost(formatter *render.Render, w http.ResponseWriter, 
 		return
 	}
 
-	formatter.JSON(w, http.StatusOK, nil)
+	formatter.JSON(w, http.StatusOK, "OK")
 }
 
 // Example curl invocations: for obtaining ALL host_entities
@@ -222,11 +228,18 @@ func processHostEntityPost(formatter *render.Render, w http.ResponseWriter, req 
 	}
 
 	vars := mux.Vars(req)
-
 	if vars[entityName] != he.Name {
 		formatter.JSON(w, http.StatusBadRequest, "json name does not matach url name")
 		return
 	}
+
+	if existing, exists := sfcplg.ramConfigCache.HEs[vars[entityName]]; exists {
+		if he.String() == existing.String() {
+			formatter.JSON(w, http.StatusOK, "OK")
+			return
+		}
+	}
+
 	sfcplg.ramConfigCache.HEs[vars[entityName]] = he
 
 	if err := sfcplg.DatastoreHostEntityCreate(&he); err != nil {
@@ -239,7 +252,7 @@ func processHostEntityPost(formatter *render.Render, w http.ResponseWriter, req 
 		return
 	}
 
-	formatter.JSON(w, http.StatusOK, nil)
+	formatter.JSON(w, http.StatusOK, "OK")
 }
 
 // Example curl invocations: for obtaining ALL host_entities
@@ -313,10 +326,17 @@ func processSfcChainPost(formatter *render.Render, w http.ResponseWriter, req *h
 	}
 
 	vars := mux.Vars(req)
-
 	if vars[entityName] != sfc.Name {
 		formatter.JSON(w, http.StatusBadRequest, "json name does not matach url name")
 		return
+	}
+
+	if existing, exists := sfcplg.ramConfigCache.SFCs[vars[entityName]]; exists {
+		// convert to string and compare ...
+		if sfc.String() == existing.String() {
+			formatter.JSON(w, http.StatusOK, "OK")
+			return
+		}
 	}
 
 	sfcplg.ramConfigCache.SFCs[vars[entityName]] = sfc
@@ -331,7 +351,7 @@ func processSfcChainPost(formatter *render.Render, w http.ResponseWriter, req *h
 		return
 	}
 
-	formatter.JSON(w, http.StatusOK, nil)
+	formatter.JSON(w, http.StatusOK, "OK")
 }
 
 // Example curl invocations: for obtaining the system parameters
@@ -388,5 +408,5 @@ func processSystemParametersPost(formatter *render.Render, w http.ResponseWriter
 		return
 	}
 
-	formatter.JSON(w, http.StatusOK, nil)
+	formatter.JSON(w, http.StatusOK, "OK")
 }

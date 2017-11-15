@@ -100,7 +100,6 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) validateSFC(sfc *controller.Sfc
 	if numSfcElements <= 0 {
 		return nil
 	}
-	log.Debugf("validateSFC: sfc=", sfc)
 
 	//for i, sfcChainElement := range sfc.GetElements() {
 	//	log.Debugf("validateSFC: sfc_chain_element[%d]=", i, sfcChainElement)
