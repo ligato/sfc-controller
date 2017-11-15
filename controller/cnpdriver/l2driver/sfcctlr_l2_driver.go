@@ -150,10 +150,11 @@ func (cnpd *sfcCtlrL2CNPDriver) GetName() string {
 // SetSystemParameters caches the current settings for the system
 func (cnpd *sfcCtlrL2CNPDriver) SetSystemParameters(sp *controller.SystemParameters) error {
 	cnpd.l2CNPEntityCache.SysParms = *sp
-	if cnpd.seq.VLanID != 0 { // only init if this is the first time being set
+	if cnpd.seq.VLanID == 0 { // only init if this is the first time being set
 		cnpd.seq.VLanID = cnpd.l2CNPEntityCache.SysParms.StartingVlanId - 1
+		log.Infof("SetSystemParameters: setting starting valnId: ", cnpd.seq.VLanID)
 	}
-
+	log.Infof("SetSystemParameters: SP", sp)
 	return nil
 }
 

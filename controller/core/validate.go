@@ -50,16 +50,18 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) validateRAMCache() error {
 // validate the system parameters
 func (sfcCtrlPlugin *SfcControllerPluginHandler) validateSystemParameters(sp *controller.SystemParameters) error {
 
+	log.Info("validateSystemParameters: initial SP's", sp)
+
 	if sp.Mtu == 0 {
-		log.Info("validateSystemParameters: sys mtu = 0, defaulting ot 1500")
+		log.Info("validateSystemParameters: sys mtu = 0, defaulting to 1500")
 		sp.Mtu = 1500 // if not provided, default it to 1500
-		return nil
 	}
 	if sp.StartingVlanId == 0 {
-		log.Info("validateSystemParameters: sys starting vlan_id = 0, defaulting ot 5000")
+		log.Info("validateSystemParameters: sys starting vlan_id = 0, defaulting to 5000")
 		sp.StartingVlanId = 5000 // if not provided, default it to 5000
-		return nil
 	}
+
+	log.Info("validateSystemParameters: final SP's", sp)
 
 	return nil
 }
