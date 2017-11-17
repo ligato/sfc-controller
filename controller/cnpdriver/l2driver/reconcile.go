@@ -566,7 +566,6 @@ func (cnpd *sfcCtlrL2CNPDriver) sequencerInitFromReconcileCache() {
 
 	maxVlanID := uint32(0)
 	maxMemifID := uint32(0)
-	maxIpID  := uint32(0)
 	maxMacAddrID := uint32(0)
 
 
@@ -594,9 +593,6 @@ func (cnpd *sfcCtlrL2CNPDriver) sequencerInitFromReconcileCache() {
 		if sfc.MemifId > maxMemifID {
 			maxMemifID = sfc.MemifId
 		}
-		if sfc.IpId > maxIpID {
-			maxIpID = sfc.IpId
-		}
 	}
 
 	// now prime the sequencer with the max values from the db to avoid collisions
@@ -604,7 +600,6 @@ func (cnpd *sfcCtlrL2CNPDriver) sequencerInitFromReconcileCache() {
 	cnpd.seq.VLanID = maxVlanID
 	cnpd.seq.MemIfID = maxMemifID
 	cnpd.seq.MacInstanceID = maxMacAddrID
-	cnpd.seq.IPInstanceID = maxIpID
 
 	fmt.Println("sequencerInitFromReconcileCache: sequence IDs after loading id's: ", cnpd.seq)
 }

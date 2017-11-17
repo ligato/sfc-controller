@@ -47,6 +47,7 @@ import (
 	"strconv"
 	"strings"
 	"sort"
+	"github.com/ligato/sfc-controller/controller/utils/ipam"
 )
 
 var (
@@ -72,7 +73,6 @@ type sequencer struct {
 	VLanID        uint32
 	MemIfID       uint32
 	MacInstanceID uint32
-	IPInstanceID  uint32
 }
 
 type heToEEStateType struct {
@@ -525,7 +525,8 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 				err := fmt.Errorf("wireSfcNorthSouthVXLANElements: cannot find host/bridge: '%s' for this sfc: '%s'",
 					sfcEntityElement.EtcdVppSwitchKey, sfc.Name)
 				return err
-			}
+
+				}
 			if err := cnpd.createMemIfPairAndAddToBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, heToEEState.bd,
 				sfcEntityElement, false); err != nil {
 				log.Error("wireSfcNorthSouthVXLANElements: error creating memIf pair: sfc: '%s', Container: '%s'",
@@ -940,24 +941,37 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 	var macAddress string
 	var ipv4Address string
 
-	// the sfc controller can be responsible for managing the mac and ip addresses if not provided t
-	// TODO: figure out how ipam, and macam should be done, for now just start at 1 and go up :-(
+	// the sfc controller can generate addresses if not provided
 	if vnfChainElement.Ipv4Addr == "" {
 		if generateAddresses {
 			if sfc.SfcIpv4Prefix != "" {
-				// still need to do ipam, but I will fill in the last octet with the instance id for now
 				if sfcID == nil || sfcID.IpId == 0 {
-					cnpd.seq.IPInstanceID++
-					ipv4Address = formatIpv4AddressFromSfcPrefix(sfc.SfcIpv4Prefix, cnpd.seq.IPInstanceID)
-					ipID = cnpd.seq.IPInstanceID
+					ipv4Address, ipID, err = ipam.AllocateFromSubnet(sfc.SfcIpv4Prefix)
+					if err != nil {
+						return "", err
+					}
 				} else {
-					ipv4Address = formatIpv4AddressFromSfcPrefix(sfc.SfcIpv4Prefix, sfcID.IpId)
+					ipv4Address, err = ipam.SetIpIDInSubnet(sfc.SfcIpv4Prefix, sfcID.IpId)
+					if err != nil {
+						return "", err
+					}
 					ipID = sfcID.IpId
 				}
 			}
 		}
 	} else {
-		ipv4Address = vnfChainElement.Ipv4Addr + "/24"
+		strs := strings.Split(vnfChainElement.Ipv4Addr, "/")
+		if len(strs) == 2 {
+			ipv4Address = vnfChainElement.Ipv4Addr
+		} else {
+			ipv4Address = vnfChainElement.Ipv4Addr + "/24"
+		}
+		if sfc.SfcIpv4Prefix != "" {
+			ipam.SetIpAddrIfInsideSubnet(sfc.SfcIpv4Prefix, strs[0])
+		}
+	}
+	if sfc.SfcIpv4Prefix != "" {
+		log.Info("createMemIfPair: ", ipam.DumpSubnet(sfc.SfcIpv4Prefix), ipv4Address)
 	}
 
 	if vnfChainElement.MacAddr == "" {
@@ -1043,21 +1057,34 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 	if vnfChainElement.Type != controller.SfcElementType_VPP_CONTAINER_AFP {
 		// no IP address in case that VPP is also on the vnf side of the vnf-vswitch entry
 
-		// TODO: figure out how ipam, and macam should be done, for now just start at 1 and increment :-(
 		if vnfChainElement.Ipv4Addr == "" {
 			if sfc.SfcIpv4Prefix != "" {
-				// still need to do ipam, but I will fill in the last octet with the instance id for now
 				if sfcID == nil || sfcID.IpId == 0 {
-					cnpd.seq.IPInstanceID++
-					ipv4Address = formatIpv4AddressFromSfcPrefix(sfc.SfcIpv4Prefix, cnpd.seq.IPInstanceID)
-					ipID = cnpd.seq.IPInstanceID
+					ipv4Address, ipID, err = ipam.AllocateFromSubnet(sfc.SfcIpv4Prefix)
+					if err != nil {
+						return "", err
+					}
 				} else {
-					ipv4Address = formatIpv4AddressFromSfcPrefix(sfc.SfcIpv4Prefix, sfcID.IpId)
+					ipv4Address, err = ipam.SetIpIDInSubnet(sfc.SfcIpv4Prefix, sfcID.IpId)
+					if err != nil {
+						return "", err
+					}
 					ipID = sfcID.IpId
 				}
 			}
 		} else {
-			ipv4Address = vnfChainElement.Ipv4Addr + "/24"
+			strs := strings.Split(vnfChainElement.Ipv4Addr, "/")
+			if len(strs) == 2 {
+				ipv4Address = vnfChainElement.Ipv4Addr
+			} else {
+				ipv4Address = vnfChainElement.Ipv4Addr + "/24"
+			}
+			if sfc.SfcIpv4Prefix != "" {
+				ipam.SetIpAddrIfInsideSubnet(sfc.SfcIpv4Prefix, strs[0])
+			}
+		}
+		if sfc.SfcIpv4Prefix != "" {
+			log.Info("createAFPacketVEthPair: ", ipam.DumpSubnet(sfc.SfcIpv4Prefix), ipv4Address)
 		}
 	}
 	if vnfChainElement.MacAddr == "" {
@@ -1555,9 +1582,31 @@ func (cnpd *sfcCtlrL2CNPDriver) getMtu(mtu uint32) uint32 {
 	return mtu
 }
 
-func formatMacAddress(macInstanceID uint32) string {
-	return "02:00:00:00:00:" + fmt.Sprintf("%02X", macInstanceID)
+func formatMacAddress(macInstanceID32 uint32) string {
+
+	// uint32 is 4Billion interfaces ... lets not worry about it
+
+	var macOctets [6]uint64
+	macInstanceID := uint64(macInstanceID32)
+
+	macOctets[0] = 0x02
+	macOctets[1] = 0xFF & (macInstanceID>>(8*4))
+	macOctets[2] = 0xFF & (macInstanceID>>(8*3))
+	macOctets[3] = 0xFF & (macInstanceID>>(8*2))
+	macOctets[4] = 0xFF & (macInstanceID>>(8*1))
+	macOctets[5] = 0xFF & (macInstanceID>>(8*0))
+
+	var macOctetString = ""
+	for i := 0; i < 6; i++ {
+		macOctetString += fmt.Sprintf("%02X", macOctets[i])
+		if i < 5 {
+			macOctetString += ":"
+		}
+	}
+
+	return macOctetString
 }
+
 
 // if the ip address has a /xx subnet attached, it is stripped off
 func stripSlashAndSubnetIpv4Address(ipAndSubnetStr string) string {
@@ -1565,15 +1614,15 @@ func stripSlashAndSubnetIpv4Address(ipAndSubnetStr string) string {
 	return strs[0]
 }
 
-func formatIpv4AddressFromSfcPrefix(ipAndSubnetStr string, ipInstanceID uint32) string {
-	strs := strings.Split(ipAndSubnetStr, "/")
-	octets := strings.Split(strs[0], ".")
-	newStr := octets[0] + "." + octets[1] + "." + octets[2] + "." +
-		fmt.Sprintf("%d", ipInstanceID) + "/" + strs[1]
-	log.Info("formatIpv4AddressFromSfcPrefix: ", strs, octets, ipInstanceID)
-	log.Info("formatIpv4AddressFromSfcPrefix: result ip addr: ", newStr)
-	return newStr
-}
+//func formatIpv4AddressFromSfcPrefix(ipAndSubnetStr string, ipInstanceID uint32) string {
+//	strs := strings.Split(ipAndSubnetStr, "/")
+//	octets := strings.Split(strs[0], ".")
+//	newStr := octets[0] + "." + octets[1] + "." + octets[2] + "." +
+//		fmt.Sprintf("%d", ipInstanceID) + "/" + strs[1]
+//	log.Info("formatIpv4AddressFromSfcPrefix: ", strs, octets, ipInstanceID)
+//	log.Info("formatIpv4AddressFromSfcPrefix: result ip addr: ", newStr)
+//	return newStr
+//}
 
 type ByIfName []*l2.BridgeDomains_BridgeDomain_Interfaces
 func (a ByIfName) Len() int { return len(a) }
