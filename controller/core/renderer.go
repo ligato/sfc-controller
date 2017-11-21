@@ -19,7 +19,6 @@ package core
 
 import (
 	"github.com/ligato/sfc-controller/controller/model/controller"
-	"os"
 )
 
 // Render the config: note that because we are wiring everything, we wire only one end when we
@@ -32,14 +31,14 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderConfigFromRAMCache() erro
 	log.Infof("render system parameters from ram cache")
 	if err := sfcCtrlPlugin.renderSystemParameters(&sfcCtrlPlugin.ramConfigCache.SysParms); err != nil {
 		log.Error("Error rendering sys parms:", sfcCtrlPlugin.ramConfigCache.SysParms)
-		os.Exit(1)
+		return err
 	}
 
 	log.Infof("render host entities from ram cache")
 	for _, he := range sfcCtrlPlugin.ramConfigCache.HEs {
 		if err := sfcCtrlPlugin.renderHostEntity(&he, true, false); err != nil {
 			log.Error("Error rendering host entity:", he)
-			os.Exit(1)
+			return err
 		}
 	}
 
@@ -47,14 +46,14 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderConfigFromRAMCache() erro
 	for _, ee := range sfcCtrlPlugin.ramConfigCache.EEs {
 		if err := sfcCtrlPlugin.renderExternalEntity(&ee, true, false); err != nil {
 			log.Error("Error rendering external entity:", ee)
-			os.Exit(1)
+			return err
 		}
 	}
 
 	for _, he := range sfcCtrlPlugin.ramConfigCache.HEs {
 		if err := sfcCtrlPlugin.renderHostEntity(&he, false, true); err != nil {
 			log.Error("Error rendering host entity:", he)
-			os.Exit(1)
+			return err
 		}
 	}
 
@@ -62,7 +61,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderConfigFromRAMCache() erro
 	for _, ee := range sfcCtrlPlugin.ramConfigCache.EEs {
 		if err := sfcCtrlPlugin.renderExternalEntity(&ee, false, true); err != nil {
 			log.Error("Error rendering external entity:", ee)
-			os.Exit(1)
+			return err
 		}
 	}
 
@@ -70,7 +69,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderConfigFromRAMCache() erro
 	for _, sfc := range sfcCtrlPlugin.ramConfigCache.SFCs {
 		if err := sfcCtrlPlugin.renderServiceFunctionEntity(&sfc); err != nil {
 			log.Error("Error rendering service function chain:", sfc)
-			os.Exit(1)
+			return err
 		}
 	}
 

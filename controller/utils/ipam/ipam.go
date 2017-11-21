@@ -13,7 +13,15 @@
 // limitations under the License.
 
 // package ipam manages ip address ranges for subnets.  A subnet is of the
-// form a.b.c.d/x ... then addresses are allocated
+// form a.b.c.d/x ... then addresses are allocated.  It is possible to have
+// subnets at the same "level" ie 10.1.1/24" and "10.1.2.0/24" and these
+// would be allocatated addresses out of the separate pools.  But, having
+// pools at different levels will cause issues: eg: "10.1.1.0/24", and
+// "10.1.0.0/16" overlap.  The ipam can be extended to see if subnets are
+// contained in other pools and the hierarchy can be "walked" to ensure
+// addresses are set and cleared across levels.  Also, might have to have
+// configurable address blocks per subnet so not allocating undesirable
+// addresses.
 package ipam
 
 import (

@@ -23,15 +23,15 @@ const ALL_BITS_SET = 0xFFFFFFFFFFFFFFFF
 
 type Bitmap struct {
 	u64Array []uint64
-	numBits uint32
+	numBits  uint32
 }
 
 func (bm *Bitmap) IsSet(i uint32) bool {
 	if i < 0 || i > bm.numBits {
 		return false
 	}
-	i -= 1;
-	return bm.u64Array[i/64]&(1<< (63-i%64)) != 0
+	i -= 1
+	return bm.u64Array[i/64]&(1<<(63-i%64)) != 0
 }
 
 func (bm *Bitmap) Set(i uint32) error {
@@ -39,8 +39,8 @@ func (bm *Bitmap) Set(i uint32) error {
 		err := fmt.Errorf("Bitmap: bit out of range: '%d'", i)
 		return err
 	}
-	i -= 1;
-	bm.u64Array[i/64] |= 1 << (63-i%64)
+	i -= 1
+	bm.u64Array[i/64] |= 1 << (63 - i%64)
 	return nil
 }
 
@@ -48,8 +48,8 @@ func (bm *Bitmap) Clear(i uint32) {
 	if i < 0 || i > bm.numBits {
 		return
 	}
-	i -= 1;
-	bm.u64Array[i/64] &^= 1 << (63-i%64)
+	i -= 1
+	bm.u64Array[i/64] &^= 1 << (63 - i%64)
 }
 
 func (bm *Bitmap) FindFirstClear() uint32 {
@@ -69,19 +69,58 @@ func (bm *Bitmap) FindFirstClear() uint32 {
 }
 
 func (bm *Bitmap) String() string {
-	str := fmt.Sprintf("numBits: %d, bits:[", bm.numBits)
-	for _, v := range bm.u64Array {
-		str += fmt.Sprintf("%016X", v)
-	}
-	str += fmt.Sprintf("]")
+	str := fmt.Sprintf("numBits: %d, bits:", bm.numBits)
 
+	// instead of blindly printing the raw hex, print only runs of 1's instead see below
+	// otherwise tones of zeros will be printed for subnets with only a small number of
+	// interfaces.
+
+	//str += fmt.Sprintf("[")
+	//for _, v := range bm.u64Array {
+	//	str += fmt.Sprintf("%016X", v)
+	//}
+	//str += fmt.Sprintf("]")
+
+	// on-a-run examples: [1,3-5,255], [1-255], [], [255], [1-2,4-5,7-254]
+	onARunBit := bm.numBits + 1 // set to something impossible
+	onARun := false
+	needComma := false
+	str += fmt.Sprintf("[")
+	for i := uint32(1); i <= bm.numBits; i++ {
+		if bm.IsSet(i) {
+			if !onARun {
+				if needComma {
+					str += fmt.Sprintf(",")
+				}
+				str += fmt.Sprintf("%d", i)
+				onARunBit = i
+				needComma = false
+			}
+			onARun = true
+		} else {
+			if onARun {
+				if onARunBit != (i - 1) {
+					str += fmt.Sprintf("-%d", i-1)
+				}
+				needComma = true
+			}
+			onARunBit = bm.numBits + 1 // set to something impossible
+			onARun = false
+		}
+	}
+	if onARun {
+		if onARunBit != bm.numBits {
+			str += fmt.Sprintf("-%d", bm.numBits)
+		}
+	}
+	str += fmt.Sprintf("] ")
 	return str
 }
 
 func NewBitmap(numBits uint32) *Bitmap {
 	bm := &Bitmap{
 		u64Array: make([]uint64, (numBits-1)/64+1),
-		numBits: numBits,
+		numBits:  numBits,
 	}
 	//fmt.Println("NewBitmap: ", bm)
 	return bm

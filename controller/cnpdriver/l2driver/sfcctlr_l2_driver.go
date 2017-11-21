@@ -38,16 +38,16 @@ import (
 	"github.com/ligato/sfc-controller/controller/extentitydriver"
 	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/ligato/sfc-controller/controller/utils"
+	"github.com/ligato/sfc-controller/controller/utils/ipam"
 	"github.com/ligato/vpp-agent/clientv1/linux"
 	"github.com/ligato/vpp-agent/clientv1/linux/remoteclient"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
 	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/ifplugin/model/interfaces"
+	"sort"
 	"strconv"
 	"strings"
-	"sort"
-	"github.com/ligato/sfc-controller/controller/utils/ipam"
 )
 
 var (
@@ -75,6 +75,11 @@ type sequencer struct {
 	MacInstanceID uint32
 }
 
+type sfcInterfaceAddressStateType struct {
+	ipAddress  string
+	macAddress string
+}
+
 type heToEEStateType struct {
 	vlanIf  *interfaces.Interfaces_Interface
 	bd      *l2.BridgeDomains_BridgeDomain
@@ -86,8 +91,9 @@ type heStateType struct {
 }
 
 type l2CNPStateCacheType struct {
-	HEToEEs map[string]map[string]*heToEEStateType
-	HE      map[string]*heStateType
+	HEToEEs   map[string]map[string]*heToEEStateType
+	HE        map[string]*heStateType
+	SFCIFAddr map[string]sfcInterfaceAddressStateType
 }
 
 type l2CNPEntityCacheType struct {
@@ -125,6 +131,7 @@ func NewSfcCtlrL2CNPDriver(name string, dbFactory func(string) keyval.ProtoBroke
 func (cnpd *sfcCtlrL2CNPDriver) initL2CNPCache() {
 	cnpd.l2CNPStateCache.HEToEEs = make(map[string]map[string]*heToEEStateType)
 	cnpd.l2CNPStateCache.HE = make(map[string]*heStateType)
+	cnpd.l2CNPStateCache.SFCIFAddr = make(map[string]sfcInterfaceAddressStateType)
 
 	cnpd.l2CNPEntityCache.EEs = make(map[string]controller.ExternalEntity)
 	cnpd.l2CNPEntityCache.HEs = make(map[string]controller.HostEntity)
@@ -526,7 +533,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 					sfcEntityElement.EtcdVppSwitchKey, sfc.Name)
 				return err
 
-				}
+			}
 			if err := cnpd.createMemIfPairAndAddToBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, heToEEState.bd,
 				sfcEntityElement, false); err != nil {
 				log.Error("wireSfcNorthSouthVXLANElements: error creating memIf pair: sfc: '%s', Container: '%s'",
@@ -1014,6 +1021,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 		cnpd.reconcileAfter.sfcIDs[key] = *sfcID
 	}
 
+	cnpd.setSfcInterfaceIPAndMac(vnfChainElement.Container, vnfChainElement.PortLabel, ipv4Address, macAddress)
+
 	return memIfName, err
 }
 
@@ -1147,6 +1156,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 		cnpd.reconcileAfter.sfcIDs[key] = *sfcID
 	}
 
+	cnpd.setSfcInterfaceIPAndMac(vnfChainElement.Container, vnfChainElement.PortLabel, ipv4Address, macAddress)
+
 	return afPktIf2.Name, nil
 }
 
@@ -1245,9 +1256,6 @@ func (cnpd *sfcCtlrL2CNPDriver) bridgedDomainAssociateWithIfs(etcdVppSwitchKey s
 
 	return nil
 }
-
-
-
 
 func (cnpd *sfcCtlrL2CNPDriver) vxLanCreate(etcdVppSwitchKey string, ifname string, vni uint32,
 	srcStr string, dstStr string) (*interfaces.Interfaces_Interface, error) {
@@ -1590,11 +1598,11 @@ func formatMacAddress(macInstanceID32 uint32) string {
 	macInstanceID := uint64(macInstanceID32)
 
 	macOctets[0] = 0x02
-	macOctets[1] = 0xFF & (macInstanceID>>(8*4))
-	macOctets[2] = 0xFF & (macInstanceID>>(8*3))
-	macOctets[3] = 0xFF & (macInstanceID>>(8*2))
-	macOctets[4] = 0xFF & (macInstanceID>>(8*1))
-	macOctets[5] = 0xFF & (macInstanceID>>(8*0))
+	macOctets[1] = 0xFF & (macInstanceID >> (8 * 4))
+	macOctets[2] = 0xFF & (macInstanceID >> (8 * 3))
+	macOctets[3] = 0xFF & (macInstanceID >> (8 * 2))
+	macOctets[4] = 0xFF & (macInstanceID >> (8 * 1))
+	macOctets[5] = 0xFF & (macInstanceID >> (8 * 0))
 
 	var macOctetString = ""
 	for i := 0; i < 6; i++ {
@@ -1606,7 +1614,6 @@ func formatMacAddress(macInstanceID32 uint32) string {
 
 	return macOctetString
 }
-
 
 // if the ip address has a /xx subnet attached, it is stripped off
 func stripSlashAndSubnetIpv4Address(ipAndSubnetStr string) string {
@@ -1625,10 +1632,28 @@ func stripSlashAndSubnetIpv4Address(ipAndSubnetStr string) string {
 //}
 
 type ByIfName []*l2.BridgeDomains_BridgeDomain_Interfaces
-func (a ByIfName) Len() int { return len(a) }
-func (a ByIfName) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+
+func (a ByIfName) Len() int           { return len(a) }
+func (a ByIfName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByIfName) Less(i, j int) bool { return a[i].Name < a[j].Name }
 
 func (cnpd *sfcCtlrL2CNPDriver) sortBridgedInterfaces(ifs []*l2.BridgeDomains_BridgeDomain_Interfaces) {
-		sort.Sort(ByIfName(ifs))
+	sort.Sort(ByIfName(ifs))
+}
+
+func (cnpd *sfcCtlrL2CNPDriver) GetSfcInterfaceIPAndMac(container string, port string) (string, string, error) {
+	if sfcIFAddr, exists := cnpd.l2CNPStateCache.SFCIFAddr[container+"/"+port]; exists {
+		return stripSlashAndSubnetIpv4Address(sfcIFAddr.ipAddress), sfcIFAddr.macAddress, nil
+	}
+	return "", "", fmt.Errorf("GetSfcInterfaceAddresses: container/port addresses not found: '%s/%s'",
+		container, port)
+}
+
+func (cnpd *sfcCtlrL2CNPDriver) setSfcInterfaceIPAndMac(container string, port string, ip string, mac string) {
+
+	sfcIFAddr := sfcInterfaceAddressStateType{
+		ipAddress:  ip,
+		macAddress: mac,
+	}
+	cnpd.l2CNPStateCache.SFCIFAddr[container+"/"+port] = sfcIFAddr
 }

@@ -56,6 +56,7 @@ type SfcControllerCNPDriverAPI interface {
 	WireInternalsForExternalEntity(ee *controller.ExternalEntity) error
 	WireSfcEntity(sfc *controller.SfcEntity) error
 	SetSystemParameters(sp *controller.SystemParameters) error
+	GetSfcInterfaceIPAndMac(container string, port string) (string, string, error)
 	Dump()
 }
 
