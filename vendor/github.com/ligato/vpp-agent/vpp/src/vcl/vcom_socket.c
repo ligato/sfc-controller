@@ -21,6 +21,7 @@
 #include <netinet/tcp.h>
 
 #include <vppinfra/types.h>
+#include <vppinfra/time.h>
 #include <vppinfra/hash.h>
 #include <vppinfra/pool.h>
 
@@ -30,6 +31,9 @@
 
 #include <vcl/vppcom.h>
 
+#ifndef IOV_MAX
+#define IOV_MAX __IOV_MAX
+#endif
 
 /*
  * VCOM_SOCKET Private definitions and functions.
@@ -38,6 +42,8 @@
 typedef struct vcom_socket_main_t_
 {
   u8 init;
+  clib_time_t clib_time;
+  pid_t my_pid;
 
   /* vcom_socket pool */
   vcom_socket_t *vsockets;
@@ -50,7 +56,6 @@ typedef struct vcom_socket_main_t_
 
   /* Hash table for epollidx to epfd mapping */
   uword *epollidx_by_epfd;
-
 
   /* common epitem poll for all epfd */
   /* TBD: epitem poll per epfd */
@@ -65,6 +70,7 @@ typedef struct vcom_socket_main_t_
   /* Hash table - key:fd, value:vec of epitemidx */
   uword *epitemidxs_by_fd;
 
+  u8 *io_buffer;
 } vcom_socket_main_t;
 
 vcom_socket_main_t vcom_socket_main;
@@ -776,10 +782,24 @@ vcom_session_ioctl_va (int __sid, int __cmd, va_list __ap)
 {
   int rv;
 
-  if (__cmd == FIONREAD)
-    rv = vppcom_session_attr (__sid, VPPCOM_ATTR_GET_NREAD, 0, 0);
-  else
-    rv = -EOPNOTSUPP;
+  switch (__cmd)
+    {
+    case FIONREAD:
+      rv = vppcom_session_attr (__sid, VPPCOM_ATTR_GET_NREAD, 0, 0);
+      break;
+
+    case FIONBIO:
+      {
+	u32 flags = va_arg (__ap, int) ? O_NONBLOCK : 0;
+	u32 len = sizeof (flags);
+	rv = vppcom_session_attr (__sid, VPPCOM_ATTR_SET_FLAGS, &flags, &len);
+      }
+      break;
+
+    default:
+      rv = -EOPNOTSUPP;
+      break;
+    }
   return rv;
 }
 
@@ -1012,7 +1032,6 @@ vcom_socket_select (int vcom_nfds, fd_set * __restrict vcom_readfds,
   static unsigned long vcom_nsid_fds = 0;
   int vcom_nsid = 0;
   int rv = -EBADF;
-  pid_t pid = getpid ();
 
   int new_vcom_nfds = 0;
   int new_vcom_nfd = 0;
@@ -1081,13 +1100,14 @@ vcom_socket_select (int vcom_nfds, fd_set * __restrict vcom_readfds,
 	  if (VCOM_DEBUG > 0)
 	    fprintf (stderr,
 		     "[%d] vcom_socket_select called to "
-		     "emulate delay_ns()!\n", pid);
+		     "emulate delay_ns()!\n", getpid ());
 	  rv = vppcom_select (0, NULL, NULL, NULL, time_to_wait);
 	}
       else
 	{
 	  fprintf (stderr, "[%d] vcom_socket_select called vcom_nfds = 0 "
-		   "and invalid time_to_wait (%f)!\n", pid, time_to_wait);
+		   "and invalid time_to_wait (%f)!\n",
+		   getpid (), time_to_wait);
 	}
       return 0;
     }
@@ -1122,7 +1142,7 @@ vcom_socket_select (int vcom_nfds, fd_set * __restrict vcom_readfds,
 		      NULL, time_to_wait);
   if (VCOM_DEBUG > 2)
     fprintf (stderr, "[%d] called vppcom_select(): "
-	     "'%04d'='%04d'\n", pid, rv, (int) vcom_nsid_fds);
+	     "'%04d'='%04d'\n", getpid (), rv, (int) vcom_nsid_fds);
 
   /* check if any file descriptors changed status */
   if (rv > 0)
@@ -1394,6 +1414,47 @@ vcom_session_getpeername (int sid, vppcom_endpt_t * ep)
   return rv;
 }
 
+static inline int
+vcom_socket_copy_ep_to_sockaddr (__SOCKADDR_ARG __addr,
+				 socklen_t * __restrict __len,
+				 vppcom_endpt_t * ep)
+{
+  int rv = 0;
+  int sa_len, copy_len;
+
+  __addr->sa_family = (ep->is_ip4 == VPPCOM_IS_IP4) ? AF_INET : AF_INET6;
+  switch (__addr->sa_family)
+    {
+    case AF_INET:
+      ((struct sockaddr_in *) __addr)->sin_port = ep->port;
+      if (*__len > sizeof (struct sockaddr_in))
+	*__len = sizeof (struct sockaddr_in);
+      sa_len = sizeof (struct sockaddr_in) - sizeof (struct in_addr);
+      copy_len = *__len - sa_len;
+      if (copy_len > 0)
+	memcpy (&((struct sockaddr_in *) __addr)->sin_addr, ep->ip, copy_len);
+      break;
+
+    case AF_INET6:
+      ((struct sockaddr_in6 *) __addr)->sin6_port = ep->port;
+      if (*__len > sizeof (struct sockaddr_in6))
+	*__len = sizeof (struct sockaddr_in6);
+      sa_len = sizeof (struct sockaddr_in6) - sizeof (struct in6_addr);
+      copy_len = *__len - sa_len;
+      if (copy_len > 0)
+	memcpy (((struct sockaddr_in6 *) __addr)->sin6_addr.
+		__in6_u.__u6_addr8, ep->ip, copy_len);
+      break;
+
+    default:
+      /* Not possible */
+      rv = -EAFNOSUPPORT;
+      break;
+    }
+
+  return rv;
+}
+
 int
 vcom_socket_getpeername (int __fd, __SOCKADDR_ARG __addr,
 			 socklen_t * __restrict __len)
@@ -1402,7 +1463,8 @@ vcom_socket_getpeername (int __fd, __SOCKADDR_ARG __addr,
   vcom_socket_main_t *vsm = &vcom_socket_main;
   uword *p;
   vcom_socket_t *vsock;
-
+  u8 src_addr[sizeof (struct sockaddr_in6)];
+  vppcom_endpt_t ep;
 
   p = hash_get (vsm->sockidx_by_fd, __fd);
   if (!p)
@@ -1418,31 +1480,10 @@ vcom_socket_getpeername (int __fd, __SOCKADDR_ARG __addr,
   if (!__addr || !__len)
     return -EFAULT;
 
-  vppcom_endpt_t ep;
-  ep.ip = (u8 *) & ((const struct sockaddr_in *) __addr)->sin_addr;
+  ep.ip = src_addr;
   rv = vcom_session_getpeername (vsock->sid, &ep);
   if (rv == 0)
-    {
-      if (ep.vrf == VPPCOM_VRF_DEFAULT)
-	{
-	  __addr->sa_family = ep.is_ip4 == VPPCOM_IS_IP4 ? AF_INET : AF_INET6;
-	  switch (__addr->sa_family)
-	    {
-	    case AF_INET:
-	      ((struct sockaddr_in *) __addr)->sin_port = ep.port;
-	      *__len = sizeof (struct sockaddr_in);
-	      break;
-
-	    case AF_INET6:
-	      ((struct sockaddr_in6 *) __addr)->sin6_port = ep.port;
-	      *__len = sizeof (struct sockaddr_in6);
-	      break;
-
-	    default:
-	      break;
-	    }
-	}
-    }
+    rv = vcom_socket_copy_ep_to_sockaddr (__addr, __len, &ep);
 
   return rv;
 }
@@ -1451,6 +1492,156 @@ ssize_t
 vcom_socket_send (int __fd, const void *__buf, size_t __n, int __flags)
 {
   return vcom_socket_sendto (__fd, __buf, __n, __flags, NULL, 0);
+}
+
+/* NOTE: this function is not thread safe or 32-bit friendly */
+ssize_t
+vcom_socket_sendfile (int __out_fd, int __in_fd, off_t * __offset,
+		      size_t __len)
+{
+  vcom_socket_main_t *vsm = &vcom_socket_main;
+  uword *p;
+  vcom_socket_t *vsock;
+  size_t n_bytes_left = __len;
+  u32 out_sockidx, out_sid = ~0;
+  size_t bytes_to_read;
+  int nbytes;
+  int rv, errno_val;
+  ssize_t results = 0;
+  u8 eagain = 0;
+
+  if (VCOM_DEBUG > 2)
+    clib_warning ("[%d] __out_fd %d, __in_fd %d, __offset %p, __len %lu",
+		  getpid (), __out_fd, __in_fd, __offset, __len);
+
+  p = hash_get (vsm->sockidx_by_fd, __out_fd);
+  if (!p)
+    {
+      clib_warning ("[%d] ERROR: invalid __out_fd (%d), fd lookup failed!",
+		    getpid (), __len);
+      return -EBADF;
+    }
+  out_sockidx = p[0];
+  vsock = pool_elt_at_index (vsm->vsockets, out_sockidx);
+  if (!vsock)
+    {
+      clib_warning ("[%d] ERROR: invalid __out_fd (%d) / out_sockidx %u, "
+		    "missing vsock pool element!",
+		    getpid (), __len, out_sockidx);
+      return -ENOTSOCK;
+    }
+  out_sid = vsock->sid;
+  if (vsock->type != SOCKET_TYPE_VPPCOM_BOUND)
+    {
+      clib_warning ("[%d] ERROR: __out_fd (%d), socket (sid %u) "
+		    "is not VCL bound!", getpid (), __out_fd, out_sid);
+      return -EINVAL;
+    }
+
+  if (__offset)
+    {
+      off_t offset = lseek (__in_fd, *__offset, SEEK_SET);
+      if (offset == -1)
+	{
+	  errno_val = errno;
+	  perror ("lseek()");
+	  clib_warning ("[%d] ERROR: lseek SEEK_SET failed: "
+			"in_fd %d, offset %p (%ld), rv %ld, errno %d",
+			getpid (), __in_fd, __offset, *__offset, offset,
+			errno_val);
+	  return -errno_val;
+	}
+
+      ASSERT (offset == *__offset);
+    }
+
+  do
+    {
+      bytes_to_read = vppcom_session_attr (out_sid,
+					   VPPCOM_ATTR_GET_NWRITE, 0, 0);
+      if (VCOM_DEBUG > 2)
+	clib_warning ("[%d] results %ld, n_bytes_left %lu, "
+		      "bytes_to_read %lu", getpid (), results,
+		      n_bytes_left, bytes_to_read);
+      if (bytes_to_read == 0)
+	{
+	  u32 flags, flags_len = sizeof (flags);
+	  rv = vppcom_session_attr (out_sid, VPPCOM_ATTR_GET_FLAGS, &flags,
+				    &flags_len);
+	  ASSERT (rv == VPPCOM_OK);
+
+	  if (flags & O_NONBLOCK)
+	    {
+	      if (!results)
+		{
+		  if (VCOM_DEBUG > 2)
+		    clib_warning ("[%d] EAGAIN", getpid ());
+		  eagain = 1;
+		}
+	      goto update_offset;
+	    }
+	  else
+	    continue;
+	}
+      bytes_to_read = clib_min (n_bytes_left, bytes_to_read);
+      vec_validate (vsm->io_buffer, bytes_to_read);
+      nbytes = libc_read (__in_fd, vsm->io_buffer, bytes_to_read);
+      if (nbytes < 0)
+	{
+	  errno_val = errno;
+	  perror ("read()");
+	  clib_warning ("[%d] ERROR: libc_read (__in_fd (%d), "
+			"io_buffer %p, bytes_to_read %lu) returned "
+			"errno %d",
+			getpid (), __in_fd, vsm->io_buffer,
+			bytes_to_read, errno_val);
+	  if (results == 0)
+	    {
+	      vec_reset_length (vsm->io_buffer);
+	      return -errno_val;
+	    }
+	  goto update_offset;
+	}
+      rv = vppcom_session_write (out_sid, vsm->io_buffer, nbytes);
+      if (rv < 0)
+	{
+	  clib_warning ("[%d] ERROR: vppcom_session_write ("
+			"out_sid %u, io_buffer %p, nbytes %d) returned %d",
+			getpid (), out_sid, vsm->io_buffer, nbytes, rv);
+	  if (results == 0)
+	    {
+	      vec_reset_length (vsm->io_buffer);
+	      return rv;
+	    }
+	  goto update_offset;
+	}
+
+      results += nbytes;
+      ASSERT (n_bytes_left >= nbytes);
+      n_bytes_left = n_bytes_left - nbytes;
+    }
+  while (n_bytes_left > 0);
+
+update_offset:
+  if (__offset)
+    {
+      off_t offset = lseek (__in_fd, *__offset, SEEK_SET);
+      if (offset == -1)
+	{
+	  errno_val = errno;
+	  perror ("lseek()");
+	  clib_warning ("[%d] ERROR: lseek (__in_fd %d, __offset %p "
+			"(%ld), SEEK_SET) returned errno %d",
+			getpid (), __in_fd, __offset, *__offset, errno_val);
+	  vec_reset_length (vsm->io_buffer);
+	  return -errno_val;
+	}
+
+      *__offset += results + 1;
+    }
+
+  vec_reset_length (vsm->io_buffer);
+  return eagain ? -EAGAIN : results;
 }
 
 ssize_t
@@ -1614,37 +1805,7 @@ vcom_session_recvfrom (int __sid, void *__restrict __buf, size_t __n,
       rv = vppcom_session_recvfrom (__sid, __buf, __n, __flags, &ep);
 
       if (rv > 0)
-	{
-	  if (ep.vrf == VPPCOM_VRF_DEFAULT)
-	    {
-	      __addr->sa_family =
-		ep.is_ip4 == VPPCOM_IS_IP4 ? AF_INET : AF_INET6;
-	      switch (__addr->sa_family)
-		{
-		case AF_INET:
-		  ((struct sockaddr_in *) __addr)->sin_port = ep.port;
-		  memcpy (&((struct sockaddr_in *) __addr)->sin_addr,
-			  src_addr, sizeof (struct in_addr));
-
-		  *__addr_len = sizeof (struct sockaddr_in);
-		  break;
-
-		case AF_INET6:
-		  ((struct sockaddr_in6 *) __addr)->sin6_port = ep.port;
-		  memcpy (((struct sockaddr_in6 *) __addr)->sin6_addr.
-			  __in6_u.__u6_addr8, src_addr,
-			  sizeof (struct in6_addr));
-		  *__addr_len = sizeof (struct sockaddr_in6);
-		  break;
-
-		default:
-		  rv = -EAFNOSUPPORT;
-		  break;
-		}
-	    }
-	  else
-	    rv = -1;
-	}
+	rv = vcom_socket_copy_ep_to_sockaddr (__addr, __addr_len, &ep);
     }
   else
     rv = vppcom_session_recvfrom (__sid, __buf, __n, __flags, NULL);
@@ -2272,9 +2433,17 @@ vcom_socket_accept_flags (int __fd, __SOCKADDR_ARG __addr,
   /* flags can be 0 or can be bitwise OR
    * of any of SOCK_NONBLOCK and SOCK_CLOEXEC */
 
+  if (VCOM_DEBUG > 2)
+    fprintf (stderr, "[%d] vcom_socket_accept_flags: "
+	     "fd = %d, __addr = %p, __addr_len = %p  flags = %d (0x%x)\n",
+	     getpid (), __fd, __addr, __addr_len, flags, flags);
+
   if (!(!flags || (flags & (SOCK_NONBLOCK | SOCK_CLOEXEC))))
     {
       /* TBD: return proper error code */
+      fprintf (stderr, "[%d] ERROR: vcom_socket_accept_flags: "
+	       "invalid flags = %d (0x%x)\n", getpid (), flags, flags);
+
       return -1;
     }
 
@@ -2282,6 +2451,8 @@ vcom_socket_accept_flags (int __fd, __SOCKADDR_ARG __addr,
 
   if (!vcom_socket_is_connection_mode_socket (__fd))
     {
+      fprintf (stderr, "[%d] ERROR: vcom_socket_accept_flags: "
+	       "connection mode socket support TBD!\n", getpid ());
       return -EOPNOTSUPP;
     }
 
@@ -2294,6 +2465,8 @@ vcom_socket_accept_flags (int __fd, __SOCKADDR_ARG __addr,
       rv = vcom_fcntl (vsock->fd, F_GETFL, 0);
       if (rv < 0)
 	{
+	  fprintf (stderr, "[%d] ERROR: vcom_socket_accept_flags: "
+		   "vcom_fcnt() returned %d!\n", getpid (), rv);
 	  return rv;
 	}
 
@@ -2305,7 +2478,7 @@ vcom_socket_accept_flags (int __fd, __SOCKADDR_ARG __addr,
 	   * on the queue, accept () blocks the caller
 	   * until a connection is present.
 	   */
-	  rv = vppcom_session_accept (vsock->sid, &ep,
+	  rv = vppcom_session_accept (vsock->sid, &ep, flags,
 				      -1.0 /* wait forever */ );
 	}
       else
@@ -2315,7 +2488,7 @@ vcom_socket_accept_flags (int __fd, __SOCKADDR_ARG __addr,
 	   * block.
 	   * */
 	  /* is non blocking */
-	  rv = vppcom_session_accept (vsock->sid, &ep, 0);
+	  rv = vppcom_session_accept (vsock->sid, &ep, flags, 0);
 	  /* If the socket is marked nonblocking and
 	   * no pending connections are present on the
 	   * queue, accept fails with the error
@@ -2328,6 +2501,9 @@ vcom_socket_accept_flags (int __fd, __SOCKADDR_ARG __addr,
 	}
       if (rv < 0)
 	{
+	  if (rv != VPPCOM_EAGAIN)
+	    fprintf (stderr, "[%d] ERROR: vcom_socket_accept_flags: "
+		     "vppcom_session_accept() returned %d!", getpid (), rv);
 	  return rv;
 	}
 
@@ -2341,6 +2517,9 @@ vcom_socket_accept_flags (int __fd, __SOCKADDR_ARG __addr,
 					 &domain, &type, &protocol, flags);
       if (fd < 0)
 	{
+	  fprintf (stderr, "[%d] ERROR: vcom_socket_accept_flags: "
+		   "vcom_socket_connected_socket() returned %d!",
+		   getpid (), rv);
 	  return fd;
 	}
 
@@ -2420,18 +2599,6 @@ vcom_socket_accept_flags (int __fd, __SOCKADDR_ARG __addr,
 		}
 	    }
 	}
-      else
-	{
-	  /* when __addr is NULL, nothing is filled in,
-	   * in this case, __addr_len is not used,
-	   * and should also be null
-	   * */
-	  if (__addr_len)
-	    {
-	      /* TBD: return proper error code */
-	      return -1;
-	    }
-	}
     }
 
   return rv;
@@ -2445,7 +2612,6 @@ vcom_socket_accept (int __fd, __SOCKADDR_ARG __addr,
   return vcom_socket_accept_flags (__fd, __addr, __addr_len, 0);
 }
 
-#ifdef __USE_GNU
 int
 vcom_socket_accept4 (int __fd, __SOCKADDR_ARG __addr,
 		     socklen_t * __restrict __addr_len, int __flags)
@@ -2453,7 +2619,6 @@ vcom_socket_accept4 (int __fd, __SOCKADDR_ARG __addr,
   /*  SOCK_NONBLOCK and SOCK_CLOEXEC can be bitwise ORed in flags */
   return vcom_socket_accept_flags (__fd, __addr, __addr_len, __flags);
 }
-#endif
 
 /* TBD: move it to vppcom */
 static inline int
@@ -2752,21 +2917,11 @@ vcom_socket_epoll_ctl_internal (int __epfd, int __op, int __fd,
 				int free_vepitem_on_del)
 {
   int rv = -1;
-
-  /* vcom_socket_main_t *vsm = &vcom_socket_main; */
+  i32 cnt;
   vcom_epoll_t *vepoll;
-
-  /*__fd could could be vcom socket or vcom epoll or kernel fd */
-  void *vfd;
-  vcom_epoll_t *vfd_vepoll;
   vcom_socket_t *vfd_vsock;
-
   i32 vep_idx;
-  i32 vfd_id;
-
-  vcom_fd_type_t type = FD_TYPE_INVALID;
-
-  /* validate __event */
+  i32 sid;
 
   /* get vep_idx and vepoll */
   vep_idx = vcom_socket_get_vep_idx_and_vepoll (__epfd, &vepoll);
@@ -2776,37 +2931,45 @@ vcom_socket_epoll_ctl_internal (int __epfd, int __op, int __fd,
     }
 
   /* get vcom fd type, vfd_id and vfd */
-  vfd_id = vcom_socket_get_sid_and_vsock (__fd, &vfd_vsock);
-  if (vfd_id != INVALID_SESSION_ID)
+  sid = vcom_socket_get_sid_and_vsock (__fd, &vfd_vsock);
+  if ((sid != INVALID_SESSION_ID) &&
+      vcom_socket_type_is_vppcom_bound (vfd_vsock->type))
     {
-      type = FD_TYPE_VCOM_SOCKET;
-      vfd = vfd_vsock;
-    }
-  else if ((vfd_id = vcom_socket_get_vep_idx_and_vepoll (__fd, &vfd_vepoll))
-	   != INVALID_VEP_IDX)
-    {
-      type = FD_TYPE_EPOLL;
-      vfd = vfd_vepoll;
+      rv = vppcom_epoll_ctl (vep_idx, __op, sid, __event);
+      if (rv == VPPCOM_OK)
+	{
+	  cnt = ((__op == EPOLL_CTL_ADD) ? 1 :
+		 (__op == EPOLL_CTL_DEL) ? -1 : 0);
+	  vepoll->count += cnt;
+	  vepoll->vcl_cnt += cnt;
+	}
+      if (VCOM_DEBUG > 0)
+	fprintf (stderr,
+		 "[%d] vcom_socket_epoll_ctl_i: vppcom_epoll_ctl() "
+		 "returned %d\n\tepfd %d, vep_idx %d, fd %d sid %d op %d"
+		 "\n\tcount %d, vcl_cnt %d, libc_cnt %d\n",
+		 getpid (), rv, __epfd, vep_idx, __fd, sid, __op,
+		 vepoll->count, vepoll->vcl_cnt, vepoll->libc_cnt);
     }
   else
     {
-      /* FD_TYPE_KERNEL not supported by epoll instance */
-      type = FD_TYPE_INVALID;
-      return -EBADF;
+      rv = libc_epoll_ctl (__epfd, __op, __fd, __event);
+      if (rv == 0)
+	{
+	  cnt = ((__op == EPOLL_CTL_ADD) ? 1 :
+		 (__op == EPOLL_CTL_DEL) ? -1 : 0);
+	  vepoll->count += cnt;
+	  vepoll->libc_cnt += cnt;
+	}
+      if (VCOM_DEBUG > 0)
+	fprintf (stderr,
+		 "[%d] vcom_socket_epoll_ctl_i: libc_epoll_ctl() "
+		 "returned %d\n\tepfd %d, vep_idx %d, fd %d sid %d op %d"
+		 "\n\tcount %d, vcl_cnt %d, libc_cnt %d\n",
+		 getpid (), rv, __epfd, vep_idx, __fd, sid, __op,
+		 vepoll->count, vepoll->vcl_cnt, vepoll->libc_cnt);
     }
 
-
-  /* vepoll and vsock are now valid */
-  rv = vppcom_epoll_ctl (vep_idx, __op, vfd_id, __event);
-  if (rv < 0)
-    {
-      return rv;
-    }
-
-  rv = vcom_socket_ctl_vepitem (__epfd, __op, __fd,
-				__event,
-				vep_idx, vepoll,
-				vfd_id, vfd, type, free_vepitem_on_del);
   return rv;
 }
 
@@ -2835,46 +2998,113 @@ vcom_socket_epoll_pwait (int __epfd, struct epoll_event *__events,
 			 int __maxevents, int __timeout,
 			 const __sigset_t * __ss)
 {
+  vcom_socket_main_t *vsm = &vcom_socket_main;
   int rv = -EBADF;
-
-  /* in seconds eg. 3.123456789 seconds */
+  int rv2;
   double time_to_wait = (double) 0;
-
+  double timeout, now = 0;
+  vcom_epoll_t *vepoll;
   i32 vep_idx;
+  static struct epoll_event *libc_ev = 0;
 
   /* validate __event */
-  if (!__events)
+  if (!__events || (__timeout < -1))
     {
+      fprintf (stderr, "[%d] ERROR: vcom_socket_epoll_pwait: "
+	       "Bad args __events %p, __timeout %d\n", getpid (),
+	       __events, __timeout);
       rv = -EFAULT;
       goto out;
     }
 
-  /* validate __timeout */
-  if (__timeout > 0)
+  time_to_wait = ((__timeout >= 0) ? (double) __timeout / (double) 1000 : 0);
+
+  vep_idx = vcom_socket_get_vep_idx_and_vepoll (__epfd, &vepoll);
+  if (vep_idx == INVALID_VEP_IDX)
     {
-      time_to_wait = (double) __timeout / (double) 1000;
+      fprintf (stderr, "[%d] ERROR: vcom_socket_epoll_pwait: "
+	       "Bad epoll fd %d\n", getpid (), __epfd);
+      return -EBADF;
     }
-  else if (__timeout == 0)
+
+  if (vepoll->count <= 0)
     {
-      time_to_wait = (double) 0;
-    }
-  else if (__timeout == -1)
-    {
-      time_to_wait = ~0;
-    }
-  else
-    {
-      rv = -EBADF;
+      fprintf (stderr, "[%d] ERROR: vcom_socket_epoll_pwait: No events"
+	       " in epfd!\n\tcount %d, vcl_cnt %d, libc_cnt %d\n",
+	       getpid (), vepoll->count, vepoll->vcl_cnt, vepoll->libc_cnt);
+      rv = -EINVAL;
       goto out;
     }
 
-  /* get vep_idx */
-  vep_idx = vcom_socket_get_vep_idx (__epfd);
-  if (vep_idx != INVALID_VEP_IDX)
+  if (vepoll->libc_cnt == 0)
     {
+      if (VCOM_DEBUG > 2)
+	fprintf (stderr, "[%d] vcom_socket_epoll_pwait: libc_cnt = 0, "
+		 "calling vppcom_epoll_wait() time_to_wait = %f\n",
+		 getpid (), time_to_wait);
       rv = vppcom_epoll_wait (vep_idx, __events, __maxevents, time_to_wait);
     }
+  else if (vepoll->vcl_cnt == 0)
+    {
+      if (VCOM_DEBUG > 2)
+	fprintf (stderr, "[%d] vcom_socket_epoll_pwait: vcl_cnt = 0, "
+		 "calling libc_epoll_pwait()\n", getpid ());
+      rv = libc_epoll_pwait (__epfd, __events, __maxevents, __timeout, __ss);
+    }
+  else
+    {
+      if (VCOM_DEBUG > 2)
+	fprintf (stderr, "[%d] vcom_socket_epoll_pwait: vcl_cnt = %d, "
+		 "libc_cnt = %d -> mixed polling (time_to_wait = %f, "
+		 "__timeout = %d)\n",
+		 getpid (), vepoll->vcl_cnt, vepoll->libc_cnt,
+		 time_to_wait, __timeout);
+      vec_validate (libc_ev, __maxevents);
+      timeout = clib_time_now (&vsm->clib_time) + time_to_wait;
+      do
+	{
+	  rv = vppcom_epoll_wait (vep_idx, __events, __maxevents, 0);
+	  rv2 = libc_epoll_pwait (__epfd, libc_ev, __maxevents, 1, __ss);
+	  if (VCOM_DEBUG == 666)
+	    fprintf (stderr, "[%d] vcom_socket_epoll_pwait: "
+		     "rv = %d, rv2 = %d, timeout = %f, now = %f\n",
+		     getpid (), rv, rv2, timeout, now);
+	  if ((rv > 0) || (rv2 > 0))
+	    {
+	      if (VCOM_DEBUG > 2)
+		fprintf (stderr, "[%d] vcom_socket_epoll_pwait: "
+			 "rv = %d, rv2 = %d\n", getpid (), rv, rv2);
+	      int n = __maxevents - rv;
+	      n = rv2 <= n ? rv2 : n;
+	      rv = (rv > 0) ? rv : 0;
+
+	      clib_memcpy (&__events[rv], libc_ev, n * sizeof (*libc_ev));
+	      rv += rv2;
+	      goto out;
+	    }
+	  else if ((rv < 0) || (rv2 < 0))
+	    {
+	      if (rv < 0)
+		fprintf (stderr,
+			 "[%d] ERROR: vppcom_epoll_wait() returned %d\n",
+			 getpid (), rv);
+	      if (rv2 < 0)
+		{
+		  fprintf (stderr,
+			   "[%d] ERROR: libc_epoll_wait() failed, errno %d\n",
+			   getpid (), errno);
+		  rv = (rv < 0) ? rv : -errno;
+		}
+	      goto out;
+	    }
+	  if (__timeout != -1)
+	    now = clib_time_now (&vsm->clib_time);
+	}
+      while (now < timeout);
+    }
+
 out:
+  vec_reset_length (libc_ev);
   return rv;
 }
 
@@ -3064,7 +3294,6 @@ vcom_socket_poll_select_impl (struct pollfd *__fds, nfds_t __nfds,
 			      int __timeout)
 {
   int rv;
-  pid_t pid = getpid ();
 
   nfds_t fds_idx = 0;
   int nfd = 0;
@@ -3153,7 +3382,7 @@ vcom_socket_poll_select_impl (struct pollfd *__fds, nfds_t __nfds,
   if (VCOM_DEBUG > 2)
     fprintf (stderr,
 	     "[%d] vcom_socket_select: "
-	     "'%04d'='%04d'\n", pid, vcom_nfd, vcom_nfds);
+	     "'%04d'='%04d'\n", getpid (), vcom_nfd, vcom_nfds);
 
   if (vcom_nfd < 0)
     {
@@ -3285,6 +3514,8 @@ vcom_socket_main_init (void)
 
       vsm->epitemidxs_by_epfd = hash_create (0, sizeof (i32 *));
       vsm->epitemidxs_by_fd = hash_create (0, sizeof (i32 *));
+
+      clib_time_init (&vsm->clib_time);
 
       vsm->init = 1;
     }

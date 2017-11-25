@@ -195,7 +195,7 @@ class VppPapiProvider(object):
         return cli + "\n" + str(self.cli(cli))
 
     def _convert_mac(self, mac):
-        return int(mac.replace(":", ""), 16) << 16
+        return mac.replace(':', '').decode('hex')
 
     def show_version(self):
         """ """
@@ -735,6 +735,7 @@ class VppPapiProvider(object):
             next_hop_n_out_labels=0,
             next_hop_out_label_stack=[],
             next_hop_via_label=MPLS_LABEL_INVALID,
+            next_hop_id=0xFFFFFFFF,
             is_resolve_host=0,
             is_resolve_attached=0,
             classify_table_index=0xFFFFFFFF,
@@ -747,6 +748,7 @@ class VppPapiProvider(object):
             is_classify=0,
             is_multipath=0,
             is_l2_bridged=0,
+            is_udp_encap=0,
             is_source_lookup=0):
         """
 
@@ -790,9 +792,11 @@ class VppPapiProvider(object):
              'is_resolve_attached': is_resolve_attached,
              'is_l2_bridged': is_l2_bridged,
              'is_source_lookup': is_source_lookup,
+             'is_udp_encap': is_udp_encap,
              'next_hop_weight': next_hop_weight,
              'dst_address_length': dst_address_length,
              'dst_address': dst_address,
+             'next_hop_id': next_hop_id,
              'next_hop_address': next_hop_address,
              'next_hop_n_out_labels': next_hop_n_out_labels,
              'next_hop_via_label': next_hop_via_label,
@@ -979,6 +983,41 @@ class VppPapiProvider(object):
              'dst_address': dst_address,
              'outer_fib_id': outer_fib_id}
         )
+
+    def udp_encap_add_del(self,
+                          id,
+                          src_ip,
+                          dst_ip,
+                          src_port,
+                          dst_port,
+                          table_id=0,
+                          is_add=1,
+                          is_ip6=0):
+        """ Add a GRE tunnel
+        :param id: user provided ID
+        :param src_ip:
+        :param dst_ip:
+        :param src_port:
+        :param dst_port:
+        :param outer_fib_id:  (Default value = 0)
+        :param is_add:  (Default value = 1)
+        :param is_ipv6:  (Default value = 0)
+        """
+
+        return self.api(
+            self.papi.udp_encap_add_del,
+            {'id': id,
+             'is_add': is_add,
+             'is_ip6': is_ip6,
+             'src_ip': src_ip,
+             'dst_ip': dst_ip,
+             'src_port': src_port,
+             'dst_port': dst_port,
+             'table_id': table_id}
+        )
+
+    def udp_encap_dump(self):
+        return self.api(self.papi.udp_encap_dump, {})
 
     def mpls_fib_dump(self):
         return self.api(self.papi.mpls_fib_dump, {})
@@ -1369,6 +1408,43 @@ class VppPapiProvider(object):
              'vrf_id': vrf_id,
              'is_in': is_in})
 
+    def nat_set_reass(
+            self,
+            timeout=2,
+            max_reass=1024,
+            max_frag=5,
+            drop_frag=0,
+            is_ip6=0):
+        """Set NAT virtual fragmentation reassembly
+
+        :param timeout: reassembly timeout (Default 2sec)
+        :param max_reass: maximum concurrent reassemblies (Default 1024)
+        :param max_frag: maximum fragmets per reassembly (Default 5)
+        :param drop_frag: if 0 translate fragments, otherwise drop fragments
+        :param is_ip6: 1 if IPv6, 0 if IPv4
+        """
+        return self.api(
+            self.papi.nat_set_reass,
+            {'timeout': timeout,
+             'max_reass': max_reass,
+             'max_frag': max_frag,
+             'drop_frag': drop_frag,
+             'is_ip6': is_ip6})
+
+    def nat_get_reass(self):
+        """Get NAT virtual fragmentation reassembly configuration
+
+        :return: NAT virtual fragmentation reassembly configuration
+        """
+        return self.api(self.papi.nat_get_reass, {})
+
+    def nat_reass_dump(self):
+        """Dump NAT virtual fragmentation reassemblies
+
+        :return: Dictionary of NAT virtual fragmentation reassemblies
+        """
+        return self.api(self.papi.nat_reass_dump, {})
+
     def nat_det_add_del_map(
             self,
             in_addr,
@@ -1647,6 +1723,46 @@ class VppPapiProvider(object):
         """
         return self.api(self.papi.nat64_prefix_dump, {})
 
+    def nat64_add_interface_addr(
+            self,
+            sw_if_index,
+            is_add=1):
+        """Add/del NAT64 address from interface
+
+        :param sw_if_index: Software index of the interface
+        :param is_add: 1 if add, 0 if delete (Default value = 1)
+        """
+        return self.api(self.papi.nat64_add_del_interface_addr,
+                        {'is_add': is_add, 'sw_if_index': sw_if_index})
+
+    def dslite_set_aftr_addr(self, ip6, ip4):
+        """Set DS-Lite AFTR addresses
+
+        :param ip4: IPv4 address
+        :param ip6: IPv6 address
+        """
+        return self.api(
+            self.papi.dslite_set_aftr_addr,
+            {'ip4_addr': ip4,
+             'ip6_addr': ip6})
+
+    def dslite_add_del_pool_addr_range(
+            self,
+            start_addr,
+            end_addr,
+            is_add=1):
+        """Add/del address range to DS-Lite pool
+
+        :param start_addr: First IP address
+        :param end_addr: Last IP address
+        :param is_add: 1 if add, 0 if delete (Default value = 1)
+        """
+        return self.api(
+            self.papi.dslite_add_del_pool_addr_range,
+            {'start_addr': start_addr,
+             'end_addr': end_addr,
+             'is_add': is_add})
+
     def control_ping(self):
         self.api(self.papi.control_ping)
 
@@ -1905,18 +2021,22 @@ class VppPapiProvider(object):
 
     def dhcp_proxy_set_vss(self,
                            table_id,
-                           fib_id,
-                           oui,
+                           vss_type=255,
+                           vpn_ascii_id="",
+                           oui=0,
+                           vpn_index=0,
                            is_add=1,
                            is_ip6=0):
         return self.api(
             self.papi.dhcp_proxy_set_vss,
             {
                 'tbl_id': table_id,
-                'fib_id': fib_id,
-                'is_ipv6': is_ip6,
-                'is_add': is_add,
+                'vss_type': vss_type,
+                'vpn_ascii_id': vpn_ascii_id,
                 'oui': oui,
+                'vpn_index': vpn_index,
+                'is_add': is_add,
+                'is_ipv6': is_ip6,
             })
 
     def dhcp_client(self,
@@ -1941,14 +2061,17 @@ class VppPapiProvider(object):
                           grp_address,
                           grp_address_length,
                           e_flags,
+                          next_hop_afi,
                           next_hop_sw_if_index,
                           i_flags,
+                          bier_imp=0,
                           rpf_id=0,
                           table_id=0,
                           is_add=1,
                           is_ipv6=0,
                           is_local=0):
         """
+        IP Multicast Route add/del
         """
         return self.api(
             self.papi.ip_mroute_add_del,
@@ -1960,6 +2083,8 @@ class VppPapiProvider(object):
              'is_add': is_add,
              'is_ipv6': is_ipv6,
              'is_local': is_local,
+             'bier_imp': bier_imp,
+             'next_hop_afi': next_hop_afi,
              'grp_address_length': grp_address_length,
              'grp_address': grp_address,
              'src_address': src_address})
@@ -1969,6 +2094,9 @@ class VppPapiProvider(object):
 
     def ip_mfib_dump(self):
         return self.api(self.papi.ip_mfib_dump, {})
+
+    def ip6_mfib_dump(self):
+        return self.api(self.papi.ip6_mfib_dump, {})
 
     def lisp_enable_disable(self, is_enabled):
         return self.api(
@@ -2377,6 +2505,23 @@ class VppPapiProvider(object):
                          'acls': acls},
                         expected_retval=expected_retval)
 
+    def acl_interface_add_del(self,
+                              sw_if_index,
+                              acl_index,
+                              is_add=1):
+        """ Add/Delete ACL to/from interface
+
+        :param sw_if_index:
+        :param acl_index:
+        :param is_add:  (Default value = 1)
+        """
+
+        return self.api(self.papi.acl_interface_add_del,
+                        {'is_add': is_add,
+                         'is_input': 1,
+                         'sw_if_index': sw_if_index,
+                         'acl_index': acl_index})
+
     def acl_dump(self, acl_index, expected_retval=0):
         return self.api(self.papi.acl_dump,
                         {'acl_index': acl_index},
@@ -2501,3 +2646,124 @@ class VppPapiProvider(object):
                          'nh': nh,
                          'is_add': is_add,
                          'is_ip6': is_ip6})
+
+    def bier_table_add_del(self,
+                           bti,
+                           mpls_label,
+                           is_add=1):
+        """ BIER Table add/del """
+        return self.api(
+            self.papi.bier_table_add_del,
+            {'bt_tbl_id': {"bt_set": bti.set_id,
+                           "bt_sub_domain": bti.sub_domain_id,
+                           "bt_hdr_len_id": bti.hdr_len_id},
+             'bt_label': mpls_label,
+             'bt_is_add': is_add})
+
+    def bier_table_dump(self):
+        return self.api(self.papi.bier_table_dump, {})
+
+    def bier_route_add_del(self,
+                           bti,
+                           bp,
+                           next_hop,
+                           next_hop_label,
+                           next_hop_table_id,
+                           next_hop_is_ip4=1,
+                           is_add=1):
+        """ BIER Route add/del """
+        return self.api(
+            self.papi.bier_route_add_del,
+            {'br_tbl_id': {"bt_set": bti.set_id,
+                           "bt_sub_domain": bti.sub_domain_id,
+                           "bt_hdr_len_id": bti.hdr_len_id},
+             'br_bp': bp,
+             'br_n_paths': 1,
+             'br_paths': [{'next_hop': next_hop,
+                           'afi': 0,
+                           'n_labels': 1,
+                           'table_id': next_hop_table_id,
+                           'label_stack': [next_hop_label]}],
+             'br_is_add': is_add})
+
+    def bier_route_dump(self, bti):
+        return self.api(
+            self.papi.bier_route_dump,
+            {'br_tbl_id': {"bt_set": bti.set_id,
+                           "bt_sub_domain": bti.sub_domain_id,
+                           "bt_hdr_len_id": bti.hdr_len_id}})
+
+    def bier_imp_add(self,
+                     bti,
+                     src,
+                     ibytes,
+                     is_add=1):
+        """ BIER Imposition Add """
+        return self.api(
+            self.papi.bier_imp_add,
+            {'bi_tbl_id': {"bt_set": bti.set_id,
+                           "bt_sub_domain": bti.sub_domain_id,
+                           "bt_hdr_len_id": bti.hdr_len_id},
+             'bi_src': src,
+             'bi_n_bytes': len(ibytes),
+             'bi_bytes': ibytes})
+
+    def bier_imp_del(self, bi_index):
+        """ BIER Imposition del """
+        return self.api(
+            self.papi.bier_imp_del,
+            {'bi_index': bi_index})
+
+    def bier_imp_dump(self):
+        return self.api(self.papi.bier_imp_dump, {})
+
+    def bier_disp_table_add_del(self,
+                                bdti,
+                                is_add=1):
+        """ BIER Disposition Table add/del """
+        return self.api(
+            self.papi.bier_disp_table_add_del,
+            {'bdt_tbl_id': bdti,
+             'bdt_is_add': is_add})
+
+    def bier_disp_table_dump(self):
+        return self.api(self.papi.bier_disp_table_dump, {})
+
+    def bier_disp_entry_add_del(self,
+                                bdti,
+                                bp,
+                                payload_proto,
+                                next_hop,
+                                next_hop_tbl_id=0,
+                                next_hop_rpf_id=~0,
+                                next_hop_is_ip4=1,
+                                is_add=1):
+        """ BIER Route add/del """
+        return self.api(
+            self.papi.bier_disp_entry_add_del,
+            {'bde_tbl_id': bdti,
+             'bde_bp': bp,
+             'bde_payload_proto': payload_proto,
+             'bde_n_paths': 1,
+             'bde_paths': [{'next_hop': next_hop,
+                            'table_id': next_hop_tbl_id,
+                            'afi': 0,
+                            'rpf_id': next_hop_rpf_id,
+                            'n_labels': 0,
+                            'label_stack': [0]}],
+             'bde_is_add': is_add})
+
+    def bier_disp_entry_dump(self, bdti):
+        return self.api(
+            self.papi.bier_disp_entry_dump,
+            {'bde_tbl_id': bdti})
+
+    def add_node_next(self, node_name, next_name):
+        """ Set the next node for a given node request
+
+        :param node_name:
+        :param next_name:
+        """
+        return self.api(self.papi.add_node_next,
+                        {'node_name': node_name,
+                         'next_name': next_name})

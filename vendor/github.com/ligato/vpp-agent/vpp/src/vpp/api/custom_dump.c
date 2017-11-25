@@ -382,7 +382,7 @@ static void *vl_api_l2fib_add_del_t_print
 
   s = format (0, "SCRIPT: l2fib_add_del ");
 
-  s = format (s, "mac %U ", format_ethernet_address, &mp->mac);
+  s = format (s, "mac %U ", format_ethernet_address, mp->mac);
 
   s = format (s, "bd_id %d ", ntohl (mp->bd_id));
 
@@ -708,22 +708,6 @@ static void *vl_api_ip_neighbor_add_del_t_print
   FINISH;
 }
 
-static void *
-vl_api_reset_vrf_t_print (vl_api_reset_vrf_t * mp, void *handle)
-{
-  u8 *s;
-
-  s = format (0, "SCRIPT: reset_vrf ");
-
-  if (mp->vrf_id)
-    s = format (s, "vrf %d ", ntohl (mp->vrf_id));
-
-  if (mp->is_ipv6 != 0)
-    s = format (s, "ipv6 ");
-
-  FINISH;
-}
-
 static void *vl_api_create_vlan_subif_t_print
   (vl_api_create_vlan_subif_t * mp, void *handle)
 {
@@ -860,9 +844,13 @@ static void *vl_api_dhcp_proxy_set_vss_t_print
 
   s = format (s, "tbl_id %d ", ntohl (mp->tbl_id));
 
-  s = format (s, "fib_id %d ", ntohl (mp->fib_id));
-
-  s = format (s, "oui %d ", ntohl (mp->oui));
+  if (mp->vss_type == VSS_TYPE_VPN_ID)
+    {
+      s = format (s, "fib_id %d ", ntohl (mp->vpn_index));
+      s = format (s, "oui %d ", ntohl (mp->oui));
+    }
+  else if (mp->vss_type == VSS_TYPE_ASCII)
+    s = format (s, "vpn_ascii_id %s", mp->vpn_ascii_id);
 
   if (mp->is_ipv6 != 0)
     s = format (s, "ipv6 ");
@@ -3209,6 +3197,45 @@ static void *vl_api_dns_resolve_ip_t_print
   FINISH;
 }
 
+static void *vl_api_session_rule_add_del_t_print
+  (vl_api_session_rule_add_del_t * mp, void *handle)
+{
+  u8 *s;
+  char *proto = mp->transport_proto == 0 ? "tcp" : "udp";
+  s = format (0, "SCRIPT: session_rule_add_del ");
+  mp->tag[sizeof (mp->tag) - 1] = 0;
+  if (mp->is_ip4)
+    s = format (s, "appns %d scope %d %s %U/%d %d %U/%d %d action %u tag %s",
+		mp->appns_index, mp->scope, proto, format_ip4_address,
+		(ip4_address_t *) mp->lcl_ip, mp->lcl_plen,
+		format_ip4_address, (ip4_address_t *) mp->rmt_ip,
+		mp->rmt_plen, mp->action_index, mp->tag);
+  else
+    s = format (s, "appns %d scope %d %s %U/%d %d %U/%d %d action %u tag %s",
+		mp->appns_index, mp->scope, proto, format_ip6_address,
+		(ip6_address_t *) mp->lcl_ip, mp->lcl_plen,
+		format_ip6_address, (ip6_address_t *) mp->rmt_ip,
+		mp->rmt_plen, mp->action_index, mp->tag);
+  FINISH;
+}
+
+static void *vl_api_ip_container_proxy_add_del_t_print
+  (vl_api_ip_container_proxy_add_del_t * mp, void *handle)
+{
+  u8 *s;
+  s = format (0, "SCRIPT: ip_container_proxy_add_del ");
+  if (mp->is_ip4)
+    s = format (s, "is_add %d address %U/%d sw_if_index %d",
+		mp->is_add, format_ip4_address,
+		(ip4_address_t *) mp->ip, mp->plen, mp->sw_if_index);
+  else
+    s = format (s, "is_add %d address %U/%d sw_if_index %d",
+		mp->is_add, format_ip6_address,
+		(ip6_address_t *) mp->ip, mp->plen, mp->sw_if_index);
+  FINISH;
+}
+
+
 #define foreach_custom_print_no_arg_function                            \
 _(lisp_eid_table_vni_dump)                                              \
 _(lisp_map_resolver_dump)                                               \
@@ -3248,7 +3275,6 @@ _(PROXY_ARP_INTFC_ENABLE_DISABLE, proxy_arp_intfc_enable_disable)       \
 _(MPLS_TUNNEL_ADD_DEL, mpls_tunnel_add_del)		                \
 _(SW_INTERFACE_SET_UNNUMBERED, sw_interface_set_unnumbered)             \
 _(IP_NEIGHBOR_ADD_DEL, ip_neighbor_add_del)                             \
-_(RESET_VRF, reset_vrf)                                                 \
 _(CREATE_VLAN_SUBIF, create_vlan_subif)                                 \
 _(CREATE_SUBIF, create_subif)                                           \
 _(OAM_ADD_DEL, oam_add_del)                                             \
@@ -3405,7 +3431,8 @@ _(SW_INTERFACE_SET_LLDP, sw_interface_set_lldp)				\
 _(DNS_ENABLE_DISABLE, dns_enable_disable)                               \
 _(DNS_NAME_SERVER_ADD_DEL, dns_name_server_add_del)                     \
 _(DNS_RESOLVE_NAME, dns_resolve_name)					\
-_(DNS_RESOLVE_IP, dns_resolve_ip)
+_(DNS_RESOLVE_IP, dns_resolve_ip)					\
+_(SESSION_RULE_ADD_DEL, session_rule_add_del)
   void
 vl_msg_api_custom_dump_configure (api_main_t * am)
 {

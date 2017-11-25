@@ -76,6 +76,9 @@ memif_create_command_fn (vlib_main_t * vm, unformat_input_t * input,
   if (!is_pow2 (ring_size))
     return clib_error_return (0, "ring size must be power of 2");
 
+  if (ring_size > 32768)
+    return clib_error_return (0, "maximum ring size is 32768");
+
   args.log2_ring_size = min_log2 (ring_size);
 
   if (rx_queues > 255 || rx_queues < 1)
@@ -306,8 +309,9 @@ memif_show_command_fn (vlib_main_t * vm, unformat_input_t * input,
       vlib_cli_output (vm, "  id %d mode %U file %s", mif->id,
 		       format_memif_if_mode, mif, msf->filename);
       vlib_cli_output (vm, "  flags%U", format_memif_if_flags, mif->flags);
-      vlib_cli_output (vm, "  listener-fd %d conn-fd %d", msf->fd,
-		       mif->conn_fd);
+      vlib_cli_output (vm, "  listener-fd %d conn-fd %d",
+		       msf->sock ? msf->sock->fd : 0,
+		       mif->sock ? mif->sock->fd : 0);
       vlib_cli_output (vm,
 		       "  num-s2m-rings %u num-m2s-rings %u buffer-size %u",
 		       mif->run.num_s2m_rings, mif->run.num_m2s_rings,

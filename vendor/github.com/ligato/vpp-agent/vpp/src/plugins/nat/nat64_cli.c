@@ -680,10 +680,11 @@ nat64_add_del_prefix_command_fn (vlib_main_t * vm, unformat_input_t * input,
 				 vlib_cli_command_t * cmd)
 {
   nat64_main_t *nm = &nat64_main;
+  vnet_main_t *vnm = vnet_get_main ();
   clib_error_t *error = 0;
   unformat_input_t _line_input, *line_input = &_line_input;
   u8 is_add = 1;
-  u32 vrf_id = 0;
+  u32 vrf_id = 0, sw_if_index = ~0;
   ip6_address_t prefix;
   u32 plen = 0;
   int rv;
@@ -704,6 +705,11 @@ nat64_add_del_prefix_command_fn (vlib_main_t * vm, unformat_input_t * input,
 	;
       else if (unformat (line_input, "del"))
 	is_add = 0;
+      else
+	if (unformat
+	    (line_input, "interface %U", unformat_vnet_sw_interface, vnm,
+	     &sw_if_index))
+	;
       else
 	{
 	  error = clib_error_return (0, "unknown input: '%U'",
@@ -730,6 +736,42 @@ nat64_add_del_prefix_command_fn (vlib_main_t * vm, unformat_input_t * input,
       goto done;
     default:
       break;
+    }
+
+  /*
+   * Add RX interface route, whenNAT isn't running on the real input
+   * interface
+   */
+  if (sw_if_index != ~0)
+    {
+      u32 fib_index;
+      fib_prefix_t fibpfx = {
+	.fp_len = plen,
+	.fp_proto = FIB_PROTOCOL_IP6,
+	.fp_addr = {.ip6 = prefix}
+      };
+
+      if (is_add)
+	{
+	  fib_index = fib_table_find_or_create_and_lock (FIB_PROTOCOL_IP6,
+							 vrf_id,
+							 FIB_SOURCE_PLUGIN_HI);
+	  fib_table_entry_update_one_path (fib_index, &fibpfx,
+					   FIB_SOURCE_PLUGIN_HI,
+					   FIB_ENTRY_FLAG_NONE, DPO_PROTO_IP6,
+					   NULL, sw_if_index, ~0, 0, NULL,
+					   FIB_ROUTE_PATH_INTF_RX);
+	}
+      else
+	{
+	  fib_index = fib_table_find (FIB_PROTOCOL_IP6, vrf_id);
+	  fib_table_entry_path_remove (fib_index, &fibpfx,
+				       FIB_SOURCE_PLUGIN_HI, DPO_PROTO_IP6,
+				       NULL, sw_if_index, ~0, 1,
+				       FIB_ROUTE_PATH_INTF_RX);
+	  fib_table_unlock (fib_index, FIB_PROTOCOL_IP6,
+			    FIB_SOURCE_PLUGIN_HI);
+	}
     }
 
 done:
@@ -763,6 +805,61 @@ nat64_show_prefix_command_fn (vlib_main_t * vm, unformat_input_t * input,
   nat64_prefix_walk (nat64_cli_prefix_walk, vm);
 
   return 0;
+}
+
+static clib_error_t *
+nat64_add_interface_address_command_fn (vlib_main_t * vm,
+					unformat_input_t * input,
+					vlib_cli_command_t * cmd)
+{
+  nat64_main_t *nm = &nat64_main;
+  vnet_main_t *vnm = vnet_get_main ();
+  unformat_input_t _line_input, *line_input = &_line_input;
+  u32 sw_if_index;
+  int rv;
+  int is_add = 1;
+  clib_error_t *error = 0;
+
+  if (nm->is_disabled)
+    return clib_error_return (0,
+			      "NAT64 disabled, multi thread not supported");
+  /* Get a line of input. */
+  if (!unformat_user (input, unformat_line_input, line_input))
+    return 0;
+
+  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat
+	  (line_input, "%U", unformat_vnet_sw_interface, vnm, &sw_if_index))
+	;
+      else if (unformat (line_input, "del"))
+	is_add = 0;
+      else
+	{
+	  error = clib_error_return (0, "unknown input '%U'",
+				     format_unformat_error, line_input);
+	  goto done;
+	}
+    }
+
+  rv = nat64_add_interface_address (sw_if_index, is_add);
+
+  switch (rv)
+    {
+    case VNET_API_ERROR_NO_SUCH_ENTRY:
+      error = clib_error_return (0, "entry not exist");
+      break;
+    case VNET_API_ERROR_VALUE_EXIST:
+      error = clib_error_return (0, "entry exist");
+      break;
+    default:
+      break;
+    }
+
+done:
+  unformat_free (line_input);
+
+  return error;
 }
 
 /* *INDENT-OFF* */
@@ -954,7 +1051,7 @@ VLIB_CLI_COMMAND (show_nat64_st_command, static) = {
 VLIB_CLI_COMMAND (nat64_add_del_prefix_command, static) = {
   .path = "nat64 add prefix",
   .short_help = "nat64 add prefix <ip6-prefix>/<plen> [tenant-vrf <vrf-id>] "
-                "[del]",
+                "[del] [interface <interface]",
   .function = nat64_add_del_prefix_command_fn,
 };
 
@@ -975,6 +1072,19 @@ VLIB_CLI_COMMAND (show_nat64_prefix_command, static) = {
   .function = nat64_show_prefix_command_fn,
 };
 
+/*?
+ * @cliexpar
+ * @cliexstart{nat64 add interface address}
+ * Add/delete NAT64 pool address from specific (DHCP addressed) interface.
+ * To add NAT64 pool address from specific interface use:
+ *  vpp# nat64 add interface address GigabitEthernet0/8/0
+ * @cliexend
+?*/
+VLIB_CLI_COMMAND (nat64_add_interface_address_command, static) = {
+    .path = "nat64 add interface address",
+    .short_help = "nat64 add interface address <interface> [del]",
+    .function = nat64_add_interface_address_command_fn,
+};
 /* *INDENT-ON* */
 
 /*

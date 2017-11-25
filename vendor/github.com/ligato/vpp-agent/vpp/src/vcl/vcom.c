@@ -98,7 +98,7 @@ static int is_vcom_init;
  * RETURN: 0 on success -1 on failure
  * */
 static inline int
-vcom_init ()
+vcom_init (void)
 {
   pid_t pid = getpid ();
 
@@ -196,12 +196,10 @@ close (int __fd)
   if (is_vcom_socket_fd (__fd) || is_vcom_epfd (__fd))
     {
       if (VCOM_DEBUG > 0)
-	vcom_socket_main_show ();
+	fprintf (stderr, "[%d] close: fd %d\n", pid, __fd);
       rv = vcom_close (__fd);
       if (VCOM_DEBUG > 0)
-	fprintf (stderr, "[%d] close: " "'%04d'='%04d'\n", pid, rv, __fd);
-      if (VCOM_DEBUG > 0)
-	vcom_socket_main_show ();
+	fprintf (stderr, "[%d] close: vcom_close() returned %d\n", pid, rv);
       if (rv != 0)
 	{
 	  errno = -rv;
@@ -2070,6 +2068,46 @@ send (int __fd, const void *__buf, size_t __n, int __flags)
   return libc_send (__fd, __buf, __n, __flags);
 }
 
+ssize_t
+sendfile (int __out_fd, int __in_fd, off_t * __offset, size_t __len)
+{
+  ssize_t size;
+
+  if (VCOM_DEBUG > 2)
+    clib_warning ("[%d] __out_fd %d, __in_fd %d, __offset %p, __len %ld",
+		  getpid (), __out_fd, __in_fd, __offset, __len);
+
+  if (is_vcom_socket_fd (__out_fd))
+    {
+      /* TBD: refactor this check to be part of is_vcom_socket_fd() */
+      if (vcom_init () != 0)
+	return -1;
+
+      size = vcom_socket_sendfile (__out_fd, __in_fd, __offset, __len);
+      if (VCOM_DEBUG > 2)
+	clib_warning ("[%d] vcom_socket_sendfile (out_fd %d, in_fd %d, "
+		      "offset %p (%ld), len %lu) returned %ld",
+		      getpid (), __out_fd, __in_fd, __offset,
+		      __offset ? *__offset : -1, __len, size);
+      if (size < 0)
+	{
+	  errno = -size;
+	  return -1;
+	}
+      return size;
+    }
+  if (VCOM_DEBUG > 2)
+    clib_warning ("[%d] calling libc_sendfile!", getpid ());
+  return libc_sendfile (__out_fd, __in_fd, __offset, __len);
+}
+
+ssize_t
+sendfile64 (int __out_fd, int __in_fd, off_t * __offset, size_t __len)
+{
+  return sendfile (__out_fd, __in_fd, __offset, __len);
+}
+
+
 /*
  * Read N bytes into BUF from socket FD.
  * Returns the number read or -1 for errors.
@@ -2568,7 +2606,6 @@ accept (int __fd, __SOCKADDR_ARG __addr, socklen_t * __restrict __addr_len)
   return libc_accept (__fd, __addr, __addr_len);
 }
 
-#ifdef __USE_GNU
 /*
  * Similar to 'accept' but takes an additional parameter to specify
  * flags.
@@ -2592,8 +2629,13 @@ int
 accept4 (int __fd, __SOCKADDR_ARG __addr,
 	 socklen_t * __restrict __addr_len, int __flags)
 {
-  int rv;
+  int rv = 0;
   pid_t pid = getpid ();
+
+  fprintf (stderr,
+	   "[%d] accept4: in the beginning... "
+	   "'%04d'='%04d', '%p', '%p', '%04x'\n",
+	   pid, rv, __fd, __addr, __addr_len, __flags);
 
   if (is_vcom_socket_fd (__fd))
     {
@@ -2602,7 +2644,7 @@ accept4 (int __fd, __SOCKADDR_ARG __addr,
       rv = vcom_accept4 (__fd, __addr, __addr_len, __flags);
       if (VCOM_DEBUG > 0)
 	fprintf (stderr,
-		 "[%d] accept4: "
+		 "[%d] accept4: VCL "
 		 "'%04d'='%04d', '%p', '%p', '%04x'\n",
 		 pid, rv, __fd, __addr, __addr_len, __flags);
       if (VCOM_DEBUG > 0)
@@ -2614,10 +2656,13 @@ accept4 (int __fd, __SOCKADDR_ARG __addr,
 	}
       return rv;
     }
+  fprintf (stderr,
+	   "[%d] accept4: libc "
+	   "'%04d'='%04d', '%p', '%p', '%04x'\n",
+	   pid, rv, __fd, __addr, __addr_len, __flags);
+
   return libc_accept4 (__fd, __addr, __addr_len, __flags);
 }
-
-#endif
 
 /*
  * Shut down all or part of the connection open on socket FD.
@@ -2792,52 +2837,17 @@ epoll_ctl (int __epfd, int __op, int __fd, struct epoll_event *__event)
   int rv;
   pid_t pid = getpid ();
 
-  if (is_vcom_epfd (__epfd))
+  rv = vcom_epoll_ctl (__epfd, __op, __fd, __event);
+  if (VCOM_DEBUG > 0)
+    fprintf (stderr,
+	     "[%d] epoll_ctl: "
+	     "'%04d'='%04d', '%04d', '%04d'\n", pid, rv, __epfd, __op, __fd);
+  if (rv != 0)
     {
-      /* TBD: currently limiting epoll to support only vcom fds */
-      if (is_vcom_socket_fd (__fd))
-	{
-	  rv = vcom_epoll_ctl (__epfd, __op, __fd, __event);
-	  if (VCOM_DEBUG > 0)
-	    fprintf (stderr,
-		     "[%d] epoll_ctl: "
-		     "'%04d'='%04d', '%04d', '%04d'\n",
-		     pid, rv, __epfd, __op, __fd);
-	  if (rv != 0)
-	    {
-	      errno = -rv;
-	      return -1;
-	    }
-	  return 0;
-	}
-      else
-	{
-	  /*
-	   * TBD: currently epoll does not support kernel fds
-	   * or epoll fds */
-	  errno = EBADF;
-	  return -1;
-	}
-    }
-  else
-    {
-      /* epfd is not an epoll file descriptor */
-      errno = EINVAL;
+      errno = -rv;
       return -1;
     }
   return 0;
-}
-
-int
-vcom_epoll_wait (int __epfd, struct epoll_event *__events,
-		 int __maxevents, int __timeout)
-{
-  if (vcom_init () != 0)
-    {
-      return -1;
-    }
-
-  return vcom_epoll_pwait (__epfd, __events, __maxevents, __timeout, NULL);
 }
 
 int
@@ -2849,48 +2859,28 @@ epoll_wait (int __epfd, struct epoll_event *__events,
 
   if (__maxevents <= 0 || __maxevents > EP_MAX_EVENTS)
     {
+      fprintf (stderr, "[%d] ERROR: epoll_wait() invalid maxevents %d\n",
+	       pid, __maxevents);
       errno = EINVAL;
       return -1;
     }
 
-  if (is_vcom_epfd (__epfd))
+  rv =
+    vcom_socket_epoll_pwait (__epfd, __events, __maxevents, __timeout, NULL);
+  if (VCOM_DEBUG > 2)
+    fprintf (stderr,
+	     "[%d] epoll_wait: "
+	     "'%04d'='%04d', '%p', "
+	     "'%04d', '%04d'\n",
+	     pid, rv, __epfd, __events, __maxevents, __timeout);
+  if (rv < 0)
     {
-      rv = vcom_epoll_wait (__epfd, __events, __maxevents, __timeout);
-      if (VCOM_DEBUG > 0)
-	fprintf (stderr,
-		 "[%d] epoll_wait: "
-		 "'%04d'='%04d', '%p', "
-		 "'%04d', '%04d'\n",
-		 pid, rv, __epfd, __events, __maxevents, __timeout);
-      if (rv < 0)
-	{
-	  errno = -rv;
-	  return -1;
-	}
-      return rv;
-    }
-  else
-    {
-      errno = EINVAL;
+      errno = -rv;
       return -1;
     }
-  return 0;
+  return rv;
 }
 
-
-int
-vcom_epoll_pwait (int __epfd, struct epoll_event *__events,
-		  int __maxevents, int __timeout, const __sigset_t * __ss)
-{
-  if (vcom_init () != 0)
-    {
-      return -1;
-    }
-
-  /* implementation */
-  return vcom_socket_epoll_pwait (__epfd, __events,
-				  __maxevents, __timeout, __ss);
-}
 
 int
 epoll_pwait (int __epfd, struct epoll_event *__events,
@@ -2907,7 +2897,9 @@ epoll_pwait (int __epfd, struct epoll_event *__events,
 
   if (is_vcom_epfd (__epfd))
     {
-      rv = vcom_epoll_pwait (__epfd, __events, __maxevents, __timeout, __ss);
+      rv =
+	vcom_socket_epoll_pwait (__epfd, __events, __maxevents, __timeout,
+				 __ss);
       if (VCOM_DEBUG > 0)
 	fprintf (stderr,
 		 "[%d] epoll_pwait: "

@@ -128,7 +128,7 @@ vl_api_lisp_add_del_locator_set_t_handler (vl_api_lisp_add_del_locator_set_t *
 
   memset (a, 0, sizeof (a[0]));
 
-  mp->locator_set_name[63] = 0;
+  mp->locator_set_name[sizeof (mp->locator_set_name) - 1] = 0;
   locator_name = format (0, "%s", mp->locator_set_name);
   vec_terminate_c_string (locator_name);
 
@@ -184,7 +184,7 @@ vl_api_lisp_add_del_locator_t_handler (vl_api_lisp_add_del_locator_t * mp)
   locator.local = 1;
   vec_add1 (locators, locator);
 
-  mp->locator_set_name[63] = 0;
+  mp->locator_set_name[sizeof (mp->locator_set_name) - 1] = 0;
   locator_name = format (0, "%s", mp->locator_set_name);
   vec_terminate_c_string (locator_name);
 
@@ -252,7 +252,7 @@ vl_api_lisp_add_del_local_eid_t_handler (vl_api_lisp_add_del_local_eid_t * mp)
   if (rv)
     goto out;
 
-  mp->locator_set_name[63] = 0;
+  mp->locator_set_name[sizeof (mp->locator_set_name) - 1] = 0;
   name = format (0, "%s", mp->locator_set_name);
   vec_terminate_c_string (name);
   p = hash_get_mem (lcm->locator_set_index_by_name, name);
@@ -395,6 +395,7 @@ vl_api_lisp_pitr_set_locator_set_t_handler (vl_api_lisp_pitr_set_locator_set_t
   int rv = 0;
   u8 *ls_name = 0;
 
+  mp->ls_name[sizeof (mp->ls_name) - 1] = 0;
   ls_name = format (0, "%s", mp->ls_name);
   vec_terminate_c_string (ls_name);
   rv = vnet_lisp_pitr_set_locator_set (ls_name, mp->is_add);
@@ -483,7 +484,7 @@ static void
   u8 *locator_set_name = NULL;
   vnet_lisp_add_del_mreq_itr_rloc_args_t _a, *a = &_a;
 
-  mp->locator_set_name[63] = 0;
+  mp->locator_set_name[sizeof (mp->locator_set_name) - 1] = 0;
   locator_set_name = format (0, "%s", mp->locator_set_name);
   vec_terminate_c_string (locator_set_name);
 
@@ -1272,7 +1273,10 @@ vl_api_show_lisp_pitr_t_handler (vl_api_show_lisp_pitr_t * mp)
       return;
     }
 
-  if (!lcm->lisp_pitr)
+  u8 is_enabled = (lcm->flags & LISP_FLAG_PITR_MODE)
+    && lcm->pitr_map_index != ~0;
+
+  if (!is_enabled)
     {
       tmp_str = format (0, "N/A");
     }
@@ -1295,7 +1299,7 @@ vl_api_show_lisp_pitr_t_handler (vl_api_show_lisp_pitr_t * mp)
   /* *INDENT-OFF* */
   REPLY_MACRO2(VL_API_SHOW_LISP_PITR_REPLY,
   ({
-    rmp->status = lcm->lisp_pitr;
+    rmp->status = lcm->flags & LISP_FLAG_PITR_MODE;
     strncpy((char *) rmp->locator_set_name, (char *) tmp_str,
             ARRAY_LEN(rmp->locator_set_name) - 1);
   }));

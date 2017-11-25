@@ -96,7 +96,17 @@ zap64 (u64 x, word n)
     return x & masks_little_endian[n];
 }
 
-static inline u64
+/**
+ * make address-sanitizer skip this:
+ * clib_mem_unaligned + zap64 casts its input as u64, computes a mask
+ * according to the input length, and returns the casted maked value.
+ * Therefore all the 8 Bytes of the u64 are systematically read, which
+ * rightfully causes address-sanitizer to raise an error on smaller inputs.
+ *
+ * However the invalid Bytes are discarded within zap64(), whicj is why
+ * this can be silenced safely.
+ */
+static inline u64 __attribute__ ((no_sanitize_address))
 hash_memory64 (void *p, word n_bytes, u64 state)
 {
   u64 *q = p;

@@ -134,7 +134,14 @@ _(ONE_ADD_DEL_NDP_ENTRY, one_add_del_ndp_entry)                         \
 _(ONE_NDP_BD_GET, one_ndp_bd_get)                                       \
 _(ONE_NDP_ENTRIES_GET, one_ndp_entries_get)                             \
 _(ONE_SET_TRANSPORT_PROTOCOL, one_set_transport_protocol)               \
-_(ONE_GET_TRANSPORT_PROTOCOL, one_get_transport_protocol)
+_(ONE_GET_TRANSPORT_PROTOCOL, one_get_transport_protocol)               \
+_(ONE_ENABLE_DISABLE_XTR_MODE, one_enable_disable_xtr_mode)             \
+_(ONE_SHOW_XTR_MODE, one_show_xtr_mode)                                 \
+_(ONE_ENABLE_DISABLE_PITR_MODE, one_enable_disable_pitr_mode)           \
+_(ONE_SHOW_PITR_MODE, one_show_pitr_mode)                               \
+_(ONE_ENABLE_DISABLE_PETR_MODE, one_enable_disable_petr_mode)           \
+_(ONE_SHOW_PETR_MODE, one_show_petr_mode)                               \
+
 
 static locator_t *
 unformat_one_locs (vl_api_one_remote_locator_t * rmt_locs, u32 rloc_num)
@@ -202,6 +209,7 @@ vl_api_one_add_del_locator_set_t_handler (vl_api_one_add_del_locator_set_t *
 
   memset (a, 0, sizeof (a[0]));
 
+  mp->locator_set_name[sizeof (mp->locator_set_name) - 1] = 0;
   locator_name = format (0, "%s", mp->locator_set_name);
   vec_terminate_c_string (locator_name);
 
@@ -257,6 +265,7 @@ vl_api_one_add_del_locator_t_handler (vl_api_one_add_del_locator_t * mp)
   locator.local = 1;
   vec_add1 (locators, locator);
 
+  mp->locator_set_name[sizeof (mp->locator_set_name) - 1] = 0;
   locator_name = format (0, "%s", mp->locator_set_name);
   vec_terminate_c_string (locator_name);
 
@@ -344,6 +353,7 @@ vl_api_one_add_del_local_eid_t_handler (vl_api_one_add_del_local_eid_t * mp)
       goto out;
     }
 
+  mp->locator_set_name[sizeof (mp->locator_set_name) - 1] = 0;
   name = format (0, "%s", mp->locator_set_name);
   vec_terminate_c_string (name);
   p = hash_get_mem (lcm->locator_set_index_by_name, name);
@@ -485,6 +495,7 @@ vl_api_one_nsh_set_locator_set_t_handler (vl_api_one_nsh_set_locator_set_t
   int rv = 0;
   u8 *ls_name = 0;
 
+  mp->ls_name[sizeof (mp->ls_name) - 1] = 0;
   ls_name = format (0, "%s", mp->ls_name);
   vec_terminate_c_string (ls_name);
   rv = vnet_lisp_nsh_set_locator_set (ls_name, mp->is_add);
@@ -501,6 +512,7 @@ vl_api_one_pitr_set_locator_set_t_handler (vl_api_one_pitr_set_locator_set_t
   int rv = 0;
   u8 *ls_name = 0;
 
+  mp->ls_name[sizeof (mp->ls_name) - 1] = 0;
   ls_name = format (0, "%s", mp->ls_name);
   vec_terminate_c_string (ls_name);
   rv = vnet_lisp_pitr_set_locator_set (ls_name, mp->is_add);
@@ -589,6 +601,7 @@ static void
   u8 *locator_set_name = NULL;
   vnet_lisp_add_del_mreq_itr_rloc_args_t _a, *a = &_a;
 
+  mp->locator_set_name[sizeof (mp->locator_set_name) - 1] = 0;
   locator_set_name = format (0, "%s", mp->locator_set_name);
   vec_terminate_c_string (locator_set_name);
 
@@ -624,6 +637,7 @@ static void
   if (!mp->is_add)
     {
       vnet_lisp_add_del_adjacency_args_t _a, *a = &_a;
+      memset (a, 0, sizeof (a[0]));
       gid_address_copy (&a->reid, eid);
       a->is_add = 0;
       rv = vnet_lisp_add_del_adjacency (a);
@@ -1438,7 +1452,10 @@ vl_api_show_one_pitr_t_handler (vl_api_show_one_pitr_t * mp)
       return;
     }
 
-  if (!lcm->lisp_pitr)
+  u8 is_enabled = (lcm->flags & LISP_FLAG_PITR_MODE)
+    && lcm->pitr_map_index != ~0;
+
+  if (!is_enabled)
     {
       tmp_str = format (0, "N/A");
     }
@@ -1461,7 +1478,7 @@ vl_api_show_one_pitr_t_handler (vl_api_show_one_pitr_t * mp)
   /* *INDENT-OFF* */
   REPLY_MACRO2(VL_API_SHOW_ONE_PITR_REPLY,
   ({
-    rmp->status = lcm->lisp_pitr;
+    rmp->status = lcm->flags & LISP_FLAG_PITR_MODE;
     strncpy((char *) rmp->locator_set_name, (char *) tmp_str,
             ARRAY_LEN(rmp->locator_set_name) - 1);
   }));
@@ -1761,6 +1778,78 @@ vl_api_one_ndp_entries_get_t_handler (vl_api_one_ndp_entries_get_t * mp)
   /* *INDENT-ON* */
 
   vec_free (entries);
+}
+
+static void
+  vl_api_one_enable_disable_xtr_mode_t_handler
+  (vl_api_one_enable_disable_xtr_mode_t * mp)
+{
+  vl_api_one_enable_disable_xtr_mode_reply_t *rmp = 0;
+  int rv = vnet_lisp_enable_disable_xtr_mode (mp->is_en);
+
+  REPLY_MACRO (VL_API_ONE_ENABLE_DISABLE_XTR_MODE_REPLY);
+}
+
+static void
+vl_api_one_show_xtr_mode_t_handler (vl_api_one_show_xtr_mode_t * mp)
+{
+  vl_api_one_show_xtr_mode_reply_t *rmp = 0;
+  int rv = 0;
+
+  /* *INDENT-OFF* */
+  REPLY_MACRO2 (VL_API_ONE_SHOW_XTR_MODE_REPLY,
+  {
+    rmp->is_en = vnet_lisp_get_xtr_mode ();
+  });
+  /* *INDENT-ON* */
+}
+
+static void
+  vl_api_one_enable_disable_pitr_mode_t_handler
+  (vl_api_one_enable_disable_pitr_mode_t * mp)
+{
+  vl_api_one_enable_disable_pitr_mode_reply_t *rmp = 0;
+  int rv = vnet_lisp_enable_disable_pitr_mode (mp->is_en);
+
+  REPLY_MACRO (VL_API_ONE_ENABLE_DISABLE_PITR_MODE_REPLY);
+}
+
+static void
+vl_api_one_show_pitr_mode_t_handler (vl_api_one_show_pitr_mode_t * mp)
+{
+  vl_api_one_show_pitr_mode_reply_t *rmp = 0;
+  int rv = 0;
+
+  /* *INDENT-OFF* */
+  REPLY_MACRO2 (VL_API_ONE_SHOW_PITR_MODE_REPLY,
+  {
+    rmp->is_en = vnet_lisp_get_pitr_mode ();
+  });
+  /* *INDENT-ON* */
+}
+
+static void
+  vl_api_one_enable_disable_petr_mode_t_handler
+  (vl_api_one_enable_disable_petr_mode_t * mp)
+{
+  vl_api_one_enable_disable_petr_mode_reply_t *rmp = 0;
+  int rv = vnet_lisp_enable_disable_petr_mode (mp->is_en);
+
+  REPLY_MACRO (VL_API_ONE_ENABLE_DISABLE_PETR_MODE_REPLY);
+}
+
+static void
+vl_api_one_show_petr_mode_t_handler (vl_api_one_show_petr_mode_t * mp)
+{
+  vl_api_one_show_petr_mode_reply_t *rmp = 0;
+  int rv = 0;
+
+  /* *INDENT-OFF* */
+  REPLY_MACRO2 (VL_API_ONE_SHOW_PETR_MODE_REPLY,
+  {
+    rmp->is_en = vnet_lisp_get_petr_mode ();
+  });
+  /* *INDENT-ON* */
 }
 
 /*

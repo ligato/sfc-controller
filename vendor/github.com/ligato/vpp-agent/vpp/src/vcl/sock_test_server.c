@@ -300,10 +300,12 @@ new_client (void)
     }
 
 #ifdef VCL_TEST
-  client_fd = vppcom_session_accept (ssm->listen_fd, &conn->endpt,
+  client_fd = vppcom_session_accept (ssm->listen_fd, &conn->endpt, 0,
 				     -1.0 /* wait forever */ );
   if (client_fd < 0)
     errno = -client_fd;
+#elif HAVE_ACCEPT4
+  client_fd = accept4 (ssm->listen_fd, (struct sockaddr *) NULL, NULL, NULL);
 #else
   client_fd = accept (ssm->listen_fd, (struct sockaddr *) NULL, NULL);
 #endif

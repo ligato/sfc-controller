@@ -16,9 +16,11 @@
 #include <vnet/vnet.h>
 #include <vlibmemory/api.h>
 #include <vnet/session/application.h>
+#include <vnet/session/application_interface.h>
+#include <vnet/session/session_rules_table.h>
+#include <vnet/session/session_table.h>
 
 #include <vnet/vnet_msg_enum.h>
-#include "application_interface.h"
 
 #define vl_typedefs		/* define message structures */
 #include <vnet/vnet_all_api_h.h>
@@ -52,6 +54,8 @@ _(UNBIND_SOCK, unbind_sock)                                             \
 _(CONNECT_SOCK, connect_sock)                                          	\
 _(SESSION_ENABLE_DISABLE, session_enable_disable)                   	\
 _(APP_NAMESPACE_ADD_DEL, app_namespace_add_del)				\
+_(SESSION_RULE_ADD_DEL, session_rule_add_del)				\
+_(SESSION_RULES_DUMP, session_rules_dump)				\
 
 static int
 send_add_segment_callback (u32 api_client_index, const u8 * segment_name,
@@ -208,6 +212,7 @@ redirect_connect_callback (u32 server_api_client_index, void *mp_arg)
 {
   vl_api_connect_sock_t *mp = mp_arg;
   unix_shared_memory_queue_t *server_q, *client_q;
+  segment_manager_properties_t *props;
   vlib_main_t *vm = vlib_get_main ();
   f64 timeout = vlib_time_now (vm) + 0.5;
   application_t *app;
@@ -237,8 +242,9 @@ redirect_connect_callback (u32 server_api_client_index, void *mp_arg)
       return -1;
     }
 
-  mp->options[SESSION_OPTIONS_RX_FIFO_SIZE] = app->sm_properties.rx_fifo_size;
-  mp->options[SESSION_OPTIONS_TX_FIFO_SIZE] = app->sm_properties.tx_fifo_size;
+  props = segment_manager_properties_get (app->sm_properties);
+  mp->options[SESSION_OPTIONS_RX_FIFO_SIZE] = props->rx_fifo_size;
+  mp->options[SESSION_OPTIONS_TX_FIFO_SIZE] = props->tx_fifo_size;
 
   /*
    * Bounce message handlers MUST NOT block the data-plane.
@@ -514,7 +520,7 @@ vl_api_disconnect_session_t_handler (vl_api_disconnect_session_t * mp)
     }
 
 done:
-  REPLY_MACRO (VL_API_DISCONNECT_SESSION_REPLY);
+  REPLY_MACRO2 (VL_API_DISCONNECT_SESSION_REPLY, rmp->handle = mp->handle);
 }
 
 static void
@@ -672,7 +678,7 @@ vl_api_unbind_sock_t_handler (vl_api_unbind_sock_t * mp)
   app = application_lookup (mp->client_index);
   if (app)
     {
-      a->app_index = mp->client_index;
+      a->app_index = app->index;
       a->handle = mp->handle;
       if ((error = vnet_unbind (a)))
 	{
@@ -742,8 +748,9 @@ static void
 vl_api_app_namespace_add_del_t_handler (vl_api_app_namespace_add_del_t * mp)
 {
   vl_api_app_namespace_add_del_reply_t *rmp;
-  u8 *ns_id = 0;
   clib_error_t *error = 0;
+  u32 appns_index = 0;
+  u8 *ns_id = 0;
   int rv = 0;
   if (!session_manager_is_enabled ())
     {
@@ -773,9 +780,201 @@ vl_api_app_namespace_add_del_t_handler (vl_api_app_namespace_add_del_t * mp)
       rv = clib_error_get_code (error);
       clib_error_report (error);
     }
+  else
+    {
+      appns_index = app_namespace_index_from_id (ns_id);
+      if (appns_index == APP_NAMESPACE_INVALID_INDEX)
+	{
+	  clib_warning ("app ns lookup failed");
+	  rv = VNET_API_ERROR_UNSPECIFIED;
+	}
+    }
   vec_free (ns_id);
+
+  /* *INDENT-OFF* */
 done:
-  REPLY_MACRO (VL_API_APP_NAMESPACE_ADD_DEL_REPLY);
+  REPLY_MACRO2 (VL_API_APP_NAMESPACE_ADD_DEL_REPLY, ({
+    if (!rv)
+      rmp->appns_index = clib_host_to_net_u32 (appns_index);
+  }));
+  /* *INDENT-ON* */
+}
+
+static void
+vl_api_session_rule_add_del_t_handler (vl_api_session_rule_add_del_t * mp)
+{
+  vl_api_session_rule_add_del_reply_t *rmp;
+  session_rule_add_del_args_t args;
+  session_rule_table_add_del_args_t *table_args = &args.table_args;
+  clib_error_t *error;
+  u8 fib_proto;
+  int rv = 0;
+
+  memset (&args, 0, sizeof (args));
+  fib_proto = mp->is_ip4 ? FIB_PROTOCOL_IP4 : FIB_PROTOCOL_IP6;
+
+  table_args->lcl.fp_len = mp->lcl_plen;
+  table_args->lcl.fp_proto = fib_proto;
+  table_args->rmt.fp_len = mp->rmt_plen;
+  table_args->rmt.fp_proto = fib_proto;
+  table_args->lcl_port = clib_net_to_host_u16 (mp->lcl_port);
+  table_args->rmt_port = clib_net_to_host_u16 (mp->rmt_port);
+  table_args->action_index = clib_net_to_host_u32 (mp->action_index);
+  table_args->is_add = mp->is_add;
+  mp->tag[sizeof (mp->tag) - 1] = 0;
+  table_args->tag = format (0, "%s", mp->tag);
+  args.appns_index = clib_net_to_host_u32 (mp->appns_index);
+  args.scope = mp->scope;
+
+  memset (&table_args->lcl.fp_addr, 0, sizeof (table_args->lcl.fp_addr));
+  memset (&table_args->rmt.fp_addr, 0, sizeof (table_args->rmt.fp_addr));
+  ip_set (&table_args->lcl.fp_addr, mp->lcl_ip, mp->is_ip4);
+  ip_set (&table_args->rmt.fp_addr, mp->rmt_ip, mp->is_ip4);
+  error = vnet_session_rule_add_del (&args);
+  if (error)
+    {
+      rv = clib_error_get_code (error);
+      clib_error_report (error);
+    }
+  vec_free (table_args->tag);
+  REPLY_MACRO (VL_API_SESSION_RULE_ADD_DEL_REPLY);
+}
+
+static void
+send_session_rule_details4 (mma_rule_16_t * rule, u8 is_local,
+			    u8 transport_proto, u32 appns_index, u8 * tag,
+			    unix_shared_memory_queue_t * q, u32 context)
+{
+  vl_api_session_rules_details_t *rmp = 0;
+  session_mask_or_match_4_t *match =
+    (session_mask_or_match_4_t *) & rule->match;
+  session_mask_or_match_4_t *mask =
+    (session_mask_or_match_4_t *) & rule->mask;
+
+  rmp = vl_msg_api_alloc (sizeof (*rmp));
+  memset (rmp, 0, sizeof (*rmp));
+  rmp->_vl_msg_id = ntohs (VL_API_SESSION_RULES_DETAILS);
+  rmp->context = context;
+
+  rmp->is_ip4 = 1;
+  clib_memcpy (rmp->lcl_ip, &match->lcl_ip, sizeof (match->lcl_ip));
+  clib_memcpy (rmp->rmt_ip, &match->rmt_ip, sizeof (match->rmt_ip));
+  rmp->lcl_plen = ip4_mask_to_preflen (&mask->lcl_ip);
+  rmp->rmt_plen = ip4_mask_to_preflen (&mask->rmt_ip);
+  rmp->lcl_port = clib_host_to_net_u16 (match->lcl_port);
+  rmp->rmt_port = clib_host_to_net_u16 (match->rmt_port);
+  rmp->action_index = clib_host_to_net_u32 (rule->action_index);
+  rmp->scope =
+    is_local ? SESSION_RULE_SCOPE_LOCAL : SESSION_RULE_SCOPE_GLOBAL;
+  rmp->transport_proto = transport_proto;
+  rmp->appns_index = clib_host_to_net_u32 (appns_index);
+  if (tag)
+    {
+      clib_memcpy (rmp->tag, tag, vec_len (tag));
+      rmp->tag[vec_len (tag)] = 0;
+    }
+
+  vl_msg_api_send_shmem (q, (u8 *) & rmp);
+}
+
+static void
+send_session_rule_details6 (mma_rule_40_t * rule, u8 is_local,
+			    u8 transport_proto, u32 appns_index, u8 * tag,
+			    unix_shared_memory_queue_t * q, u32 context)
+{
+  vl_api_session_rules_details_t *rmp = 0;
+  session_mask_or_match_6_t *match =
+    (session_mask_or_match_6_t *) & rule->match;
+  session_mask_or_match_6_t *mask =
+    (session_mask_or_match_6_t *) & rule->mask;
+
+  rmp = vl_msg_api_alloc (sizeof (*rmp));
+  memset (rmp, 0, sizeof (*rmp));
+  rmp->_vl_msg_id = ntohs (VL_API_SESSION_RULES_DETAILS);
+  rmp->context = context;
+
+  rmp->is_ip4 = 0;
+  clib_memcpy (rmp->lcl_ip, &match->lcl_ip, sizeof (match->lcl_ip));
+  clib_memcpy (rmp->rmt_ip, &match->rmt_ip, sizeof (match->rmt_ip));
+  rmp->lcl_plen = ip6_mask_to_preflen (&mask->lcl_ip);
+  rmp->rmt_plen = ip6_mask_to_preflen (&mask->rmt_ip);
+  rmp->lcl_port = clib_host_to_net_u16 (match->lcl_port);
+  rmp->rmt_port = clib_host_to_net_u16 (match->rmt_port);
+  rmp->action_index = clib_host_to_net_u32 (rule->action_index);
+  rmp->scope =
+    is_local ? SESSION_RULE_SCOPE_LOCAL : SESSION_RULE_SCOPE_GLOBAL;
+  rmp->transport_proto = transport_proto;
+  rmp->appns_index = clib_host_to_net_u32 (appns_index);
+  if (tag)
+    {
+      clib_memcpy (rmp->tag, tag, vec_len (tag));
+      rmp->tag[vec_len (tag)] = 0;
+    }
+
+  vl_msg_api_send_shmem (q, (u8 *) & rmp);
+}
+
+static void
+send_session_rules_table_details (session_rules_table_t * srt, u8 fib_proto,
+				  u8 tp, u8 is_local, u32 appns_index,
+				  unix_shared_memory_queue_t * q, u32 context)
+{
+  mma_rule_16_t *rule16;
+  mma_rule_40_t *rule40;
+  mma_rules_table_16_t *srt16;
+  mma_rules_table_40_t *srt40;
+  u32 ri;
+
+  if (is_local || fib_proto == FIB_PROTOCOL_IP4)
+    {
+      u8 *tag = 0;
+      /* *INDENT-OFF* */
+      srt16 = &srt->session_rules_tables_16;
+      pool_foreach (rule16, srt16->rules, ({
+	ri = mma_rules_table_rule_index_16 (srt16, rule16);
+	tag = session_rules_table_rule_tag (srt, ri, 1);
+        send_session_rule_details4 (rule16, is_local, tp, appns_index, tag,
+                                    q, context);
+      }));
+      /* *INDENT-ON* */
+    }
+  if (is_local || fib_proto == FIB_PROTOCOL_IP6)
+    {
+      u8 *tag = 0;
+      /* *INDENT-OFF* */
+      srt40 = &srt->session_rules_tables_40;
+      pool_foreach (rule40, srt40->rules, ({
+	ri = mma_rules_table_rule_index_40 (srt40, rule40);
+	tag = session_rules_table_rule_tag (srt, ri, 1);
+        send_session_rule_details6 (rule40, is_local, tp, appns_index, tag,
+                                    q, context);
+      }));
+      /* *INDENT-ON* */
+    }
+}
+
+static void
+vl_api_session_rules_dump_t_handler (vl_api_one_map_server_dump_t * mp)
+{
+  unix_shared_memory_queue_t *q = NULL;
+  session_table_t *st;
+  u8 tp;
+
+  q = vl_api_client_index_to_input_queue (mp->client_index);
+  if (q == 0)
+    return;
+
+  /* *INDENT-OFF* */
+  session_table_foreach (st, ({
+    for (tp = 0; tp < TRANSPORT_N_PROTO; tp++)
+      {
+        send_session_rules_table_details (&st->session_rules[tp],
+                                          st->active_fib_proto, tp,
+                                          st->is_local, st->appns_index, q,
+                                          mp->context);
+      }
+  }));
+  /* *INDENT-ON* */
 }
 
 static clib_error_t *

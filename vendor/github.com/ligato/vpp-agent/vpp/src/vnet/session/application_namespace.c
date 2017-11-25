@@ -94,7 +94,9 @@ vnet_app_namespace_add_del (vnet_app_namespace_add_del_args_t * a)
 	{
 	  app_ns = app_namespace_alloc (a->ns_id);
 	  st = session_table_alloc ();
-	  session_table_init (st);
+	  session_table_init (st, FIB_PROTOCOL_MAX);
+	  st->is_local = 1;
+	  st->appns_index = app_namespace_index (app_ns);
 	  app_ns->local_table_index = session_table_index (st);
 	}
       app_ns->ns_secret = a->secret;
@@ -103,6 +105,7 @@ vnet_app_namespace_add_del (vnet_app_namespace_add_del_args_t * a)
 	fib_table_find (FIB_PROTOCOL_IP4, a->ip4_fib_id);
       app_ns->ip6_fib_index =
 	fib_table_find (FIB_PROTOCOL_IP6, a->ip6_fib_id);
+      session_lookup_set_tables_appns (app_ns);
     }
   else
     {
@@ -135,6 +138,19 @@ app_namespace_id_from_index (u32 index)
 
   app_ns = app_namespace_get (index);
   return app_namespace_id (app_ns);
+}
+
+u32
+app_namespace_get_fib_index (app_namespace_t * app_ns, u8 fib_proto)
+{
+  return fib_proto == FIB_PROTOCOL_IP4 ?
+    app_ns->ip4_fib_index : app_ns->ip6_fib_index;
+}
+
+session_table_t *
+app_namespace_get_local_table (app_namespace_t * app_ns)
+{
+  return session_table_get (app_ns->local_table_index);
 }
 
 void
@@ -238,25 +254,31 @@ format_app_namespace (u8 * s, va_list * args)
 }
 
 static clib_error_t *
-show_app_ns_fn (vlib_main_t * vm, unformat_input_t * input,
+show_app_ns_fn (vlib_main_t * vm, unformat_input_t * main_input,
 		vlib_cli_command_t * cmd)
 {
+  unformat_input_t _line_input, *line_input = &_line_input;
   app_namespace_t *app_ns;
   session_table_t *st;
-  u8 *ns_id, do_table = 0;
+  u8 *ns_id, do_table = 0, had_input = 1;
 
   session_cli_return_if_not_enabled ();
 
-  if (unformat_peek_input (input) != UNFORMAT_END_OF_INPUT)
+  if (!unformat_user (main_input, unformat_line_input, line_input))
     {
-      if (unformat (input, "table %_%v%_", &ns_id))
+      had_input = 0;
+      goto do_ns_list;
+    }
+
+  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (line_input, "table %_%v%_", &ns_id))
 	do_table = 1;
       else
 	{
-	  vlib_cli_output (vm, "unknown input [%U]",
-			   format_unformat_error, input);
-	  return clib_error_return (0, "unknown input `%U'",
-				    format_unformat_error, input);
+	  vlib_cli_output (vm, "unknown input [%U]", format_unformat_error,
+			   line_input);
+	  goto done;
 	}
     }
 
@@ -266,28 +288,31 @@ show_app_ns_fn (vlib_main_t * vm, unformat_input_t * input,
       if (!app_ns)
 	{
 	  vlib_cli_output (vm, "ns %v not found", ns_id);
-	  return 0;
+	  goto done;
 	}
       st = session_table_get (app_ns->local_table_index);
       if (!st)
 	{
 	  vlib_cli_output (vm, "table for ns %v could not be found", ns_id);
-	  return 0;
+	  goto done;
 	}
       session_lookup_show_table_entries (vm, st, 0, 1);
       vec_free (ns_id);
-      return 0;
+      goto done;
     }
 
   vlib_cli_output (vm, "%-20s%-20s%-20s", "Namespace", "Secret",
 		   "sw_if_index");
-
+do_ns_list:
   /* *INDENT-OFF* */
   pool_foreach (app_ns, app_namespace_pool, ({
     vlib_cli_output (vm, "%U", format_app_namespace, app_ns);
   }));
   /* *INDENT-ON* */
 
+done:
+  if (had_input)
+    unformat_free (line_input);
   return 0;
 }
 

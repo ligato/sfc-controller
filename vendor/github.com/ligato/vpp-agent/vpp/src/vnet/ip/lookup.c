@@ -368,11 +368,11 @@ vnet_ip_route_cmd (vlib_main_t * vm,
   unformat_input_t _line_input, *line_input = &_line_input;
   fib_route_path_t *rpaths = NULL, rpath;
   dpo_id_t dpo = DPO_INVALID, *dpos = NULL;
+  u32 table_id, is_del, udp_encap_id;
   fib_prefix_t *prefixs = NULL, pfx;
   mpls_label_t out_label, via_label;
   clib_error_t *error = NULL;
   u32 weight, preference;
-  u32 table_id, is_del;
   vnet_main_t *vnm;
   u32 fib_index;
   f64 count;
@@ -525,6 +525,13 @@ vnet_ip_route_cmd (vlib_main_t * vm,
 	  rpath.frp_weight = 1;
 	  rpath.frp_sw_if_index = ~0;
 	  rpath.frp_proto = DPO_PROTO_IP6;
+	  vec_add1 (rpaths, rpath);
+	}
+      else if (unformat (line_input, "via udp-encap %d", &udp_encap_id))
+	{
+	  rpath.frp_udp_encap_id = udp_encap_id;
+	  rpath.frp_flags |= FIB_ROUTE_PATH_UDP_ENCAP;
+	  rpath.frp_proto = fib_proto_to_dpo (pfx.fp_proto);
 	  vec_add1 (rpaths, rpath);
 	}
       else if (unformat (line_input,
@@ -1435,25 +1442,144 @@ VLIB_CLI_COMMAND (ip_probe_neighbor_command, static) = {
 /* *INDENT-ON* */
 
 clib_error_t *
+vnet_ip_container_proxy_add_del (vnet_ip_container_proxy_args_t * args)
+{
+  u32 fib_index;
+
+  if (!vnet_sw_interface_is_api_valid (vnet_get_main (), args->sw_if_index))
+    return clib_error_return_code (0, VNET_API_ERROR_INVALID_INTERFACE, 0,
+				   "invalid sw_if_index");
+
+  fib_index = fib_table_get_table_id_for_sw_if_index (args->prefix.fp_proto,
+						      args->sw_if_index);
+  if (args->is_add)
+    {
+      dpo_id_t proxy_dpo = DPO_INVALID;
+      l3_proxy_dpo_add_or_lock (fib_proto_to_dpo (args->prefix.fp_proto),
+				args->sw_if_index, &proxy_dpo);
+      fib_table_entry_special_dpo_add (fib_index,
+				       &args->prefix,
+				       FIB_SOURCE_PROXY,
+				       FIB_ENTRY_FLAG_EXCLUSIVE, &proxy_dpo);
+      dpo_reset (&proxy_dpo);
+    }
+  else
+    {
+      fib_table_entry_special_remove (fib_index, &args->prefix,
+				      FIB_SOURCE_PROXY);
+    }
+  return 0;
+}
+
+u8
+ip_container_proxy_is_set (fib_prefix_t * pfx, u32 sw_if_index)
+{
+  u32 fib_index;
+  fib_node_index_t fei;
+  const dpo_id_t *dpo;
+  l3_proxy_dpo_t *l3p;
+  load_balance_t *lb0;
+
+  fib_index = fib_table_get_table_id_for_sw_if_index (pfx->fp_proto,
+						      sw_if_index);
+  if (fib_index == ~0)
+    return 0;
+
+  fei = fib_table_lookup_exact_match (fib_index, pfx);
+  if (fei == FIB_NODE_INDEX_INVALID)
+    return 0;
+
+  dpo = fib_entry_contribute_ip_forwarding (fei);
+  lb0 = load_balance_get (dpo->dpoi_index);
+  dpo = load_balance_get_bucket_i (lb0, 0);
+  if (dpo->dpoi_type != DPO_L3_PROXY)
+    return 0;
+
+  l3p = l3_proxy_dpo_get (dpo->dpoi_index);
+  return (l3p->l3p_sw_if_index == sw_if_index);
+}
+
+clib_error_t *
 ip_container_cmd (vlib_main_t * vm,
 		  unformat_input_t * main_input, vlib_cli_command_t * cmd)
 {
   unformat_input_t _line_input, *line_input = &_line_input;
   fib_prefix_t pfx;
-
-  u32 is_del;
+  u32 is_del, addr_set = 0;
   vnet_main_t *vnm;
-  u32 fib_index;
   u32 sw_if_index;
 
   vnm = vnet_get_main ();
   is_del = 0;
   sw_if_index = ~0;
+  memset (&pfx, 0, sizeof (pfx));
 
   /* Get a line of input. */
   if (!unformat_user (main_input, unformat_line_input, line_input))
     return 0;
 
+  while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (line_input, "%U", unformat_ip4_address, &pfx.fp_addr.ip4))
+	{
+	  pfx.fp_proto = FIB_PROTOCOL_IP4;
+	  pfx.fp_len = 32;
+	  addr_set = 1;
+	}
+      else if (unformat (line_input, "%U",
+			 unformat_ip6_address, &pfx.fp_addr.ip6))
+	{
+	  pfx.fp_proto = FIB_PROTOCOL_IP6;
+	  pfx.fp_len = 128;
+	  addr_set = 1;
+	}
+      else if (unformat (line_input, "%U",
+			 unformat_vnet_sw_interface, vnm, &sw_if_index))
+	;
+      else if (unformat (line_input, "del"))
+	is_del = 1;
+      else
+	return (clib_error_return (0, "unknown input '%U'",
+				   format_unformat_error, line_input));
+    }
+
+  if (~0 == sw_if_index || !addr_set)
+    {
+      vlib_cli_output (vm, "interface and address must be set");
+      return 0;
+    }
+
+  vnet_ip_container_proxy_args_t args = {
+    .prefix = pfx,
+    .sw_if_index = sw_if_index,
+    .is_add = !is_del,
+  };
+  vnet_ip_container_proxy_add_del (&args);
+  unformat_free (line_input);
+  return (NULL);
+}
+
+/* *INDENT-OFF* */
+VLIB_CLI_COMMAND (ip_container_command_node, static) = {
+  .path = "ip container",
+  .function = ip_container_cmd,
+  .short_help = "ip container <address> <interface>",
+  .is_mp_safe = 1,
+};
+/* *INDENT-ON* */
+
+clib_error_t *
+show_ip_container_cmd_fn (vlib_main_t * vm, unformat_input_t * main_input,
+			  vlib_cli_command_t * cmd)
+{
+  unformat_input_t _line_input, *line_input = &_line_input;
+  vnet_main_t *vnm = vnet_get_main ();
+  fib_prefix_t pfx;
+  u32 sw_if_index = ~0;
+  u8 has_proxy;
+
+  if (!unformat_user (main_input, unformat_line_input, line_input))
+    return 0;
   while (unformat_check_input (line_input) != UNFORMAT_END_OF_INPUT)
     {
       if (unformat (line_input, "%U", unformat_ip4_address, &pfx.fp_addr.ip4))
@@ -1470,8 +1596,6 @@ ip_container_cmd (vlib_main_t * vm,
       else if (unformat (line_input, "%U",
 			 unformat_vnet_sw_interface, vnm, &sw_if_index))
 	;
-      else if (unformat (line_input, "del"))
-	is_del = 1;
       else
 	return (clib_error_return (0, "unknown input '%U'",
 				   format_unformat_error, line_input));
@@ -1479,35 +1603,22 @@ ip_container_cmd (vlib_main_t * vm,
 
   if (~0 == sw_if_index)
     {
+      vlib_cli_output (vm, "no interface");
       return (clib_error_return (0, "no interface"));
     }
 
-  fib_index = fib_table_get_table_id_for_sw_if_index (pfx.fp_proto,
-						      sw_if_index);
+  has_proxy = ip_container_proxy_is_set (&pfx, sw_if_index);
+  vlib_cli_output (vm, "ip container proxy is: %s", has_proxy ? "on" : "off");
 
-  if (is_del)
-    fib_table_entry_special_remove (fib_index, &pfx, FIB_SOURCE_PROXY);
-  else
-    {
-      dpo_id_t proxy_dpo = DPO_INVALID;
-
-      l3_proxy_dpo_add_or_lock (fib_proto_to_dpo (pfx.fp_proto),
-				sw_if_index, &proxy_dpo);
-
-      fib_table_entry_special_dpo_add (fib_index,
-				       &pfx,
-				       FIB_SOURCE_PROXY,
-				       FIB_ENTRY_FLAG_EXCLUSIVE, &proxy_dpo);
-    }
-
-  return (NULL);
+  unformat_free (line_input);
+  return 0;
 }
 
 /* *INDENT-OFF* */
-VLIB_CLI_COMMAND (ip_container_command_node, static) = {
-  .path = "ip container",
-  .function = ip_container_cmd,
-  .short_help = "ip container <address> <interface>",
+VLIB_CLI_COMMAND (show_ip_container_command, static) = {
+  .path = "show ip container",
+  .function = show_ip_container_cmd_fn,
+  .short_help = "show ip container <address> <interface>",
   .is_mp_safe = 1,
 };
 /* *INDENT-ON* */

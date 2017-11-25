@@ -53,6 +53,7 @@ _(MPLS_ROUTE_ADD_DEL, mpls_route_add_del)                   \
 _(MPLS_TABLE_ADD_DEL, mpls_table_add_del)                   \
 _(MPLS_TUNNEL_ADD_DEL, mpls_tunnel_add_del)                 \
 _(MPLS_TUNNEL_DUMP, mpls_tunnel_dump)                       \
+_(SW_INTERFACE_SET_MPLS_ENABLE, sw_interface_set_mpls_enable) \
 _(MPLS_FIB_DUMP, mpls_fib_dump)
 
 extern void stats_dslock_with_hint (int hint, int tag);
@@ -234,9 +235,11 @@ mpls_route_add_del_t_handler (vnet_main_t * vnm,
                                    mp->mr_is_rpf_id,
                                    0,	// l2_bridged
                                    0,   // is source_lookup
+                                   0,   // is_udp_encap
 				   fib_index, &pfx,
 				   mp->mr_next_hop_proto,
-				   &nh, ntohl (mp->mr_next_hop_sw_if_index),
+				   &nh, ~0, // next_hop_id
+                                   ntohl (mp->mr_next_hop_sw_if_index),
 				   next_hop_fib_index,
 				   mp->mr_next_hop_weight,
 				   mp->mr_next_hop_preference,
@@ -354,6 +357,23 @@ vl_api_mpls_tunnel_add_del_t_handler (vl_api_mpls_tunnel_add_del_t * mp)
   /* *INDENT-ON* */
 }
 
+static void
+  vl_api_sw_interface_set_mpls_enable_t_handler
+  (vl_api_sw_interface_set_mpls_enable_t * mp)
+{
+  vl_api_sw_interface_set_mpls_enable_reply_t *rmp;
+  int rv = 0;
+
+  VALIDATE_SW_IF_INDEX (mp);
+
+  rv = mpls_sw_interface_enable_disable (&mpls_main,
+					 ntohl (mp->sw_if_index),
+					 mp->enable, 1);
+
+  BAD_SW_IF_INDEX_LABEL;
+  REPLY_MACRO (VL_API_SW_INTERFACE_SET_MPLS_ENABLE_REPLY);
+}
+
 typedef struct mpls_tunnel_send_walk_ctx_t_
 {
   unix_shared_memory_queue_t *q;
@@ -364,7 +384,7 @@ typedef struct mpls_tunnel_send_walk_ctx_t_
 static void
 send_mpls_tunnel_entry (u32 mti, void *arg)
 {
-  fib_route_path_encode_t *api_rpaths, *api_rpath;
+  fib_route_path_encode_t *api_rpaths = NULL, *api_rpath;
   mpls_tunnel_send_walk_ctx_t *ctx;
   vl_api_mpls_tunnel_details_t *mp;
   const mpls_tunnel_t *mt;

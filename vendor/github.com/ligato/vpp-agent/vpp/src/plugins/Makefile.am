@@ -14,7 +14,7 @@
 
 AUTOMAKE_OPTIONS = foreign subdir-objects
 
-AM_CFLAGS = -Wall -I${top_srcdir} -I${top_builddir}
+AM_CFLAGS = @CPU_FLAGS@ -Wall -I${top_srcdir} -I${top_builddir}
 AM_LDFLAGS = -module -shared -avoid-version
 AM_LIBTOOLFLAGS = --quiet
 SUFFIXES = .api.h .api .api.json
@@ -23,6 +23,7 @@ BUILT_SOURCES =
 vppplugins_LTLIBRARIES =
 vppapitestplugins_LTLIBRARIES =
 noinst_HEADERS =
+noinst_LTLIBRARIES =
 nobase_apiinclude_HEADERS =
 nobase_include_HEADERS =
 

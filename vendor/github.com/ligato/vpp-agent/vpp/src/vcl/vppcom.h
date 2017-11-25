@@ -23,14 +23,17 @@
 /*
  * VPPCOM Public API Definitions, Enums, and Data Structures
  */
-#define INVALID_SESSION_ID               (~0)
-#define VPPCOM_VRF_DEFAULT               0
-#define VPPCOM_CONF_DEFAULT              "/etc/vpp/vppcom.conf"
-#define VPPCOM_ENV_CONF                  "VCL_CONFIG"
-#define VPPCOM_ENV_APP_NAMESPACE_ID      "VCL_APP_NAMESPACE_ID"
-#define VPPCOM_ENV_APP_NAMESPACE_SECRET  "VCL_APP_NAMESPACE_SECRET"
-#define VPPCOM_ENV_SESSION_SCOPE_LOCAL   "VCL_SESSION_SCOPE_LOCAL"
-#define VPPCOM_ENV_SESSION_SCOPE_GLOBAL  "VCL_SESSION_SCOPE_GLOBAL"
+#define INVALID_SESSION_ID                   (~0)
+#define VPPCOM_VRF_DEFAULT                   0
+#define VPPCOM_CONF_DEFAULT                  "/etc/vpp/vcl.conf"
+#define VPPCOM_ENV_CONF                      "VCL_CONFIG"
+#define VPPCOM_ENV_DEBUG                     "VCL_DEBUG"
+#define VPPCOM_ENV_APP_PROXY_TRANSPORT_TCP   "VCL_APP_PROXY_TRANSPORT_TCP"
+#define VPPCOM_ENV_APP_PROXY_TRANSPORT_UDP   "VCL_APP_PROXY_TRANSPORT_UDP"
+#define VPPCOM_ENV_APP_NAMESPACE_ID          "VCL_APP_NAMESPACE_ID"
+#define VPPCOM_ENV_APP_NAMESPACE_SECRET      "VCL_APP_NAMESPACE_SECRET"
+#define VPPCOM_ENV_APP_SCOPE_LOCAL           "VCL_APP_SCOPE_LOCAL"
+#define VPPCOM_ENV_APP_SCOPE_GLOBAL          "VCL_APP_SCOPE_GLOBAL"
 
 typedef enum
 {
@@ -57,6 +60,7 @@ typedef enum
 {
   VPPCOM_OK = 0,
   VPPCOM_EAGAIN = -EAGAIN,
+  VPPCOM_ENOMEM = -ENOMEM,
   VPPCOM_EINVAL = -EINVAL,
   VPPCOM_EBADFD = -EBADFD,
   VPPCOM_EAFNOSUPPORT = -EAFNOSUPPORT,
@@ -68,7 +72,7 @@ typedef enum
 typedef enum
 {
   VPPCOM_ATTR_GET_NREAD,
-  VPPCOM_ATTR_PEEK_NREAD,
+  VPPCOM_ATTR_GET_NWRITE,
   VPPCOM_ATTR_GET_FLAGS,
   VPPCOM_ATTR_SET_FLAGS,
   VPPCOM_ATTR_GET_LCL_ADDR,
@@ -143,7 +147,7 @@ extern int vppcom_session_bind (uint32_t session_index, vppcom_endpt_t * ep);
 extern int vppcom_session_listen (uint32_t session_index, uint32_t q_len);
 extern int vppcom_session_accept (uint32_t session_index,
 				  vppcom_endpt_t * client_ep,
-				  double wait_for_time);
+				  uint32_t flags, double wait_for_time);
 
 extern int vppcom_session_connect (uint32_t session_index,
 				   vppcom_endpt_t * server_ep);

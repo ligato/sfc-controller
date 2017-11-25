@@ -3,11 +3,12 @@ LT_INIT
 AC_CONFIG_AUX_DIR([.])
 AM_INIT_AUTOMAKE([subdir-objects])
 AM_SILENT_RULES([yes])
-AC_CONFIG_FILES([Makefile plugins/Makefile vpp-api/python/Makefile vpp-api/java/Makefile vpp-api/vapi/Makefile])
+AC_CONFIG_FILES([Makefile plugins/Makefile vpp-api/python/Makefile vpp-api/java/Makefile vpp-api/vapi/Makefile vpp-api/vom/Makefile])
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_PROG_CC
 AC_PROG_CXX
+AC_PROG_CPP
 AM_PROG_AS
 AM_PROG_LIBTOOL
 AC_PROG_YACC
@@ -118,6 +119,22 @@ AC_DEFUN([DETECT_DPDK_IS_1702_OR_1705],
   AM_CONDITIONAL(DPDK_IS_1702_OR_1705, test "$dpdk_is_1702_or_1705" = "yes")
 ])
 
+# Check if compiler supports specific flag
+AC_DEFUN([CC_CHECK_FLAG],
+[
+  AC_MSG_CHECKING([if $CC supports $1])
+  AC_LANG_PUSH([C])
+  ac_saved_cflags="$CFLAGS"
+  CFLAGS="-Werror $1"
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
+  [cc_flag_check=yes],
+  [cc_flag_check=no]
+)
+  AC_MSG_RESULT([$cc_flag_check])
+  CFLAGS="$ac_saved_cflags"
+  AC_LANG_POP([C])
+])
+
 ###############################################################################
 # configure arguments
 ###############################################################################
@@ -133,6 +150,7 @@ DISABLE_ARG(vlib,	[Disable vlib and dependant libs and binaries])
 DISABLE_ARG(svm,	[Disable svm and dependant libs and binaries])
 DISABLE_ARG(papi,	[Disable Python API bindings])
 DISABLE_ARG(japi,	[Disable Java API bindings])
+DISABLE_ARG(vom,	[Disable VPP object model bindings])
 
 # --with-X
 
@@ -157,6 +175,37 @@ AC_ARG_WITH(pre-data,
 	       256) ;;
                *) with_pre_data="pre-data-not-set" ;;
 	     esac], [with_pre_data=128])
+
+###############################################################################
+# Target CPU flags
+###############################################################################
+
+# Check if compiler supports march=core-avx2
+CC_CHECK_FLAG("-march=core-avx2")
+AS_IF([test "$cc_flag_check" = yes],
+      [march_core_avx2=yes],
+      [march_core_avx2=no])
+AM_CONDITIONAL([CC_SUPPORTS_AVX2], [test "$march_core_avx2" = "yes"])
+
+# Check if compiler supports march=skylake-avx512
+CC_CHECK_FLAG("-march=skylake-avx512")
+AS_IF([test "$cc_flag_check" = yes],
+  [march_skylake_avx512=yes],
+  [march_skylake_avx512=no])
+AM_CONDITIONAL([CC_SUPPORTS_AVX512], [test "$march_skylake_avx512" = "yes"])
+
+AS_CASE([$build_cpu],
+	[x86_64], [CPU_FLAGS="-march=corei7 -mtune=corei7-avx"],
+	[aarch64], [CPU_FLAGS="-march=armv8-a+crc"],
+	[CPU_FLAGS=""],
+)
+AC_SUBST([CPU_FLAGS])
+
+AC_SUBST([CPU_AVX2_FLAGS],"-march=core-avx2 -mtune=core-avx2")
+AC_SUBST([CPU_AVX512_FLAGS],"-march=skylake-avx512 -mtune=skylake-avx512")
+
+AM_CONDITIONAL([CPU_X86_64], [test "$build_cpu" = "x86_64"])
+AM_CONDITIONAL([CPU_AARCH64], [test "$build_cpu" = "aarch64"])
 
 ###############################################################################
 # Substitutions and defines

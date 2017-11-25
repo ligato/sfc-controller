@@ -15,18 +15,18 @@
 package vppdump
 
 import (
-	"encoding/binary"
 	"net"
+
+	"time"
 
 	govppapi "git.fd.io/govpp.git/api"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/logging/measure"
 	l2ba "github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/bin_api/l2"
 	l2nb "github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
-	"time"
 )
 
-// DumpBridgeDomainIDs lists all configured bridge domains. Auxiliary method for LookupFIBEntries
+// DumpBridgeDomainIDs lists all configured bridge domains. Auxiliary method for LookupFIBEntries.
 func DumpBridgeDomainIDs(log logging.Logger, vppChannel *govppapi.Channel, timeLog measure.StopWatchEntry) ([]uint32, error) {
 	// BridgeDomainDump time measurement
 	start := time.Now()
@@ -86,14 +86,14 @@ func DumpBridgeDomains(log logging.Logger, vppChan *govppapi.Channel, timeLog me
 	// map for the resulting BDs
 	bds := make(map[uint32]*BridgeDomain)
 
-	// first, dump all interfaces to create initial data
+	// First, dump all interfaces to create initial data.
 	reqCtx := vppChan.SendMultiRequest(&l2ba.BridgeDomainDump{BdID: ^uint32(0)})
 
 	for {
 		bdDetails := &l2ba.BridgeDomainDetails{}
 		stop, err := reqCtx.ReceiveReply(bdDetails)
 		if stop {
-			break // break out of the loop
+			break // Break from the loop.
 		}
 		if err != nil {
 			log.Error(err)
@@ -151,14 +151,14 @@ func DumpFIBTableEntries(log logging.Logger, vppChan *govppapi.Channel, timeLog 
 		fibDetails := &l2ba.L2FibTableDetails{}
 		stop, err := reqCtx.ReceiveReply(fibDetails)
 		if stop {
-			break // break out of the loop
+			break // Break from the loop.
 		}
 		if err != nil {
 			log.Error(err)
 			return nil, err
 		}
 
-		mac := uint64ToMACAddrString(fibDetails.Mac)
+		mac := net.HardwareAddr(fibDetails.Mac).String()
 		var action l2nb.FibTableEntries_FibTableEntry_Action
 		if fibDetails.FilterMac > 0 {
 			action = l2nb.FibTableEntries_FibTableEntry_DROP
@@ -206,7 +206,7 @@ func DumpXConnectPairs(log logging.Logger, vppChan *govppapi.Channel, timeLog me
 		pairs := &l2ba.L2XconnectDetails{}
 		stop, err := reqCtx.ReceiveReply(pairs)
 		if stop {
-			break // break out of the loop
+			break // Break from the loop.
 		}
 		if err != nil {
 			log.Error(err)
@@ -220,11 +220,4 @@ func DumpXConnectPairs(log logging.Logger, vppChan *govppapi.Channel, timeLog me
 	}
 
 	return nil, nil
-}
-
-// uint64ToMACAddrString converts MAC address in uint64 number as received from VPP to MAC address string.
-func uint64ToMACAddrString(macUint uint64) string {
-	mac := make([]byte, 8)
-	binary.BigEndian.PutUint64(mac, macUint)
-	return net.HardwareAddr(mac[2:]).String()
 }

@@ -17,30 +17,31 @@ package linuxplugin
 import (
 	"strings"
 
+	"fmt"
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/vpp-agent/plugins/linuxplugin/ifplugin/model/interfaces"
 	"github.com/ligato/vpp-agent/plugins/linuxplugin/l3plugin/model/l3"
 )
 
-// DataResyncReq is used to transfer expected configuration of the Linux network stack to the plugins
+// DataResyncReq is used to transfer expected configuration of the Linux network stack to the plugins.
 type DataResyncReq struct {
-	// Interfaces is a list af all interfaces that are expected to be in Linux after RESYNC
+	// Interfaces is a list af all interfaces that are expected to be in Linux after RESYNC.
 	Interfaces []*interfaces.LinuxInterfaces_Interface
-	// ARPs is a list af all arp entries that are expected to be in Linux after RESYNC
+	// ARPs is a list af all arp entries that are expected to be in Linux after RESYNC.
 	ARPs []*l3.LinuxStaticArpEntries_ArpEntry
-	// Routes is a list af all routes that are expected to be in Linux after RESYNC
+	// Routes is a list af all routes that are expected to be in Linux after RESYNC.
 	Routes []*l3.LinuxStaticRoutes_Route
 }
 
-// NewDataResyncReq is a constructor of object requirements which are expected to be re-synced
+// NewDataResyncReq is a constructor of object requirements which are expected to be re-synced.
 func NewDataResyncReq() *DataResyncReq {
 	return &DataResyncReq{
-		// Interfaces is a list af all interfaces that are expected to be in Linux after RESYNC
+		// Interfaces is a list af all interfaces that are expected to be in Linux after RESYNC.
 		Interfaces: []*interfaces.LinuxInterfaces_Interface{},
-		// ARPs is a list af all arp entries that are expected to be in Linux after RESYNC
+		// ARPs is a list af all arp entries that are expected to be in Linux after RESYNC.
 		ARPs: []*l3.LinuxStaticArpEntries_ArpEntry{},
-		// Routes is a list af all routes that are expected to be in Linux after RESYNC
+		// Routes is a list af all routes that are expected to be in Linux after RESYNC.
 		Routes: []*l3.LinuxStaticRoutes_Route{},
 	}
 }
@@ -48,16 +49,29 @@ func NewDataResyncReq() *DataResyncReq {
 // DataResync delegates resync request linuxplugin configurators.
 func (plugin *Plugin) resyncPropageRequest(req *DataResyncReq) error {
 	plugin.Log.Info("resync the Linux Configuration")
+	// store all resync errors
+	var resyncErrs []error
 
 	if err := plugin.ifConfigurator.Resync(req.Interfaces); err != nil {
-		return err
+		resyncErrs = append(resyncErrs, err)
 	}
 
 	if err := plugin.arpConfigurator.Resync(req.ARPs); err != nil {
-		return err
+		resyncErrs = append(resyncErrs, err)
 	}
 
-	return plugin.routeConfigurator.Resync(req.Routes)
+	if err := plugin.routeConfigurator.Resync(req.Routes); err != nil {
+		resyncErrs = append(resyncErrs, err)
+	}
+
+	// log errors if any
+	if len(resyncErrs) == 0 {
+		return nil
+	}
+	for _, err := range resyncErrs {
+		plugin.Log.Error(err)
+	}
+	return fmt.Errorf("%v errors occured during linuxplugin resync", len(resyncErrs))
 }
 
 func resyncParseEvent(resyncEv datasync.ResyncEvent, log logging.Logger) *DataResyncReq {
@@ -135,7 +149,7 @@ func resyncAppendRoutes(resyncData datasync.KeyValIterator, req *DataResyncReq) 
 
 func (plugin *Plugin) subscribeWatcher() (err error) {
 	plugin.Log.Debug("subscribeWatcher begin")
-
+	plugin.ifIndexes.WatchNameToIdx(plugin.PluginName, plugin.ifIndexesWatchChan)
 	plugin.watchDataReg, err = plugin.Watcher.
 		Watch("linuxplugin", plugin.changeChan, plugin.resyncChan,
 			interfaces.InterfaceKeyPrefix(),

@@ -10,6 +10,7 @@ import tempfile
 import time
 import resource
 import faulthandler
+import random
 from collections import deque
 from threading import Thread, Event
 from inspect import getdoc, isclass
@@ -68,17 +69,45 @@ class _PacketInfo(object):
 
 def pump_output(testclass):
     """ pump output from vpp stdout/stderr to proper queues """
+    stdout_fragment = ""
+    stderr_fragment = ""
     while not testclass.pump_thread_stop_flag.wait(0):
         readable = select.select([testclass.vpp.stdout.fileno(),
                                   testclass.vpp.stderr.fileno(),
                                   testclass.pump_thread_wakeup_pipe[0]],
                                  [], [])[0]
         if testclass.vpp.stdout.fileno() in readable:
-            read = os.read(testclass.vpp.stdout.fileno(), 1024)
-            testclass.vpp_stdout_deque.append(read)
+            read = os.read(testclass.vpp.stdout.fileno(), 102400)
+            if len(read) > 0:
+                split = read.splitlines(True)
+                if len(stdout_fragment) > 0:
+                    split[0] = "%s%s" % (stdout_fragment, split[0])
+                if len(split) > 0 and split[-1].endswith("\n"):
+                    limit = None
+                else:
+                    limit = -1
+                    stdout_fragment = split[-1]
+                testclass.vpp_stdout_deque.extend(split[:limit])
+                if not testclass.cache_vpp_output:
+                    for line in split[:limit]:
+                        testclass.logger.debug(
+                            "VPP STDOUT: %s" % line.rstrip("\n"))
         if testclass.vpp.stderr.fileno() in readable:
-            read = os.read(testclass.vpp.stderr.fileno(), 1024)
-            testclass.vpp_stderr_deque.append(read)
+            read = os.read(testclass.vpp.stderr.fileno(), 102400)
+            if len(read) > 0:
+                split = read.splitlines(True)
+                if len(stderr_fragment) > 0:
+                    split[0] = "%s%s" % (stderr_fragment, split[0])
+                if len(split) > 0 and split[-1].endswith("\n"):
+                    limit = None
+                else:
+                    limit = -1
+                    stderr_fragment = split[-1]
+                testclass.vpp_stderr_deque.extend(split[:limit])
+                if not testclass.cache_vpp_output:
+                    for line in split[:limit]:
+                        testclass.logger.debug(
+                            "VPP STDERR: %s" % line.rstrip("\n"))
         # ignoring the dummy pipe here intentionally - the flag will take care
         # of properly terminating the loop
 
@@ -190,6 +219,12 @@ class VppTestCase(unittest.TestCase):
             d = os.getenv("DEBUG")
         except:
             d = None
+        try:
+            c = os.getenv("CACHE_OUTPUT", "1")
+            cls.cache_vpp_output = \
+                False if c.lower() in ("n", "no", "0") else True
+        except:
+            cls.cache_vpp_output = True
         cls.set_debug_flags(d)
         cls.vpp_bin = os.getenv('VPP_TEST_BIN', "vpp")
         cls.plugin_path = os.getenv('VPP_TEST_PLUGIN_PATH')
@@ -282,6 +317,7 @@ class VppTestCase(unittest.TestCase):
         Remove shared memory files, start vpp and connect the vpp-api
         """
         gc.collect()  # run garbage collection first
+        random.seed()
         cls.logger = getLogger(cls.__name__)
         cls.tempdir = tempfile.mkdtemp(
             prefix='vpp-unittest-%s-' % cls.__name__)
@@ -1051,3 +1087,33 @@ class VppTestRunner(unittest.TextTestRunner):
         if not running_extended_tests():
             print("Not running extended tests (some tests will be skipped)")
         return super(VppTestRunner, self).run(filtered)
+
+
+class Worker(Thread):
+    def __init__(self, args, logger):
+        self.logger = logger
+        self.args = args
+        self.result = None
+        super(Worker, self).__init__()
+
+    def run(self):
+        executable = self.args[0]
+        self.logger.debug("Running executable w/args `%s'" % self.args)
+        env = os.environ.copy()
+        env["CK_LOG_FILE_NAME"] = "-"
+        self.process = subprocess.Popen(
+            self.args, shell=False, env=env, preexec_fn=os.setpgrp,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = self.process.communicate()
+        self.logger.debug("Finished running `%s'" % executable)
+        self.logger.info("Return code is `%s'" % self.process.returncode)
+        self.logger.info(single_line_delim)
+        self.logger.info("Executable `%s' wrote to stdout:" % executable)
+        self.logger.info(single_line_delim)
+        self.logger.info(out)
+        self.logger.info(single_line_delim)
+        self.logger.info("Executable `%s' wrote to stderr:" % executable)
+        self.logger.info(single_line_delim)
+        self.logger.error(err)
+        self.logger.info(single_line_delim)
+        self.result = self.process.returncode

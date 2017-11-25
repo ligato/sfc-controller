@@ -1,6 +1,7 @@
 [Documentation]     Keywords for working with VPP terminal
 
 *** Settings ***
+Library      Collections
 Library      vpp_term.py
 
 *** Variables ***
@@ -95,6 +96,13 @@ vpp_term: Check Ping
     Should Contain     ${out}    from ${ip}
     Should Not Contain    ${out}    100% packet loss
 
+vpp_term: Check Ping Within Interface
+    [Arguments]        ${node}    ${ip}    ${source}
+    Log Many           ${node}    ${ip}    ${source}
+    ${out}=            vpp_term: Issue Command    ${node}    ping ${ip} source ${source}    delay=10s
+    Should Contain     ${out}    from ${ip}
+    Should Not Contain    ${out}    100% packet loss
+
 vpp_term: Check Interface Presence
     [Arguments]        ${node}     ${mac}    ${status}=${TRUE}
     [Documentation]    Checking if specified interface with mac exists in VPP
@@ -102,7 +110,7 @@ vpp_term: Check Interface Presence
     ${ints}=           vpp_term: Show Hardware    ${node}
     ${result}=         Run Keyword And Return Status    Should Contain    ${ints}    ${mac}
     Should Be Equal    ${result}    ${status}
-    
+
 vpp_term: Interface Is Created
     [Arguments]    ${node}    ${mac}
     Log Many       ${node}    ${mac}
@@ -117,7 +125,7 @@ vpp_term: Interface Exists
     [Arguments]    ${node}    ${mac}
     Log Many       ${node}    ${mac}
     vpp_term: Check Interface Presence    ${node}    ${mac}
-    
+
 vpp_term: Interface Not Exists
     [Arguments]    ${node}    ${mac}
     Log Many       ${node}    ${mac}
@@ -137,7 +145,7 @@ vpp_term: Check Interface UpDown Status
     Should Be Equal As Integers    ${enabled}    ${status}
 
 vpp_term: Get Interface IPs
-    [Arguments]          ${node}     ${interface} 
+    [Arguments]          ${node}     ${interface}
     Log Many             ${node}     ${interface}
     ${int_addr}=         vpp_term: Show Interfaces Address    ${node}    ${interface}
     Log                  ${int_addr}
@@ -181,3 +189,23 @@ vpp_term: Show Memif
     ${out}=            vpp_term: Issue Command  ${node}   sh memif ${interface}
     [Return]           ${out}
 
+vpp_term: Check TAP Interface State
+    [Arguments]          ${node}    ${name}    @{desired_state}
+    Log Many             ${node}    ${name}    @{desired_state}
+    ${internal_name}=    vpp_ctl: Get Interface Internal Name    ${node}    ${name}
+    Log                  ${internal_name}
+    ${interface}=        vpp_term: Show Interfaces    ${node}    ${internal_name}
+    Log                  ${interface}
+    ${state}=            Set Variable    up
+    ${status}=           Evaluate     "${state}" in """${interface}"""
+    ${tap_int_state}=    Set Variable If    ${status}==True    ${state}    ELSE    down
+    Log                  ${tap_int_state}
+    ${ipv4}=             vpp_term: Get Interface IPs    ${node}     ${internal_name}
+    ${ipv4_string}=      Get From List    ${ipv4}    0
+    Log                  ${ipv4}
+    ${mac}=              vpp_term: Get Interface MAC    ${node}    ${internal_name}
+    Log                  ${mac}
+    ${actual_state}=     Create List    mac=${mac}    ipv4=${ipv4_string}    state=${tap_int_state}
+    Log List             ${actual_state}
+    List Should Contain Sub List    ${actual_state}    ${desired_state}
+    [Return]             ${actual_state}

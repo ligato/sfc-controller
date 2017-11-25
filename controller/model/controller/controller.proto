@@ -2,6 +2,12 @@ syntax = "proto3";
 
 package controller;
 
+enum RxModeType {
+    RX_MODE_UNKNOWN = 0;
+    RX_MODE_POLLING = 1;
+    RX_MODE_INTERRUPT = 2;
+}
+
 message SystemParameters {
     uint32 mtu = 1; // optional, overrrides default 1500
     uint32 starting_vlan_id = 2; // optional, overrrides default 5000
@@ -46,6 +52,7 @@ message HostEntity {
     string loopback_mac_addr = 4;
     string loopback_ipv4 = 5;
     uint32 mtu = 6;                   // if provided, this overrides system value
+    RxModeType rx_mode = 7;
 };
 
 enum SfcType {
@@ -94,6 +101,7 @@ message SfcEntity {
         SfcElementType type = 6;
         CustomInfoType custom_info = 7;   // opaque string ... possibly json for app specific information
         uint32 mtu = 8;                   // if provided, this overrides system value
+        RxModeType rx_mode = 9;
     };
     repeated SfcElement elements = 7;
 };

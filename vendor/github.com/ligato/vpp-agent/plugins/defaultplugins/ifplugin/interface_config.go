@@ -32,7 +32,10 @@ import (
 	"bytes"
 	"errors"
 
+	"time"
+
 	govppapi "git.fd.io/govpp.git/api"
+	"git.fd.io/govpp.git/core/bin_api/vpe"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/logging/measure"
 	"github.com/ligato/cn-infra/servicelabel"
@@ -41,14 +44,14 @@ import (
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/bin_api/interfaces"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/bin_api/memif"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/bin_api/tap"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/bin_api/vpe"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/bin_api/vxlan"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/ifaceidx"
 	intf "github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/vppcalls"
 	"github.com/ligato/vpp-agent/plugins/govppmux"
-	"time"
 )
+
+const dummyMode = -1
 
 // InterfaceConfigurator runs in the background in its own goroutine where it watches for any changes
 // in the configuration of interfaces as modelled by the proto file "../model/interfaces/interfaces.proto"
@@ -93,7 +96,7 @@ func (plugin *InterfaceConfigurator) Init(swIfIndexes ifaceidx.SwIfIndexRW, mtu 
 		return err
 	}
 
-	plugin.afPacketConfigurator = &AFPacketConfigurator{Logger: plugin.Log, Linux: plugin.Linux, Stopwatch: plugin.Stopwatch}
+	plugin.afPacketConfigurator = &AFPacketConfigurator{Logger: plugin.Log, Linux: plugin.Linux, SwIfIndexes: plugin.swIfIndexes, Stopwatch: plugin.Stopwatch}
 	plugin.afPacketConfigurator.Init(plugin.vppCh)
 
 	return nil
@@ -107,7 +110,6 @@ func (plugin *InterfaceConfigurator) Close() error {
 // LookupVPPInterfaces looks up all VPP interfaces and saves their name-to-index mapping and state information.
 func (plugin *InterfaceConfigurator) LookupVPPInterfaces() error {
 	start := time.Now()
-	plugin.Log.Debug("Starting lookup of VPP interfaces")
 	req := &interfaces.SwInterfaceDump{}
 	reqCtx := plugin.vppCh.SendMultiRequest(req)
 
@@ -122,7 +124,7 @@ func (plugin *InterfaceConfigurator) LookupVPPInterfaces() error {
 			return err
 		}
 
-		// store the name to index mapping if it does not exist yet
+		// store the name-to-index mapping if it does not exist yet
 		_, _, found := plugin.swIfIndexes.LookupName(msg.SwIfIndex)
 		if !found {
 			ifName := string(bytes.Trim(msg.InterfaceName, "\x00"))
@@ -160,7 +162,7 @@ func (plugin *InterfaceConfigurator) ConfigureVPPInterface(iface *intf.Interface
 	case intf.InterfaceType_MEMORY_INTERFACE:
 		ifIdx, err = vppcalls.AddMemifInterface(iface.Memif, plugin.vppCh, measure.GetTimeLog(memif.MemifCreate{}, plugin.Stopwatch))
 	case intf.InterfaceType_VXLAN_TUNNEL:
-		ifIdx, err = vppcalls.AddVxlanTunnel(iface.Vxlan, plugin.vppCh, measure.GetTimeLog(vxlan.VxlanAddDelTunnelReply{}, plugin.Stopwatch))
+		ifIdx, err = vppcalls.AddVxlanTunnel(iface.Vxlan, iface.Vrf, plugin.vppCh, measure.GetTimeLog(vxlan.VxlanAddDelTunnelReply{}, plugin.Stopwatch))
 	case intf.InterfaceType_SOFTWARE_LOOPBACK:
 		ifIdx, err = vppcalls.AddLoopbackInterface(plugin.vppCh, measure.GetTimeLog(vpe.CreateLoopback{}, plugin.Stopwatch))
 	case intf.InterfaceType_ETHERNET_CSMACD:
@@ -172,6 +174,8 @@ func (plugin *InterfaceConfigurator) ConfigureVPPInterface(iface *intf.Interface
 		ifIdx, pending, err = plugin.afPacketConfigurator.ConfigureAfPacketInterface(iface)
 	}
 
+	var wasError error
+
 	if nil != err {
 		return err
 	}
@@ -180,13 +184,21 @@ func (plugin *InterfaceConfigurator) ConfigureVPPInterface(iface *intf.Interface
 		return nil
 	}
 
-	var wasError error
+	//rx mode
+	wasError = plugin.configRxModeForInterface(iface, ifIdx)
 
 	// configure optional mac address
 	if iface.PhysAddress != "" {
 		err := vppcalls.SetInterfaceMac(ifIdx, iface.PhysAddress, plugin.Log, plugin.vppCh,
 			measure.GetTimeLog(interfaces.SwInterfaceSetMacAddress{}, plugin.Stopwatch))
 		if err != nil {
+			wasError = err
+		}
+	}
+
+	// configure optional vrf
+	if iface.Type != intf.InterfaceType_VXLAN_TUNNEL {
+		if err := vppcalls.SetInterfaceVRF(ifIdx, iface.Vrf, plugin.Log, plugin.vppCh); err != nil {
 			wasError = err
 		}
 	}
@@ -219,8 +231,10 @@ func (plugin *InterfaceConfigurator) ConfigureVPPInterface(iface *intf.Interface
 		}
 	}
 
-	// register name to idx mapping
-	plugin.swIfIndexes.RegisterName(iface.Name, ifIdx, iface)
+	// register name to idx mapping if it is not an af_packet interface type (it is registered in ConfigureAfPacketInterface if needed)
+	if iface.Type != intf.InterfaceType_AF_PACKET_INTERFACE {
+		plugin.swIfIndexes.RegisterName(iface.Name, ifIdx, iface)
+	}
 	plugin.Log.WithFields(logging.Fields{"ifName": iface.Name, "ifIdx": ifIdx}).Info("Configured interface")
 
 	// set interface up if enabled
@@ -237,6 +251,48 @@ func (plugin *InterfaceConfigurator) ConfigureVPPInterface(iface *intf.Interface
 	plugin.LookupVPPInterfaces()
 
 	return wasError
+}
+
+/**
+Set rx-mode on specified VPP interface
+
+Legend:
+P - polling
+I - interrupt
+A - adaptive
+
+Interfaces - supported modes:
+* tap interface - PIA
+* memory interface - PIA
+* vxlan tunnel - PIA
+* software loopback - PIA
+* ethernet csmad - P
+* af packet - PIA
+*/
+func (plugin *InterfaceConfigurator) configRxModeForInterface(iface *intf.Interfaces_Interface, ifIdx uint32) error {
+	rxModeSettings := iface.RxModeSettings
+	if rxModeSettings != nil {
+		switch iface.Type {
+		case intf.InterfaceType_ETHERNET_CSMACD:
+			if rxModeSettings.RxMode == intf.RxModeType_POLLING {
+				return plugin.configRxMode(iface, ifIdx, *rxModeSettings)
+			}
+		default:
+			return plugin.configRxMode(iface, ifIdx, *rxModeSettings)
+		}
+	}
+	return nil
+}
+
+/**
+Call concrete vpp API method for setting rx-mode
+*/
+func (plugin *InterfaceConfigurator) configRxMode(iface *intf.Interfaces_Interface, ifIdx uint32, rxModeSettings intf.Interfaces_Interface_RxModeSettings) error {
+	err := vppcalls.SetRxMode(ifIdx, rxModeSettings, plugin.Log, plugin.vppCh,
+		measure.GetTimeLog(interfaces.SwInterfaceSetRxMode{}, plugin.Stopwatch))
+	plugin.Log.WithFields(logging.Fields{"ifName": iface.Name, "rxMode": rxModeSettings.RxMode}).
+		Debug("RX-mode configuration for ", iface.Type, ".")
+	return err
 }
 
 // ModifyVPPInterface applies changes in the NB configuration of a VPP interface into the running VPP
@@ -286,7 +342,8 @@ func (plugin *InterfaceConfigurator) modifyVPPInterface(newConfig *intf.Interfac
 			return err
 		}
 	case intf.InterfaceType_VXLAN_TUNNEL:
-		if !plugin.canVxlanBeModifWithoutDelete(newConfig.Vxlan, oldConfig.Vxlan) {
+		if !plugin.canVxlanBeModifWithoutDelete(newConfig.Vxlan, oldConfig.Vxlan) ||
+			oldConfig.Vrf != newConfig.Vrf {
 			err := plugin.recreateVPPInterface(newConfig, oldConfig, ifIdx)
 			plugin.Log.WithFields(logging.Fields{"ifName": newConfig.Name, "ifIdx": ifIdx}).
 				Debug("modifyVPPInterface end. ", err)
@@ -307,6 +364,8 @@ func (plugin *InterfaceConfigurator) modifyVPPInterface(newConfig *intf.Interfac
 	}
 
 	var wasError error
+	//rx mode
+	wasError = plugin.modifyRxModeForInterfaces(oldConfig, newConfig, ifIdx)
 
 	// admin status
 	if newConfig.Enabled != oldConfig.Enabled {
@@ -339,24 +398,54 @@ func (plugin *InterfaceConfigurator) modifyVPPInterface(newConfig *intf.Interfac
 		return err
 	}
 
-	del, add := addrs.DiffAddr(newAddrs, oldAddrs)
+	// configure VRF if it was changed
+	if oldConfig.Vrf != newConfig.Vrf &&
+		ifaceType != intf.InterfaceType_VXLAN_TUNNEL {
+		plugin.Log.Debugf("VRF changed: %v -> %v", oldConfig.Vrf, newConfig.Vrf)
 
-	plugin.Log.Debug("del ip addrs: ", del)
-	plugin.Log.Debug("add ip addrs: ", add)
+		// interface must not have IP when setting VRF
+		for _, addr := range oldAddrs {
+			err := vppcalls.DelInterfaceIP(ifIdx, addr, plugin.Log, plugin.vppCh, nil)
+			plugin.Log.Debug("del ip addr ", ifIdx, " ", addr, " ", err)
+			if nil != err {
+				wasError = err
+			}
+		}
 
-	for i := range del {
-		err := vppcalls.DelInterfaceIP(ifIdx, del[i], plugin.Log, plugin.vppCh, nil)
-		plugin.Log.Debug("del ip addr ", ifIdx, " ", del[i], " ", err)
-		if nil != err {
+		err := vppcalls.SetInterfaceVRF(ifIdx, newConfig.Vrf, plugin.Log, plugin.vppCh)
+		if err != nil {
 			wasError = err
 		}
-	}
 
-	for i := range add {
-		err := vppcalls.AddInterfaceIP(ifIdx, add[i], plugin.Log, plugin.vppCh, nil)
-		plugin.Log.Debug("add ip addr ", ifIdx, " ", add[i], " ", err)
-		if nil != err {
-			wasError = err
+		// set new IP addresses
+		for _, addr := range newAddrs {
+			err := vppcalls.AddInterfaceIP(ifIdx, addr, plugin.Log, plugin.vppCh, nil)
+			plugin.Log.Debug("add ip addr ", ifIdx, " ", addr, " ", err)
+			if nil != err {
+				wasError = err
+			}
+		}
+	} else {
+		// if VRF is not changed, try to add/del only differences
+		del, add := addrs.DiffAddr(newAddrs, oldAddrs)
+
+		plugin.Log.Debug("del ip addrs: ", del)
+		plugin.Log.Debug("add ip addrs: ", add)
+
+		for i := range del {
+			err := vppcalls.DelInterfaceIP(ifIdx, del[i], plugin.Log, plugin.vppCh, nil)
+			plugin.Log.Debug("del ip addr ", ifIdx, " ", del[i], " ", err)
+			if nil != err {
+				wasError = err
+			}
+		}
+
+		for i := range add {
+			err := vppcalls.AddInterfaceIP(ifIdx, add[i], plugin.Log, plugin.vppCh, nil)
+			plugin.Log.Debug("add ip addr ", ifIdx, " ", add[i], " ", err)
+			if nil != err {
+				wasError = err
+			}
 		}
 	}
 
@@ -376,6 +465,63 @@ func (plugin *InterfaceConfigurator) modifyVPPInterface(newConfig *intf.Interfac
 	plugin.Log.WithFields(logging.Fields{"ifName": newConfig.Name, "ifIdx": ifIdx}).Debug("modifyVPPInterface end. ", err)
 
 	return wasError
+}
+
+/**
+Modify rx-mode on specified VPP interface
+*/
+func (plugin *InterfaceConfigurator) modifyRxModeForInterfaces(oldIntf *intf.Interfaces_Interface, newIntf *intf.Interfaces_Interface,
+	ifIdx uint32) error {
+	oldRxSettings := oldIntf.RxModeSettings
+	newRxSettings := newIntf.RxModeSettings
+	if oldRxSettings != newRxSettings {
+		var oldRxMode intf.RxModeType
+		if oldRxSettings == nil {
+			oldRxMode = dummyMode
+		} else {
+			oldRxMode = oldRxSettings.RxMode
+		}
+
+		if newRxSettings != nil {
+			switch newIntf.Type {
+			case intf.InterfaceType_ETHERNET_CSMACD:
+				if newRxSettings.RxMode == intf.RxModeType_POLLING {
+					return plugin.modifyRxMode(ifIdx, newIntf, oldRxMode, *newRxSettings)
+				}
+				plugin.Log.WithFields(logging.Fields{"rx-mode": newRxSettings.RxMode}).
+					Warn("Attempt to set unsupported rx-mode on Ethernet interface.")
+			default:
+				return plugin.modifyRxMode(ifIdx, newIntf, oldRxMode, *newRxSettings)
+			}
+		} else {
+			//reset rx-mode to default value
+			newRxSettings = &intf.Interfaces_Interface_RxModeSettings{}
+			switch newIntf.Type {
+			case intf.InterfaceType_ETHERNET_CSMACD:
+				newRxSettings.RxMode = intf.RxModeType_POLLING
+			case intf.InterfaceType_AF_PACKET_INTERFACE:
+				newRxSettings.RxMode = intf.RxModeType_INTERRUPT
+			default:
+				newRxSettings.RxMode = intf.RxModeType_DEFAULT
+			}
+			newIntf.RxModeSettings = newRxSettings
+			return plugin.modifyRxMode(ifIdx, newIntf, oldRxMode, *newRxSettings)
+		}
+	}
+	return nil
+}
+
+/**
+Direct call of vpp api to change rx-mode of specified interface
+*/
+func (plugin *InterfaceConfigurator) modifyRxMode(ifIdx uint32, newIntf *intf.Interfaces_Interface,
+	oldRxMode intf.RxModeType, newRxMode intf.Interfaces_Interface_RxModeSettings) error {
+	err := vppcalls.SetRxMode(ifIdx, *newIntf.RxModeSettings, plugin.Log, plugin.vppCh,
+		measure.GetTimeLog(interfaces.SwInterfaceSetRxMode{}, plugin.Stopwatch))
+	plugin.Log.WithFields(
+		logging.Fields{"ifName": newIntf.Name, "rxMode old": oldRxMode, "rxMode new": newRxMode.RxMode}).
+		Debug("RX-mode modification for ", newIntf.Type, ".")
+	return err
 }
 
 // recreateVPPInterface removes and creates an interface from scratch.
@@ -422,6 +568,7 @@ func (plugin *InterfaceConfigurator) deleteVPPInterface(oldConfig *intf.Interfac
 	err := vppcalls.InterfaceAdminDown(ifIdx, plugin.vppCh, measure.GetTimeLog(interfaces.SwInterfaceSetFlags{}, plugin.Stopwatch))
 	if nil != err {
 		wasError = err
+
 	}
 
 	// let's try to do following even if previously error occurred
@@ -490,15 +637,12 @@ func (plugin *InterfaceConfigurator) canMemifBeModifWithoutDelete(newConfig *int
 	if newConfig == nil || oldConfig == nil {
 		return true
 	}
-	if newConfig.RingSize == 0 {
-		newConfig.RingSize = 1 // default
-	}
 
 	if newConfig.BufferSize != oldConfig.BufferSize || newConfig.Id != oldConfig.Id || newConfig.Secret != oldConfig.Secret ||
 		newConfig.RingSize != oldConfig.RingSize || newConfig.Master != oldConfig.Master || newConfig.SocketFilename != oldConfig.SocketFilename ||
 		newConfig.RxQueues != oldConfig.RxQueues || newConfig.TxQueues != oldConfig.TxQueues {
 
-		plugin.Log.Warn("Difference between new & old config causing recreation of memif ", oldConfig)
+		plugin.Log.Warnf("Difference between new & old config causing recreation of memif, old: '%+v' new: '%+v'", oldConfig, newConfig)
 
 		return false
 	}

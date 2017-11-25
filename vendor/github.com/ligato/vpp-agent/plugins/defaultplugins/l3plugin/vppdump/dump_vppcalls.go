@@ -18,13 +18,14 @@ import (
 	"fmt"
 	"net"
 
+	"time"
+
 	govppapi "git.fd.io/govpp.git/api"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/logging/measure"
 	"github.com/ligato/cn-infra/utils/addrs"
 	l3ba "github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/bin_api/ip"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/vppcalls"
-	"time"
 )
 
 // DumpStaticRoutes dumps l3 routes from VPP and fills them into the provided static route map.
@@ -39,13 +40,13 @@ func DumpStaticRoutes(log logging.Logger, vppChan *govppapi.Channel, timeLog mea
 
 	var routes []*vppcalls.Route
 
-	// dump IPv4 l3 FIB
+	// Dump IPv4 l3 FIB.
 	reqCtx := vppChan.SendMultiRequest(&l3ba.IPFibDump{})
 	for {
 		fibDetails := &l3ba.IPFibDetails{}
 		stop, err := reqCtx.ReceiveReply(fibDetails)
 		if stop {
-			break // break out of the loop
+			break // Break from the loop.
 		}
 		if err != nil {
 			log.Error(err)
@@ -59,7 +60,7 @@ func DumpStaticRoutes(log logging.Logger, vppChan *govppapi.Channel, timeLog mea
 		routes = append(routes, ipv4Route)
 	}
 
-	// dump IPv6 l3 FIB
+	// Dump IPv6 l3 FIB.
 	reqCtx = vppChan.SendMultiRequest(&l3ba.IP6FibDump{})
 	for {
 		fibDetails := &l3ba.IP6FibDetails{}
@@ -82,16 +83,16 @@ func DumpStaticRoutes(log logging.Logger, vppChan *govppapi.Channel, timeLog mea
 }
 
 func dumpStaticRouteIPv4Details(fibDetails *l3ba.IPFibDetails) (*vppcalls.Route, error) {
-	return dumpStaticRouteIPDetails(fibDetails.TableID, fibDetails.Address, fibDetails.AddressLength, fibDetails.Path, false)
+	return dumpStaticRouteIPDetails(fibDetails.TableID, fibDetails.TableName, fibDetails.Address, fibDetails.AddressLength, fibDetails.Path, false)
 
 }
 
 func dumpStaticRouteIPv6Details(fibDetails *l3ba.IP6FibDetails) (*vppcalls.Route, error) {
-	return dumpStaticRouteIPDetails(fibDetails.TableID, fibDetails.Address, fibDetails.AddressLength, fibDetails.Path, true)
+	return dumpStaticRouteIPDetails(fibDetails.TableID, fibDetails.TableName, fibDetails.Address, fibDetails.AddressLength, fibDetails.Path, true)
 }
 
 // dumpStaticRouteIPDetails processes static route details and returns a route object
-func dumpStaticRouteIPDetails(tableID uint32, address []byte, prefixLen uint8, path []l3ba.FibPath, ipv6 bool) (*vppcalls.Route, error) {
+func dumpStaticRouteIPDetails(tableID uint32, tableName []byte, address []byte, prefixLen uint8, path []l3ba.FibPath, ipv6 bool) (*vppcalls.Route, error) {
 	// route details
 	var ipAddr string
 	if ipv6 {
@@ -108,6 +109,7 @@ func dumpStaticRouteIPDetails(tableID uint32, address []byte, prefixLen uint8, p
 		return nil, err
 	}
 
+	rt.TableName = string(tableName)
 	rt.VrfID = tableID
 	rt.DstAddr = *parsedIP
 

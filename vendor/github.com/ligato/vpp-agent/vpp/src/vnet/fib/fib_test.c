@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include <vnet/fib/fib_test.h>
 #include <vnet/fib/ip6_fib.h>
 #include <vnet/fib/ip4_fib.h>
 #include <vnet/fib/mpls_fib.h>
@@ -28,6 +29,7 @@
 #include <vnet/dpo/interface_rx_dpo.h>
 #include <vnet/dpo/replicate_dpo.h>
 #include <vnet/dpo/l2_bridge_dpo.h>
+#include <vnet/dpo/mpls_disposition.h>
 
 #include <vnet/mpls/mpls.h>
 
@@ -513,6 +515,30 @@ fib_test_validate_lb_v (const load_balance_t *lb,
 			bucket,
 			exp->adj.adj);
 	    break;
+	case FT_LB_MPLS_DISP_O_ADJ:
+        {
+            const mpls_disp_dpo_t *mdd;
+
+            FIB_TEST_I((DPO_MPLS_DISPOSITION == dpo->dpoi_type),
+		       "bucket %d stacks on %U",
+		       bucket,
+		       format_dpo_type, dpo->dpoi_type);
+	    
+            mdd = mpls_disp_dpo_get(dpo->dpoi_index);
+
+            dpo = &mdd->mdd_dpo;
+
+	    FIB_TEST_I(((DPO_ADJACENCY == dpo->dpoi_type) ||
+			(DPO_ADJACENCY_INCOMPLETE == dpo->dpoi_type)),
+		       "bucket %d stacks on %U",
+		       bucket,
+		       format_dpo_type, dpo->dpoi_type);
+	    FIB_TEST_LB((exp->adj.adj == dpo->dpoi_index),
+			"bucket %d stacks on adj %d",
+			bucket,
+			exp->adj.adj);
+	    break;
+        }
 	case FT_LB_INTF:
 	    FIB_TEST_I((DPO_INTERFACE_RX == dpo->dpoi_type),
 		       "bucket %d stacks on %U",
@@ -544,19 +570,64 @@ fib_test_validate_lb_v (const load_balance_t *lb,
 			dpo->dpoi_index,
                         exp->lb.lb);
 	    break;
-	case FT_LB_SPECIAL:
-	    FIB_TEST_I((DPO_DROP == dpo->dpoi_type),
-		       "bucket %d stacks on %U",
-		       bucket,
-		       format_dpo_type, dpo->dpoi_type);
-	    FIB_TEST_LB((exp->special.adj == dpo->dpoi_index),
-			"bucket %d stacks on drop %d",
+	case FT_LB_BIER_TABLE:
+	    FIB_TEST_LB((DPO_BIER_TABLE == dpo->dpoi_type),
+                        "bucket %d stacks on %U",
+                        bucket,
+                        format_dpo_type, dpo->dpoi_type);
+	    FIB_TEST_LB((exp->bier.table == dpo->dpoi_index),
+			"bucket %d stacks on lb %d",
 			bucket,
-			exp->special.adj);
+			exp->bier.table);
+            break;
+	case FT_LB_BIER_FMASK:
+	    FIB_TEST_LB((DPO_BIER_FMASK == dpo->dpoi_type),
+                        "bucket %d stacks on %U",
+                        bucket,
+                        format_dpo_type, dpo->dpoi_type);
+	    FIB_TEST_LB((exp->bier.fmask == dpo->dpoi_index),
+			"bucket %d stacks on lb %d",
+			bucket,
+			exp->bier.fmask);
+            break;
+	case FT_LB_DROP:
+	    FIB_TEST_LB((DPO_DROP == dpo->dpoi_type),
+                        "bucket %d stacks on %U",
+                        bucket,
+                        format_dpo_type, dpo->dpoi_type);
 	    break;
 	}
     }
     return (!0);
+}
+
+int
+fib_test_validate_lb (const dpo_id_t *dpo,
+                     u16 n_buckets,
+                     ...)
+{
+    const load_balance_t *lb;
+    va_list ap;
+    int res;
+
+    va_start(ap, n_buckets);
+
+    if (FIB_TEST_I((DPO_LOAD_BALANCE == dpo->dpoi_type),
+                   "Entry links to %U",
+                   format_dpo_type, dpo->dpoi_type))
+    {
+        lb = load_balance_get(dpo->dpoi_index);
+
+        res = fib_test_validate_lb_v(lb, n_buckets, &ap);
+    }
+    else
+    {
+        res = !0;
+    }
+
+    va_end(ap);
+
+    return (res);
 }
 
 int
@@ -6340,6 +6411,12 @@ fib_test_label (void)
 	.fp_label = 24001,
 	.fp_eos = MPLS_NON_EOS,
     };
+    fib_test_lb_bucket_t disp_o_10_10_11_1 = {
+	.type = FT_LB_MPLS_DISP_O_ADJ,
+	.adj = {
+	    .adj = ai_v4_10_10_11_1,
+	},
+    };
 
     /*
      * The EOS entry should link to both the paths,
@@ -6353,10 +6430,10 @@ fib_test_label (void)
 				     FIB_FORW_CHAIN_TYPE_MPLS_EOS,
 				     2,
 				     &l99_eos_o_10_10_10_1,
-				     &a_o_10_10_11_1),
+				     &disp_o_10_10_11_1),
 	     "24001/eos LB 2 buckets via: "
 	     "label 99 over 10.10.10.1, "
-	     "adj over 10.10.11.1");
+	     "mpls disp adj over 10.10.11.1");
 
 
     fei = fib_table_lookup(MPLS_FIB_DEFAULT_TABLE_ID,
@@ -6379,6 +6456,13 @@ fib_test_label (void)
 	    .adj = ai_v4_10_10_11_2,
 	},
     };
+    fib_test_lb_bucket_t disp_o_10_10_11_2 = {
+	.type = FT_LB_MPLS_DISP_O_ADJ,
+	.adj = {
+	    .adj = ai_v4_10_10_11_2,
+	},
+    };
+
 
     fei = fib_table_entry_path_add(fib_index,
 				   &pfx_1_1_1_1_s_32,
@@ -6527,11 +6611,11 @@ fib_test_label (void)
     FIB_TEST(fib_test_validate_entry(fei, 
 				     FIB_FORW_CHAIN_TYPE_MPLS_EOS,
 				     2,
-				     &a_o_10_10_11_1,
-				     &adj_o_10_10_11_2),
+				     &disp_o_10_10_11_1,
+				     &disp_o_10_10_11_2),
 	     "24001/eos LB 2 buckets via: "
-	     "adj over 10.10.11.1, ",
-	     "adj-v4 over 10.10.11.2");
+	     "mpls-disp adj over 10.10.11.1, ",
+	     "mpls-disp adj-v4 over 10.10.11.2");
 
     fei = fib_table_lookup(MPLS_FIB_DEFAULT_TABLE_ID,
 			   &pfx_24001_neos);
@@ -6604,20 +6688,20 @@ fib_test_label (void)
 				     &l99_eos_o_10_10_10_1,
 				     &l99_eos_o_10_10_10_1,
 				     &l99_eos_o_10_10_10_1,
-				     &a_o_10_10_11_1,
-				     &a_o_10_10_11_1,
-				     &a_o_10_10_11_1,
-				     &a_o_10_10_11_1,
-				     &a_o_10_10_11_1,
-				     &adj_o_10_10_11_2,
-				     &adj_o_10_10_11_2,
-				     &adj_o_10_10_11_2,
-				     &adj_o_10_10_11_2,
-				     &adj_o_10_10_11_2),
+				     &disp_o_10_10_11_1,
+				     &disp_o_10_10_11_1,
+				     &disp_o_10_10_11_1,
+				     &disp_o_10_10_11_1,
+				     &disp_o_10_10_11_1,
+				     &disp_o_10_10_11_2,
+				     &disp_o_10_10_11_2,
+				     &disp_o_10_10_11_2,
+				     &disp_o_10_10_11_2,
+				     &disp_o_10_10_11_2),
 	     "24001/eos LB 16 buckets via: "
 	     "label 99 over 10.10.10.1, "
-	     "adj over 10.10.11.1",
-	     "adj-v4 over 10.10.11.2");
+	     "MPLS disp adj over 10.10.11.1",
+	     "MPLS disp adj-v4 over 10.10.11.2");
 
     fei = fib_table_lookup(MPLS_FIB_DEFAULT_TABLE_ID,
 			   &pfx_24001_neos);
@@ -6658,11 +6742,11 @@ fib_test_label (void)
     FIB_TEST(fib_test_validate_entry(fei, 
 				     FIB_FORW_CHAIN_TYPE_MPLS_EOS,
 				     2,
-				     &a_o_10_10_11_1,
-				     &adj_o_10_10_11_2),
+				     &disp_o_10_10_11_1,
+				     &disp_o_10_10_11_2),
 	     "24001/eos LB 2 buckets via: "
-	     "adj over 10.10.11.1, "
-	     "adj-v4 over 10.10.11.2");
+	     "MPLS disp adj over 10.10.11.1, "
+	     "MPLS disp adj-v4 over 10.10.11.2");
 
     fei = fib_table_lookup(MPLS_FIB_DEFAULT_TABLE_ID,
 			   &pfx_24001_neos);
@@ -6678,13 +6762,10 @@ fib_test_label (void)
      * remove the other path with a valid label
      */
     fib_test_lb_bucket_t bucket_drop = {
-	.type = FT_LB_SPECIAL,
-	.special = {
-	    .adj = DPO_PROTO_IP4,
-	},
+	.type = FT_LB_DROP,
     };
     fib_test_lb_bucket_t mpls_bucket_drop = {
-	.type = FT_LB_SPECIAL,
+	.type = FT_LB_DROP,
 	.special = {
 	    .adj = DPO_PROTO_MPLS,
 	},
@@ -6713,9 +6794,9 @@ fib_test_label (void)
     FIB_TEST(fib_test_validate_entry(fei, 
 				     FIB_FORW_CHAIN_TYPE_MPLS_EOS,
 				     1,
-				     &adj_o_10_10_11_2),
+				     &disp_o_10_10_11_2),
 	     "24001/eos LB 1 buckets via: "
-	     "adj over 10.10.11.2");
+	     "MPLS disp adj over 10.10.11.2");
 
     fei = fib_table_lookup(MPLS_FIB_DEFAULT_TABLE_ID,
 			   &pfx_24001_neos);
@@ -6759,10 +6840,10 @@ fib_test_label (void)
 				     FIB_FORW_CHAIN_TYPE_MPLS_EOS,
 				     2,
 				     &l99_eos_o_10_10_10_1,
-				     &adj_o_10_10_11_2),
+				     &disp_o_10_10_11_2),
 	     "24001/eos LB 2 buckets via: "
 	     "label 99 over 10.10.10.1, "
-	     "adj over 10.10.11.2");
+	     "MPLS disp adj over 10.10.11.2");
 
     fei = fib_table_lookup(MPLS_FIB_DEFAULT_TABLE_ID,
 			   &pfx_24001_neos);
@@ -6804,10 +6885,10 @@ fib_test_label (void)
 				     FIB_FORW_CHAIN_TYPE_MPLS_EOS,
 				     2,
 				     &l99_eos_o_10_10_10_1,
-				     &adj_o_10_10_11_2),
+				     &disp_o_10_10_11_2),
 	     "25005/eos LB 2 buckets via: "
 	     "label 99 over 10.10.10.1, "
-	     "adj over 10.10.11.2");
+	     "MPLS disp adj over 10.10.11.2");
 
     fei = fib_table_lookup(MPLS_FIB_DEFAULT_TABLE_ID,
 			   &pfx_25005_neos);
@@ -8497,13 +8578,13 @@ lfib_test (void)
      * A recursive via a label that does not exist
      */
     fib_test_lb_bucket_t bucket_drop = {
-	.type = FT_LB_SPECIAL,
+	.type = FT_LB_DROP,
 	.special = {
 	    .adj = DPO_PROTO_IP4,
 	},
     };
     fib_test_lb_bucket_t mpls_bucket_drop = {
-	.type = FT_LB_SPECIAL,
+	.type = FT_LB_DROP,
 	.special = {
 	    .adj = DPO_PROTO_MPLS,
 	},

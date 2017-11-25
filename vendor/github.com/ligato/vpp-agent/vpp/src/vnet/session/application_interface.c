@@ -109,7 +109,7 @@ vnet_bind_i (u32 app_index, session_endpoint_t * sep, u64 * handle)
 
   table_index = application_session_table (app,
 					   session_endpoint_fib_proto (sep));
-  listener = session_lookup_session_endpoint (table_index, sep);
+  listener = session_lookup_endpoint_listener (table_index, sep, 1);
   if (listener != SESSION_INVALID_HANDLE)
     return VNET_API_ERROR_ADDRESS_IN_USE;
 
@@ -120,7 +120,7 @@ vnet_bind_i (u32 app_index, session_endpoint_t * sep, u64 * handle)
   if (application_has_local_scope (app) && session_endpoint_is_zero (sep))
     {
       table_index = application_local_session_table (app);
-      listener = session_lookup_session_endpoint (table_index, sep);
+      listener = session_lookup_endpoint_listener (table_index, sep, 1);
       if (listener != SESSION_INVALID_HANDLE)
 	return VNET_API_ERROR_ADDRESS_IN_USE;
       session_lookup_add_session_endpoint (table_index, sep, app->index);
@@ -206,7 +206,7 @@ vnet_connect_i (u32 app_index, u32 api_context, session_endpoint_t * sep,
 		void *mp)
 {
   application_t *server, *app;
-  u32 table_index;
+  u32 table_index, server_index;
   stream_session_t *listener;
 
   if (session_endpoint_is_zero (sep))
@@ -223,14 +223,25 @@ vnet_connect_i (u32 app_index, u32 api_context, session_endpoint_t * sep,
   if (application_has_local_scope (app))
     {
       table_index = application_local_session_table (app);
-      app_index = session_lookup_local_session_endpoint (table_index, sep);
-      server = application_get (app_index);
+      server_index = session_lookup_local_endpoint (table_index, sep);
+      if (server_index == APP_DROP_INDEX)
+	return VNET_API_ERROR_APP_CONNECT_FILTERED;
+
       /*
-       * Server is willing to have a direct fifo connection created
-       * instead of going through the state machine, etc.
+       * Break loop if rule in local table points to connecting app. This
+       * can happen if client is a generic proxy. Route connect through
+       * global table instead.
        */
-      if (server && (server->flags & APP_OPTIONS_FLAGS_ACCEPT_REDIRECT))
-	return app_connect_redirect (server, mp);
+      if (server_index != app_index)
+	{
+	  server = application_get (server_index);
+	  /*
+	   * Server is willing to have a direct fifo connection created
+	   * instead of going through the state machine, etc.
+	   */
+	  if (server && (server->flags & APP_OPTIONS_FLAGS_ACCEPT_REDIRECT))
+	    return app_connect_redirect (server, mp);
+	}
     }
 
   /*
@@ -413,6 +424,9 @@ vnet_application_attach (vnet_app_attach_args_t * a)
   sm = segment_manager_get (app->first_segment_manager);
   segment_manager_get_segment_info (sm->segment_indices[0],
 				    &seg_name, &a->segment_size);
+
+  if (application_is_proxy (app))
+    application_setup_proxy (app);
 
   a->segment_name_length = vec_len (seg_name);
   a->segment_name = seg_name;

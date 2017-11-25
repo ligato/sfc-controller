@@ -97,6 +97,8 @@ typedef struct
    * 03. cached for frequent access.
    * */
   i32 count;
+  i32 vcl_cnt;
+  i32 libc_cnt;
 
   /* close( ) called on this epoll instance */
   /* 0 - close ( ) not called, 1 - close( ) called. */
@@ -381,6 +383,10 @@ vcom_socket_send (int __fd, const void *__buf, size_t __n, int __flags);
 
 ssize_t vcom_socket_recv (int __fd, void *__buf, size_t __n, int __flags);
 
+ssize_t
+vcom_socket_sendfile (int __out_fd, int __in_fd, off_t * __offset,
+		      size_t __len);
+
 /*
  * RETURN   1 if __fd is (SOCK_STREAM, SOCK_SEQPACKET),
  * 0 otherwise
@@ -430,11 +436,9 @@ int
 vcom_socket_accept (int __fd, __SOCKADDR_ARG __addr,
 		    socklen_t * __restrict __addr_len);
 
-#ifdef __USE_GNU
 int
 vcom_socket_accept4 (int __fd, __SOCKADDR_ARG __addr,
 		     socklen_t * __restrict __addr_len, int __flags);
-#endif
 
 int vcom_socket_shutdown (int __fd, int __how);
 

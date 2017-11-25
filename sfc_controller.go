@@ -18,8 +18,6 @@
 package main
 
 import (
-	"time"
-
 	agent_api "github.com/ligato/cn-infra/core"
 	"github.com/ligato/cn-infra/db/keyval/etcdv3"
 	"github.com/ligato/cn-infra/flavors/local"
@@ -113,6 +111,7 @@ func (f *Flavor) Plugins() []*agent_api.NamedPlugin {
 func main() {
 
 	f := Flavor{}
-	agent := agent_api.NewAgent(log, 15*time.Second, f.Plugins()...)
+	//agent := agent_api.NewAgent(log, 15*time.Second, f.Plugins()...)
+	agent := agent_api.NewAgent(&f)
 	agent_api.EventLoopWithInterrupt(agent, nil)
 }

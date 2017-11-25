@@ -259,6 +259,23 @@ fib_entry_chain_type_fixup (const fib_entry_t *entry,
     return (dfct);
 }
 
+static dpo_proto_t
+fib_prefix_get_payload_proto (const fib_prefix_t *pfx)
+{
+    switch (pfx->fp_proto)
+    {
+    case FIB_PROTOCOL_IP4:
+        return (DPO_PROTO_IP4);
+    case FIB_PROTOCOL_IP6:
+        return (DPO_PROTO_IP6);
+    case FIB_PROTOCOL_MPLS:
+        return (pfx->fp_payload_proto);
+    }
+
+    ASSERT(0);
+    return (DPO_PROTO_IP4);
+}
+
 static void
 fib_entry_src_get_path_forwarding (fib_node_index_t path_index,
                                    fib_entry_src_collect_forwarding_ctx_t *ctx)
@@ -275,6 +292,7 @@ fib_entry_src_get_path_forwarding (fib_node_index_t path_index,
     case FIB_FORW_CHAIN_TYPE_UNICAST_IP6:
     case FIB_FORW_CHAIN_TYPE_MCAST_IP4:
     case FIB_FORW_CHAIN_TYPE_MCAST_IP6:
+    case FIB_FORW_CHAIN_TYPE_BIER:
         /*
          * EOS traffic with no label to stack, we need the IP Adj
          */
@@ -312,7 +330,7 @@ fib_entry_src_get_path_forwarding (fib_node_index_t path_index,
                                                                       ctx->fct),
                                            &nh->path_dpo);
             fib_path_stack_mpls_disp(path_index,
-                                     ctx->fib_entry->fe_prefix.fp_payload_proto,
+                                     fib_prefix_get_payload_proto(&ctx->fib_entry->fe_prefix),
                                      &nh->path_dpo);
 
             break;
@@ -480,8 +498,8 @@ fib_entry_src_mk_lb (fib_entry_t *fib_entry,
         }
         else
         {
+            fib_protocol_t flow_hash_proto;
             flow_hash_config_t fhc;
-            fib_protocol_t fp;
 
             /*
              * if the protocol for the LB we are building does not match that
@@ -489,16 +507,17 @@ fib_entry_src_mk_lb (fib_entry_t *fib_entry,
              * then the fib_index is not an index that relates to the table
              * type we need. So get the default flow-hash config instead.
              */
-            fp = dpo_proto_to_fib(lb_proto);
-
-            if (fib_entry->fe_prefix.fp_proto != fp)
+            flow_hash_proto = dpo_proto_to_fib(lb_proto);
+            if (fib_entry->fe_prefix.fp_proto != flow_hash_proto)
             {
-                fhc = fib_table_get_default_flow_hash_config(fp);
+                fhc = fib_table_get_default_flow_hash_config(flow_hash_proto);
             }
             else
             {
-                fhc = fib_table_get_flow_hash_config(fib_entry->fe_fib_index, fp);
+                fhc = fib_table_get_flow_hash_config(fib_entry->fe_fib_index,
+                                                     flow_hash_proto);
             }
+
             dpo_set(dpo_lb,
                     DPO_LOAD_BALANCE,
                     lb_proto,

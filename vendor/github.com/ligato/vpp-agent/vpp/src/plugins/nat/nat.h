@@ -154,9 +154,9 @@ typedef CLIB_PACKED(struct {
   /* Outside address */
   u32 outside_address_index;    /* 64-67 */
 
-  /* External host address */
+  /* External host address and port */
   ip4_address_t ext_host_addr;  /* 68-71 */
-
+  u16 ext_host_port;            /* 72-73 */
 }) snat_session_t;
 
 
@@ -269,6 +269,15 @@ typedef u32 snat_icmp_match_function_t (struct snat_main_s *sm,
 
 typedef u32 (snat_get_worker_function_t) (ip4_header_t * ip, u32 rx_fib_index);
 
+typedef int nat_alloc_out_addr_and_port_function_t (snat_address_t * addresses,
+                                                    u32 fib_index,
+                                                    u32 thread_index,
+                                                    snat_session_key_t * k,
+                                                    u32 * address_indexp,
+                                                    u8 vrf_mode,
+                                                    u16 port_per_thread,
+                                                    u32 snat_thread_index);
+
 typedef struct snat_main_s {
   /* Endpoint address dependent sessions lookup tables */
   clib_bihash_16_8_t out2in_ed;
@@ -304,6 +313,10 @@ typedef struct snat_main_s {
 
   /* Vector of outside addresses */
   snat_address_t * addresses;
+  nat_alloc_out_addr_and_port_function_t *alloc_addr_and_port;
+  u8 psid_offset;
+  u8 psid_length;
+  u16 psid;
 
   /* sw_if_indices whose intfc addresses should be auto-added */
   u32 * auto_add_sw_if_indices;
@@ -376,16 +389,19 @@ extern vlib_node_registration_t snat_det_out2in_node;
 extern vlib_node_registration_t snat_hairpin_dst_node;
 extern vlib_node_registration_t snat_hairpin_src_node;
 
-void snat_free_outside_address_and_port (snat_main_t * sm,
+void snat_free_outside_address_and_port (snat_address_t * addresses,
                                          u32 thread_index,
                                          snat_session_key_t * k,
                                          u32 address_index);
 
-int snat_alloc_outside_address_and_port (snat_main_t * sm,
+int snat_alloc_outside_address_and_port (snat_address_t * addresses,
                                          u32 fib_index,
                                          u32 thread_index,
                                          snat_session_key_t * k,
-                                         u32 * address_indexp);
+                                         u32 * address_indexp,
+                                         u8 vrf_mode,
+                                         u16 port_per_thread,
+                                         u32 snat_thread_index);
 
 int snat_static_mapping_match (snat_main_t * sm,
                                snat_session_key_t match,
@@ -409,7 +425,7 @@ typedef struct {
     @param s SNAT session
     @return 1 if SNAT session is created from static mapping otherwise 0
 */
-#define snat_is_session_static(s) s->flags & SNAT_SESSION_FLAG_STATIC_MAPPING
+#define snat_is_session_static(s) (s->flags & SNAT_SESSION_FLAG_STATIC_MAPPING)
 
 /** \brief Check if SNAT session for unknown protocol.
     @param s SNAT session
@@ -560,4 +576,30 @@ maximum_sessions_exceeded (snat_main_t *sm, u32 thread_index)
   return 0;
 }
 
-#endif /* __included_nat_h__ */
+static_always_inline void
+nat_send_all_to_node(vlib_main_t *vm, u32 *bi_vector,
+                     vlib_node_runtime_t *node, vlib_error_t *error, u32 next)
+{
+  u32 n_left_from, *from, next_index, *to_next, n_left_to_next;
+
+  from = bi_vector;
+  n_left_from = vec_len(bi_vector);
+  next_index = node->cached_next_index;
+  while (n_left_from > 0) {
+    vlib_get_next_frame(vm, node, next_index, to_next, n_left_to_next);
+    while (n_left_from > 0 && n_left_to_next > 0) {
+      u32 bi0 = to_next[0] = from[0];
+      from += 1;
+      n_left_from -= 1;
+      to_next += 1;
+      n_left_to_next -= 1;
+      vlib_buffer_t *p0 = vlib_get_buffer(vm, bi0);
+      p0->error = *error;
+      vlib_validate_buffer_enqueue_x1(vm, node, next_index, to_next,
+                                      n_left_to_next, bi0, next);
+    }
+    vlib_put_next_frame(vm, node, next_index, n_left_to_next);
+  }
+}
+
+#endif /* __included_snat_h__ */

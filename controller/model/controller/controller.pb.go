@@ -22,6 +22,29 @@ import proto "github.com/gogo/protobuf/proto"
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 
+type RxModeType int32
+
+const (
+	RxModeType_RX_MODE_UNKNOWN   RxModeType = 0
+	RxModeType_RX_MODE_POLLING   RxModeType = 1
+	RxModeType_RX_MODE_INTERRUPT RxModeType = 2
+)
+
+var RxModeType_name = map[int32]string{
+	0: "RX_MODE_UNKNOWN",
+	1: "RX_MODE_POLLING",
+	2: "RX_MODE_INTERRUPT",
+}
+var RxModeType_value = map[string]int32{
+	"RX_MODE_UNKNOWN":   0,
+	"RX_MODE_POLLING":   1,
+	"RX_MODE_INTERRUPT": 2,
+}
+
+func (x RxModeType) String() string {
+	return proto.EnumName(RxModeType_name, int32(x))
+}
+
 type ExtEntDriverType int32
 
 const (
@@ -190,12 +213,13 @@ func (m *ExternalEntity_HostBD) String() string { return proto.CompactTextString
 func (*ExternalEntity_HostBD) ProtoMessage()    {}
 
 type HostEntity struct {
-	Name            string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	EthIfName       string `protobuf:"bytes,2,opt,name=eth_if_name,proto3" json:"eth_if_name,omitempty"`
-	EthIpv4         string `protobuf:"bytes,3,opt,name=eth_ipv4,proto3" json:"eth_ipv4,omitempty"`
-	LoopbackMacAddr string `protobuf:"bytes,4,opt,name=loopback_mac_addr,proto3" json:"loopback_mac_addr,omitempty"`
-	LoopbackIpv4    string `protobuf:"bytes,5,opt,name=loopback_ipv4,proto3" json:"loopback_ipv4,omitempty"`
-	Mtu             uint32 `protobuf:"varint,6,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	Name            string     `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	EthIfName       string     `protobuf:"bytes,2,opt,name=eth_if_name,proto3" json:"eth_if_name,omitempty"`
+	EthIpv4         string     `protobuf:"bytes,3,opt,name=eth_ipv4,proto3" json:"eth_ipv4,omitempty"`
+	LoopbackMacAddr string     `protobuf:"bytes,4,opt,name=loopback_mac_addr,proto3" json:"loopback_mac_addr,omitempty"`
+	LoopbackIpv4    string     `protobuf:"bytes,5,opt,name=loopback_ipv4,proto3" json:"loopback_ipv4,omitempty"`
+	Mtu             uint32     `protobuf:"varint,6,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	RxMode          RxModeType `protobuf:"varint,7,opt,name=rx_mode,proto3,enum=controller.RxModeType" json:"rx_mode,omitempty"`
 }
 
 func (m *HostEntity) Reset()         { *m = HostEntity{} }
@@ -239,6 +263,7 @@ type SfcEntity_SfcElement struct {
 	Type             SfcElementType  `protobuf:"varint,6,opt,name=type,proto3,enum=controller.SfcElementType" json:"type,omitempty"`
 	CustomInfo       *CustomInfoType `protobuf:"bytes,7,opt,name=custom_info" json:"custom_info,omitempty"`
 	Mtu              uint32          `protobuf:"varint,8,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	RxMode           RxModeType      `protobuf:"varint,9,opt,name=rx_mode,proto3,enum=controller.RxModeType" json:"rx_mode,omitempty"`
 }
 
 func (m *SfcEntity_SfcElement) Reset()         { *m = SfcEntity_SfcElement{} }
@@ -253,6 +278,7 @@ func (m *SfcEntity_SfcElement) GetCustomInfo() *CustomInfoType {
 }
 
 func init() {
+	proto.RegisterEnum("controller.RxModeType", RxModeType_name, RxModeType_value)
 	proto.RegisterEnum("controller.ExtEntDriverType", ExtEntDriverType_name, ExtEntDriverType_value)
 	proto.RegisterEnum("controller.SfcType", SfcType_name, SfcType_value)
 	proto.RegisterEnum("controller.SfcElementType", SfcElementType_name, SfcElementType_value)

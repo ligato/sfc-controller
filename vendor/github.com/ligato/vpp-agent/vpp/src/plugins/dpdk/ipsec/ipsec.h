@@ -66,9 +66,9 @@ typedef struct
 {
   u16 *resource_idx;
   uword *session_by_drv_id_and_sa_index;
+  struct rte_crypto_op **ops;
   u16 cipher_resource_idx[IPSEC_CRYPTO_N_ALG];
   u16 auth_resource_idx[IPSEC_INTEG_N_ALG];
-  struct rte_crypto_op *ops[VLIB_FRAME_SIZE];
 } crypto_worker_main_t __attribute__ ((aligned (CLIB_CACHE_LINE_BYTES)));
 
 typedef struct
@@ -327,9 +327,6 @@ crypto_op_setup (u8 is_aead, struct rte_mbuf *mb0,
 
   sym_op->m_src = mb0;
   sym_op->session = session;
-
-  if (!digest_paddr)
-    digest_paddr = mb0->buf_physaddr + ((u8 *) digest) - ((u8 *) mb0);
 
 #if DPDK_NO_AEAD
   sym_op->cipher.data.offset = cipher_off;

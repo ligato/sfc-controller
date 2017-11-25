@@ -22,11 +22,17 @@ nat_plugin_la_SOURCES = nat/nat.c		\
 	nat/nat_plugin.api.h			\
         nat/nat_ipfix_logging.c	        	\
         nat/nat_det.c               		\
+        nat/nat_reass.c             		\
         nat/nat64.c                  		\
         nat/nat64_cli.c              		\
         nat/nat64_in2out.c           		\
         nat/nat64_out2in.c           		\
-        nat/nat64_db.c
+        nat/nat64_db.c                       	\
+        nat/dslite_dpo.c                     	\
+        nat/dslite.c                         	\
+        nat/dslite_in2out.c                  	\
+        nat/dslite_out2in.c                  	\
+        nat/dslite_cli.c
 
 API_FILES += nat/nat.api
 

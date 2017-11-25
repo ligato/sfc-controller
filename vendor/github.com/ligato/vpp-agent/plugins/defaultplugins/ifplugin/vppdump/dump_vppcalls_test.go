@@ -16,14 +16,13 @@ package vppdump
 
 import (
 	"fmt"
+	"github.com/ligato/cn-infra/logging/logrus"
 	"os"
 	"testing"
-
-	"git.fd.io/govpp.git"
 )
 
 func TestDumpInterfaces(t *testing.T) {
-	// connect to VPP
+	// Connect to VPP.
 	conn, err := govpp.Connect()
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -31,7 +30,7 @@ func TestDumpInterfaces(t *testing.T) {
 	}
 	defer conn.Disconnect()
 
-	// create an API channel that will be used in the examples
+	// Create an API channel that will be used in the examples.
 	ch, err := conn.NewAPIChannel()
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -39,6 +38,14 @@ func TestDumpInterfaces(t *testing.T) {
 	}
 	defer ch.Close()
 
-	res, _ := DumpInterfaces(ch)
-	fmt.Println(res)
+	res, err := DumpInterfaces(logrus.DefaultLogger(), ch, nil)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("%+v\n", res)
+	for key, iface := range res {
+		fmt.Printf(" %v %+v\n", key, *iface)
+	}
 }

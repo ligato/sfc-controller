@@ -16,12 +16,15 @@
 #ifndef included_vcom_h
 #define included_vcom_h
 
-/* VCOM DEBUG flag.  Setting this to 1 or 0 turns off
-   ASSERT & other debugging code. */
-#ifndef VCOM_DEBUG
+#if (CLIB_DEBUG > 0)
+/* Set VCOM_DEBUG 2 for connection debug, 3 for read/write debug output */
+#define VCOM_DEBUG 1
+#else
 #define VCOM_DEBUG 0
 #endif
 
+#include <vppinfra/error.h>
+#include <vppinfra/types.h>
 #include <vcl/vcom_glibc_socket.h>
 
 #define MAX_VCOM_APP_NAME  256
@@ -106,7 +109,7 @@ vcom_getpeername (int __fd, __SOCKADDR_ARG __addr,
 		  socklen_t * __restrict __len);
 
 extern ssize_t
-vcom_send (int __fd, const void *__buf, size_t __n, int __flags);
+vcom_sendfile (int __out_fd, int __in_fd, off_t * __offset, int __len);
 
 extern ssize_t vcom_recv (int __fd, void *__buf, size_t __n, int __flags);
 

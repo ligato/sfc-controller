@@ -50,6 +50,7 @@
 #include <vnet/policer/policer.h>
 #include <vnet/policer/police.h>
 #include <vnet/mfib/mfib_types.h>
+#include <vnet/dhcp/dhcp_proxy.h>
 
 #include "vat/json_format.h"
 
@@ -718,14 +719,14 @@ increment_v6_address (ip6_address_t * a)
 }
 
 static void
-increment_mac_address (u64 * mac)
+increment_mac_address (u8 * mac)
 {
-  u64 tmp = *mac;
-
+  u64 tmp = *((u64 *) mac);
   tmp = clib_net_to_host_u64 (tmp);
   tmp += 1 << 16;		/* skip unused (least significant) octets */
   tmp = clib_host_to_net_u64 (tmp);
-  *mac = tmp;
+
+  clib_memcpy (mac, &tmp, 6);
 }
 
 static void vl_api_create_loopback_reply_t_handler
@@ -4239,6 +4240,123 @@ static void
 }
 
 static void
+  vl_api_one_show_xtr_mode_reply_t_handler
+  (vl_api_one_show_xtr_mode_reply_t * mp)
+{
+  vat_main_t *vam = &vat_main;
+  i32 retval = ntohl (mp->retval);
+
+  if (0 <= retval)
+    {
+      print (vam->ofp, "%s\n", mp->is_en ? "enabled" : "disabled");
+    }
+
+  vam->retval = retval;
+  vam->result_ready = 1;
+}
+
+static void
+  vl_api_one_show_xtr_mode_reply_t_handler_json
+  (vl_api_one_show_xtr_mode_reply_t * mp)
+{
+  vat_main_t *vam = &vat_main;
+  vat_json_node_t node;
+  u8 *status = 0;
+
+  status = format (0, "%s", mp->is_en ? "enabled" : "disabled");
+  vec_add1 (status, 0);
+
+  vat_json_init_object (&node);
+  vat_json_object_add_string_copy (&node, "status", status);
+
+  vec_free (status);
+
+  vat_json_print (vam->ofp, &node);
+  vat_json_free (&node);
+
+  vam->retval = ntohl (mp->retval);
+  vam->result_ready = 1;
+}
+
+static void
+  vl_api_one_show_pitr_mode_reply_t_handler
+  (vl_api_one_show_pitr_mode_reply_t * mp)
+{
+  vat_main_t *vam = &vat_main;
+  i32 retval = ntohl (mp->retval);
+
+  if (0 <= retval)
+    {
+      print (vam->ofp, "%s\n", mp->is_en ? "enabled" : "disabled");
+    }
+
+  vam->retval = retval;
+  vam->result_ready = 1;
+}
+
+static void
+  vl_api_one_show_pitr_mode_reply_t_handler_json
+  (vl_api_one_show_pitr_mode_reply_t * mp)
+{
+  vat_main_t *vam = &vat_main;
+  vat_json_node_t node;
+  u8 *status = 0;
+
+  status = format (0, "%s", mp->is_en ? "enabled" : "disabled");
+  vec_add1 (status, 0);
+
+  vat_json_init_object (&node);
+  vat_json_object_add_string_copy (&node, "status", status);
+
+  vec_free (status);
+
+  vat_json_print (vam->ofp, &node);
+  vat_json_free (&node);
+
+  vam->retval = ntohl (mp->retval);
+  vam->result_ready = 1;
+}
+
+static void
+  vl_api_one_show_petr_mode_reply_t_handler
+  (vl_api_one_show_petr_mode_reply_t * mp)
+{
+  vat_main_t *vam = &vat_main;
+  i32 retval = ntohl (mp->retval);
+
+  if (0 <= retval)
+    {
+      print (vam->ofp, "%s\n", mp->is_en ? "enabled" : "disabled");
+    }
+
+  vam->retval = retval;
+  vam->result_ready = 1;
+}
+
+static void
+  vl_api_one_show_petr_mode_reply_t_handler_json
+  (vl_api_one_show_petr_mode_reply_t * mp)
+{
+  vat_main_t *vam = &vat_main;
+  vat_json_node_t node;
+  u8 *status = 0;
+
+  status = format (0, "%s", mp->is_en ? "enabled" : "disabled");
+  vec_add1 (status, 0);
+
+  vat_json_init_object (&node);
+  vat_json_object_add_string_copy (&node, "status", status);
+
+  vec_free (status);
+
+  vat_json_print (vam->ofp, &node);
+  vat_json_free (&node);
+
+  vam->retval = ntohl (mp->retval);
+  vam->result_ready = 1;
+}
+
+static void
   vl_api_show_one_use_petr_reply_t_handler
   (vl_api_show_one_use_petr_reply_t * mp)
 {
@@ -5044,6 +5162,7 @@ static void vl_api_flow_classify_details_t_handler_json
 #define foreach_standard_reply_retval_handler           \
 _(sw_interface_set_flags_reply)                         \
 _(sw_interface_add_del_address_reply)                   \
+_(sw_interface_set_rx_mode_reply)                       \
 _(sw_interface_set_table_reply)                         \
 _(sw_interface_set_mpls_enable_reply)                   \
 _(sw_interface_set_vpath_reply)                         \
@@ -5062,11 +5181,12 @@ _(ip_mroute_add_del_reply)                              \
 _(mpls_route_add_del_reply)                             \
 _(mpls_table_add_del_reply)                             \
 _(mpls_ip_bind_unbind_reply)                            \
+_(bier_route_add_del_reply)                             \
+_(bier_table_add_del_reply)                             \
 _(proxy_arp_add_del_reply)                              \
 _(proxy_arp_intfc_enable_disable_reply)                 \
 _(sw_interface_set_unnumbered_reply)                    \
 _(ip_neighbor_add_del_reply)                            \
-_(reset_vrf_reply)                                      \
 _(oam_add_del_reply)                                    \
 _(reset_fib_reply)                                      \
 _(dhcp_proxy_config_reply)                              \
@@ -5153,6 +5273,9 @@ _(one_stats_enable_disable_reply)                       \
 _(one_add_del_l2_arp_entry_reply)                       \
 _(one_add_del_ndp_entry_reply)                          \
 _(one_stats_flush_reply)                                \
+_(one_enable_disable_xtr_mode_reply)                    \
+_(one_enable_disable_pitr_mode_reply)                   \
+_(one_enable_disable_petr_mode_reply)                   \
 _(gpe_enable_disable_reply)                             \
 _(gpe_set_encap_mode_reply)                             \
 _(gpe_add_del_iface_reply)                              \
@@ -5181,9 +5304,10 @@ _(p2p_ethernet_del_reply)                               \
 _(lldp_config_reply)                                    \
 _(sw_interface_set_lldp_reply)				\
 _(tcp_configure_src_addresses_reply)			\
-_(app_namespace_add_del_reply)                          \
 _(dns_enable_disable_reply)                             \
-_(dns_name_server_add_del_reply)
+_(dns_name_server_add_del_reply)			\
+_(session_rule_add_del_reply)				\
+_(ip_container_proxy_add_del_reply)
 
 #define _(n)                                    \
     static void vl_api_##n##_t_handler          \
@@ -5231,6 +5355,7 @@ _(CLI_REPLY, cli_reply)                                                 \
 _(CLI_INBAND_REPLY, cli_inband_reply)                                   \
 _(SW_INTERFACE_ADD_DEL_ADDRESS_REPLY,                                   \
   sw_interface_add_del_address_reply)                                   \
+_(SW_INTERFACE_SET_RX_MODE_REPLY, sw_interface_set_rx_mode_reply)       \
 _(SW_INTERFACE_SET_TABLE_REPLY, sw_interface_set_table_reply) 		\
 _(SW_INTERFACE_SET_MPLS_ENABLE_REPLY, sw_interface_set_mpls_enable_reply) \
 _(SW_INTERFACE_SET_VPATH_REPLY, sw_interface_set_vpath_reply) 		\
@@ -5259,6 +5384,8 @@ _(IP_MROUTE_ADD_DEL_REPLY, ip_mroute_add_del_reply)			\
 _(MPLS_TABLE_ADD_DEL_REPLY, mpls_table_add_del_reply)			\
 _(MPLS_ROUTE_ADD_DEL_REPLY, mpls_route_add_del_reply)			\
 _(MPLS_IP_BIND_UNBIND_REPLY, mpls_ip_bind_unbind_reply)			\
+_(BIER_ROUTE_ADD_DEL_REPLY, bier_route_add_del_reply)			\
+_(BIER_TABLE_ADD_DEL_REPLY, bier_table_add_del_reply)			\
 _(PROXY_ARP_ADD_DEL_REPLY, proxy_arp_add_del_reply)                     \
 _(PROXY_ARP_INTFC_ENABLE_DISABLE_REPLY,                                 \
   proxy_arp_intfc_enable_disable_reply)                                 \
@@ -5266,7 +5393,6 @@ _(MPLS_TUNNEL_ADD_DEL_REPLY, mpls_tunnel_add_del_reply)                 \
 _(SW_INTERFACE_SET_UNNUMBERED_REPLY,                                    \
   sw_interface_set_unnumbered_reply)                                    \
 _(IP_NEIGHBOR_ADD_DEL_REPLY, ip_neighbor_add_del_reply)                 \
-_(RESET_VRF_REPLY, reset_vrf_reply)                                     \
 _(CREATE_VLAN_SUBIF_REPLY, create_vlan_subif_reply)                     \
 _(CREATE_SUBIF_REPLY, create_subif_reply)                     		\
 _(OAM_ADD_DEL_REPLY, oam_add_del_reply)                                 \
@@ -5413,6 +5539,14 @@ _(ONE_NDP_ENTRIES_GET_REPLY, one_ndp_entries_get_reply)                 \
 _(ONE_ADD_DEL_L2_ARP_ENTRY_REPLY, one_add_del_l2_arp_entry_reply)       \
 _(ONE_L2_ARP_BD_GET_REPLY, one_l2_arp_bd_get_reply)                     \
 _(ONE_L2_ARP_ENTRIES_GET_REPLY, one_l2_arp_entries_get_reply)           \
+_(ONE_ENABLE_DISABLE_XTR_MODE_REPLY, one_enable_disable_xtr_mode_reply) \
+_(ONE_ENABLE_DISABLE_PITR_MODE_REPLY,                                   \
+  one_enable_disable_pitr_mode_reply)                                   \
+_(ONE_ENABLE_DISABLE_PETR_MODE_REPLY,                                   \
+  one_enable_disable_petr_mode_reply)                                   \
+_(ONE_SHOW_XTR_MODE_REPLY, one_show_xtr_mode_reply)                     \
+_(ONE_SHOW_PITR_MODE_REPLY, one_show_pitr_mode_reply)                   \
+_(ONE_SHOW_PETR_MODE_REPLY, one_show_petr_mode_reply)                   \
 _(GPE_SET_ENCAP_MODE_REPLY, gpe_set_encap_mode_reply)                   \
 _(GPE_GET_ENCAP_MODE_REPLY, gpe_get_encap_mode_reply)                   \
 _(GPE_ADD_DEL_IFACE_REPLY, gpe_add_del_iface_reply)                     \
@@ -5494,7 +5628,10 @@ _(APP_NAMESPACE_ADD_DEL_REPLY, app_namespace_add_del_reply)		\
 _(DNS_ENABLE_DISABLE_REPLY, dns_enable_disable_reply)                   \
 _(DNS_NAME_SERVER_ADD_DEL_REPLY, dns_name_server_add_del_reply)		\
 _(DNS_RESOLVE_NAME_REPLY, dns_resolve_name_reply)			\
-_(DNS_RESOLVE_IP_REPLY, dns_resolve_ip_reply)
+_(DNS_RESOLVE_IP_REPLY, dns_resolve_ip_reply)				\
+_(SESSION_RULE_ADD_DEL_REPLY, session_rule_add_del_reply)		\
+_(SESSION_RULES_DETAILS, session_rules_details)				\
+_(IP_CONTAINER_PROXY_ADD_DEL_REPLY, ip_container_proxy_add_del_reply)	\
 
 #define foreach_standalone_reply_msg					\
 _(SW_INTERFACE_EVENT, sw_interface_event)                               \
@@ -6231,6 +6368,64 @@ api_sw_interface_set_flags (vat_main_t * vam)
 }
 
 static int
+api_sw_interface_set_rx_mode (vat_main_t * vam)
+{
+  unformat_input_t *i = vam->input;
+  vl_api_sw_interface_set_rx_mode_t *mp;
+  u32 sw_if_index;
+  u8 sw_if_index_set = 0;
+  int ret;
+  u8 queue_id_valid = 0;
+  u32 queue_id;
+  vnet_hw_interface_rx_mode mode = VNET_HW_INTERFACE_RX_MODE_UNKNOWN;
+
+  /* Parse args required to build the message */
+  while (unformat_check_input (i) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (i, "queue %d", &queue_id))
+	queue_id_valid = 1;
+      else if (unformat (i, "polling"))
+	mode = VNET_HW_INTERFACE_RX_MODE_POLLING;
+      else if (unformat (i, "interrupt"))
+	mode = VNET_HW_INTERFACE_RX_MODE_INTERRUPT;
+      else if (unformat (i, "adaptive"))
+	mode = VNET_HW_INTERFACE_RX_MODE_ADAPTIVE;
+      else
+	if (unformat (i, "%U", api_unformat_sw_if_index, vam, &sw_if_index))
+	sw_if_index_set = 1;
+      else if (unformat (i, "sw_if_index %d", &sw_if_index))
+	sw_if_index_set = 1;
+      else
+	break;
+    }
+
+  if (sw_if_index_set == 0)
+    {
+      errmsg ("missing interface name or sw_if_index");
+      return -99;
+    }
+  if (mode == VNET_HW_INTERFACE_RX_MODE_UNKNOWN)
+    {
+      errmsg ("missing rx-mode");
+      return -99;
+    }
+
+  /* Construct the API message */
+  M (SW_INTERFACE_SET_RX_MODE, mp);
+  mp->sw_if_index = ntohl (sw_if_index);
+  mp->mode = mode;
+  mp->queue_id_valid = queue_id_valid;
+  mp->queue_id = queue_id_valid ? ntohl (queue_id) : ~0;
+
+  /* send it... */
+  S (mp);
+
+  /* Wait for a reply, return the good/bad news... */
+  W (ret);
+  return ret;
+}
+
+static int
 api_sw_interface_clear_stats (vat_main_t * vam)
 {
   unformat_input_t *i = vam->input;
@@ -6866,7 +7061,7 @@ api_bridge_domain_add_del (vat_main_t * vam)
       goto done;
     }
 
-  if ((bd_tag) && (strlen ((char *) bd_tag) > 63))
+  if ((bd_tag) && (vec_len (bd_tag) > 63))
     {
       errmsg ("bd-tag cannot be longer than 63");
       ret = -99;
@@ -6884,8 +7079,10 @@ api_bridge_domain_add_del (vat_main_t * vam)
   mp->is_add = is_add;
   mp->mac_age = (u8) mac_age;
   if (bd_tag)
-    strcpy ((char *) mp->bd_tag, (char *) bd_tag);
-
+    {
+      clib_memcpy (mp->bd_tag, bd_tag, vec_len (bd_tag));
+      mp->bd_tag[vec_len (bd_tag)] = 0;
+    }
   S (mp);
   W (ret);
 
@@ -6964,7 +7161,7 @@ api_l2fib_add_del (vat_main_t * vam)
   unformat_input_t *i = vam->input;
   vl_api_l2fib_add_del_t *mp;
   f64 timeout;
-  u64 mac = 0;
+  u8 mac[6] = { 0 };
   u8 mac_set = 0;
   u32 bd_id;
   u8 bd_id_set = 0;
@@ -6981,7 +7178,7 @@ api_l2fib_add_del (vat_main_t * vam)
   /* Parse args required to build the message */
   while (unformat_check_input (i) != UNFORMAT_END_OF_INPUT)
     {
-      if (unformat (i, "mac %U", unformat_ethernet_address, &mac))
+      if (unformat (i, "mac %U", unformat_ethernet_address, mac))
 	mac_set = 1;
       else if (unformat (i, "bd_id %d", &bd_id))
 	bd_id_set = 1;
@@ -7048,7 +7245,7 @@ api_l2fib_add_del (vat_main_t * vam)
     {
       M (L2FIB_ADD_DEL, mp);
 
-      mp->mac = mac;
+      clib_memcpy (mp->mac, mac, 6);
       mp->bd_id = ntohl (bd_id);
       mp->is_add = is_add;
 
@@ -7059,7 +7256,7 @@ api_l2fib_add_del (vat_main_t * vam)
 	  mp->filter_mac = filter_mac;
 	  mp->bvi_mac = bvi_mac;
 	}
-      increment_mac_address (&mac);
+      increment_mac_address (mac);
       /* send it... */
       S (mp);
     }
@@ -8355,6 +8552,154 @@ api_mpls_ip_bind_unbind (vat_main_t * vam)
 }
 
 static int
+api_bier_table_add_del (vat_main_t * vam)
+{
+  unformat_input_t *i = vam->input;
+  vl_api_bier_table_add_del_t *mp;
+  u8 is_add = 1;
+  u32 set = 0, sub_domain = 0, hdr_len = 3;
+  mpls_label_t local_label = MPLS_LABEL_INVALID;
+  int ret;
+
+  /* Parse args required to build the message */
+  while (unformat_check_input (i) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (i, "sub-domain %d", &sub_domain))
+	;
+      else if (unformat (i, "set %d", &set))
+	;
+      else if (unformat (i, "label %d", &local_label))
+	;
+      else if (unformat (i, "hdr-len %d", &hdr_len))
+	;
+      else if (unformat (i, "add"))
+	is_add = 1;
+      else if (unformat (i, "del"))
+	is_add = 0;
+      else
+	{
+	  clib_warning ("parse error '%U'", format_unformat_error, i);
+	  return -99;
+	}
+    }
+
+  if (MPLS_LABEL_INVALID == local_label)
+    {
+      errmsg ("missing label\n");
+      return -99;
+    }
+
+  /* Construct the API message */
+  M (BIER_TABLE_ADD_DEL, mp);
+
+  mp->bt_is_add = is_add;
+  mp->bt_label = ntohl (local_label);
+  mp->bt_tbl_id.bt_set = set;
+  mp->bt_tbl_id.bt_sub_domain = sub_domain;
+  mp->bt_tbl_id.bt_hdr_len_id = hdr_len;
+
+  /* send it... */
+  S (mp);
+
+  /* Wait for a reply... */
+  W (ret);
+
+  return (ret);
+}
+
+static int
+api_bier_route_add_del (vat_main_t * vam)
+{
+  unformat_input_t *i = vam->input;
+  vl_api_bier_route_add_del_t *mp;
+  u8 is_add = 1;
+  u32 set = 0, sub_domain = 0, hdr_len = 3, bp = 0;
+  ip4_address_t v4_next_hop_address;
+  ip6_address_t v6_next_hop_address;
+  u8 next_hop_set = 0;
+  u8 next_hop_proto_is_ip4 = 1;
+  mpls_label_t next_hop_out_label = MPLS_LABEL_INVALID;
+  int ret;
+
+  /* Parse args required to build the message */
+  while (unformat_check_input (i) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (i, "%U", unformat_ip4_address, &v4_next_hop_address))
+	{
+	  next_hop_proto_is_ip4 = 1;
+	  next_hop_set = 1;
+	}
+      else if (unformat (i, "%U", unformat_ip6_address, &v6_next_hop_address))
+	{
+	  next_hop_proto_is_ip4 = 0;
+	  next_hop_set = 1;
+	}
+      if (unformat (i, "sub-domain %d", &sub_domain))
+	;
+      else if (unformat (i, "set %d", &set))
+	;
+      else if (unformat (i, "hdr-len %d", &hdr_len))
+	;
+      else if (unformat (i, "bp %d", &bp))
+	;
+      else if (unformat (i, "add"))
+	is_add = 1;
+      else if (unformat (i, "del"))
+	is_add = 0;
+      else if (unformat (i, "out-label %d", &next_hop_out_label))
+	;
+      else
+	{
+	  clib_warning ("parse error '%U'", format_unformat_error, i);
+	  return -99;
+	}
+    }
+
+  if (!next_hop_set || (MPLS_LABEL_INVALID == next_hop_out_label))
+    {
+      errmsg ("next hop / label set\n");
+      return -99;
+    }
+  if (0 == bp)
+    {
+      errmsg ("bit=position not set\n");
+      return -99;
+    }
+
+  /* Construct the API message */
+  M2 (BIER_ROUTE_ADD_DEL, mp, sizeof (vl_api_fib_path3_t));
+
+  mp->br_is_add = is_add;
+  mp->br_tbl_id.bt_set = set;
+  mp->br_tbl_id.bt_sub_domain = sub_domain;
+  mp->br_tbl_id.bt_hdr_len_id = hdr_len;
+  mp->br_bp = ntohs (bp);
+  mp->br_n_paths = 1;
+  mp->br_paths[0].n_labels = 1;
+  mp->br_paths[0].label_stack[0] = ntohl (next_hop_out_label);
+  mp->br_paths[0].afi = (next_hop_proto_is_ip4 ? 0 : 1);
+
+  if (next_hop_proto_is_ip4)
+    {
+      clib_memcpy (mp->br_paths[0].next_hop,
+		   &v4_next_hop_address, sizeof (v4_next_hop_address));
+    }
+  else
+    {
+      clib_memcpy (mp->br_paths[0].next_hop,
+		   &v6_next_hop_address, sizeof (v6_next_hop_address));
+    }
+
+  /* send it... */
+  S (mp);
+
+  /* Wait for a reply... */
+  W (ret);
+
+  return (ret);
+}
+
+static int
 api_proxy_arp_add_del (vat_main_t * vam)
 {
   unformat_input_t *i = vam->input;
@@ -8661,45 +9006,6 @@ api_ip_neighbor_add_del (vat_main_t * vam)
   S (mp);
 
   /* Wait for a reply, return good/bad news  */
-  W (ret);
-  return ret;
-}
-
-static int
-api_reset_vrf (vat_main_t * vam)
-{
-  unformat_input_t *i = vam->input;
-  vl_api_reset_vrf_t *mp;
-  u32 vrf_id = 0;
-  u8 is_ipv6 = 0;
-  u8 vrf_id_set = 0;
-  int ret;
-
-  while (unformat_check_input (i) != UNFORMAT_END_OF_INPUT)
-    {
-      if (unformat (i, "vrf %d", &vrf_id))
-	vrf_id_set = 1;
-      else if (unformat (i, "ipv6"))
-	is_ipv6 = 1;
-      else
-	{
-	  clib_warning ("parse error '%U'", format_unformat_error, i);
-	  return -99;
-	}
-    }
-
-  if (vrf_id_set == 0)
-    {
-      errmsg ("missing vrf id");
-      return -99;
-    }
-
-  M (RESET_VRF, mp);
-
-  mp->vrf_id = ntohl (vrf_id);
-  mp->is_ipv6 = is_ipv6;
-
-  S (mp);
   W (ret);
   return ret;
 }
@@ -9034,15 +9340,19 @@ vl_api_dhcp_proxy_details_t_handler (vl_api_dhcp_proxy_details_t * mp)
 
   if (mp->is_ipv6)
     print (vam->ofp,
-	   "RX Table-ID %d, Source Address %U, VSS FIB-ID %d, VSS OUI %d",
+	   "RX Table-ID %d, Source Address %U, VSS Type %d, "
+	   "VSS VPN-ID '%s', VSS FIB-ID %d, VSS OUI %d",
 	   ntohl (mp->rx_vrf_id),
 	   format_ip6_address, mp->dhcp_src_address,
+	   mp->vss_type, mp->vss_vpn_ascii_id,
 	   ntohl (mp->vss_oui), ntohl (mp->vss_fib_id));
   else
     print (vam->ofp,
-	   "RX Table-ID %d, Source Address %U, VSS FIB-ID %d, VSS OUI %d",
+	   "RX Table-ID %d, Source Address %U, VSS Type %d, "
+	   "VSS VPN-ID '%s', VSS FIB-ID %d, VSS OUI %d",
 	   ntohl (mp->rx_vrf_id),
 	   format_ip4_address, mp->dhcp_src_address,
+	   mp->vss_type, mp->vss_vpn_ascii_id,
 	   ntohl (mp->vss_oui), ntohl (mp->vss_fib_id));
 
   for (i = 0; i < count; i++)
@@ -9079,6 +9389,10 @@ static void vl_api_dhcp_proxy_details_t_handler_json
 
   vat_json_init_object (node);
   vat_json_object_add_uint (node, "rx-table-id", ntohl (mp->rx_vrf_id));
+  vat_json_object_add_bytes (node, "vss-type", &mp->vss_type,
+			     sizeof (mp->vss_type));
+  vat_json_object_add_string_copy (node, "vss-vpn-ascii-id",
+				   mp->vss_vpn_ascii_id);
   vat_json_object_add_uint (node, "vss-fib-id", ntohl (mp->vss_fib_id));
   vat_json_object_add_uint (node, "vss-oui", ntohl (mp->vss_oui));
 
@@ -9153,59 +9467,62 @@ api_dhcp_proxy_set_vss (vat_main_t * vam)
   vl_api_dhcp_proxy_set_vss_t *mp;
   u8 is_ipv6 = 0;
   u8 is_add = 1;
-  u32 tbl_id;
-  u8 tbl_id_set = 0;
-  u32 oui;
-  u8 oui_set = 0;
-  u32 fib_id;
-  u8 fib_id_set = 0;
+  u32 tbl_id = ~0;
+  u8 vss_type = VSS_TYPE_DEFAULT;
+  u8 *vpn_ascii_id = 0;
+  u32 oui = 0;
+  u32 fib_id = 0;
   int ret;
 
   while (unformat_check_input (i) != UNFORMAT_END_OF_INPUT)
     {
       if (unformat (i, "tbl_id %d", &tbl_id))
-	tbl_id_set = 1;
-      if (unformat (i, "fib_id %d", &fib_id))
-	fib_id_set = 1;
-      if (unformat (i, "oui %d", &oui))
-	oui_set = 1;
+	;
+      else if (unformat (i, "vpn_ascii_id %s", &vpn_ascii_id))
+	vss_type = VSS_TYPE_ASCII;
+      else if (unformat (i, "fib_id %d", &fib_id))
+	vss_type = VSS_TYPE_VPN_ID;
+      else if (unformat (i, "oui %d", &oui))
+	vss_type = VSS_TYPE_VPN_ID;
       else if (unformat (i, "ipv6"))
 	is_ipv6 = 1;
       else if (unformat (i, "del"))
 	is_add = 0;
       else
-	{
-	  clib_warning ("parse error '%U'", format_unformat_error, i);
-	  return -99;
-	}
+	break;
     }
 
-  if (tbl_id_set == 0)
+  if (tbl_id == ~0)
     {
-      errmsg ("missing tbl id");
+      errmsg ("missing tbl_id ");
+      vec_free (vpn_ascii_id);
       return -99;
     }
 
-  if (fib_id_set == 0)
+  if ((vpn_ascii_id) && (vec_len (vpn_ascii_id) > 128))
     {
-      errmsg ("missing fib id");
-      return -99;
-    }
-  if (oui_set == 0)
-    {
-      errmsg ("missing oui");
+      errmsg ("vpn_ascii_id cannot be longer than 128 ");
+      vec_free (vpn_ascii_id);
       return -99;
     }
 
   M (DHCP_PROXY_SET_VSS, mp);
   mp->tbl_id = ntohl (tbl_id);
-  mp->fib_id = ntohl (fib_id);
+  mp->vss_type = vss_type;
+  if (vpn_ascii_id)
+    {
+      clib_memcpy (mp->vpn_ascii_id, vpn_ascii_id, vec_len (vpn_ascii_id));
+      mp->vpn_ascii_id[vec_len (vpn_ascii_id)] = 0;
+    }
+  mp->vpn_index = ntohl (fib_id);
   mp->oui = ntohl (oui);
   mp->is_ipv6 = is_ipv6;
   mp->is_add = is_add;
 
   S (mp);
   W (ret);
+
+  vec_free (vpn_ascii_id);
   return ret;
 }
 
@@ -13254,16 +13571,6 @@ api_vxlan_gpe_tunnel_dump (vat_main_t * vam)
   return ret;
 }
 
-
-u8 *
-format_l2_fib_mac_address (u8 * s, va_list * args)
-{
-  u8 *a = va_arg (*args, u8 *);
-
-  return format (s, "%02x:%02x:%02x:%02x:%02x:%02x",
-		 a[2], a[3], a[4], a[5], a[6], a[7]);
-}
-
 static void vl_api_l2_fib_table_details_t_handler
   (vl_api_l2_fib_table_details_t * mp)
 {
@@ -13271,7 +13578,7 @@ static void vl_api_l2_fib_table_details_t_handler
 
   print (vam->ofp, "%3" PRIu32 "    %U    %3" PRIu32
 	 "       %d       %d     %d",
-	 ntohl (mp->bd_id), format_l2_fib_mac_address, &mp->mac,
+	 ntohl (mp->bd_id), format_ethernet_address, mp->mac,
 	 ntohl (mp->sw_if_index), mp->static_mac, mp->filter_mac,
 	 mp->bvi_mac);
 }
@@ -13291,7 +13598,7 @@ static void vl_api_l2_fib_table_details_t_handler_json
 
   vat_json_init_object (node);
   vat_json_object_add_uint (node, "bd_id", ntohl (mp->bd_id));
-  vat_json_object_add_uint (node, "mac", clib_net_to_host_u64 (mp->mac));
+  vat_json_object_add_bytes (node, "mac", mp->mac, 6);
   vat_json_object_add_uint (node, "sw_if_index", ntohl (mp->sw_if_index));
   vat_json_object_add_uint (node, "static_mac", mp->static_mac);
   vat_json_object_add_uint (node, "filter_mac", mp->filter_mac);
@@ -16350,6 +16657,189 @@ api_one_enable_disable (vat_main_t * vam)
 }
 
 #define api_lisp_enable_disable api_one_enable_disable
+
+static int
+api_one_enable_disable_xtr_mode (vat_main_t * vam)
+{
+  unformat_input_t *input = vam->input;
+  vl_api_one_enable_disable_xtr_mode_t *mp;
+  u8 is_set = 0;
+  u8 is_en = 0;
+  int ret;
+
+  /* Parse args required to build the message */
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "enable"))
+	{
+	  is_set = 1;
+	  is_en = 1;
+	}
+      else if (unformat (input, "disable"))
+	{
+	  is_set = 1;
+	}
+      else
+	break;
+    }
+
+  if (!is_set)
+    {
+      errmsg ("Value not set");
+      return -99;
+    }
+
+  /* Construct the API message */
+  M (ONE_ENABLE_DISABLE_XTR_MODE, mp);
+
+  mp->is_en = is_en;
+
+  /* send it... */
+  S (mp);
+
+  /* Wait for a reply... */
+  W (ret);
+  return ret;
+}
+
+static int
+api_one_show_xtr_mode (vat_main_t * vam)
+{
+  vl_api_one_show_xtr_mode_t *mp;
+  int ret;
+
+  /* Construct the API message */
+  M (ONE_SHOW_XTR_MODE, mp);
+
+  /* send it... */
+  S (mp);
+
+  /* Wait for a reply... */
+  W (ret);
+  return ret;
+}
+
+static int
+api_one_enable_disable_pitr_mode (vat_main_t * vam)
+{
+  unformat_input_t *input = vam->input;
+  vl_api_one_enable_disable_pitr_mode_t *mp;
+  u8 is_set = 0;
+  u8 is_en = 0;
+  int ret;
+
+  /* Parse args required to build the message */
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "enable"))
+	{
+	  is_set = 1;
+	  is_en = 1;
+	}
+      else if (unformat (input, "disable"))
+	{
+	  is_set = 1;
+	}
+      else
+	break;
+    }
+
+  if (!is_set)
+    {
+      errmsg ("Value not set");
+      return -99;
+    }
+
+  /* Construct the API message */
+  M (ONE_ENABLE_DISABLE_PITR_MODE, mp);
+
+  mp->is_en = is_en;
+
+  /* send it... */
+  S (mp);
+
+  /* Wait for a reply... */
+  W (ret);
+  return ret;
+}
+
+static int
+api_one_show_pitr_mode (vat_main_t * vam)
+{
+  vl_api_one_show_pitr_mode_t *mp;
+  int ret;
+
+  /* Construct the API message */
+  M (ONE_SHOW_PITR_MODE, mp);
+
+  /* send it... */
+  S (mp);
+
+  /* Wait for a reply... */
+  W (ret);
+  return ret;
+}
+
+static int
+api_one_enable_disable_petr_mode (vat_main_t * vam)
+{
+  unformat_input_t *input = vam->input;
+  vl_api_one_enable_disable_petr_mode_t *mp;
+  u8 is_set = 0;
+  u8 is_en = 0;
+  int ret;
+
+  /* Parse args required to build the message */
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "enable"))
+	{
+	  is_set = 1;
+	  is_en = 1;
+	}
+      else if (unformat (input, "disable"))
+	{
+	  is_set = 1;
+	}
+      else
+	break;
+    }
+
+  if (!is_set)
+    {
+      errmsg ("Value not set");
+      return -99;
+    }
+
+  /* Construct the API message */
+  M (ONE_ENABLE_DISABLE_PETR_MODE, mp);
+
+  mp->is_en = is_en;
+
+  /* send it... */
+  S (mp);
+
+  /* Wait for a reply... */
+  W (ret);
+  return ret;
+}
+
+static int
+api_one_show_petr_mode (vat_main_t * vam)
+{
+  vl_api_one_show_petr_mode_t *mp;
+  int ret;
+
+  /* Construct the API message */
+  M (ONE_SHOW_PETR_MODE, mp);
+
+  /* send it... */
+  S (mp);
+
+  /* Wait for a reply... */
+  W (ret);
+  return ret;
+}
 
 static int
 api_show_one_map_register_state (vat_main_t * vam)
@@ -20945,6 +21435,41 @@ api_tcp_configure_src_addresses (vat_main_t * vam)
   return ret;
 }
 
+static void vl_api_app_namespace_add_del_reply_t_handler
+  (vl_api_app_namespace_add_del_reply_t * mp)
+{
+  vat_main_t *vam = &vat_main;
+  i32 retval = ntohl (mp->retval);
+  if (vam->async_mode)
+    {
+      vam->async_errors += (retval < 0);
+    }
+  else
+    {
+      vam->retval = retval;
+      if (retval == 0)
+	errmsg ("app ns index %d\n", ntohl (mp->appns_index));
+      vam->result_ready = 1;
+    }
+}
+
+static void vl_api_app_namespace_add_del_reply_t_handler_json
+  (vl_api_app_namespace_add_del_reply_t * mp)
+{
+  vat_main_t *vam = &vat_main;
+  vat_json_node_t node;
+
+  vat_json_init_object (&node);
+  vat_json_object_add_int (&node, "retval", ntohl (mp->retval));
+  vat_json_object_add_uint (&node, "appns_index", ntohl (mp->appns_index));
+
+  vat_json_print (vam->ofp, &node);
+  vat_json_free (&node);
+
+  vam->retval = ntohl (mp->retval);
+  vam->result_ready = 1;
+}
+
 static int
 api_app_namespace_add_del (vat_main_t * vam)
 {
@@ -21189,6 +21714,256 @@ api_dns_name_server_add_del (vat_main_t * vam)
   return ret;
 }
 
+static void
+vl_api_session_rules_details_t_handler (vl_api_session_rules_details_t * mp)
+{
+  vat_main_t *vam = &vat_main;
+
+  if (mp->is_ip4)
+    {
+      print (vam->ofp,
+	     "appns %u tp %u scope %d %U/%d %d %U/%d %d action: %d tag: %s",
+	     clib_net_to_host_u32 (mp->appns_index), mp->transport_proto,
+	     mp->scope, format_ip4_address, &mp->lcl_ip, mp->lcl_plen,
+	     clib_net_to_host_u16 (mp->lcl_port), format_ip4_address,
+	     &mp->rmt_ip, mp->rmt_plen, clib_net_to_host_u16 (mp->rmt_port),
+	     clib_net_to_host_u32 (mp->action_index), mp->tag);
+    }
+  else
+    {
+      print (vam->ofp,
+	     "appns %u tp %u scope %d %U/%d %d %U/%d %d action: %d tag: %s",
+	     clib_net_to_host_u32 (mp->appns_index), mp->transport_proto,
+	     mp->scope, format_ip6_address, &mp->lcl_ip, mp->lcl_plen,
+	     clib_net_to_host_u16 (mp->lcl_port), format_ip6_address,
+	     &mp->rmt_ip, mp->rmt_plen, clib_net_to_host_u16 (mp->rmt_port),
+	     clib_net_to_host_u32 (mp->action_index), mp->tag);
+    }
+}
+
+static void
+vl_api_session_rules_details_t_handler_json (vl_api_session_rules_details_t *
+					     mp)
+{
+  vat_main_t *vam = &vat_main;
+  vat_json_node_t *node = NULL;
+  struct in6_addr ip6;
+  struct in_addr ip4;
+
+  if (VAT_JSON_ARRAY != vam->json_tree.type)
+    {
+      ASSERT (VAT_JSON_NONE == vam->json_tree.type);
+      vat_json_init_array (&vam->json_tree);
+    }
+  node = vat_json_array_add (&vam->json_tree);
+  vat_json_init_object (node);
+
+  vat_json_object_add_uint (node, "is_ip4", mp->is_ip4 ? 1 : 0);
+  vat_json_object_add_uint (node, "appns_index",
+			    clib_net_to_host_u32 (mp->appns_index));
+  vat_json_object_add_uint (node, "transport_proto", mp->transport_proto);
+  vat_json_object_add_uint (node, "scope", mp->scope);
+  vat_json_object_add_uint (node, "action_index",
+			    clib_net_to_host_u32 (mp->action_index));
+  vat_json_object_add_uint (node, "lcl_port",
+			    clib_net_to_host_u16 (mp->lcl_port));
+  vat_json_object_add_uint (node, "rmt_port",
+			    clib_net_to_host_u16 (mp->rmt_port));
+  vat_json_object_add_uint (node, "lcl_plen", mp->lcl_plen);
+  vat_json_object_add_uint (node, "rmt_plen", mp->rmt_plen);
+  vat_json_object_add_string_copy (node, "tag", mp->tag);
+  if (mp->is_ip4)
+    {
+      clib_memcpy (&ip4, mp->lcl_ip, sizeof (ip4));
+      vat_json_object_add_ip4 (node, "lcl_ip", ip4);
+      clib_memcpy (&ip4, mp->rmt_ip, sizeof (ip4));
+      vat_json_object_add_ip4 (node, "rmt_ip", ip4);
+    }
+  else
+    {
+      clib_memcpy (&ip6, mp->lcl_ip, sizeof (ip6));
+      vat_json_object_add_ip6 (node, "lcl_ip", ip6);
+      clib_memcpy (&ip6, mp->rmt_ip, sizeof (ip6));
+      vat_json_object_add_ip6 (node, "rmt_ip", ip6);
+    }
+}
+
+static int
+api_session_rule_add_del (vat_main_t * vam)
+{
+  vl_api_session_rule_add_del_t *mp;
+  unformat_input_t *i = vam->input;
+  u32 proto = ~0, lcl_port, rmt_port, action = 0, lcl_plen, rmt_plen;
+  u32 appns_index = 0, scope = 0;
+  ip4_address_t lcl_ip4, rmt_ip4;
+  ip6_address_t lcl_ip6, rmt_ip6;
+  u8 is_ip4 = 1, conn_set = 0;
+  u8 is_add = 1, *tag = 0;
+  int ret;
+
+  while (unformat_check_input (i) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (i, "del"))
+	is_add = 0;
+      else if (unformat (i, "add"))
+	;
+      else if (unformat (i, "proto tcp"))
+	proto = 0;
+      else if (unformat (i, "proto udp"))
+	proto = 1;
+      else if (unformat (i, "appns %d", &appns_index))
+	;
+      else if (unformat (i, "scope %d", &scope))
+	;
+      else if (unformat (i, "tag %_%v%_", &tag))
+	;
+      else
+	if (unformat
+	    (i, "%U/%d %d %U/%d %d", unformat_ip4_address, &lcl_ip4,
+	     &lcl_plen, &lcl_port, unformat_ip4_address, &rmt_ip4, &rmt_plen,
+	     &rmt_port))
+	{
+	  is_ip4 = 1;
+	  conn_set = 1;
+	}
+      else
+	if (unformat
+	    (i, "%U/%d %d %U/%d %d", unformat_ip6_address, &lcl_ip6,
+	     &lcl_plen, &lcl_port, unformat_ip6_address, &rmt_ip6, &rmt_plen,
+	     &rmt_port))
+	{
+	  is_ip4 = 0;
+	  conn_set = 1;
+	}
+      else if (unformat (i, "action %d", &action))
+	;
+      else
+	break;
+    }
+  if (proto == ~0 || !conn_set || action == ~0)
+    {
+      errmsg ("transport proto, connection and action must be set");
+      return -99;
+    }
+
+  if (scope > 3)
+    {
+      errmsg ("scope should be 0-3");
+      return -99;
+    }
+
+  M (SESSION_RULE_ADD_DEL, mp);
+
+  mp->is_ip4 = is_ip4;
+  mp->transport_proto = proto;
+  mp->lcl_port = clib_host_to_net_u16 ((u16) lcl_port);
+  mp->rmt_port = clib_host_to_net_u16 ((u16) rmt_port);
+  mp->lcl_plen = lcl_plen;
+  mp->rmt_plen = rmt_plen;
+  mp->action_index = clib_host_to_net_u32 (action);
+  mp->appns_index = clib_host_to_net_u32 (appns_index);
+  mp->scope = scope;
+  mp->is_add = is_add;
+  if (is_ip4)
+    {
+      clib_memcpy (mp->lcl_ip, &lcl_ip4, sizeof (lcl_ip4));
+      clib_memcpy (mp->rmt_ip, &rmt_ip4, sizeof (rmt_ip4));
+    }
+  else
+    {
+      clib_memcpy (mp->lcl_ip, &lcl_ip6, sizeof (lcl_ip6));
+      clib_memcpy (mp->rmt_ip, &rmt_ip6, sizeof (rmt_ip6));
+    }
+  if (tag)
+    {
+      clib_memcpy (mp->tag, tag, vec_len (tag));
+      vec_free (tag);
+    }
+
+  S (mp);
+  W (ret);
+  return ret;
+}
+
+static int
+api_session_rules_dump (vat_main_t * vam)
+{
+  vl_api_session_rules_dump_t *mp;
+  vl_api_control_ping_t *mp_ping;
+  int ret;
+
+  if (!vam->json_output)
+    {
+      print (vam->ofp, "%=20s", "Session Rules");
+    }
+
+  M (SESSION_RULES_DUMP, mp);
+  /* send it... */
+  S (mp);
+
+  /* Use a control ping for synchronization */
+  MPING (CONTROL_PING, mp_ping);
+  S (mp_ping);
+
+  /* Wait for a reply... */
+  W (ret);
+  return ret;
+}
+
+static int
+api_ip_container_proxy_add_del (vat_main_t * vam)
+{
+  vl_api_ip_container_proxy_add_del_t *mp;
+  unformat_input_t *i = vam->input;
+  u32 plen = ~0, sw_if_index = ~0;
+  ip4_address_t ip4;
+  ip6_address_t ip6;
+  u8 is_ip4 = 1;
+  u8 is_add = 1;
+  int ret;
+
+  while (unformat_check_input (i) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (i, "del"))
+	is_add = 0;
+      else if (unformat (i, "add"))
+	;
+      if (unformat (i, "%U", unformat_ip4_address, &ip4))
+	{
+	  is_ip4 = 1;
+	  plen = 32;
+	}
+      else if (unformat (i, "%U", unformat_ip6_address, &ip6))
+	{
+	  is_ip4 = 0;
+	  plen = 128;
+	}
+      else if (unformat (i, "sw_if_index %u", &sw_if_index))
+	;
+      else
+	break;
+    }
+  if (sw_if_index == ~0 || plen == ~0)
+    {
+      errmsg ("address and sw_if_index must be set");
+      return -99;
+    }
+
+  M (IP_CONTAINER_PROXY_ADD_DEL, mp);
+
+  mp->is_ip4 = is_ip4;
+  mp->sw_if_index = clib_host_to_net_u32 (sw_if_index);
+  mp->plen = plen;
+  mp->is_add = is_add;
+  if (is_ip4)
+    clib_memcpy (mp->ip, &ip4, sizeof (ip4));
+  else
+    clib_memcpy (mp->ip, &ip6, sizeof (ip6));
+
+  S (mp);
+  W (ret);
+  return ret;
+}
 
 static int
 q_or_quit (vat_main_t * vam)
@@ -21562,6 +22337,8 @@ _(sw_interface_set_flags,                                               \
   "<intfc> | sw_if_index <id> admin-up | admin-down link-up | link down") \
 _(sw_interface_add_del_address,                                         \
   "<intfc> | sw_if_index <id> <ip4-address> | <ip6-address> [del] [del-all] ") \
+_(sw_interface_set_rx_mode,                                             \
+  "<intfc> | sw_if_index <id> [queue <id>] <polling | interrupt | adaptive>") \
 _(sw_interface_set_table,                                               \
   "<intfc> | sw_if_index <id> vrf <table-id> [ipv6]")                   \
 _(sw_interface_set_mpls_enable,                                         \
@@ -21581,7 +22358,7 @@ _(sw_interface_set_l2_bridge,                                           \
   "enable | disable")                                                   \
 _(bridge_domain_set_mac_age, "bd_id <bridge-domain-id> mac-age 0-255")  \
 _(bridge_domain_add_del,                                                \
-  "bd_id <bridge-domain-id> [flood 1|0] [uu-flood 1|0] [forward 1|0] [learn 1|0] [arp-term 1|0] [mac-age 0-255] [bd-tag <tag>] [del]\n") \
+  "bd_id <bridge-domain-id> [flood 1|0] [uu-flood 1|0] [forward 1|0] [learn 1|0] [arp-term 1|0] [mac-age 0-255] [bd-tag <text>] [del]\n") \
 _(bridge_domain_dump, "[bd_id <bridge-domain-id>]\n")                   \
 _(l2fib_add_del,                                                        \
   "mac <mac-addr> bd_id <bridge-domain-id> [del] | sw_if <intfc> | sw_if_index <id> [static] [filter] [bvi] [count <nn>]\n") \
@@ -21620,6 +22397,12 @@ _(mpls_ip_bind_unbind,                                                  \
 _(mpls_tunnel_add_del,                                                  \
   " via <addr> [table-id <n>]\n"                                        \
   "sw_if_index <id>] [l2]  [del]")                                      \
+_(bier_table_add_del,                                                   \
+  "<label> <sub-domain> <set> <bsl> [del]")                             \
+_(bier_route_add_del,                                                   \
+  "<bit-position> <sub-domain> <set> <bsl> via <addr> [table-id <n>]\n" \
+  "[<intfc> | sw_if_index <id>]"                                        \
+  "[weight <n>] [del] [multipath]")                                     \
 _(proxy_arp_add_del,                                                    \
   "<lo-ip4-addr> - <hi-ip4-addr> [vrf <n>] [del]")                      \
 _(proxy_arp_intfc_enable_disable,                                       \
@@ -21629,7 +22412,6 @@ _(sw_interface_set_unnumbered,                                          \
 _(ip_neighbor_add_del,                                                  \
   "(<intfc> | sw_if_index <id>) dst <ip46-address> "                    \
   "[mac <mac-addr>] [vrf <vrf-id>] [is_static] [del]")                  \
-_(reset_vrf, "vrf <id> [ipv6]")                                         \
 _(create_vlan_subif, "<intfc> | sw_if_index <id> vlan <n>")             \
 _(create_subif, "<intfc> | sw_if_index <id> sub_id <n>\n"               \
   "[outer_vlan_id <n>][inner_vlan_id <n>]\n"                            \
@@ -21641,7 +22423,7 @@ _(dhcp_proxy_config,                                                    \
   "svr <v46-address> src <v46-address>\n"                               \
    "rx_vrf_id <nn> server_vrf_id <nn>  [del]")                          \
 _(dhcp_proxy_set_vss,                                                   \
-  "tbl_id <n> fib_id <n> oui <n> [ipv6] [del]")                         \
+  "tbl_id <n> [fib_id <n> oui <n> | vpn_ascii_id <text>] [ipv6] [del]") \
 _(dhcp_proxy_dump, "ip6")                                               \
 _(dhcp_client_config,                                                   \
   "<intfc> | sw_if_index <id> [hostname <name>] [disable_event] [del]") \
@@ -21855,6 +22637,12 @@ _(one_get_map_request_itr_rlocs, "")                                    \
 _(one_map_register_set_ttl, "<ttl>")                                    \
 _(one_set_transport_protocol, "udp|api")                                \
 _(one_get_transport_protocol, "")                                       \
+_(one_enable_disable_xtr_mode, "enable|disable")                        \
+_(one_show_xtr_mode, "")                                                \
+_(one_enable_disable_pitr_mode, "enable|disable")                       \
+_(one_show_pitr_mode, "")                                               \
+_(one_enable_disable_petr_mode, "enable|disable")                       \
+_(one_show_petr_mode, "")                                               \
 _(show_one_nsh_mapping, "")                                             \
 _(show_one_pitr, "")                                                    \
 _(show_one_use_petr, "")                                                \
@@ -21987,7 +22775,13 @@ _(app_namespace_add_del, "[add] id <ns-id> secret <nn> sw_if_index <nn>")\
 _(dns_enable_disable, "[enable][disable]")				\
 _(dns_name_server_add_del, "<ip-address> [del]")			\
 _(dns_resolve_name, "<hostname>")					\
-_(dns_resolve_ip, "<ip4|ip6>")
+_(dns_resolve_ip, "<ip4|ip6>")						\
+_(dns_name_server_add_del, "<ip-address> [del]")			\
+_(dns_resolve_name, "<hostname>")					\
+_(session_rule_add_del, "[add|del] proto <tcp/udp> <lcl-ip>/<plen> "	\
+  "<lcl-port> <rmt-ip>/<plen> <rmt-port> action <nn>")			\
+_(session_rules_dump, "")						\
+_(ip_container_proxy_add_del, "[add|del] <address> <sw_if_index>")	\
 
 /* List of command functions, CLI names map directly to functions */
 #define foreach_cli_function                                    \

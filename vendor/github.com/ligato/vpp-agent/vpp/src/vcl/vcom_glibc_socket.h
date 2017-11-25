@@ -153,6 +153,9 @@ getpeername (int __fd, __SOCKADDR_ARG __addr, socklen_t * __restrict __len);
    __THROW.  */
 extern ssize_t send (int __fd, const void *__buf, size_t __n, int __flags);
 
+extern ssize_t sendfile (int __out_fd, int __in_fd, off_t * __offset,
+			 size_t __len);
+
 /* Read N bytes into BUF from socket FD.
    Returns the number read or -1 for errors.
 
@@ -249,7 +252,6 @@ extern int __THROW listen (int __fd, int __n);
 extern int
 accept (int __fd, __SOCKADDR_ARG __addr, socklen_t * __restrict __addr_len);
 
-#ifdef __USE_GNU
 /* Similar to 'accept' but takes an additional parameter to specify flags.
 
    This function is a cancellation point and therefore not marked with
@@ -258,7 +260,6 @@ accept (int __fd, __SOCKADDR_ARG __addr, socklen_t * __restrict __addr_len);
 extern int
 accept4 (int __fd, __SOCKADDR_ARG __addr,
 	 socklen_t * __restrict __addr_len, int __flags);
-#endif
 
 /* Shut down all or part of the connection open on socket FD.
    HOW determines what to shut down:

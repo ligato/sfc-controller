@@ -67,7 +67,7 @@ icmpr_CPPFLAGS = $(AM_CPPFLAGS) -Isrc -Iexamples/icmp_responder
 #
 icmpr_epoll_SOURCES = examples/icmp_responder-epoll/main.c \
                     examples/icmp_responder/icmp_proto.c
-icmpr_epoll_LDADD = libmemif.la
+icmpr_epoll_LDADD = libmemif.la -lpthread
 icmpr_epoll_CPPFLAGS = $(AM_CPPFLAGS) -Isrc -Iexamples/icmp_responder
 
 #

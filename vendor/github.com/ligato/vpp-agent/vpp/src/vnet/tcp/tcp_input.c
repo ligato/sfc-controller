@@ -2735,7 +2735,7 @@ tcp46_listen_inline (vlib_main_t * vm, vlib_node_runtime_t * node,
 
 	  /* Create child session and send SYN-ACK */
 	  child0 = tcp_connection_new (my_thread_index);
-	  child0->c_lcl_port = lc0->c_lcl_port;
+	  child0->c_lcl_port = th0->dst_port;
 	  child0->c_rmt_port = th0->src_port;
 	  child0->c_is_ip4 = is_ip4;
 	  child0->state = TCP_STATE_SYN_RCVD;
@@ -2751,15 +2751,6 @@ tcp46_listen_inline (vlib_main_t * vm, vlib_node_runtime_t * node,
 			   sizeof (ip6_address_t));
 	      clib_memcpy (&child0->c_rmt_ip6, &ip60->src_address,
 			   sizeof (ip6_address_t));
-	    }
-
-	  if (stream_session_accept (&child0->connection, lc0->c_s_index,
-				     0 /* notify */ ))
-	    {
-	      clib_warning ("session accept fail");
-	      tcp_connection_cleanup (child0);
-	      error0 = TCP_ERROR_CREATE_SESSION_FAIL;
-	      goto drop;
 	    }
 
 	  if (tcp_options_parse (th0, &child0->rcv_opts))
@@ -2790,6 +2781,15 @@ tcp46_listen_inline (vlib_main_t * vm, vlib_node_runtime_t * node,
 
 	  tcp_connection_init_vars (child0);
 	  TCP_EVT_DBG (TCP_EVT_SYN_RCVD, child0, 1);
+
+	  if (stream_session_accept (&child0->connection, lc0->c_s_index,
+				     0 /* notify */ ))
+	    {
+	      clib_warning ("session accept fail");
+	      tcp_connection_cleanup (child0);
+	      error0 = TCP_ERROR_CREATE_SESSION_FAIL;
+	      goto drop;
+	    }
 
 	  /* Reuse buffer to make syn-ack and send */
 	  tcp_make_synack (child0, b0);

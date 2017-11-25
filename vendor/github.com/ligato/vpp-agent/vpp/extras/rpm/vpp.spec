@@ -50,11 +50,9 @@ BuildRequires: python-devel, python-virtualenv
 BuildRequires: libffi-devel
 BuildRequires: glibc-static, java-1.8.0-openjdk, java-1.8.0-openjdk-devel yum-utils, redhat-lsb
 BuildRequires: apr-devel
-%if %{with aesni}
-BuildRequires: nasm
-%endif
 BuildRequires: numactl-devel
 BuildRequires: autoconf automake libtool byacc bison flex
+BuildRequires: boost boost-devel
 
 Source: %{name}-%{_version}-%{_release}.tar.xz
 # Source: vpp-latest.tar.xz

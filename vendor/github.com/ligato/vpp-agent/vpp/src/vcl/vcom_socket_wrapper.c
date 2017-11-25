@@ -154,14 +154,11 @@ PRINTF_ATTRIBUTE (3, 4);
  * SWRAP LOADING LIBC FUNCTIONS
  *********************************************************/
 
-#ifdef HAVE_ACCEPT4
 typedef int (*__libc_accept4) (int sockfd,
 			       struct sockaddr * addr,
 			       socklen_t * addrlen, int flags);
-#else
 typedef int (*__libc_accept) (int sockfd,
 			      struct sockaddr * addr, socklen_t * addrlen);
-#endif
 typedef int (*__libc_bind) (int sockfd,
 			    const struct sockaddr * addr, socklen_t addrlen);
 typedef int (*__libc_close) (int fd);
@@ -215,6 +212,8 @@ typedef int (*__libc_recvmsg) (int sockfd, const struct msghdr * msg,
 			       int flags);
 typedef int (*__libc_send) (int sockfd, const void *buf, size_t len,
 			    int flags);
+typedef ssize_t (*__libc_sendfile) (int out_fd, int in_fd, off_t * offset,
+				    size_t len);
 typedef int (*__libc_sendmsg) (int sockfd, const struct msghdr * msg,
 			       int flags);
 typedef int (*__libc_sendto) (int sockfd, const void *buf, size_t len,
@@ -282,11 +281,8 @@ typedef int (*__libc_ppoll) (struct pollfd * __fds, nfds_t __nfds,
 
 struct swrap_libc_symbols
 {
-#ifdef HAVE_ACCEPT4
   SWRAP_SYMBOL_ENTRY (accept4);
-#else
   SWRAP_SYMBOL_ENTRY (accept);
-#endif
   SWRAP_SYMBOL_ENTRY (bind);
   SWRAP_SYMBOL_ENTRY (close);
   SWRAP_SYMBOL_ENTRY (connect);
@@ -320,6 +316,7 @@ struct swrap_libc_symbols
   SWRAP_SYMBOL_ENTRY (recvfrom);
   SWRAP_SYMBOL_ENTRY (recvmsg);
   SWRAP_SYMBOL_ENTRY (send);
+  SWRAP_SYMBOL_ENTRY (sendfile);
   SWRAP_SYMBOL_ENTRY (sendmsg);
   SWRAP_SYMBOL_ENTRY (sendto);
   SWRAP_SYMBOL_ENTRY (setsockopt);
@@ -474,7 +471,6 @@ _swrap_bind_symbol (enum swrap_lib lib, const char *fn_name)
  * has probably something todo with with the linker.
  * So we need load each function at the point it is called the first time.
  */
-#ifdef HAVE_ACCEPT4
 int
 libc_accept4 (int sockfd,
 	      struct sockaddr *addr, socklen_t * addrlen, int flags)
@@ -484,8 +480,6 @@ libc_accept4 (int sockfd,
   return swrap.libc.symbols._libc_accept4.f (sockfd, addr, addrlen, flags);
 }
 
-#else /* HAVE_ACCEPT4 */
-
 int
 libc_accept (int sockfd, struct sockaddr *addr, socklen_t * addrlen)
 {
@@ -493,7 +487,6 @@ libc_accept (int sockfd, struct sockaddr *addr, socklen_t * addrlen)
 
   return swrap.libc.symbols._libc_accept.f (sockfd, addr, addrlen);
 }
-#endif /* HAVE_ACCEPT4 */
 
 int
 libc_bind (int sockfd, const struct sockaddr *addr, socklen_t addrlen)
@@ -625,6 +618,7 @@ libc_listen (int sockfd, int backlog)
   return swrap.libc.symbols._libc_listen.f (sockfd, backlog);
 }
 
+/* TBD: libc_read() should return ssize_t not an int */
 int
 libc_read (int fd, void *buf, size_t count)
 {
@@ -676,6 +670,14 @@ libc_send (int sockfd, const void *buf, size_t len, int flags)
   swrap_bind_symbol_libc (send);
 
   return swrap.libc.symbols._libc_send.f (sockfd, buf, len, flags);
+}
+
+ssize_t
+libc_sendfile (int out_fd, int in_fd, off_t * offset, size_t len)
+{
+  swrap_bind_symbol_libc (sendfile);
+
+  return swrap.libc.symbols._libc_sendfile.f (out_fd, in_fd, offset, len);
 }
 
 int

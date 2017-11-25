@@ -18,6 +18,7 @@
 
 #include <vppinfra/bihash_16_8.h>
 #include <vppinfra/bihash_48_8.h>
+#include <vnet/session/session_rules_table.h>
 
 typedef struct _session_lookup_table
 {
@@ -32,6 +33,22 @@ typedef struct _session_lookup_table
    */
   clib_bihash_16_8_t v4_half_open_hash;
   clib_bihash_48_8_t v6_half_open_hash;
+
+  /**
+   * Per fib proto and transport proto session rules tables
+   */
+  session_rules_table_t session_rules[TRANSPORT_N_PROTO];
+
+  /** Flag that indicates if table has local scope */
+  u8 is_local;
+
+  /** Namespace this table belongs to */
+  u32 appns_index;
+
+  /** For global tables only one fib proto is active. This is a
+   * byproduct of fib table ids not necessarily being the same for
+   * identical fib idices of v4 and v6 fib protos */
+  u8 active_fib_proto;
 } session_table_t;
 
 #define SESSION_TABLE_INVALID_INDEX ((u32)~0)
@@ -49,7 +66,13 @@ void ip4_session_table_walk (clib_bihash_16_8_t * hash,
 session_table_t *session_table_alloc (void);
 session_table_t *session_table_get (u32 table_index);
 u32 session_table_index (session_table_t * slt);
-void session_table_init (session_table_t * slt);
+void session_table_init (session_table_t * slt, u8 fib_proto);
+
+/* Internal, try not to use it! */
+session_table_t *_get_session_tables ();
+
+#define session_table_foreach(VAR, BODY)		\
+  pool_foreach(VAR, _get_session_tables (), BODY)
 
 #endif /* SRC_VNET_SESSION_SESSION_TABLE_H_ */
 /* *INDENT-ON* */

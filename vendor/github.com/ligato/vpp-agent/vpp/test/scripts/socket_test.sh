@@ -66,7 +66,7 @@ OPTIONS:
   -l                  Leave ${tmp_cmdfile_prefix}* files after test run.
   -b                  Run bash after application exit.
   -d                  Run the vpp_debug version of all apps.
-  -c                  Set VCL_CONFIG to use the vppcom_test.conf file.
+  -c                  Set VCL_CONFIG to use the vcl_test.conf file.
   -i                  Run iperf3 for client/server app in native tests.
   -n                  Name of ethernet for VPP to use in multi-host cfg.
   -6                  Use ipv6 addressing.
@@ -248,12 +248,6 @@ done
 
 VCL_LDPRELOAD_LIB_DIR="${VCL_LDPRELOAD_LIB_DIR:-$lib64_dir}"
 
-if [ -n "$multi_host" ] ; then
-    VCL_SESSION_SCOPE_GLOBAL=true
-else
-    VCL_SESSION_SCOPE_LOCAL=true
-fi
-
 if [ -z "$WS_ROOT" ] ; then
     echo "ERROR: WS_ROOT environment variable not set!" >&2
     echo "       Please set WS_ROOT to VPP workspace root directory." >&2
@@ -340,8 +334,6 @@ if [ -f "$VCL_CONFIG" ] ; then
     if [ -n "$api_prefix" ] ; then
         api_segment=" api-segment { gid $user_gid prefix $api_prefix }"
     fi
-    namespace_id="$(egrep -s '^\s*namespace-id \w+' $VCL_CONFIG | tail -1 | awk -e '{print $2}')"
-    namespace_secret="$(egrep -s '^\s*namespace-secret \w+' $VCL_CONFIG | tail -1 | awk -e '{print $2}')"
 fi
 if [ -n "$VCL_APP_NAMESPACE_ID" ] && [ -n "$VCL_APP_NAMESPACE_SECRET" ] ; then
     namespace_id="$VCL_APP_NAMESPACE_ID"
@@ -351,7 +343,7 @@ fi
 if [ -z "$api_segment" ] ; then
     api_segment=" api-segment { gid $user_gid }"
 fi
-vpp_args="unix { interactive exec $tmp_vpp_exec_file}${api_segment}"
+vpp_args="unix { interactive full-coredump coredump-size unlimited exec $tmp_vpp_exec_file}${api_segment}"
 
 if [ $iperf3 -eq 1 ] ; then
     app_dir="$(dirname $(which iperf3))/"
@@ -517,16 +509,27 @@ write_script_header() {
             echo "trap \"rm -f $1 $2 $tmp_vpp_exec_file\" $trap_signals" >> $1
         fi
     fi
-    echo "export VCL_CONFIG=${vcl_config_dir}${vcl_config}" >> $1
+    if [ -n "$VCL_CONFIG" ] ; then
+        echo "export VCL_CONFIG=${vcl_config_dir}${vcl_config}" >> $1
+    fi
+    if [ -n "$VCL_DEBUG" ] ; then
+        echo "export VCL_DEBUG=$VCL_DEBUG" >> $1
+    fi
     if [ -n "$namespace_id" ] ; then
         echo "export VCL_APP_NAMESPACE_ID=\"$namespace_id\"" >> $1
         echo "export VCL_APP_NAMESPACE_SECRET=\"$namespace_secret\"" >> $1
     fi
-    if [ -n "$VCL_SESSION_SCOPE_LOCAL" ] ; then
-        echo "export VCL_SESSION_SCOPE_LOCAL=true" >> $1
+    if [ -n "$VCL_APP_SCOPE_LOCAL" ] || [ -z "$multi_host" ] ; then
+        echo "export VCL_APP_SCOPE_LOCAL=true" >> $1
     fi
-    if [ -n "$VCL_SESSION_SCOPE_GLOBAL" ] ; then
-        echo "export VCL_SESSION_SCOPE_GLOBAL=true" >> $1
+    if [ -n "$VCL_APP_SCOPE_GLOBAL" ] || [ -n "$multi_host" ] ; then
+        echo "export VCL_APP_SCOPE_GLOBAL=true" >> $1
+    fi
+    if [ -n "$VCL_APP_PROXY_TRANSPORT_TCP" ] ; then
+        echo "export VCL_APP_PROXY_TRANSPORT_TCP=true" >> $1
+    fi
+    if [ -n "$VCL_APP_PROXY_TRANSPORT_UDP" ] ; then
+        echo "export VCL_APP_PROXY_TRANSPORT_UDP=true" >> $1
     fi
     if [ "$pre_cmd" = "$gdb_in_emacs " ] ; then
         if [ -n "$multi_host" ] && [[ $3 =~ "VPP".* ]] ; then
@@ -571,7 +574,7 @@ write_gdb_cmdfile() {
     echo "set confirm off" >> $1
     if [ -n "$4" ] ; then
         echo "set exec-wrapper env LD_PRELOAD=$4" >> $1
-        echo "start" >> $1
+        # echo "start" >> $1
     fi
 
     if [ ! -f $2 ] ; then

@@ -1,10 +1,10 @@
 package: github.com/ligato/sfc-controller
 import:
 - package: github.com/ligato/cn-infra
-  version: 31828788c07aa73521d83869714e994aae5cba2d
+  version: v1.0.7
   vcs: git
 - package: github.com/ligato/vpp-agent
-  version: 9793b5f6c6f1613f016a103d7f9d0c58326fa880
+  version: v1.0.8
   vcs: git
 - package: golang.org/x/crypto
   version: 7d9177d70076375b9a59c8fde23d52d9c4a7ecd5
