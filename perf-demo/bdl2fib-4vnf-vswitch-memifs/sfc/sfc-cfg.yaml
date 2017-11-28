@@ -1,0 +1,104 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sfc-controller-cfg
+data:
+  etcd.conf: |
+    insecure-transport: true
+    dial-timeout: 1000000000
+    endpoints:
+     - "172.17.0.1:22379"
+
+  sfc.conf: |
+    sfc_controller_config_version: 1
+    description: Demo topology using bd and l2fibs
+    host_entities:
+        - name: vswitch
+    sfc_entities:
+        - name: vswitch-89-0-l2fib
+          description: vswitch-89-0-l2fib - memif
+          type: 3
+          elements:
+              - container: vswitch
+                port_label: FortyGigabitEthernet89/0/0
+                mac_addr: "02:00:00:00:89:00"
+                etcd_vpp_switch_key: vswitch
+                type: 5
+              - container: vnf1
+                port_label: port1
+                etcd_vpp_switch_key: vswitch
+                mac_addr: "02:00:00:00:00:11"
+                type: 2
+              - container: vnf2
+                port_label: port1
+                mac_addr: "02:00:00:00:00:21"
+                etcd_vpp_switch_key: vswitch
+                type: 2
+              - container: vnf3
+                port_label: port1
+                mac_addr: "02:00:00:00:00:31"
+                etcd_vpp_switch_key: vswitch
+                type: 2
+              - container: vnf4
+                port_label: port1
+                mac_addr: "02:00:00:00:00:41"
+                etcd_vpp_switch_key: vswitch
+                type: 2
+        - name: vswitch-89-1-l2fib
+          description: vswitch-89-1-l2fib - memif
+          type: 3
+          elements:
+              - container: vswitch
+                port_label: FortyGigabitEthernet89/0/1
+                mac_addr: "02:00:00:00:89:01"
+                etcd_vpp_switch_key: vswitch
+                type: 5
+              - container: vnf1
+                port_label: port2
+                mac_addr: "02:00:00:00:00:12"
+                etcd_vpp_switch_key: vswitch
+                type: 2
+              - container: vnf2
+                port_label: port2
+                mac_addr: "02:00:00:00:00:22"
+                etcd_vpp_switch_key: vswitch
+                type: 2
+              - container: vnf3
+                port_label: port2
+                mac_addr: "02:00:00:00:00:32"
+                etcd_vpp_switch_key: vswitch
+                type: 2
+              - container: vnf4
+                port_label: port2
+                mac_addr: "02:00:00:00:00:42"
+                etcd_vpp_switch_key: vswitch
+                type: 2
+  vnf.conf: |
+    vnf_plugin_config_version: 1
+    description: l2xconn vnf ports on each vnf for perf testing
+    vnf_entities:
+      - name: vnf1
+        container: vnf1
+        l2xconnects:
+          - port_labels:
+            - port1
+            - port2
+      - name: vnf2
+        container: vnf2
+        l2xconnects:
+          - port_labels:
+            - port1
+            - port2
+      - name: vnf3
+        container: vnf3
+        l2xconnects:
+          - port_labels:
+            - port1
+            - port2
+      - name: vnf4
+        container: vnf4
+        l2xconnects:
+          - port_labels:
+            - port1
+            - port2
