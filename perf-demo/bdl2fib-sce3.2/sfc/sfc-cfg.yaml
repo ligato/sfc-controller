@@ -12,46 +12,52 @@ data:
 
   sfc.conf: |
     sfc_controller_config_version: 1
-    description: Demo topology using bd and l2fibs
+    description: Demo topology using bd and l2fibs and inter-vnf memifs
     host_entities:
         - name: vswitch
     sfc_entities:
         - name: vswitch-89-0-l2fib
           description: vswitch-89-0-l2fib - memif
-          type: 3
+          type: 3 # l2 BD NIC
           elements:
               - container: vswitch
                 port_label: FortyGigabitEthernet89/0/0
-                mac_addr: "02:00:00:00:89:00"
                 etcd_vpp_switch_key: vswitch
+                l2fib_macs:
+                  - "02:00:00:89:00:AA"
                 type: 5
               - container: vnf1
                 port_label: port1
-                mac_addr: "02:00:00:00:00:11"
-                etcd_vpp_switch_key: vswitch
-                type: 2
-              - container: vnf2
-                port_label: port1
-                mac_addr: "02:00:00:00:00:12"
+                l2fib_macs:
+                  - "02:00:00:89:01:AA"
                 etcd_vpp_switch_key: vswitch
                 type: 2
         - name: vswitch-89-1-l2fib
           description: vswitch-89-1-l2fib - memif
-          type: 3
+          type: 3 # l2 BD NIC
           elements:
               - container: vswitch
                 port_label: FortyGigabitEthernet89/0/1
-                mac_addr: "02:00:00:00:89:01"
+                l2fib_macs:
+                  - "02:00:00:89:01:AA"
                 etcd_vpp_switch_key: vswitch
                 type: 5
+              - container: vnf2
+                port_label: port2
+                l2fib_macs:
+                  - "02:00:00:89:00:AA"
+                etcd_vpp_switch_key: vswitch
+                type: 2
+        - name: vnf1-vnf2
+          description: vnf1 to vnf2 via direct memifs
+          type: 6
+          elements:
               - container: vnf1
                 port_label: port2
-                mac_addr: "02:00:00:00:00:12"
                 etcd_vpp_switch_key: vswitch
                 type: 2
               - container: vnf2
-                port_label: port2
-                mac_addr: "02:00:00:00:00:22"
+                port_label: port1
                 etcd_vpp_switch_key: vswitch
                 type: 2
   vnf.conf: |
@@ -70,4 +76,3 @@ data:
           - port_labels:
             - port1
             - port2
-

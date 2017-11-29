@@ -102,6 +102,7 @@ message SfcEntity {
         CustomInfoType custom_info = 7;   // opaque string ... possibly json for app specific information
         uint32 mtu = 8;                   // if provided, this overrides system value
         RxModeType rx_mode = 9;
+        repeated string l2fib_macs = 10;
     };
     repeated SfcElement elements = 7;
 };

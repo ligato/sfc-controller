@@ -25,7 +25,7 @@ import (
 
 // YamlConfig is container struct for yaml config file
 type YamlConfig struct {
-	Version     string                        `json:"sfc_controller_config_version"`
+	Version     int                           `json:"sfc_controller_config_version"`
 	Description string                        `json:"description"`
 	EEs         []controller.ExternalEntity   `json:"external_entities"`
 	HEs         []controller.HostEntity       `json:"host_entities"`

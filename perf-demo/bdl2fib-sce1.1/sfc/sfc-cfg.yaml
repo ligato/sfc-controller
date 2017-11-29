@@ -23,11 +23,13 @@ data:
               - container: vswitch
                 port_label: FortyGigabitEthernet89/0/0
                 etcd_vpp_switch_key: vswitch
-                mac_addr: "02:00:00:00:89:00"
+                l2fib_macs:
+                  - "02:00:00:89:00:AA"
                 type: 5
               - container: vnf1
                 port_label: port1
-                mac_addr: "02:00:00:00:00:11"
+                l2fib_macs:
+                  - "02:00:00:89:01:AA"
                 etcd_vpp_switch_key: vswitch
                 type: 2
         - name: vswitch-89-1-l2fib
@@ -36,12 +38,14 @@ data:
           elements:
               - container: vswitch
                 port_label: FortyGigabitEthernet89/0/1
-                mac_addr: "02:00:00:00:89:01"
+                l2fib_macs:
+                  - "02:00:00:89:01:AA"
                 etcd_vpp_switch_key: vswitch
                 type: 5
               - container: vnf1
                 port_label: port2
-                mac_addr: "02:00:00:00:00:12"
+                l2fib_macs:
+                  - "02:00:00:89:00:AA"
                 etcd_vpp_switch_key: vswitch
                 type: 2
 

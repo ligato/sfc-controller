@@ -290,7 +290,7 @@ func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToExternalEntity(he *controller.Ho
 	ifs[0] = &ifEntry
 
 	// now create the bridge
-	bd, err := cnpd.bridgedDomainCreateWithIfs(he.Name, bdName, ifs)
+	bd, err := cnpd.bridgedDomainCreateWithIfs(he.Name, bdName, ifs, true)
 	if err != nil {
 		log.Error("WireHostEntityToExternalEntity: error creating BD: '%s'", bd.Name)
 		return err
@@ -385,7 +385,7 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 	}
 
 	bdName := "BD_INTERNAL_EW_" + he.Name
-	bd, err := cnpd.bridgedDomainCreateWithIfs(he.Name, bdName, nil)
+	bd, err := cnpd.bridgedDomainCreateWithIfs(he.Name, bdName, nil, true)
 	if err != nil {
 		log.Error("WireInternalsForHostEntity: error creating BD: '%s'", bd.Name)
 		return err
@@ -599,17 +599,21 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 			}
 			bdName := "BD_INTERNAL_NS_" + replaceSlashesWithUScores(he.PortLabel)
 			bd, err = cnpd.bridgedDomainCreateWithIfs(he.Container, bdName,
-				[]*l2.BridgeDomains_BridgeDomain_Interfaces{ifEntry})
+				[]*l2.BridgeDomains_BridgeDomain_Interfaces{ifEntry}, false)
 			if err != nil {
 				log.Error("wireSfcNorthSouthNICElements: error creating BD: '%s'", bd.Name)
 				return err
 			}
 
-			// now create the l2fib entry
-			if _, err := cnpd.createL2FibEntry(he.Container, bd.Name, he.MacAddr, he.PortLabel); err != nil {
-				log.Error("wireSfcNorthSouthNICElements: error creating l2fib: bd: '%s', mac: '%s', i/f: '%s'",
-					bd.Name, he.MacAddr, he.PortLabel)
-				return err
+			// now create the l2fib entries
+			if he.L2FibMacs != nil {
+				for _, macAddr := range he.L2FibMacs {
+					if _, err := cnpd.createL2FibEntry(he.Container, bd.Name, macAddr, he.PortLabel); err != nil {
+						log.Error("wireSfcNorthSouthNICElements: error creating l2fib: bd: '%s', mac: '%s', i/f: '%s'",
+							bd.Name, macAddr, he.PortLabel)
+						return err
+					}
+				}
 			}
 		}
 	}
@@ -633,12 +637,16 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 					return err
 				}
 
-				// now create the l2fib entry
-				if _, err := cnpd.createL2FibEntry(sfcEntityElement.EtcdVppSwitchKey, bd.Name, sfcEntityElement.MacAddr,
-					ifName); err != nil {
-					log.Error("wireSfcNorthSouthNICElements: error creating l2fib: bd: '%s', mac: '%s', i/f: '%s'",
-						bd.Name, sfcEntityElement.MacAddr, ifName)
-					return err
+				// now create the l2fib entries
+				if sfcEntityElement.L2FibMacs != nil {
+					for _, macAddr := range sfcEntityElement.L2FibMacs {
+						if _, err := cnpd.createL2FibEntry(sfcEntityElement.EtcdVppSwitchKey, bd.Name, macAddr,
+							ifName); err != nil {
+							log.Error("wireSfcNorthSouthNICElements: error creating l2fib: bd: '%s', mac: '%s', i/f: '%s'",
+								bd.Name, macAddr, ifName)
+							return err
+						}
+					}
 				}
 
 			} else {
@@ -675,12 +683,16 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 					return err
 				}
 
-				// now create the l2fib entry
-				if _, err := cnpd.createL2FibEntry(sfcEntityElement.EtcdVppSwitchKey, bd.Name, sfcEntityElement.MacAddr,
-					ifName); err != nil {
-					log.Error("wireSfcNorthSouthNICElements: error creating l2fib: bd: '%s', mac: '%s', i/f: '%s'",
-						bd.Name, sfcEntityElement.MacAddr, ifName)
-					return err
+				// now create the l2fib entries
+				if sfcEntityElement.L2FibMacs != nil {
+					for _, macAddr := range sfcEntityElement.L2FibMacs {
+						if _, err := cnpd.createL2FibEntry(sfcEntityElement.EtcdVppSwitchKey, bd.Name, macAddr,
+							ifName); err != nil {
+							log.Error("wireSfcNorthSouthNICElements: error creating l2fib: bd: '%s', mac: '%s', i/f: '%s'",
+								bd.Name, macAddr, ifName)
+							return err
+						}
+					}
 				}
 
 			} else {
@@ -1198,14 +1210,14 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPairAndAddToBridge(sfc *contro
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) bridgedDomainCreateWithIfs(etcdVppSwitchKey string, bdName string,
-	ifs []*l2.BridgeDomains_BridgeDomain_Interfaces) (*l2.BridgeDomains_BridgeDomain, error) {
+	ifs []*l2.BridgeDomains_BridgeDomain_Interfaces, dynamicBridge bool) (*l2.BridgeDomains_BridgeDomain, error) {
 
 	bd := &l2.BridgeDomains_BridgeDomain{
 		Name:                bdName,
-		Flood:               true,
-		UnknownUnicastFlood: true,
+		Flood:               dynamicBridge,
+		UnknownUnicastFlood: dynamicBridge,
 		Forward:             true,
-		Learn:               true,
+		Learn:               dynamicBridge,
 		ArpTermination:      false,
 		MacAge:              0,
 		Interfaces:          ifs,

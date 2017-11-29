@@ -18,60 +18,48 @@ data:
     sfc_entities:
         - name: vswitch-89-0-l2fib
           description: vswitch-89-0-l2fib - memif
-          type: 3
+          type: 3 # l2 BD NIC
           elements:
               - container: vswitch
                 port_label: FortyGigabitEthernet89/0/0
-                mac_addr: "02:00:00:00:89:00"
                 etcd_vpp_switch_key: vswitch
+                l2fib_macs:
+                  - "02:00:00:89:00:AA"
+                  - "02:00:00:89:00:BB"
                 type: 5
               - container: vnf1
                 port_label: port1
+                l2fib_macs:
+                  - "02:00:00:89:01:AA"
                 etcd_vpp_switch_key: vswitch
-                mac_addr: "02:00:00:00:00:11"
                 type: 2
               - container: vnf2
                 port_label: port1
-                mac_addr: "02:00:00:00:00:21"
-                etcd_vpp_switch_key: vswitch
-                type: 2
-              - container: vnf3
-                port_label: port1
-                mac_addr: "02:00:00:00:00:31"
-                etcd_vpp_switch_key: vswitch
-                type: 2
-              - container: vnf4
-                port_label: port1
-                mac_addr: "02:00:00:00:00:41"
+                l2fib_macs:
+                  - "02:00:00:89:01:BB"
                 etcd_vpp_switch_key: vswitch
                 type: 2
         - name: vswitch-89-1-l2fib
           description: vswitch-89-1-l2fib - memif
-          type: 3
+          type: 3 # l2 BD NIC
           elements:
               - container: vswitch
                 port_label: FortyGigabitEthernet89/0/1
-                mac_addr: "02:00:00:00:89:01"
+                l2fib_macs:
+                  - "02:00:00:89:01:AA"
+                  - "02:00:00:89:01:BB"
                 etcd_vpp_switch_key: vswitch
                 type: 5
               - container: vnf1
                 port_label: port2
-                mac_addr: "02:00:00:00:00:12"
+                l2fib_macs:
+                  - "02:00:00:89:00:AA"
                 etcd_vpp_switch_key: vswitch
                 type: 2
               - container: vnf2
                 port_label: port2
-                mac_addr: "02:00:00:00:00:22"
-                etcd_vpp_switch_key: vswitch
-                type: 2
-              - container: vnf3
-                port_label: port2
-                mac_addr: "02:00:00:00:00:32"
-                etcd_vpp_switch_key: vswitch
-                type: 2
-              - container: vnf4
-                port_label: port2
-                mac_addr: "02:00:00:00:00:42"
+                l2fib_macs:
+                  - "02:00:00:89:00:BB"
                 etcd_vpp_switch_key: vswitch
                 type: 2
   vnf.conf: |
@@ -90,15 +78,4 @@ data:
           - port_labels:
             - port1
             - port2
-      - name: vnf3
-        container: vnf3
-        l2xconnects:
-          - port_labels:
-            - port1
-            - port2
-      - name: vnf4
-        container: vnf4
-        l2xconnects:
-          - port_labels:
-            - port1
-            - port2
+

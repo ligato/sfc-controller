@@ -110,8 +110,6 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 	// Flag variables registered in init() are ready to use in InitPlugin()
 	LogFlags()
 
-
-
 	// register northbound controller API's
 	sfcCtrlPlugin.InitHTTPHandlers()
 

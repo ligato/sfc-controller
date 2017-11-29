@@ -264,6 +264,7 @@ type SfcEntity_SfcElement struct {
 	CustomInfo       *CustomInfoType `protobuf:"bytes,7,opt,name=custom_info" json:"custom_info,omitempty"`
 	Mtu              uint32          `protobuf:"varint,8,opt,name=mtu,proto3" json:"mtu,omitempty"`
 	RxMode           RxModeType      `protobuf:"varint,9,opt,name=rx_mode,proto3,enum=controller.RxModeType" json:"rx_mode,omitempty"`
+	L2FibMacs        []string        `protobuf:"bytes,10,rep,name=l2fib_macs" json:"l2fib_macs,omitempty"`
 }
 
 func (m *SfcEntity_SfcElement) Reset()         { *m = SfcEntity_SfcElement{} }
