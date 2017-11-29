@@ -1328,7 +1328,7 @@ func (cnpd *sfcCtlrL2CNPDriver) memIfCreate(etcdPrefix string, memIfName string,
 		Memif: &interfaces.Interfaces_Interface_Memif{
 			Id:             memifID,
 			Master:         isMaster,
-			SocketFilename: "/tmp/memif.sock",
+			SocketFilename: "/tmp/memif.sock" + fmt.Sprintf("%d", memifID),
 		},
 	}
 
