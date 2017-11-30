@@ -57,6 +57,7 @@ type SFCIDs struct {
 	IpId      uint32 `protobuf:"varint,4,opt,name=ip_id,proto3" json:"ip_id,omitempty"`
 	MacAddrId uint32 `protobuf:"varint,5,opt,name=mac_addr_id,proto3" json:"mac_addr_id,omitempty"`
 	MemifId   uint32 `protobuf:"varint,6,opt,name=memif_id,proto3" json:"memif_id,omitempty"`
+	VethId    uint32 `protobuf:"varint,7,opt,name=veth_id,proto3" json:"veth_id,omitempty"`
 }
 
 func (m *SFCIDs) Reset()         { *m = SFCIDs{} }

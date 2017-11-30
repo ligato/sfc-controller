@@ -73,6 +73,7 @@ type sequencer struct {
 	VLanID        uint32
 	MemIfID       uint32
 	MacInstanceID uint32
+	VethID        uint32
 }
 
 type sfcInterfaceAddressStateType struct {
@@ -557,9 +558,9 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 	heCount := 0
 	var ifName string
 	var he *controller.SfcEntity_SfcElement
-    var bd *l2.BridgeDomains_BridgeDomain
-    var err error
-    
+	var bd *l2.BridgeDomains_BridgeDomain
+	var err error
+
 	// find the host entity and ensure there is only one allowed
 	for i, sfcEntityElement := range sfc.GetElements() {
 
@@ -673,7 +674,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 		case controller.SfcElementType_VPP_CONTAINER_MEMIF:
 			fallthrough
 		case controller.SfcElementType_NON_VPP_CONTAINER_MEMIF:
-			
+
 			if sfc.Type == controller.SfcType_SFC_NS_NIC_BD {
 				// memif
 				if ifName, err = cnpd.createMemIfPairAndAddToBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, bd,
@@ -906,7 +907,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createOneOrMoreInterContainerMemIfPairs(
 			return err
 		}
 
-		key, sfcID, err := cnpd.DatastoreSFCIDsCreate(sfcName, container1Name, vnf1Port, 0, 0, memifID)
+		key, sfcID, err := cnpd.DatastoreSFCIDsCreate(sfcName, container1Name, vnf1Port,
+			0, 0, memifID, 0)
 		if err == nil && cnpd.reconcileInProgress {
 			cnpd.reconcileAfter.sfcIDs[key] = *sfcID
 		}
@@ -928,7 +930,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createInterContainerMemIfPair(
 		vnf1Container, vnf1Port, vnf2Container, vnf2Port, memIFID)
 
 	// create a memif in the vnf container 1
-	if _, err := cnpd.memIfCreate(vnf1Container, vnf1Port, memIFID, true, "", "", mtu,
+	if _, err := cnpd.memIfCreate(vnf1Container, vnf1Port, memIFID, true, vnf1Container,
+		"", "", mtu,
 		rxMode); err != nil {
 		log.Error("createInterContainerMemIfPair: error creating memIf for container: '%s'/'%s', memIF: '%d'",
 			vnf1Container, vnf1Port, memIFID)
@@ -936,7 +939,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createInterContainerMemIfPair(
 	}
 
 	// create a memif in the vnf container 2
-	if _, err := cnpd.memIfCreate(vnf2Container, vnf2Port, memIFID, false, "", "", mtu,
+	if _, err := cnpd.memIfCreate(vnf2Container, vnf2Port, memIFID, false, vnf1Container,
+		"", "", mtu,
 		rxMode); err != nil {
 
 		log.Error("createInterContainerMemIfPair: error creating memIf for container: '%s'/'%s', memIF: '%d'",
@@ -1022,7 +1026,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 	// create a memif in the vnf container
 	memIfName := vnfChainElement.PortLabel
 	if _, err := cnpd.memIfCreate(vnfChainElement.Container, memIfName, memifID,
-		false, ipv4Address, macAddress, mtu, rxMode); err != nil {
+		false, vnfChainElement.EtcdVppSwitchKey, ipv4Address, macAddress, mtu, rxMode); err != nil {
 		log.Error("createMemIfPair: error creating memIf for container: '%s'", memIfName)
 		return "", err
 	}
@@ -1030,14 +1034,14 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 	// now create a memif for the vpp switch
 	memIfName = "IF_MEMIF_VSWITCH_" + vnfChainElement.Container + "_" + vnfChainElement.PortLabel
 	memIf, err := cnpd.memIfCreate(vnfChainElement.EtcdVppSwitchKey, memIfName, memifID,
-		true, "", "", mtu, rxMode)
+		true, vnfChainElement.EtcdVppSwitchKey, "", "", mtu, rxMode)
 	if err != nil {
 		log.Error("createMemIfPair: error creating memIf for vpp switch: '%s'", memIf.Name)
 		return "", err
 	}
 
 	key, sfcID, err := cnpd.DatastoreSFCIDsCreate(sfc.Name, vnfChainElement.Container, vnfChainElement.PortLabel,
-		ipID, macAddrID, memifID)
+		ipID, macAddrID, memifID, 0)
 	if err == nil && cnpd.reconcileInProgress {
 		cnpd.reconcileAfter.sfcIDs[key] = *sfcID
 	}
@@ -1050,7 +1054,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 // createMemIfPairAndAddToBridge creates a memif pair and adds the vswitch-end interface into the provided bridge domain
 func (cnpd *sfcCtlrL2CNPDriver) createMemIfPairAndAddToBridge(sfc *controller.SfcEntity, hostName string,
 	bd *l2.BridgeDomains_BridgeDomain, vnfChainElement *controller.SfcEntity_SfcElement,
-		generateAddresses bool) (string, error) {
+	generateAddresses bool) (string, error) {
 
 	memIfName, err := cnpd.createMemIfPair(sfc, hostName, vnfChainElement, generateAddresses)
 	if err != nil {
@@ -1078,11 +1082,20 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 		vnfChainElement.EtcdVppSwitchKey)
 
 	var macAddrID uint32
+	var vethID uint32
 	var ipID uint32
 	var macAddress string
 	var ipv4Address string
 
 	sfcID, err := cnpd.DatastoreSFCIDsRetrieve(sfc.Name, vnfChainElement.Container, vnfChainElement.PortLabel)
+
+	if sfcID == nil || sfcID.VethId == 0 {
+		cnpd.seq.VethID++ // first one is for the container
+		vethID = cnpd.seq.VethID
+		cnpd.seq.VethID++ // second one is for the vswitch
+	} else {
+		vethID = sfcID.VethId
+	}
 
 	// the sfc controller can be responsible for managing the mac and ip addresses if not provided t
 	if vnfChainElement.Type != controller.SfcElementType_VPP_CONTAINER_AFP {
@@ -1137,17 +1150,25 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 	// Create a VETH if for the vnf container. VETH will get created by the agent from a more privileged vswitch.
 	// Note: In Linux kernel the length of an interface name is limited by the constant IFNAMSIZ.
 	//       In most distributions this is 16 characters including the terminating NULL character.
-	veth1Name := utils.TruncateString(vnfChainElement.PortLabel, 15)
-	veth2Name := utils.TruncateString(vnfChainElement.Container, 7) + "_" +
-		utils.TruncateString(vnfChainElement.PortLabel, 7)
-	if err := cnpd.vEthIfCreate(vnfChainElement.EtcdVppSwitchKey, veth1Name, veth2Name, vnfChainElement.Container,
+	//		 The hostname uses chars from the container, and port name plus a unique id base 36
+	//       for a total of at most 15 chars. 3 chars for base36 given 36x36x36 = lots of interfaces
+
+	veth1Name := "IF_VETH_VNF_" + vnfChainElement.Container + "_" + vnfChainElement.PortLabel
+	veth2Name := "IF_VETH_VSWITCH_" + vnfChainElement.Container + "_" + vnfChainElement.PortLabel
+	veth1Str := strconv.FormatUint(uint64(vethID), 36)
+	veth2Str := strconv.FormatUint(uint64(vethID+1), 36)
+	baseHostName := constructBaseHostName(vnfChainElement.Container, vnfChainElement.PortLabel, veth2Str)
+	host1Name := baseHostName + "_" + veth1Str
+	host2Name := baseHostName + "_" + veth2Str
+
+	if err := cnpd.vEthIfCreate(vnfChainElement.EtcdVppSwitchKey, veth1Name, host1Name, veth2Name, vnfChainElement.Container,
 		macAddress, ipv4Address, mtu); err != nil {
 		log.Error("createAFPacketVEthPair: error creating veth if '%s' for container: '%s'", veth1Name,
 			vnfChainElement.Container)
 		return "", err
 	}
 	// Configure opposite side of the VETH interface for the vpp switch
-	if err := cnpd.vEthIfCreate(vnfChainElement.EtcdVppSwitchKey, veth2Name, veth1Name, vnfChainElement.EtcdVppSwitchKey,
+	if err := cnpd.vEthIfCreate(vnfChainElement.EtcdVppSwitchKey, veth2Name, host2Name, veth1Name, vnfChainElement.EtcdVppSwitchKey,
 		"", "", mtu); err != nil {
 		log.Error("createAFPacketVEthPair: error creating veth if '%s' for container: '%s'", veth2Name,
 			vnfChainElement.EtcdVppSwitchKey)
@@ -1157,7 +1178,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 	// create af_packet for the vnf -end of the veth
 	if vnfChainElement.Type == controller.SfcElementType_VPP_CONTAINER_AFP {
 		afPktIf1, err := cnpd.afPacketCreate(vnfChainElement.Container, vnfChainElement.PortLabel,
-			veth1Name, "", "", mtu, rxMode)
+			host1Name, "", "", mtu, rxMode)
 		if err != nil {
 			log.Error("createAFPacketVEthPair: error creating afpacket for vpp switch: '%s'", afPktIf1.Name)
 			return "", err
@@ -1166,7 +1187,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 
 	// create af_packet for the vswitch -end of the veth
 	afPktName := "IF_AFPIF_VSWITCH_" + vnfChainElement.Container + "_" + vnfChainElement.PortLabel
-	afPktIf2, err := cnpd.afPacketCreate(vnfChainElement.EtcdVppSwitchKey, afPktName, veth2Name,
+	afPktIf2, err := cnpd.afPacketCreate(vnfChainElement.EtcdVppSwitchKey, afPktName, host2Name,
 		"", "", mtu, rxMode)
 	if err != nil {
 		log.Error("createAFPacketVEthPair: error creating afpacket for vpp switch: '%s'", afPktIf2.Name)
@@ -1174,7 +1195,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 	}
 
 	key, sfcID, err := cnpd.DatastoreSFCIDsCreate(sfc.Name, vnfChainElement.Container, vnfChainElement.PortLabel,
-		ipID, macAddrID, 0)
+		ipID, macAddrID, 0, vethID)
 	if err == nil && cnpd.reconcileInProgress {
 		cnpd.reconcileAfter.sfcIDs[key] = *sfcID
 	}
@@ -1317,7 +1338,7 @@ func (cnpd *sfcCtlrL2CNPDriver) vxLanCreate(etcdVppSwitchKey string, ifname stri
 }
 
 func (cnpd *sfcCtlrL2CNPDriver) memIfCreate(etcdPrefix string, memIfName string, memifID uint32, isMaster bool,
-	ipv4 string, macAddress string, mtu uint32, rxMode controller.RxModeType) (*interfaces.Interfaces_Interface, error) {
+	masterContainer string, ipv4 string, macAddress string, mtu uint32, rxMode controller.RxModeType) (*interfaces.Interfaces_Interface, error) {
 
 	memIf := &interfaces.Interfaces_Interface{
 		Name:        memIfName,
@@ -1328,7 +1349,7 @@ func (cnpd *sfcCtlrL2CNPDriver) memIfCreate(etcdPrefix string, memIfName string,
 		Memif: &interfaces.Interfaces_Interface_Memif{
 			Id:             memifID,
 			Master:         isMaster,
-			SocketFilename: "/tmp/memif.sock" + fmt.Sprintf("%d", memifID),
+			SocketFilename: "/tmp/memif_" + masterContainer + ".sock",
 		},
 	}
 
@@ -1371,8 +1392,6 @@ func rxModeControllerToInterface(contrtollerRxMode controller.RxModeType) *inter
 	}
 	return nil
 }
-
-
 
 func (cnpd *sfcCtlrL2CNPDriver) createEthernet(etcdPrefix string, ifname string, ipv4Addr string, macAddr string,
 	mtu uint32, rxMode controller.RxModeType) error {
@@ -1486,7 +1505,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createLoopback(etcdPrefix string, ifname string,
 	return nil
 }
 
-func (cnpd *sfcCtlrL2CNPDriver) vEthIfCreate(etcdPrefix string, ifname string, peerIfName string, container string,
+func (cnpd *sfcCtlrL2CNPDriver) vEthIfCreate(etcdPrefix string, ifname string, hostIfName, peerIfName string, container string,
 	physAddr string, ipv4Addr string, mtu uint32) error {
 
 	linuxif := &linuxIntf.LinuxInterfaces_Interface{
@@ -1494,7 +1513,7 @@ func (cnpd *sfcCtlrL2CNPDriver) vEthIfCreate(etcdPrefix string, ifname string, p
 		Type:        linuxIntf.LinuxInterfaces_VETH,
 		Enabled:     true,
 		PhysAddress: physAddr,
-		HostIfName:  ifname,
+		HostIfName:  hostIfName,
 		Mtu:         mtu,
 		Namespace: &linuxIntf.LinuxInterfaces_Interface_Namespace{
 			Type:         linuxIntf.LinuxInterfaces_Interface_Namespace_MICROSERVICE_REF_NS,
@@ -1597,27 +1616,27 @@ func (cnpd *sfcCtlrL2CNPDriver) createL2FibEntry(etcdPrefix string, bdName strin
 	outGoingIf string) (*l2.FibTableEntries_FibTableEntry, error) {
 
 	l2fib := &l2.FibTableEntries_FibTableEntry{
-		BridgeDomain: bdName,
-		PhysAddress: destMacAddr,
-		Action: l2.FibTableEntries_FibTableEntry_FORWARD,
+		BridgeDomain:      bdName,
+		PhysAddress:       destMacAddr,
+		Action:            l2.FibTableEntries_FibTableEntry_FORWARD,
 		OutgoingInterface: outGoingIf,
-		StaticConfig: true,
+		StaticConfig:      true,
 	}
 
 	//if cnpd.reconcileInProgress {
 	//	cnpd.reconcileL2FibEntry(etcdPrefix, l2fib)
 	//} else {
 
-		log.Println(l2fib)
+	log.Println(l2fib)
 
-		rc := NewRemoteClientTxn(etcdPrefix, cnpd.dbFactory)
-		err := rc.Put().BDFIB(l2fib).Send().ReceiveReply()
+	rc := NewRemoteClientTxn(etcdPrefix, cnpd.dbFactory)
+	err := rc.Put().BDFIB(l2fib).Send().ReceiveReply()
 
-		if err != nil {
-			log.Error("createL2Fib: databroker.Store: ", err)
-			return nil, err
+	if err != nil {
+		log.Error("createL2Fib: databroker.Store: ", err)
+		return nil, err
 
-		}
+	}
 	//}
 
 	return l2fib, nil
@@ -1731,4 +1750,80 @@ func (cnpd *sfcCtlrL2CNPDriver) setSfcInterfaceIPAndMac(container string, port s
 		macAddress: mac,
 	}
 	cnpd.l2CNPStateCache.SFCIFAddr[container+"/"+port] = sfcIFAddr
+}
+
+func stringFirstNLastM(n int, m int, str string) string {
+	if len(str) <= n+m {
+		return str
+	}
+	outStr := ""
+	for i := 0; i < n; i++ {
+		outStr += fmt.Sprintf("%c", str[i])
+	}
+	for i := 0; i < m; i++ {
+		outStr += fmt.Sprintf("%c", str[len(str)-m+i])
+	}
+	return outStr
+}
+
+func constructBaseHostName(container string, port string, v string) string {
+
+	// Use at most 5 chrs from cntr name, and 5 from port, 3 for base 36 unique id plus some under scores
+	// If cntr is less than 5 then can use more for port and visa versa.  Also, when cntr and port name
+	// is more than 5 chars, use first couple of chars and last 3 chars from name ... brain dead scheme?
+	// will it be readable?
+	// Example: container: vnf1, port: port1 will be vnf1_port1_1, and container: vnfunc1, port: myport1
+	// will be vnnc1_myrt1_2
+
+	cb := 2 // 2 from beginning of container string
+	ce := 3 // 3 from end of container string
+	pb := 2 // 2 from beginning of port string
+	pe := 3 // 3 from end of port string
+
+	if len(container) < 5 {
+		// increase char budget for port if container is less than max budget of 5
+		switch len(container) {
+		case 4:
+			pb++
+		case 3:
+			pb++
+			pe++
+		case 2:
+			pb += 2
+			pe++
+		case 1:
+			pb += 2
+			pe += 2
+		}
+	}
+
+	if len(port) < 5 {
+		// increase char budget for container if port is less than max budget of 5
+		switch len(port) {
+		case 4:
+			cb++
+		case 3:
+			cb++
+			ce++
+		case 2:
+			cb += 2
+			ce++
+		case 1:
+			cb += 2
+			ce += 2
+		}
+	}
+
+	if len(v) < 3 {
+		// increase char budget for container if vethid str less than max budget of 3
+		switch len(v) {
+		case 2:
+			cb++
+		case 1:
+			cb++
+			ce++
+		}
+	}
+
+	return stringFirstNLastM(cb, ce, container) + "_" + stringFirstNLastM(pb, pe, port)
 }

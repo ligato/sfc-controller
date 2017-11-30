@@ -26,4 +26,5 @@ message SFCIDs {
     uint32 ip_id = 4;
     uint32 mac_addr_id = 5;
     uint32 memif_id = 6;
+    uint32 veth_id = 7;
 };

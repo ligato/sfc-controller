@@ -242,7 +242,7 @@ func (cnpd *sfcCtlrL2CNPDriver) DatastoreHE2EEIDsDelete(ee *l2.HE2EEIDs) error {
 
 // DatastoreSFCIDsCreate creates the specified entity in the sfc db in etcd
 func (cnpd *sfcCtlrL2CNPDriver) DatastoreSFCIDsCreate(sfcName string, container string,
-	port string, ipID uint32, macAddrID uint32, memifID uint32) (string, *l2.SFCIDs, error) {
+	port string, ipID uint32, macAddrID uint32, memifID uint32, vethID uint32) (string, *l2.SFCIDs, error) {
 
 	sfc := &l2.SFCIDs{
 		SfcName: sfcName,
@@ -251,6 +251,7 @@ func (cnpd *sfcCtlrL2CNPDriver) DatastoreSFCIDsCreate(sfcName string, container 
 		IpId: ipID,
 		MacAddrId: macAddrID,
 		MemifId: memifID,
+		VethId: vethID,
 	}
 
 	key := l2.SFCContainerPortIDsNameKey(sfcName, container, port)
