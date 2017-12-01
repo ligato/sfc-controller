@@ -88,7 +88,8 @@ type heToEEStateType struct {
 }
 
 type heStateType struct {
-	bd *l2.BridgeDomains_BridgeDomain
+	ewBD      *l2.BridgeDomains_BridgeDomain
+	ewBDL2Fib *l2.BridgeDomains_BridgeDomain
 }
 
 type l2CNPStateCacheType struct {
@@ -212,9 +213,9 @@ func (cnpd *sfcCtlrL2CNPDriver) wireExternalEntityToHostEntity(ee *controller.Ex
 	//ifs[0] = &ifEntry
 	//
 	//// now create the bridge
-	//bd, err := cnpd.bridgedDomainCreateWithIfs(ee.Name, bdName, ifs)
+	//ewBD, err := cnpd.bridgedDomainCreateWithIfs(ee.Name, bdName, ifs)
 	//if err != nil {
-	//	log.Error("wireExternalEntityToHostEntity: error creating BD: '%s'", bd.Name)
+	//	log.Error("wireExternalEntityToHostEntity: error creating BD: '%s'", ewBD.Name)
 	//	return err
 	//}
 
@@ -315,7 +316,7 @@ func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToExternalEntity(he *controller.Ho
 	// now link the he to the ee
 	heToEEMap[ee.Name] = heToEEState
 
-	log.Infof("WireHostEntityToExternalEntity: he: %s, ee: %s, vlanIf: %s, bd: %s, static route: %s",
+	log.Infof("WireHostEntityToExternalEntity: he: %s, ee: %s, vlanIf: %s, ewBD: %s, static route: %s",
 		he.Name, ee.Name, vlanIf.Name, bd.Name, sr.String())
 
 	cnpd.wireExternalEntityToHostEntity(ee, he)
@@ -385,6 +386,7 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 		}
 	}
 
+	// create a default east-west bd with flooding, learning ON
 	bdName := "BD_INTERNAL_EW_" + he.Name
 	bd, err := cnpd.bridgedDomainCreateWithIfs(he.Name, bdName, nil, true)
 	if err != nil {
@@ -392,7 +394,17 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 		return err
 	}
 
-	heState.bd = bd
+	heState.ewBD = bd
+
+	// create a default east-west bd with flooding and learning OFF so VNFs can set l2 fib mac entries
+	bdName = "BD_INTERNAL_EW_L2FIB_" + he.Name
+	bd, err = cnpd.bridgedDomainCreateWithIfs(he.Name, bdName, nil, false)
+	if err != nil {
+		log.Error("WireInternalsForHostEntity: error creating BD: '%s'", bd.Name)
+		return err
+	}
+
+	heState.ewBDL2Fib = bd
 
 	key, heID, err := cnpd.DatastoreHEIDsCreate(he.Name, loopbackMacAddrId)
 	if err == nil && cnpd.reconcileInProgress {
@@ -433,6 +445,8 @@ func (cnpd *sfcCtlrL2CNPDriver) WireSfcEntity(sfc *controller.SfcEntity) error {
 	case controller.SfcType_SFC_EW_MEMIF:
 		fallthrough
 	case controller.SfcType_SFC_EW_BD:
+		fallthrough
+	case controller.SfcType_SFC_EW_BD_L2FIB:
 		fallthrough
 	case controller.SfcType_SFC_EW_L2XCONN:
 		// east/west type, memIfs/cntrs connect to the hosts easet/west bridge
@@ -610,7 +624,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 			if he.L2FibMacs != nil {
 				for _, macAddr := range he.L2FibMacs {
 					if _, err := cnpd.createL2FibEntry(he.Container, bd.Name, macAddr, he.PortLabel); err != nil {
-						log.Error("wireSfcNorthSouthNICElements: error creating l2fib: bd: '%s', mac: '%s', i/f: '%s'",
+						log.Error("wireSfcNorthSouthNICElements: error creating l2fib: ewBD: '%s', mac: '%s', i/f: '%s'",
 							bd.Name, macAddr, he.PortLabel)
 						return err
 					}
@@ -643,7 +657,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 					for _, macAddr := range sfcEntityElement.L2FibMacs {
 						if _, err := cnpd.createL2FibEntry(sfcEntityElement.EtcdVppSwitchKey, bd.Name, macAddr,
 							ifName); err != nil {
-							log.Error("wireSfcNorthSouthNICElements: error creating l2fib: bd: '%s', mac: '%s', i/f: '%s'",
+							log.Error("wireSfcNorthSouthNICElements: error creating l2fib: ewBD: '%s', mac: '%s', i/f: '%s'",
 								bd.Name, macAddr, ifName)
 							return err
 						}
@@ -689,7 +703,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 					for _, macAddr := range sfcEntityElement.L2FibMacs {
 						if _, err := cnpd.createL2FibEntry(sfcEntityElement.EtcdVppSwitchKey, bd.Name, macAddr,
 							ifName); err != nil {
-							log.Error("wireSfcNorthSouthNICElements: error creating l2fib: bd: '%s', mac: '%s', i/f: '%s'",
+							log.Error("wireSfcNorthSouthNICElements: error creating l2fib: ewBD: '%s', mac: '%s', i/f: '%s'",
 								bd.Name, macAddr, ifName)
 							return err
 						}
@@ -730,6 +744,9 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 // macAddress in the 02:*:*:*:*:* space.  Also, is east-west bridge connected via vxLan's?
 func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntity) error {
 
+	var ifName string
+	var err error
+
 	prevMemIfName := ""
 
 	if sfc.Type == controller.SfcType_SFC_EW_MEMIF {
@@ -761,13 +778,33 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 					sfcEntityElement.EtcdVppSwitchKey, sfc.Name)
 				return err
 			}
-			if sfc.Type == controller.SfcType_SFC_EW_BD {
-				// bridge domain -based wiring
-				if _, err := cnpd.createAFPacketVEthPairAndAddToBridge(sfc, heState.bd, sfcEntityElement); err != nil {
+			if sfc.Type == controller.SfcType_SFC_EW_BD || sfc.Type == controller.SfcType_SFC_EW_BD_L2FIB {
+
+				// bridge domain -based wiring ... select the internal dynamic or static bridge
+				var bd *l2.BridgeDomains_BridgeDomain
+				if sfc.Type == controller.SfcType_SFC_EW_BD {
+					bd = heState.ewBD
+				} else {
+					bd = heState.ewBDL2Fib
+				}
+				if ifName, err = cnpd.createAFPacketVEthPairAndAddToBridge(sfc, bd, sfcEntityElement); err != nil {
 					log.Error("wireSfcEastWestElements: error creating memIf pair: sfc: '%s', Container: '%s'",
 						sfc.Name, sfcEntityElement.Container)
 					return err
 				}
+
+				// now create the l2fib entries
+				if sfcEntityElement.L2FibMacs != nil {
+					for _, macAddr := range sfcEntityElement.L2FibMacs {
+						if _, err := cnpd.createL2FibEntry(sfcEntityElement.EtcdVppSwitchKey, bd.Name, macAddr,
+							ifName); err != nil {
+							log.Error("wireSfcNorthSouthNICElements: error creating l2fib: ewBD: '%s', mac: '%s', i/f: '%s'",
+								bd.Name, macAddr, ifName)
+							return err
+						}
+					}
+				}
+
 			} else {
 				// l2xconnect -based wiring
 				afIfName, err := cnpd.createAFPacketVEthPair(sfc, sfcEntityElement)
@@ -814,14 +851,34 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 						return err
 					}
 				}
-			} else if sfc.Type == controller.SfcType_SFC_EW_BD {
-				// bridge domain -based wiring
-				if _, err := cnpd.createMemIfPairAndAddToBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, heState.bd,
+			} else if sfc.Type == controller.SfcType_SFC_EW_BD || sfc.Type == controller.SfcType_SFC_EW_BD_L2FIB {
+
+				// bridge domain -based wiring ... select the internal dynamic or static bridge
+				var bd *l2.BridgeDomains_BridgeDomain
+				if sfc.Type == controller.SfcType_SFC_EW_BD {
+					bd = heState.ewBD
+				} else {
+					bd = heState.ewBDL2Fib
+				}
+				if ifName, err = cnpd.createMemIfPairAndAddToBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, bd,
 					sfcEntityElement, true); err != nil {
 					log.Error("wireSfcEastWestElements: error creating memIf pair: sfc: '%s', Container: '%s'",
 						sfc.Name, sfcEntityElement.Container)
 					return err
 				}
+
+				// now create the l2fib entries
+				if sfcEntityElement.L2FibMacs != nil {
+					for _, macAddr := range sfcEntityElement.L2FibMacs {
+						if _, err := cnpd.createL2FibEntry(sfcEntityElement.EtcdVppSwitchKey, bd.Name, macAddr,
+							ifName); err != nil {
+							log.Error("wireSfcNorthSouthNICElements: error creating l2fib: ewBD: '%s', mac: '%s', i/f: '%s'",
+								bd.Name, macAddr, ifName)
+							return err
+						}
+					}
+				}
+
 			} else {
 				// l2xconnect -based wiring
 				memIfName, err := cnpd.createMemIfPair(sfc, sfcEntityElement.EtcdVppSwitchKey, sfcEntityElement,
@@ -1268,7 +1325,7 @@ func (cnpd *sfcCtlrL2CNPDriver) bridgedDomainAssociateWithIfs(etcdVppSwitchKey s
 	bd *l2.BridgeDomains_BridgeDomain,
 	ifs []*l2.BridgeDomains_BridgeDomain_Interfaces) error {
 
-	// only add the interface to bd array if it is not already in the bridge's interface array
+	// only add the interface to ewBD array if it is not already in the bridge's interface array
 	for _, iface := range ifs {
 		found := false
 		for _, bi := range bd.Interfaces {

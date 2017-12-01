@@ -63,8 +63,10 @@ enum SfcType {
     SFC_NS_NIC_BD = 3;       // physial NIC-based north-south SFC - bridge domain -based
     SFC_NS_NIC_L2XCONN = 4;  // physial NIC-based north-south SFC - l2xconnect -based
 
-    SFC_EW_BD = 2;           // bridge domain -based east-west SFC
+    SFC_EW_BD = 2;           // bridge domain-based east-west SFC dynamcic bridge
     SFC_EW_L2XCONN = 5;      // l2xconnect -based east-west SFC
+    SFC_EW_BD_L2FIB = 8;     // bridge domain-based east-west SFC static l2fib bridge
+
 
     SFC_EW_MEMIF = 6;        // each container pair is wired via memif's
     SFC_EW_VETH = 7;         // each container pair is wired via veths's

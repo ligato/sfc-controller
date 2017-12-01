@@ -23,17 +23,17 @@ var VPP1MEMIF2LoopbackVETH = sfccore.YamlConfig{
 			PortLabel:        "vpp1_memif1",
 			MacAddr:          "02:02:02:02:02:02",
 			EtcdVppSwitchKey: "HOST-1",
-			Type:             controller.SfcElementType_CONTAINER_AGENT_VPP_MEMIF,
+			Type:             controller.SfcElementType_VPP_CONTAINER_MEMIF,
 		}, {
 			PortLabel:        "vpp1_memif2",
 			Ipv4Addr:         "10:0:0:10",
 			EtcdVppSwitchKey: "HOST-1",
-			Type:             controller.SfcElementType_CONTAINER_AGENT_VPP_MEMIF,
+			Type:             controller.SfcElementType_VPP_CONTAINER_MEMIF,
 		}, {
 			PortLabel:        "agent1_afpacket1",
 			Ipv4Addr:         "10:0:0:11",
 			EtcdVppSwitchKey: "HOST-1",
-			Type:             controller.SfcElementType_CONTAINER_AGENT_VPP_AFP,
+			Type:             controller.SfcElementType_VPP_CONTAINER_AFP,
 		}},
 	}},
 	EEs: []controller.ExternalEntity{{

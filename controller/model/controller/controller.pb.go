@@ -74,6 +74,7 @@ const (
 	SfcType_SFC_NS_NIC_L2XCONN SfcType = 4
 	SfcType_SFC_EW_BD          SfcType = 2
 	SfcType_SFC_EW_L2XCONN     SfcType = 5
+	SfcType_SFC_EW_BD_L2FIB    SfcType = 8
 	SfcType_SFC_EW_MEMIF       SfcType = 6
 	SfcType_SFC_EW_VETH        SfcType = 7
 )
@@ -85,6 +86,7 @@ var SfcType_name = map[int32]string{
 	4: "SFC_NS_NIC_L2XCONN",
 	2: "SFC_EW_BD",
 	5: "SFC_EW_L2XCONN",
+	8: "SFC_EW_BD_L2FIB",
 	6: "SFC_EW_MEMIF",
 	7: "SFC_EW_VETH",
 }
@@ -95,6 +97,7 @@ var SfcType_value = map[string]int32{
 	"SFC_NS_NIC_L2XCONN": 4,
 	"SFC_EW_BD":          2,
 	"SFC_EW_L2XCONN":     5,
+	"SFC_EW_BD_L2FIB":    8,
 	"SFC_EW_MEMIF":       6,
 	"SFC_EW_VETH":        7,
 }
