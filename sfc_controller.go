@@ -91,6 +91,7 @@ func (f *Flavor) Inject() bool {
 
 	f.Sfc.Etcd = &f.ETCD
 	f.Sfc.HTTPmux = &f.HTTP
+	f.Sfc.FlavorLocal = &f.FlavorLocal
 
 	f.VNFDriver.Etcd = &f.ETCD
 	f.VNFDriver.HTTPmux = &f.HTTP
