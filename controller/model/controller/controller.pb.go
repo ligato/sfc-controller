@@ -65,6 +65,29 @@ func (x ExtEntDriverType) String() string {
 	return proto.EnumName(ExtEntDriverType_name, int32(x))
 }
 
+type EWBridgeType int32
+
+const (
+	EWBridgeType_EW_SYSTEM_DEFAULT_BRIDGE EWBridgeType = 0
+	EWBridgeType_EW_L2FIB_BRIDGE          EWBridgeType = 1
+	EWBridgeType_EW_DYNAMIC_BRIDGE        EWBridgeType = 2
+)
+
+var EWBridgeType_name = map[int32]string{
+	0: "EW_SYSTEM_DEFAULT_BRIDGE",
+	1: "EW_L2FIB_BRIDGE",
+	2: "EW_DYNAMIC_BRIDGE",
+}
+var EWBridgeType_value = map[string]int32{
+	"EW_SYSTEM_DEFAULT_BRIDGE": 0,
+	"EW_L2FIB_BRIDGE":          1,
+	"EW_DYNAMIC_BRIDGE":        2,
+}
+
+func (x EWBridgeType) String() string {
+	return proto.EnumName(EWBridgeType_name, int32(x))
+}
+
 type SfcType int32
 
 const (
@@ -242,7 +265,8 @@ type SfcEntity struct {
 	Description    string                  `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
 	Type           SfcType                 `protobuf:"varint,3,opt,name=type,proto3,enum=controller.SfcType" json:"type,omitempty"`
 	SfcIpv4Prefix  string                  `protobuf:"bytes,4,opt,name=sfc_ipv4_prefix,proto3" json:"sfc_ipv4_prefix,omitempty"`
-	VnfRepeatCount uint32                  `protobuf:"varint,6,opt,name=vnf_repeat_count,proto3" json:"vnf_repeat_count,omitempty"`
+	VnfRepeatCount uint32                  `protobuf:"varint,5,opt,name=vnf_repeat_count,proto3" json:"vnf_repeat_count,omitempty"`
+	EwBridgeType   EWBridgeType            `protobuf:"varint,6,opt,name=ew_bridge_type,proto3,enum=controller.EWBridgeType" json:"ew_bridge_type,omitempty"`
 	Elements       []*SfcEntity_SfcElement `protobuf:"bytes,7,rep,name=elements" json:"elements,omitempty"`
 }
 
@@ -284,6 +308,7 @@ func (m *SfcEntity_SfcElement) GetCustomInfo() *CustomInfoType {
 func init() {
 	proto.RegisterEnum("controller.RxModeType", RxModeType_name, RxModeType_value)
 	proto.RegisterEnum("controller.ExtEntDriverType", ExtEntDriverType_name, ExtEntDriverType_value)
+	proto.RegisterEnum("controller.EWBridgeType", EWBridgeType_name, EWBridgeType_value)
 	proto.RegisterEnum("controller.SfcType", SfcType_name, SfcType_value)
 	proto.RegisterEnum("controller.SfcElementType", SfcElementType_name, SfcElementType_value)
 }

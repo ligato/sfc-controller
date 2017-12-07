@@ -94,6 +94,7 @@ type heStateType struct {
 
 type l2CNPStateCacheType struct {
 	HEToEEs   map[string]map[string]*heToEEStateType
+	SFCToHEs  map[string]map[string]*heStateType
 	HE        map[string]*heStateType
 	SFCIFAddr map[string]sfcInterfaceAddressStateType
 }
@@ -132,6 +133,7 @@ func NewSfcCtlrL2CNPDriver(name string, dbFactory func(string) keyval.ProtoBroke
 
 func (cnpd *sfcCtlrL2CNPDriver) initL2CNPCache() {
 	cnpd.l2CNPStateCache.HEToEEs = make(map[string]map[string]*heToEEStateType)
+	cnpd.l2CNPStateCache.SFCToHEs = make(map[string]map[string]*heStateType)
 	cnpd.l2CNPStateCache.HE = make(map[string]*heStateType)
 	cnpd.l2CNPStateCache.SFCIFAddr = make(map[string]sfcInterfaceAddressStateType)
 
@@ -737,15 +739,12 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 	return nil
 }
 
-// This is a group of containers that need to be wired to the e/w bridge.  Each container has a host that it is
-// supposed to be wired to.  When we have k8s, each container in the sfc-entity will have to be resolved as to which
-// host it has been deployed on.  Questions: ip addressing, mac addresses for memIf's.  Am I using one space for
-// the system .... ie each memIf in each container will have a unique ip address in the 10.*.*.* space, and a unique
-// macAddress in the 02:*:*:*:*:* space.  Also, is east-west bridge connected via vxLan's?
+// This is a group of containers that need to be wired to an e/w bridge.
 func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntity) error {
 
 	var ifName string
 	var err error
+	var bd *l2.BridgeDomains_BridgeDomain
 
 	prevMemIfName := ""
 
@@ -771,22 +770,61 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 		case controller.SfcElementType_VPP_CONTAINER_AFP:
 			fallthrough
 		case controller.SfcElementType_NON_VPP_CONTAINER_AFP:
-			// the container has which host it is assoc'ed with, get the host e/w bridge
-			heState, exists := cnpd.l2CNPStateCache.HE[sfcEntityElement.EtcdVppSwitchKey]
-			if !exists {
-				err := fmt.Errorf("wireSfcEastWestElements: cannot find host/bridge: '%s' for this sfc: '%s'",
-					sfcEntityElement.EtcdVppSwitchKey, sfc.Name)
-				return err
-			}
+
 			if sfc.Type == controller.SfcType_SFC_EW_BD || sfc.Type == controller.SfcType_SFC_EW_BD_L2FIB {
 
-				// bridge domain -based wiring ... select the internal dynamic or static bridge
-				var bd *l2.BridgeDomains_BridgeDomain
-				if sfc.Type == controller.SfcType_SFC_EW_BD {
-					bd = heState.ewBD
-				} else {
-					bd = heState.ewBDL2Fib
+				switch sfc.EwBridgeType {
+				case controller.EWBridgeType_EW_SYSTEM_DEFAULT_BRIDGE:
+					// bridge domain -based wiring ... select the internal dynamic or static bridge
+					heState, exists := cnpd.l2CNPStateCache.HE[sfcEntityElement.EtcdVppSwitchKey]
+					if !exists {
+						err := fmt.Errorf("wireSfcEastWestElements: cannot find host/bridge: '%s' for this sfc: '%s'",
+							sfcEntityElement.EtcdVppSwitchKey, sfc.Name)
+						return err
+					}
+					if sfc.Type == controller.SfcType_SFC_EW_BD {
+						bd = heState.ewBD
+					} else {
+						bd = heState.ewBDL2Fib
+					}
+
+				case controller.EWBridgeType_EW_L2FIB_BRIDGE:
+					fallthrough
+				case controller.EWBridgeType_EW_DYNAMIC_BRIDGE:
+
+					sfcToHEMap, exists := cnpd.l2CNPStateCache.SFCToHEs[sfc.Name]
+					if !exists {
+						cnpd.l2CNPStateCache.SFCToHEs[sfc.Name] = make(map[string]*heStateType, 0)
+						sfcToHEMap = cnpd.l2CNPStateCache.SFCToHEs[sfc.Name]
+					}
+					heState, exists := sfcToHEMap[sfcEntityElement.EtcdVppSwitchKey]
+					if !exists {
+						bdName := "BD_INTERNAL_EW_" + sfc.Name + "_" + sfcEntityElement.EtcdVppSwitchKey
+						bd, err = cnpd.bridgedDomainCreateWithIfs(sfcEntityElement.EtcdVppSwitchKey, bdName,
+							nil, sfc.EwBridgeType == controller.EWBridgeType_EW_DYNAMIC_BRIDGE)
+						if err != nil {
+							log.Error("WireInternalsForHostEntity: error creating BD: '%s'", bd.Name)
+							return err
+						}
+						if sfc.EwBridgeType == controller.EWBridgeType_EW_DYNAMIC_BRIDGE {
+							heState = &heStateType{
+								ewBD: bd,
+							}
+						} else {
+							heState = &heStateType{
+								ewBDL2Fib: bd,
+							}
+						}
+						sfcToHEMap[sfcEntityElement.EtcdVppSwitchKey] = heState
+					} else {
+						if sfc.EwBridgeType == controller.EWBridgeType_EW_DYNAMIC_BRIDGE {
+							bd = heState.ewBD
+						} else {
+							bd = heState.ewBDL2Fib
+						}
+					}
 				}
+
 				if ifName, err = cnpd.createAFPacketVEthPairAndAddToBridge(sfc, bd, sfcEntityElement); err != nil {
 					log.Error("wireSfcEastWestElements: error creating memIf pair: sfc: '%s', Container: '%s'",
 						sfc.Name, sfcEntityElement.Container)
@@ -833,14 +871,6 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 			fallthrough
 		case controller.SfcElementType_NON_VPP_CONTAINER_MEMIF:
 
-			// the container has which host it is assoc'ed with, get the host e/w bridge
-			heState, exists := cnpd.l2CNPStateCache.HE[sfcEntityElement.EtcdVppSwitchKey]
-			if !exists {
-				err := fmt.Errorf("wireSfcEastWestElements: cannot find host/bridge: '%s' for this sfc: '%s'",
-					sfcEntityElement.EtcdVppSwitchKey, sfc.Name)
-				return err
-			}
-
 			if sfc.Type == controller.SfcType_SFC_EW_MEMIF {
 				if i%2 == 0 {
 					// need to create an inter-container memif, use the left of the pair to create the pair
@@ -853,13 +883,58 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 				}
 			} else if sfc.Type == controller.SfcType_SFC_EW_BD || sfc.Type == controller.SfcType_SFC_EW_BD_L2FIB {
 
-				// bridge domain -based wiring ... select the internal dynamic or static bridge
-				var bd *l2.BridgeDomains_BridgeDomain
-				if sfc.Type == controller.SfcType_SFC_EW_BD {
-					bd = heState.ewBD
-				} else {
-					bd = heState.ewBDL2Fib
+				switch sfc.EwBridgeType {
+				case controller.EWBridgeType_EW_SYSTEM_DEFAULT_BRIDGE:
+					// bridge domain -based wiring ... select the internal dynamic or static bridge
+					heState, exists := cnpd.l2CNPStateCache.HE[sfcEntityElement.EtcdVppSwitchKey]
+					if !exists {
+						err := fmt.Errorf("wireSfcEastWestElements: cannot find host/bridge: '%s' for this sfc: '%s'",
+							sfcEntityElement.EtcdVppSwitchKey, sfc.Name)
+						return err
+					}
+					if sfc.Type == controller.SfcType_SFC_EW_BD {
+						bd = heState.ewBD
+					} else {
+						bd = heState.ewBDL2Fib
+					}
+
+				case controller.EWBridgeType_EW_L2FIB_BRIDGE:
+					fallthrough
+				case controller.EWBridgeType_EW_DYNAMIC_BRIDGE:
+
+					sfcToHEMap, exists := cnpd.l2CNPStateCache.SFCToHEs[sfc.Name]
+					if !exists {
+						cnpd.l2CNPStateCache.SFCToHEs[sfc.Name] = make(map[string]*heStateType, 0)
+						sfcToHEMap = cnpd.l2CNPStateCache.SFCToHEs[sfc.Name]
+					}
+					heState, exists := sfcToHEMap[sfcEntityElement.EtcdVppSwitchKey]
+					if !exists {
+						bdName := "BD_INTERNAL_EW_" + sfc.Name + "_" + sfcEntityElement.EtcdVppSwitchKey
+						bd, err = cnpd.bridgedDomainCreateWithIfs(sfcEntityElement.EtcdVppSwitchKey, bdName,
+							nil, sfc.EwBridgeType == controller.EWBridgeType_EW_DYNAMIC_BRIDGE)
+						if err != nil {
+							log.Error("WireInternalsForHostEntity: error creating BD: '%s'", bd.Name)
+							return err
+						}
+						if sfc.EwBridgeType == controller.EWBridgeType_EW_DYNAMIC_BRIDGE {
+							heState = &heStateType{
+								ewBD: bd,
+							}
+						} else {
+							heState = &heStateType{
+								ewBDL2Fib: bd,
+							}
+						}
+						sfcToHEMap[sfcEntityElement.EtcdVppSwitchKey] = heState
+					} else {
+						if sfc.EwBridgeType == controller.EWBridgeType_EW_DYNAMIC_BRIDGE {
+							bd = heState.ewBD
+						} else {
+							bd = heState.ewBDL2Fib
+						}
+					}
 				}
+
 				if ifName, err = cnpd.createMemIfPairAndAddToBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, bd,
 					sfcEntityElement, true); err != nil {
 					log.Error("wireSfcEastWestElements: error creating memIf pair: sfc: '%s', Container: '%s'",
