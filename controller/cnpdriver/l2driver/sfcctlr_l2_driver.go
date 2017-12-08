@@ -37,7 +37,6 @@ import (
 	l2driver "github.com/ligato/sfc-controller/controller/cnpdriver/l2driver/model"
 	"github.com/ligato/sfc-controller/controller/extentitydriver"
 	"github.com/ligato/sfc-controller/controller/model/controller"
-	"github.com/ligato/sfc-controller/controller/utils"
 	"github.com/ligato/sfc-controller/controller/utils/ipam"
 	"github.com/ligato/vpp-agent/clientv1/linux"
 	"github.com/ligato/vpp-agent/clientv1/linux/remoteclient"
@@ -260,45 +259,14 @@ func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToExternalEntity(he *controller.Ho
 		cnpd.l2CNPStateCache.HEToEEs[he.Name] = heToEEMap
 	}
 
-	// now ensure this HE has not yet been wired to the EE
+	// now ensure this HE has not yet been associated to the EE
 	heToEEState, exists := heToEEMap[ee.Name]
 	if exists {
 		// maybe look at contents to see if they are programmed properly but for now just return
 		return nil
 	}
 
-	bdName := "BD_H2E_" + he.Name + "_" + ee.Name
-
-	// create the vxlan i'f before the BD
-	ifName := "IF_VXLAN_H2E_" + he.Name + "_" + ee.Name
-
-	var vlanID uint32
-
-	he2eeID, err := cnpd.DatastoreHE2EEIDsRetrieve(he.Name, ee.Name)
-	if he2eeID == nil || he2eeID.VlanId == 0 {
-		cnpd.seq.VLanID++
-		vlanID = cnpd.seq.VLanID
-	} else {
-		vlanID = he2eeID.VlanId
-	}
-	vlanIf, err := cnpd.vxLanCreate(he.Name, ifName, vlanID, he.LoopbackIpv4, ee.HostVxlan.SourceIpv4)
-	if err != nil {
-		log.Error("WireHostEntityToExternalEntity: error creating vxlan: '%s'", ifName)
-		return err
-	}
-
-	ifs := make([]*l2.BridgeDomains_BridgeDomain_Interfaces, 1)
-	ifEntry := l2.BridgeDomains_BridgeDomain_Interfaces{
-		Name: ifName,
-	}
-	ifs[0] = &ifEntry
-
-	// now create the bridge
-	bd, err := cnpd.bridgedDomainCreateWithIfs(he.Name, bdName, ifs, true)
-	if err != nil {
-		log.Error("WireHostEntityToExternalEntity: error creating BD: '%s'", bd.Name)
-		return err
-	}
+	// delay adding of vlan and bridge till an sfc entity specifies one
 
 	// configure static route from this host to the external router
 	description := "IF_STATIC_ROUTE_H2E_" + ee.Name
@@ -310,23 +278,16 @@ func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToExternalEntity(he *controller.Ho
 	}
 
 	heToEEState = &heToEEStateType{
-		vlanIf:  vlanIf,
-		bd:      bd,
+		//vlanIf:  vlanIf,
+		//bd:      bd,
 		l3Route: sr,
 	}
 
 	// now link the he to the ee
 	heToEEMap[ee.Name] = heToEEState
 
-	log.Infof("WireHostEntityToExternalEntity: he: %s, ee: %s, vlanIf: %s, ewBD: %s, static route: %s",
-		he.Name, ee.Name, vlanIf.Name, bd.Name, sr.String())
-
-	cnpd.wireExternalEntityToHostEntity(ee, he)
-
-	key, he2eeID, err := cnpd.DatastoreHE2EEIDsCreate(he.Name, ee.Name, vlanID)
-	if err == nil && cnpd.reconcileInProgress {
-		cnpd.reconcileAfter.he2eeIDs[key] = *he2eeID
-	}
+	log.Infof("WireHostEntityToExternalEntity: he: %s, ee: %s, static route: %s",
+		he.Name, ee.Name, sr.String())
 
 	return err
 }
@@ -468,6 +429,8 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 
 	eeCount := 0
 	eeName := ""
+	var eeSfcElement *controller.SfcEntity_SfcElement
+
 
 	// find the external entity and ensure there is only one allowed
 	for i, sfcEntityElement := range sfc.GetElements() {
@@ -491,6 +454,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 				log.Error(err.Error())
 				return err
 			}
+			eeSfcElement = sfcEntityElement
 		}
 	}
 
@@ -511,25 +475,14 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 			fallthrough
 		case controller.SfcElementType_NON_VPP_CONTAINER_AFP:
 
-			if _, exists := cnpd.l2CNPEntityCache.HEs[sfcEntityElement.EtcdVppSwitchKey]; !exists {
-				err := fmt.Errorf("wireSfcNorthSouthVXLANElements: cannot find host '%s' for this sfc: '%s'",
-					sfcEntityElement.EtcdVppSwitchKey, sfc.Name)
+			heToEEState, err := cnpd.createVxLANAndBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, eeName,
+				eeSfcElement.VlanId)
+			if err != nil {
 				return err
 			}
-			// the container has which host it is assoc'ed with, get the ee bridge
-			heToEEState, exists := cnpd.l2CNPStateCache.HEToEEs[sfcEntityElement.EtcdVppSwitchKey][eeName]
-			if !exists {
-				err := fmt.Errorf("wireSfcNorthSouthVXLANElements: cannot find host/bridge: '%s' for this sfc: '%s'",
-					sfcEntityElement.EtcdVppSwitchKey, sfc.Name)
-				return err
-			}
+
 			if _, err := cnpd.createAFPacketVEthPairAndAddToBridge(sfc, heToEEState.bd, sfcEntityElement); err != nil {
 				log.Error("wireSfcNorthSouthVXLANElements: error creating memIf pair: sfc: '%s', Container: '%s'",
-					sfc.Name, sfcEntityElement.Container)
-				return err
-			}
-			if err := cnpd.createCustomLabel(sfcEntityElement.Container, sfcEntityElement.GetCustomInfo()); err != nil {
-				log.Error("wireSfcNorthSouthVXLANElements: error creating customLabel: sfc: '%s', Container: '%s'",
 					sfc.Name, sfcEntityElement.Container)
 				return err
 			}
@@ -538,27 +491,15 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 			fallthrough
 		case controller.SfcElementType_NON_VPP_CONTAINER_MEMIF:
 
-			if _, exists := cnpd.l2CNPEntityCache.HEs[sfcEntityElement.EtcdVppSwitchKey]; !exists {
-				err := fmt.Errorf("wireSfcNorthSouthVXLANElements: cannot find host '%s' for this sfc: '%s'",
-					sfcEntityElement.EtcdVppSwitchKey, sfc.Name)
+			heToEEState, err := cnpd.createVxLANAndBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, eeName,
+				eeSfcElement.VlanId)
+			if err != nil {
 				return err
 			}
-			// the container has which host it is assoc'ed with, get the ee bridge
-			heToEEState, exists := cnpd.l2CNPStateCache.HEToEEs[sfcEntityElement.EtcdVppSwitchKey][eeName]
-			if !exists {
-				err := fmt.Errorf("wireSfcNorthSouthVXLANElements: cannot find host/bridge: '%s' for this sfc: '%s'",
-					sfcEntityElement.EtcdVppSwitchKey, sfc.Name)
-				return err
 
-			}
 			if _, err := cnpd.createMemIfPairAndAddToBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, heToEEState.bd,
 				sfcEntityElement, false); err != nil {
 				log.Error("wireSfcNorthSouthVXLANElements: error creating memIf pair: sfc: '%s', Container: '%s'",
-					sfc.Name, sfcEntityElement.Container)
-				return err
-			}
-			if err := cnpd.createCustomLabel(sfcEntityElement.Container, sfcEntityElement.GetCustomInfo()); err != nil {
-				log.Error("wireSfcNorthSouthVXLANElements: error creating customLabel: sfc: '%s', Container: '%s'",
 					sfc.Name, sfcEntityElement.Container)
 				return err
 			}
@@ -566,6 +507,88 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 	}
 
 	return nil
+}
+
+// createVxLANAndBridge ensure vxlan and bridge are create if not already done yet
+func (cnpd *sfcCtlrL2CNPDriver) createVxLANAndBridge(sfc *controller.SfcEntity,
+	hostName string , eeName string, vlanID uint32) (*heToEEStateType, error) {
+
+	// the container has which host it is assoc'ed with, get the ee bridge
+	heToEEMap, exists := cnpd.l2CNPStateCache.HEToEEs[hostName]
+	if !exists {
+		err := fmt.Errorf("wireSfcNorthSouthVXLANElements: host not found: '%s' for this sfc: '%s'",
+			hostName, sfc.Name)
+		return nil, err
+	}
+	heToEEState, exists := heToEEMap[eeName]
+	if !exists {
+		err := fmt.Errorf("wireSfcNorthSouthVXLANElements: host '%s' not wired to this ee: '%s' for this sfc: '%s'",
+			hostName, eeName, sfc.Name)
+		return nil, err
+	}
+
+	if heToEEState.vlanIf == nil {
+
+		// first time sfc is wired from this host to this external ee so create a vxlan tunnel
+
+		he := cnpd.l2CNPEntityCache.HEs[hostName]
+		ee := cnpd.l2CNPEntityCache.EEs[eeName]
+
+		// create the vxlan i'f before the BD
+		ifName := "IF_VXLAN_H2E_" + he.Name + "_" + ee.Name
+
+		if vlanID == 0 {
+			he2eeID, _ := cnpd.DatastoreHE2EEIDsRetrieve(he.Name, ee.Name)
+			if he2eeID == nil || he2eeID.VlanId == 0 {
+				cnpd.seq.VLanID++
+				vlanID = cnpd.seq.VLanID
+			} else {
+				vlanID = he2eeID.VlanId
+			}
+		}
+		vlanIf, err := cnpd.vxLanCreate(he.Name, ifName, vlanID, he.LoopbackIpv4, ee.HostVxlan.SourceIpv4)
+		if err != nil {
+			log.Error("wireSfcNorthSouthVXLANElements: error creating vxlan: '%s'", ifName)
+			return nil, err
+		}
+
+		heToEEState.vlanIf = vlanIf
+
+		key, he2eeID, err := cnpd.DatastoreHE2EEIDsCreate(he.Name, ee.Name, vlanID)
+		if err == nil && cnpd.reconcileInProgress {
+			cnpd.reconcileAfter.he2eeIDs[key] = *he2eeID
+		}
+	}
+
+	if heToEEState.bd == nil {
+
+		// first time sfc is wired from this host to this external ee so create a bridge
+
+		he := cnpd.l2CNPEntityCache.HEs[hostName]
+		ee := cnpd.l2CNPEntityCache.EEs[eeName]
+
+		bdName := "BD_H2E_" + he.Name + "_" + ee.Name
+
+		ifs := make([]*l2.BridgeDomains_BridgeDomain_Interfaces, 1)
+		ifEntry := l2.BridgeDomains_BridgeDomain_Interfaces{
+			Name: heToEEState.vlanIf.Name,
+		}
+		ifs[0] = &ifEntry
+
+		// now create the bridge
+		bd, err := cnpd.bridgedDomainCreateWithIfs(he.Name, bdName, ifs, true)
+		if err != nil {
+			log.Error("wireSfcNorthSouthVXLANElements: error creating BD: '%s'", bd.Name)
+			return nil, err
+		}
+
+		heToEEState.bd = bd
+
+		// now we can wire the external entity to this host
+		cnpd.wireExternalEntityToHostEntity(&ee, &he)
+	}
+
+	return heToEEState, nil
 }
 
 // north/south NIC type, memIfs/cntrs connect to physical NIC
@@ -680,13 +703,6 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 				}
 			}
 
-			// custom label
-			if err := cnpd.createCustomLabel(sfcEntityElement.Container, sfcEntityElement.GetCustomInfo()); err != nil {
-				log.Error("wireSfcNorthSouthNICElements: error creating customLabel: sfc: '%s', Container: '%s'",
-					sfc.Name, sfcEntityElement.Container)
-				return err
-			}
-
 		case controller.SfcElementType_VPP_CONTAINER_MEMIF:
 			fallthrough
 		case controller.SfcElementType_NON_VPP_CONTAINER_MEMIF:
@@ -725,13 +741,6 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 				if err != nil {
 					return err
 				}
-			}
-
-			// custom label
-			if err := cnpd.createCustomLabel(sfcEntityElement.Container, sfcEntityElement.GetCustomInfo()); err != nil {
-				log.Error("wireSfcNorthSouthNICElements: error creating customLabel: sfc: '%s', Container: '%s'",
-					sfc.Name, sfcEntityElement.Container)
-				return err
 			}
 		}
 	}
@@ -861,11 +870,6 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 					prevMemIfName = afIfName
 				}
 			}
-			if err := cnpd.createCustomLabel(sfcEntityElement.Container, sfcEntityElement.GetCustomInfo()); err != nil {
-				log.Error("wireSfcNorthSouthVXLANElements: error creating customLabel: sfc: '%s', Container: '%s'",
-					sfc.Name, sfcEntityElement.Container)
-				return err
-			}
 
 		case controller.SfcElementType_VPP_CONTAINER_MEMIF:
 			fallthrough
@@ -972,11 +976,6 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntit
 				} else {
 					prevMemIfName = memIfName
 				}
-			}
-			if err := cnpd.createCustomLabel(sfcEntityElement.Container, sfcEntityElement.GetCustomInfo()); err != nil {
-				log.Error("wireSfcNorthSouthVXLANElements: error creating customLabel: sfc: '%s', Container: '%s'",
-					sfc.Name, sfcEntityElement.Container)
-				return err
 			}
 		}
 	}
@@ -1772,25 +1771,6 @@ func (cnpd *sfcCtlrL2CNPDriver) createL2FibEntry(etcdPrefix string, bdName strin
 	//}
 
 	return l2fib, nil
-}
-
-func (cnpd *sfcCtlrL2CNPDriver) createCustomLabel(etcdPrefix string, ci *controller.CustomInfoType) error {
-
-	if ci != nil && ci.Label != "" {
-		key := utils.CustomInfoKey(etcdPrefix)
-
-		log.Println(key)
-		log.Println(ci)
-
-		err := cnpd.db.Put(key, ci)
-		if err != nil {
-			log.Error("createCustomLabel: error storing key: '%s'", key)
-			log.Error("createCustomLabel: databroker.Store: ", err)
-			return err
-		}
-	}
-
-	return nil
 }
 
 // Debug dump routine

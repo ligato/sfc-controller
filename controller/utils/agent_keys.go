@@ -95,8 +95,3 @@ func L3RouteKeyPrefix(vppLabel string) string {
 func L3RouteKey(vppLabel string, vrf uint32, destNet *net.IPNet, nextHop string) string {
 	return agentPrefix + vppLabel + "/" + l3.RouteKey(vrf, destNet, nextHop)
 }
-
-// CustomInfoKey constructs custom info db key
-func CustomInfoKey(vppLabel string) string {
-	return agentPrefix + vppLabel + "/" + "vpp/config/v1/custom"
-}

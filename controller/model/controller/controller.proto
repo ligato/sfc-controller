@@ -103,11 +103,11 @@ message SfcEntity {
     message SfcElement {
         string container = 1;
         string port_label = 2;
-        string etcd_vpp_switch_key = 3;   // static for now, k8s will tell us which host this container is deployed
-        string ipv4_addr = 4;             // optional, if provided, this overrides what ipAddr the if is given
-        string mac_addr = 5;              // optional, if provided, this overrides what mac the if is given
+        string etcd_vpp_switch_key = 3;   // static for now, k8s will tell us on which host this container is deployed
+        string ipv4_addr = 4;             // optional, if provided, this overrides what ipAddr this i/f is given
+        string mac_addr = 5;              // optional, if provided, this overrides what mac this i/f is given
         SfcElementType type = 6;
-        CustomInfoType custom_info = 7;   // opaque string ... possibly json for app specific information
+        uint32 vlan_id = 7;               // optional, if provided, this overrides what vlanID this i/f is given
         uint32 mtu = 8;                   // if provided, this overrides system value
         RxModeType rx_mode = 9;
         repeated string l2fib_macs = 10;

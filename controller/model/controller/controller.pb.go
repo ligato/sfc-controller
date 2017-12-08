@@ -282,28 +282,21 @@ func (m *SfcEntity) GetElements() []*SfcEntity_SfcElement {
 }
 
 type SfcEntity_SfcElement struct {
-	Container        string          `protobuf:"bytes,1,opt,name=container,proto3" json:"container,omitempty"`
-	PortLabel        string          `protobuf:"bytes,2,opt,name=port_label,proto3" json:"port_label,omitempty"`
-	EtcdVppSwitchKey string          `protobuf:"bytes,3,opt,name=etcd_vpp_switch_key,proto3" json:"etcd_vpp_switch_key,omitempty"`
-	Ipv4Addr         string          `protobuf:"bytes,4,opt,name=ipv4_addr,proto3" json:"ipv4_addr,omitempty"`
-	MacAddr          string          `protobuf:"bytes,5,opt,name=mac_addr,proto3" json:"mac_addr,omitempty"`
-	Type             SfcElementType  `protobuf:"varint,6,opt,name=type,proto3,enum=controller.SfcElementType" json:"type,omitempty"`
-	CustomInfo       *CustomInfoType `protobuf:"bytes,7,opt,name=custom_info" json:"custom_info,omitempty"`
-	Mtu              uint32          `protobuf:"varint,8,opt,name=mtu,proto3" json:"mtu,omitempty"`
-	RxMode           RxModeType      `protobuf:"varint,9,opt,name=rx_mode,proto3,enum=controller.RxModeType" json:"rx_mode,omitempty"`
-	L2FibMacs        []string        `protobuf:"bytes,10,rep,name=l2fib_macs" json:"l2fib_macs,omitempty"`
+	Container        string         `protobuf:"bytes,1,opt,name=container,proto3" json:"container,omitempty"`
+	PortLabel        string         `protobuf:"bytes,2,opt,name=port_label,proto3" json:"port_label,omitempty"`
+	EtcdVppSwitchKey string         `protobuf:"bytes,3,opt,name=etcd_vpp_switch_key,proto3" json:"etcd_vpp_switch_key,omitempty"`
+	Ipv4Addr         string         `protobuf:"bytes,4,opt,name=ipv4_addr,proto3" json:"ipv4_addr,omitempty"`
+	MacAddr          string         `protobuf:"bytes,5,opt,name=mac_addr,proto3" json:"mac_addr,omitempty"`
+	Type             SfcElementType `protobuf:"varint,6,opt,name=type,proto3,enum=controller.SfcElementType" json:"type,omitempty"`
+	VlanId           uint32         `protobuf:"varint,7,opt,name=vlan_id,proto3" json:"vlan_id,omitempty"`
+	Mtu              uint32         `protobuf:"varint,8,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	RxMode           RxModeType     `protobuf:"varint,9,opt,name=rx_mode,proto3,enum=controller.RxModeType" json:"rx_mode,omitempty"`
+	L2FibMacs        []string       `protobuf:"bytes,10,rep,name=l2fib_macs" json:"l2fib_macs,omitempty"`
 }
 
 func (m *SfcEntity_SfcElement) Reset()         { *m = SfcEntity_SfcElement{} }
 func (m *SfcEntity_SfcElement) String() string { return proto.CompactTextString(m) }
 func (*SfcEntity_SfcElement) ProtoMessage()    {}
-
-func (m *SfcEntity_SfcElement) GetCustomInfo() *CustomInfoType {
-	if m != nil {
-		return m.CustomInfo
-	}
-	return nil
-}
 
 func init() {
 	proto.RegisterEnum("controller.RxModeType", RxModeType_name, RxModeType_value)

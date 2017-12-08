@@ -53,7 +53,6 @@ func SfcDump() keyval.ProtoBroker {
 	sfcDatastoreSfcEntityDumpAll(db)
 	for k := range EtcdVppLabelMap {
 		fmt.Println("ETCD VPP LABEL: ", k)
-		vnfDatastoreCustomLabelsDumpAll(db, k)
 		vnfDatastoreInterfacesDumpAll(db, k)
 		vnfDatastoreLinuxInterfacesDumpAll(db, k)
 		vnfDatastoreBridgesDumpAll(db, k)
@@ -278,32 +277,6 @@ func vnfDatastoreL3RoutesDumpAll(db keyval.ProtoBroker, etcdVppLabel string) err
 			return nil
 		}
 		fmt.Println("Static route: ", kv.GetKey(), entry)
-	}
-}
-
-func vnfDatastoreCustomLabelsDumpAll(db keyval.ProtoBroker, etcdVppLabel string) error {
-
-	kvi, err := db.ListValues(utils.CustomInfoKey(etcdVppLabel))
-	if err != nil {
-		log.Fatal(err)
-		return nil
-	}
-
-	for {
-		kv, allReceived := kvi.GetNext()
-		if allReceived {
-			return nil
-		}
-		type label struct {
-			value string
-		}
-		entry := &controller.CustomInfoType{}
-		err := kv.GetValue(entry)
-		if err != nil {
-			log.Fatal(err)
-			return nil
-		}
-		fmt.Println("Custom Info: ", kv.GetKey(), entry)
 	}
 }
 
