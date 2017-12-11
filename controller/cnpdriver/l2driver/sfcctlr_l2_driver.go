@@ -1228,40 +1228,36 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 		vethID = sfcID.VethId
 	}
 
-	// the sfc controller can be responsible for managing the mac and ip addresses if not provided t
-	if vnfChainElement.Type != controller.SfcElementType_VPP_CONTAINER_AFP {
-		// no IP address in case that VPP is also on the vnf side of the vnf-vswitch entry
-
-		if vnfChainElement.Ipv4Addr == "" {
-			if sfc.SfcIpv4Prefix != "" {
-				if sfcID == nil || sfcID.IpId == 0 {
-					ipv4Address, ipID, err = ipam.AllocateFromSubnet(sfc.SfcIpv4Prefix)
-					if err != nil {
-						return "", err
-					}
-				} else {
-					ipv4Address, err = ipam.SetIpIDInSubnet(sfc.SfcIpv4Prefix, sfcID.IpId)
-					if err != nil {
-						return "", err
-					}
-					ipID = sfcID.IpId
+	if vnfChainElement.Ipv4Addr == "" {
+		if sfc.SfcIpv4Prefix != "" {
+			if sfcID == nil || sfcID.IpId == 0 {
+				ipv4Address, ipID, err = ipam.AllocateFromSubnet(sfc.SfcIpv4Prefix)
+				if err != nil {
+					return "", err
 				}
-			}
-		} else {
-			strs := strings.Split(vnfChainElement.Ipv4Addr, "/")
-			if len(strs) == 2 {
-				ipv4Address = vnfChainElement.Ipv4Addr
 			} else {
-				ipv4Address = vnfChainElement.Ipv4Addr + "/24"
+				ipv4Address, err = ipam.SetIpIDInSubnet(sfc.SfcIpv4Prefix, sfcID.IpId)
+				if err != nil {
+					return "", err
+				}
+				ipID = sfcID.IpId
 			}
-			if sfc.SfcIpv4Prefix != "" {
-				ipam.SetIpAddrIfInsideSubnet(sfc.SfcIpv4Prefix, strs[0])
-			}
+		}
+	} else {
+		strs := strings.Split(vnfChainElement.Ipv4Addr, "/")
+		if len(strs) == 2 {
+			ipv4Address = vnfChainElement.Ipv4Addr
+		} else {
+			ipv4Address = vnfChainElement.Ipv4Addr + "/24"
 		}
 		if sfc.SfcIpv4Prefix != "" {
-			log.Info("createAFPacketVEthPair: ", ipam.DumpSubnet(sfc.SfcIpv4Prefix), ipv4Address)
+			ipam.SetIpAddrIfInsideSubnet(sfc.SfcIpv4Prefix, strs[0])
 		}
 	}
+	if sfc.SfcIpv4Prefix != "" {
+		log.Info("createAFPacketVEthPair: ", ipam.DumpSubnet(sfc.SfcIpv4Prefix), ipv4Address)
+	}
+
 	if vnfChainElement.MacAddr == "" {
 		if sfcID == nil || sfcID.MacAddrId == 0 {
 			cnpd.seq.MacInstanceID++
@@ -1292,30 +1288,34 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 	host1Name := baseHostName + "_" + veth1Str
 	host2Name := baseHostName + "_" + veth2Str
 
-	if err := cnpd.vEthIfCreate(vnfChainElement.EtcdVppSwitchKey, veth1Name, host1Name, veth2Name, vnfChainElement.Container,
-		macAddress, ipv4Address, mtu); err != nil {
+	ipAddrForVEth := ipv4Address
+	ipAddrForAFP := ipv4Address
+	if vnfChainElement.Type == controller.SfcElementType_VPP_CONTAINER_AFP {
+		ipAddrForVEth = ""
+	}
+	// Configure the VETH interface for the VNF end
+	if err := cnpd.vEthIfCreate(vnfChainElement.EtcdVppSwitchKey, veth1Name, host1Name, veth2Name,
+		vnfChainElement.Container, macAddress, ipAddrForVEth, mtu); err != nil {
 		log.Error("createAFPacketVEthPair: error creating veth if '%s' for container: '%s'", veth1Name,
 			vnfChainElement.Container)
 		return "", err
 	}
-	// Configure opposite side of the VETH interface for the vpp switch
-	if err := cnpd.vEthIfCreate(vnfChainElement.EtcdVppSwitchKey, veth2Name, host2Name, veth1Name, vnfChainElement.EtcdVppSwitchKey,
-		"", "", mtu); err != nil {
+	// Configure the VETH interface for the VSWITCH end
+	if err := cnpd.vEthIfCreate(vnfChainElement.EtcdVppSwitchKey, veth2Name, host2Name, veth1Name,
+		vnfChainElement.EtcdVppSwitchKey, "", "", mtu); err != nil {
 		log.Error("createAFPacketVEthPair: error creating veth if '%s' for container: '%s'", veth2Name,
 			vnfChainElement.EtcdVppSwitchKey)
 		return "", err
 	}
-
 	// create af_packet for the vnf -end of the veth
 	if vnfChainElement.Type == controller.SfcElementType_VPP_CONTAINER_AFP {
 		afPktIf1, err := cnpd.afPacketCreate(vnfChainElement.Container, vnfChainElement.PortLabel,
-			host1Name, "", "", mtu, rxMode)
+			host1Name, ipAddrForAFP, macAddress, mtu, rxMode)
 		if err != nil {
 			log.Error("createAFPacketVEthPair: error creating afpacket for vpp switch: '%s'", afPktIf1.Name)
 			return "", err
 		}
 	}
-
 	// create af_packet for the vswitch -end of the veth
 	afPktName := "IF_AFPIF_VSWITCH_" + vnfChainElement.Container + "_" + vnfChainElement.PortLabel
 	afPktIf2, err := cnpd.afPacketCreate(vnfChainElement.EtcdVppSwitchKey, afPktName, host2Name,
