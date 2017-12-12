@@ -1221,9 +1221,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 	sfcID, err := cnpd.DatastoreSFCIDsRetrieve(sfc.Name, vnfChainElement.Container, vnfChainElement.PortLabel)
 
 	if sfcID == nil || sfcID.VethId == 0 {
-		cnpd.seq.VethID++ // first one is for the container
+		cnpd.seq.VethID++
 		vethID = cnpd.seq.VethID
-		cnpd.seq.VethID++ // second one is for the vswitch
 	} else {
 		vethID = sfcID.VethId
 	}
@@ -1282,11 +1281,12 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 
 	veth1Name := "IF_VETH_VNF_" + vnfChainElement.Container + "_" + vnfChainElement.PortLabel
 	veth2Name := "IF_VETH_VSWITCH_" + vnfChainElement.Container + "_" + vnfChainElement.PortLabel
-	veth1Str := strconv.FormatUint(uint64(vethID), 36)
-	veth2Str := strconv.FormatUint(uint64(vethID+1), 36)
-	baseHostName := constructBaseHostName(vnfChainElement.Container, vnfChainElement.PortLabel, veth2Str)
-	host1Name := baseHostName + "_" + veth1Str
-	host2Name := baseHostName + "_" + veth2Str
+
+	host1Name := vnfChainElement.PortLabel
+
+	vethIDStr := strconv.FormatUint(uint64(vethID), 36)
+	baseHostName := constructBaseHostName(vnfChainElement.Container, vnfChainElement.PortLabel, vethIDStr)
+	host2Name := baseHostName + "_" + vethIDStr
 
 	ipAddrForVEth := ipv4Address
 	ipAddrForAFP := ipv4Address
