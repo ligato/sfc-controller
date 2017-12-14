@@ -220,8 +220,19 @@ func (cnpd *sfcCtlrL2CNPDriver) ReconcileEnd() error {
 			log.Info("ReconcileEnd: remove static route before entry: ", beforeSR)
 			delete(cnpd.reconcileAfter.l3Routes, key)
 		} else {
-			if beforeSR.String() == afterSR.String() {
+			// turns out it is possible and OK to have duplicate static routes so recheck the route
+			// body and weed out the fields we care about to discern these routes are the same
+			// the description is filled in which can be different for the various duplicates
+			if beforeSR.DstIpAddr == afterSR.DstIpAddr &&
+				beforeSR.NextHopAddr == afterSR.NextHopAddr &&
+				beforeSR.OutgoingInterface == afterSR.OutgoingInterface &&
+				beforeSR.Preference == afterSR.Preference &&
+				beforeSR.VrfId == afterSR.VrfId &&
+				beforeSR.Weight == afterSR.Weight {
 				delete(cnpd.reconcileAfter.l3Routes, key)
+			} else {
+				log.Info("ReconcileEnd: before != after ... beforeSR: ", beforeSR)
+				log.Info("ReconcileEnd: before != after ... afterSR: ", afterSR)
 			}
 		}
 	}
