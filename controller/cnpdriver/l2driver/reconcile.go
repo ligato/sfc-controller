@@ -220,7 +220,7 @@ func (cnpd *sfcCtlrL2CNPDriver) ReconcileEnd() error {
 			log.Info("ReconcileEnd: remove static route before entry: ", beforeSR)
 			delete(cnpd.reconcileAfter.l3Routes, key)
 		} else {
-			if beforeSR == afterSR {
+			if beforeSR.String() == afterSR.String() {
 				delete(cnpd.reconcileAfter.l3Routes, key)
 			}
 		}
