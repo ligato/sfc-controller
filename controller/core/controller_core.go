@@ -104,7 +104,6 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) Init() error {
 	sfcCtrlPlugin.StatusCheck.Register(PluginID, nil)
 	sfcCtrlPlugin.StatusCheck.ReportStateChange(PluginID, statuscheck.Init, nil)
 
-
 	sfcCtrlPlugin.db = sfcCtrlPlugin.Etcd.NewBroker(keyval.Root)
 
 	sfcCtrlPlugin.InitRAMCache()
