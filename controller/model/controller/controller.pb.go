@@ -246,15 +246,17 @@ func (m *ExternalEntity_HostBD) String() string { return proto.CompactTextString
 func (*ExternalEntity_HostBD) ProtoMessage()    {}
 
 type HostEntity struct {
-	Name            string     `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	EthIfName       string     `protobuf:"bytes,2,opt,name=eth_if_name,proto3" json:"eth_if_name,omitempty"`
-	EthIpv4         string     `protobuf:"bytes,3,opt,name=eth_ipv4,proto3" json:"eth_ipv4,omitempty"`
-	EthIpv6         string     `protobuf:"bytes,4,opt,name=eth_ipv6,proto3" json:"eth_ipv6,omitempty"`
-	LoopbackMacAddr string     `protobuf:"bytes,5,opt,name=loopback_mac_addr,proto3" json:"loopback_mac_addr,omitempty"`
-	LoopbackIpv4    string     `protobuf:"bytes,6,opt,name=loopback_ipv4,proto3" json:"loopback_ipv4,omitempty"`
-	LoopbackIpv6    string     `protobuf:"bytes,7,opt,name=loopback_ipv6,proto3" json:"loopback_ipv6,omitempty"`
-	Mtu             uint32     `protobuf:"varint,8,opt,name=mtu,proto3" json:"mtu,omitempty"`
-	RxMode          RxModeType `protobuf:"varint,9,opt,name=rx_mode,proto3,enum=controller.RxModeType" json:"rx_mode,omitempty"`
+	Name                   string     `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	EthIfName              string     `protobuf:"bytes,2,opt,name=eth_if_name,proto3" json:"eth_if_name,omitempty"`
+	EthIpv4                string     `protobuf:"bytes,3,opt,name=eth_ipv4,proto3" json:"eth_ipv4,omitempty"`
+	EthIpv6                string     `protobuf:"bytes,4,opt,name=eth_ipv6,proto3" json:"eth_ipv6,omitempty"`
+	LoopbackMacAddr        string     `protobuf:"bytes,5,opt,name=loopback_mac_addr,proto3" json:"loopback_mac_addr,omitempty"`
+	LoopbackIpv4           string     `protobuf:"bytes,6,opt,name=loopback_ipv4,proto3" json:"loopback_ipv4,omitempty"`
+	LoopbackIpv6           string     `protobuf:"bytes,7,opt,name=loopback_ipv6,proto3" json:"loopback_ipv6,omitempty"`
+	VxlanTunnelIpv4        string     `protobuf:"bytes,8,opt,name=vxlan_tunnel_ipv4,proto3" json:"vxlan_tunnel_ipv4,omitempty"`
+	CreateVxlanStaticRoute bool       `protobuf:"varint,9,opt,name=create_vxlan_static_route,proto3" json:"create_vxlan_static_route,omitempty"`
+	Mtu                    uint32     `protobuf:"varint,10,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	RxMode                 RxModeType `protobuf:"varint,11,opt,name=rx_mode,proto3,enum=controller.RxModeType" json:"rx_mode,omitempty"`
 }
 
 func (m *HostEntity) Reset()         { *m = HostEntity{} }

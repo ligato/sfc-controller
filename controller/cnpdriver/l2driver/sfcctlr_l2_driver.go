@@ -87,6 +87,12 @@ type heToEEStateType struct {
 	l3Route *l3.StaticRoutes_Route
 }
 
+type heToHEStateType struct {
+	vlanIf  *interfaces.Interfaces_Interface
+	bd      *l2.BridgeDomains_BridgeDomain
+	l3Route *l3.StaticRoutes_Route
+}
+
 type heStateType struct {
 	ewBD      *l2.BridgeDomains_BridgeDomain
 	ewBDL2Fib *l2.BridgeDomains_BridgeDomain
@@ -94,6 +100,7 @@ type heStateType struct {
 
 type l2CNPStateCacheType struct {
 	HEToEEs   map[string]map[string]*heToEEStateType
+	HEToHEs   map[string]map[string]*heToHEStateType
 	SFCToHEs  map[string]map[string]*heStateType
 	HE        map[string]*heStateType
 	SFCIFAddr map[string]sfcInterfaceAddressStateType
@@ -133,6 +140,7 @@ func NewSfcCtlrL2CNPDriver(name string, dbFactory func(string) keyval.ProtoBroke
 
 func (cnpd *sfcCtlrL2CNPDriver) initL2CNPCache() {
 	cnpd.l2CNPStateCache.HEToEEs = make(map[string]map[string]*heToEEStateType)
+	cnpd.l2CNPStateCache.HEToHEs = make(map[string]map[string]*heToHEStateType)
 	cnpd.l2CNPStateCache.SFCToHEs = make(map[string]map[string]*heStateType)
 	cnpd.l2CNPStateCache.HE = make(map[string]*heStateType)
 	cnpd.l2CNPStateCache.SFCIFAddr = make(map[string]sfcInterfaceAddressStateType)
@@ -172,7 +180,37 @@ func (cnpd *sfcCtlrL2CNPDriver) SetSystemParameters(sp *controller.SystemParamet
 func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToDestinationHostEntity(sh *controller.HostEntity,
 	dh *controller.HostEntity) error {
 
-	// might have to create a vxlan tunnel i/f and assoc it to the e/w bridge on each of the hosts
+	cnpd.l2CNPEntityCache.HEs[sh.Name] = *sh
+	cnpd.l2CNPEntityCache.HEs[dh.Name] = *dh
+
+	log.Infof("WireHostEntityToDestinationHostEntity: sr", sh)
+	log.Infof("WireHostEntityToDestinationHostEntity: dh", dh)
+
+	// this holds the relationship from the HE to the map of EEs to which this HE is wired
+	heToHEMap, exists := cnpd.l2CNPStateCache.HEToHEs[sh.Name]
+	if !exists {
+		heToHEMap = make(map[string]*heToHEStateType)
+		cnpd.l2CNPStateCache.HEToHEs[sh.Name] = heToHEMap
+	}
+
+	// now ensure this source HE has not yet been associated to the dest HE
+	heToHEState, exists := heToHEMap[dh.Name]
+	if exists {
+		// maybe look at contents to see if they are programmed properly but for now just return
+		return nil
+	}
+
+	// delay adding of vlan tunnel, [static_route] and bridge till an sfc entity specifies one
+	heToHEState = &heToHEStateType{
+		//vlanIf:  vlanIf,
+		//bd:      bd,
+		//l3Route: sr,
+	}
+
+	// now link the sh to the dh
+	heToHEMap[dh.Name] = heToHEState
+
+	log.Infof("WireHostEntityToDestinationHostEntity: sh: %s, dh: %s", sh.Name, dh.Name)
 
 	return nil
 }
@@ -223,12 +261,12 @@ func (cnpd *sfcCtlrL2CNPDriver) wireExternalEntityToHostEntity(ee *controller.Ex
 
 	// configure static route from this external router to the host
 	description := "IF_STATIC_ROUTE_E2H_" + he.Name
-	sr, err := cnpd.createStaticRoute(ee.Name, description, he.LoopbackIpv4, he.EthIpv4, ee.HostInterface.IfName)
+	sr, err := cnpd.createStaticRoute(ee.Name, description, he.VxlanTunnelIpv4, he.EthIpv4, ee.HostInterface.IfName)
 	if err != nil {
 		log.Errorf("wireExternalEntityToHostEntity: error creating static route i/f: '%s'", description)
 		return err
 	}
-
+	
 	log.Infof("wireExternalEntityToHostEntity: ee: %s, he: %s, vlanid: %d, static route: %s",
 		ee.Name, he.Name, tmpVlanid, sr.String())
 
@@ -267,30 +305,19 @@ func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToExternalEntity(he *controller.Ho
 		return nil
 	}
 
-	// delay adding of vlan and bridge till an sfc entity specifies one
-
-	// configure static route from this host to the external router
-	description := "IF_STATIC_ROUTE_H2E_" + ee.Name
-	sr, err := cnpd.createStaticRoute(he.Name, description, ee.HostVxlan.SourceIpv4, ee.HostInterface.Ipv4Addr,
-		he.EthIfName)
-	if err != nil {
-		log.Errorf("WireHostEntityToExternalEntity: error creating static route i/f: '%s'", description)
-		return err
-	}
-
+	// delay adding of vlan tunnel, [static_route] and bridge till an sfc entity specifies one
 	heToEEState = &heToEEStateType{
 		//vlanIf:  vlanIf,
 		//bd:      bd,
-		l3Route: sr,
+		//l3Route: sr,
 	}
 
 	// now link the he to the ee
 	heToEEMap[ee.Name] = heToEEState
 
-	log.Infof("WireHostEntityToExternalEntity: he: %s, ee: %s, static route: %s",
-		he.Name, ee.Name, sr.String())
+	log.Infof("WireHostEntityToExternalEntity: he: %s, ee: %s", he.Name, ee.Name)
 
-	return err
+	return nil
 }
 
 // Perform CNP specific wiring for "preparing" a host server example: create an east-west bridge
@@ -319,9 +346,9 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 	}
 
 	var heID *l2driver.HEIDs
-	var loopbackMacAddrId uint32
+	var loopbackMacAddrID uint32
 
-	if he.LoopbackIpv4 != "" { // if configured, then create a loop back address
+	if he.LoopbackIpv4 != "" || he.LoopbackIpv6 != "" { // if configured, then create a loop back address
 
 		var loopbackMacAddress string
 
@@ -330,10 +357,10 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 			if heID == nil || heID.LoopbackMacAddrId == 0 {
 				cnpd.seq.MacInstanceID++
 				loopbackMacAddress = formatMacAddress(cnpd.seq.MacInstanceID)
-				loopbackMacAddrId = cnpd.seq.MacInstanceID
+				loopbackMacAddrID = cnpd.seq.MacInstanceID
 			} else {
 				loopbackMacAddress = formatMacAddress(heID.LoopbackMacAddrId)
-				loopbackMacAddrId = heID.LoopbackMacAddrId
+				loopbackMacAddrID = heID.LoopbackMacAddrId
 			}
 		} else {
 			loopbackMacAddress = he.LoopbackMacAddr
@@ -370,7 +397,7 @@ func (cnpd *sfcCtlrL2CNPDriver) WireInternalsForHostEntity(he *controller.HostEn
 
 	heState.ewBDL2Fib = bd
 
-	key, heID, err := cnpd.DatastoreHEIDsCreate(he.Name, loopbackMacAddrId)
+	key, heID, err := cnpd.DatastoreHEIDsCreate(he.Name, loopbackMacAddrID)
 	if err == nil && cnpd.reconcileInProgress {
 		cnpd.reconcileAfter.heIDs[key] = *heID
 	}
@@ -428,14 +455,21 @@ func (cnpd *sfcCtlrL2CNPDriver) WireSfcEntity(sfc *controller.SfcEntity) error {
 // for now, ensure there is only one ee ... as each container will be wirred to it
 func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.SfcEntity) error {
 
+	var err error
+	var bd *l2.BridgeDomains_BridgeDomain
+
 	eeCount := 0
 	eeName := ""
 	var eeSfcElement *controller.SfcEntity_SfcElement
 
+	dhCount := 0
+	dhName := ""
+	var dhSfcElement *controller.SfcEntity_SfcElement
+
 	// find the external entity and ensure there is only one allowed
 	for i, sfcEntityElement := range sfc.GetElements() {
 
-		log.Infof("wireSfcEastWestElements: sfc entity element[%d]: ", i, sfcEntityElement)
+		log.Infof("wireSfcNorthSouthVXLANElements: sfc entity element[%d]: ", i, sfcEntityElement)
 
 		switch sfcEntityElement.Type {
 		case controller.SfcElementType_EXTERNAL_ENTITY:
@@ -455,11 +489,29 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 				return err
 			}
 			eeSfcElement = sfcEntityElement
-		}
-	}
+		
+		case controller.SfcElementType_HOST_ENTITY:
+			dhCount++
+			if dhCount > 1 {
+				err := fmt.Errorf("wireSfcNorthSouthVXLANElements: only one dest host allowed for n/s sfc: '%s'",
+					sfc.Name)
+				log.Error(err.Error())
+				return err
+			}
 
-	if eeCount == 0 {
-		err := fmt.Errorf("wireSfcNorthSouthVXLANElements: NO ee specified for n/s sfc: '%s'", sfc.Name)
+			dhName = sfcEntityElement.Container
+			if _, exists := cnpd.l2CNPEntityCache.HEs[sfcEntityElement.Container]; !exists {
+				err := fmt.Errorf("wireSfcNorthSouthVXLANElements: dest host not found: '%s' for n/s sfc: '%s'",
+					dhName, sfc.Name)
+				log.Error(err.Error())
+				return err
+			}
+			dhSfcElement = sfcEntityElement
+		}
+	}		
+	
+	if eeCount == 0 && dhCount == 0 {
+		err := fmt.Errorf("wireSfcNorthSouthVXLANElements: NO ee or dh specified for n/s sfc: '%s'", sfc.Name)
 		log.Error(err.Error())
 		return err
 	}
@@ -475,13 +527,18 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 			fallthrough
 		case controller.SfcElementType_NON_VPP_CONTAINER_AFP:
 
-			heToEEState, err := cnpd.createVxLANAndBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, eeName,
-				eeSfcElement.VlanId)
+			if eeCount != 0 {
+				bd, err = cnpd.createVxLANAndBridgeToExtEntity(sfc, sfcEntityElement.EtcdVppSwitchKey, eeName,
+					eeSfcElement.VlanId)
+			} else {
+				bd, err = cnpd.createVxLANAndBridgeToDestHost(sfc, sfcEntityElement.EtcdVppSwitchKey, dhName,
+					dhSfcElement.VlanId)
+			}
 			if err != nil {
 				return err
 			}
 
-			if _, err := cnpd.createAFPacketVEthPairAndAddToBridge(sfc, heToEEState.bd, sfcEntityElement); err != nil {
+			if _, err := cnpd.createAFPacketVEthPairAndAddToBridge(sfc, bd, sfcEntityElement); err != nil {
 				log.Errorf("wireSfcNorthSouthVXLANElements: error creating memIf pair: sfc: '%s', Container: '%s'",
 					sfc.Name, sfcEntityElement.Container)
 				return err
@@ -491,13 +548,18 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 			fallthrough
 		case controller.SfcElementType_NON_VPP_CONTAINER_MEMIF:
 
-			heToEEState, err := cnpd.createVxLANAndBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, eeName,
-				eeSfcElement.VlanId)
+			if eeCount != 0 {
+				bd, err = cnpd.createVxLANAndBridgeToExtEntity(sfc, sfcEntityElement.EtcdVppSwitchKey, eeName,
+					eeSfcElement.VlanId)
+			} else {
+				bd, err = cnpd.createVxLANAndBridgeToDestHost(sfc, sfcEntityElement.EtcdVppSwitchKey, dhName,
+					dhSfcElement.VlanId)
+			}
 			if err != nil {
 				return err
 			}
 
-			if _, err := cnpd.createMemIfPairAndAddToBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, heToEEState.bd,
+			if _, err := cnpd.createMemIfPairAndAddToBridge(sfc, sfcEntityElement.EtcdVppSwitchKey, bd,
 				sfcEntityElement, false); err != nil {
 				log.Errorf("wireSfcNorthSouthVXLANElements: error creating memIf pair: sfc: '%s', Container: '%s'",
 					sfc.Name, sfcEntityElement.Container)
@@ -509,20 +571,20 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 	return nil
 }
 
-// createVxLANAndBridge and ensure vxlan and bridge are created if not already done yet
-func (cnpd *sfcCtlrL2CNPDriver) createVxLANAndBridge(sfc *controller.SfcEntity,
-	hostName string, eeName string, vlanID uint32) (*heToEEStateType, error) {
+// createVxLANAndBridgeToExtEntity and ensure vxlan and bridge are created if not already done yet
+func (cnpd *sfcCtlrL2CNPDriver) createVxLANAndBridgeToExtEntity(sfc *controller.SfcEntity,
+	hostName string, eeName string, vlanID uint32) (*l2.BridgeDomains_BridgeDomain, error) {
 
 	// the container has which host it is assoc'ed with, get the ee bridge
 	heToEEMap, exists := cnpd.l2CNPStateCache.HEToEEs[hostName]
 	if !exists {
-		err := fmt.Errorf("wireSfcNorthSouthVXLANElements: host not found: '%s' for this sfc: '%s'",
+		err := fmt.Errorf("createVxLANAndBridgeToExtEntity: host not found: '%s' for this sfc: '%s'",
 			hostName, sfc.Name)
 		return nil, err
 	}
 	heToEEState, exists := heToEEMap[eeName]
 	if !exists {
-		err := fmt.Errorf("wireSfcNorthSouthVXLANElements: host '%s' not wired to this ee: '%s' for this sfc: '%s'",
+		err := fmt.Errorf("createVxLANAndBridgeToExtEntity: host '%s' not wired to this ee: '%s' for this sfc: '%s'",
 			hostName, eeName, sfc.Name)
 		return nil, err
 	}
@@ -546,9 +608,9 @@ func (cnpd *sfcCtlrL2CNPDriver) createVxLANAndBridge(sfc *controller.SfcEntity,
 				vlanID = he2eeID.VlanId
 			}
 		}
-		vlanIf, err := cnpd.vxLanCreate(he.Name, ifName, vlanID, he.LoopbackIpv4, ee.HostVxlan.SourceIpv4)
+		vlanIf, err := cnpd.vxLanCreate(he.Name, ifName, vlanID, he.VxlanTunnelIpv4, ee.HostVxlan.SourceIpv4)
 		if err != nil {
-			log.Errorf("wireSfcNorthSouthVXLANElements: error creating vxlan: '%s'", ifName)
+			log.Errorf("createVxLANAndBridgeToExtEntity: error creating vxlan: '%s'", ifName)
 			return nil, err
 		}
 
@@ -557,6 +619,25 @@ func (cnpd *sfcCtlrL2CNPDriver) createVxLANAndBridge(sfc *controller.SfcEntity,
 		key, he2eeID, err := cnpd.DatastoreHE2EEIDsCreate(he.Name, ee.Name, vlanID)
 		if err == nil && cnpd.reconcileInProgress {
 			cnpd.reconcileAfter.he2eeIDs[key] = *he2eeID
+		}
+	}
+
+	if heToEEState.l3Route == nil {
+
+		he := cnpd.l2CNPEntityCache.HEs[hostName]
+		ee := cnpd.l2CNPEntityCache.EEs[eeName]
+
+		// configure static route from this host to the dest host
+		if he.CreateVxlanStaticRoute {
+			description := "IF_STATIC_ROUTE_H2E_" + ee.Name
+			sr, err := cnpd.createStaticRoute(he.Name, description, ee.HostVxlan.SourceIpv4, ee.HostInterface.Ipv4Addr,
+				he.EthIfName)
+			if err != nil {
+				log.Errorf("createVxLANAndBridgeToExtEntity: error creating static route i/f: '%s'", description)
+				return nil, err
+			}
+
+			heToEEState.l3Route = sr
 		}
 	}
 
@@ -578,7 +659,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createVxLANAndBridge(sfc *controller.SfcEntity,
 		// now create the bridge
 		bd, err := cnpd.bridgedDomainCreateWithIfs(he.Name, bdName, ifs, cnpd.l2CNPEntityCache.SysParms.DynamicBridgeParms)
 		if err != nil {
-			log.Errorf("wireSfcNorthSouthVXLANElements: error creating BD: '%s'", bd.Name)
+			log.Errorf("createVxLANAndBridgeToExtEntity: error creating BD: '%s'", bd.Name)
 			return nil, err
 		}
 
@@ -588,7 +669,105 @@ func (cnpd *sfcCtlrL2CNPDriver) createVxLANAndBridge(sfc *controller.SfcEntity,
 		cnpd.wireExternalEntityToHostEntity(&ee, &he)
 	}
 
-	return heToEEState, nil
+	return heToEEState.bd, nil
+}
+
+// createVxLANAndBridgeToDestHost and ensure vxlan and bridge are created if not already done yet
+func (cnpd *sfcCtlrL2CNPDriver) createVxLANAndBridgeToDestHost(sfc *controller.SfcEntity,
+	shName string, dhName string, vlanID uint32) (*l2.BridgeDomains_BridgeDomain, error) {
+
+	// the container has which host it is assoc'ed with, get the dh bridge
+	heToHEMap, exists := cnpd.l2CNPStateCache.HEToHEs[shName]
+	if !exists {
+		err := fmt.Errorf("createVxLANAndBridgeToDestHost: host not found: '%s' for this sfc: '%s'",
+			shName, sfc.Name)
+		return nil, err
+	}
+	heToHEState, exists := heToHEMap[dhName]
+	if !exists {
+		err := fmt.Errorf("createVxLANAndBridgeToDestHost: host '%s' not wired to this ee: '%s' for this sfc: '%s'",
+			shName, dhName, sfc.Name)
+		return nil, err
+	}
+
+	if heToHEState.vlanIf == nil {
+
+		// first time sfc is wired from this host to this dest host so create a vxlan tunnel
+
+		sh := cnpd.l2CNPEntityCache.HEs[shName]
+		dh := cnpd.l2CNPEntityCache.HEs[dhName]
+
+		// create the vxlan i'f before the BD
+		ifName := "IF_VXLAN_H2H_" + sh.Name + "_" + dh.Name
+
+		if vlanID == 0 {
+			he2eeID, _ := cnpd.DatastoreHE2EEIDsRetrieve(sh.Name, dh.Name)
+			if he2eeID == nil || he2eeID.VlanId == 0 {
+				cnpd.seq.VLanID++
+				vlanID = cnpd.seq.VLanID
+			} else {
+				vlanID = he2eeID.VlanId
+			}
+		}
+		vlanIf, err := cnpd.vxLanCreate(sh.Name, ifName, vlanID, sh.VxlanTunnelIpv4, dh.VxlanTunnelIpv4)
+		if err != nil {
+			log.Errorf("createVxLANAndBridgeToDestHost: error creating vxlan: '%s'", ifName)
+			return nil, err
+		}
+
+		heToHEState.vlanIf = vlanIf
+
+		key, sh2dhID, err := cnpd.DatastoreHE2HEIDsCreate(sh.Name, dh.Name, vlanID)
+		if err == nil && cnpd.reconcileInProgress {
+			cnpd.reconcileAfter.he2heIDs[key] = *sh2dhID
+		}
+	}
+
+	if heToHEState.l3Route == nil {
+
+		sh := cnpd.l2CNPEntityCache.HEs[shName]
+		dh := cnpd.l2CNPEntityCache.HEs[dhName]
+
+		// configure static route from this host to the dest host
+		if sh.CreateVxlanStaticRoute {
+			description := "IF_STATIC_ROUTE_H2H_" + dh.Name
+			sr, err := cnpd.createStaticRoute(sh.Name, description, dh.VxlanTunnelIpv4, dh.EthIpv4,
+				sh.EthIfName)
+			if err != nil {
+				log.Errorf("createVxLANAndBridgeToDestHost: error creating static route i/f: '%s'", description)
+				return nil, err
+			}
+
+			heToHEState.l3Route = sr
+		}
+	}
+
+	if heToHEState.bd == nil {
+
+		// first time sfc is wired from this host to this external ee so create a bridge
+
+		sh := cnpd.l2CNPEntityCache.HEs[shName]
+		dh := cnpd.l2CNPEntityCache.HEs[dhName]
+
+		bdName := "BD_H2H_" + sh.Name + "_" + dh.Name
+
+		ifs := make([]*l2.BridgeDomains_BridgeDomain_Interfaces, 1)
+		ifEntry := l2.BridgeDomains_BridgeDomain_Interfaces{
+			Name: heToHEState.vlanIf.Name,
+		}
+		ifs[0] = &ifEntry
+
+		// now create the bridge
+		bd, err := cnpd.bridgedDomainCreateWithIfs(sh.Name, bdName, ifs, cnpd.l2CNPEntityCache.SysParms.DynamicBridgeParms)
+		if err != nil {
+			log.Errorf("createVxLANAndBridgeToDestHost: error creating BD: '%s'", bd.Name)
+			return nil, err
+		}
+
+		heToHEState.bd = bd
+	}
+
+	return heToHEState.bd, nil
 }
 
 // north/south NIC type, memIfs/cntrs connect to physical NIC
