@@ -95,3 +95,9 @@ func L3RouteKeyPrefix(vppLabel string) string {
 func L3RouteKey(vppLabel string, vrf uint32, destNet *net.IPNet, nextHop string) string {
 	return agentPrefix + vppLabel + "/" + l3.RouteKey(vrf, destNet, nextHop)
 }
+
+// ArpEntryKeyl3 arp key
+func ArpEntryKey(vppLabel string, iface string, ipAddress string) string {
+	return agentPrefix + vppLabel + "/" + l3.ArpEntryKey(iface, ipAddress)
+}
+

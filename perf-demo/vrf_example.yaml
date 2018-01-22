@@ -1,0 +1,28 @@
+sfc_controller_config_version: 1
+description: Basic Example static config for hosting 2 containers with a vnf-agent and vpp
+
+system_parameters:
+      mtu: 1500
+
+host_entities:
+    - name: vswitch
+
+sfc_entities:
+    - name: vrf_vnf_to_nic
+      type: 9
+      elements:
+          - container: vswitch
+            port_label: GigabitEthernet13/0/0
+            l3vrf_routes:
+              - dst_ip_addr: 1.2.3.4/24
+                next_hop_addr: 1.1.1.1
+              - dst_ip_addr: 1.2.3.5/24
+                next_hop_addr: 1.1.1.1
+            l3arp_entries:
+              - ip_address: 3.2.3.4
+                phys_address: 02:02:03:03:04:04
+            type: 5
+          - container: vnf1
+            port_label: port1
+            etcd_vpp_switch_key: vswitch
+            type: 2

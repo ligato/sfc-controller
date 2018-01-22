@@ -20,8 +20,10 @@ message BDParms {
 message SystemParameters {
     uint32 mtu = 1; // optional, overrrides default 1500
     uint32 starting_vlan_id = 2; // optional, overrrides default 5000
-    BDParms dynamic_bridge_parms = 3; // optional, overrides default parms
-    BDParms static_bridge_parms = 4; // optional, overrides default parms
+    uint32 default_static_route_weight = 3; // optional, overrrides default 5
+    uint32 default_static_route_preference = 4; // optional, overrrides default 0
+    BDParms dynamic_bridge_parms = 5; // optional, overrides default parms
+    BDParms static_bridge_parms = 6; // optional, overrides default parms
 };
 
 enum ExtEntDriverType {
@@ -77,10 +79,12 @@ enum SfcType {
 
     SFC_NS_NIC_BD = 3;       // physial NIC-based north-south SFC - bridge domain -based
     SFC_NS_NIC_L2XCONN = 4;  // physial NIC-based north-south SFC - l2xconnect -based
+    SFC_NS_NIC_VRF = 9;      // physial NIC-based north-south SFC - vrf -based
 
     SFC_EW_BD = 2;           // bridge domain-based east-west SFC dynamcic bridge
     SFC_EW_L2XCONN = 5;      // l2xconnect -based east-west SFC
     SFC_EW_BD_L2FIB = 8;     // bridge domain-based east-west SFC static l2fib bridge
+    SFC_EW_VRF_FIB = 10;     // vrf-based east-west SFC static fib
 
     SFC_EW_MEMIF = 6;        // each container pair is wired via memif's
     SFC_EW_VETH = 7;         // each container pair is wired via veths's
@@ -99,7 +103,24 @@ enum SfcElementType {
 
 message CustomInfoType {
     string label = 1;
-}
+};
+
+message L3VRFRoute {
+    uint32 vrf_id = 1;                   /* optional: 0 by default */
+    string description = 2;              /* optional description */
+    string dst_ip_addr = 3;              /* ip address + prefix in format <address>/<prefix> */
+    string next_hop_addr = 4;            /* next hop address */
+    string outgoing_interface = 5;       /* outgoing interface name */
+    uint32 weight = 6;                   /* weight (used for unequal cost load balncing) */
+    uint32 preference = 7;               /* The preference of the path. Lowest preference is preferred.  */
+                                         /* Only paths with the best preference contribute to forwarding. */
+                                         /* (a poor man's primary and backup) */
+};
+
+message L3ArpEntry {
+    string ip_address = 2;               /* IP address */
+    string phys_address = 3;             /* MAC address matching to the IP */
+};
 
 message SfcEntity {
     string name = 1;
@@ -118,8 +139,10 @@ message SfcEntity {
         uint32 vlan_id = 7;               // optional, if provided, this overrides what vlanID this i/f is given
         uint32 mtu = 8;                   // if provided, this overrides system value
         RxModeType rx_mode = 9;
-        repeated string l2fib_macs = 10;
+        repeated string l2fib_macs = 10;  // for ns and ew bd l2fib sfc types
         string ipv6_addr = 11;            // optional, if provided, this i/f is assigned an ipv6 addr
+        repeated L3VRFRoute l3vrf_routes = 12;       // for ew and ns l3vrf sfc types
+        repeated L3ArpEntry l3arp_entries = 13;       // for ew and ns l3vrf sfc types
     };
     repeated SfcElement elements = 7;
 };
