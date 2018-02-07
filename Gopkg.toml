@@ -43,11 +43,11 @@
 
 [[constraint]]
   name = "github.com/ligato/cn-infra"
-  version = "1.0.7"
+  version = "1.1"
 
 [[constraint]]
   name = "github.com/ligato/vpp-agent"
-  version = "1.0.8"
+  version = "1.2"
 
 [[constraint]]
   name = "github.com/namsral/flag"
@@ -64,6 +64,10 @@
 [[constraint]]
   name = "golang.org/x/crypto"
   source = "https://github.com/golang/crypto.git"
+
+[[override]]
+  name = "google.golang.org/grpc"
+  revision = "8050b9cbc271307e5a716a9d782803d09b0d6f2d"
 
 [prune]
   go-tests = true

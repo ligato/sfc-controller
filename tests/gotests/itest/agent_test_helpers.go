@@ -2,14 +2,18 @@ package itest
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/ligato/cn-infra/core"
 	etcdmock "github.com/ligato/cn-infra/db/keyval/etcdv3/mocks"
 	httpmock "github.com/ligato/cn-infra/rpc/rest/mock"
 	"github.com/onsi/gomega"
-	"testing"
 	//etcdmock "github.com/ligato/cn-infra/db/keyval/etcdv3/mocks"
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"time"
+
 	"github.com/golang/protobuf/proto"
 	agent_api "github.com/ligato/cn-infra/core"
 	"github.com/ligato/cn-infra/datasync"
@@ -17,16 +21,14 @@ import (
 	"github.com/ligato/cn-infra/flavors/local"
 	"github.com/ligato/cn-infra/health/probe"
 	"github.com/ligato/cn-infra/logging/logmanager"
+	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/ligato/cn-infra/rpc/rest"
 	"github.com/ligato/cn-infra/servicelabel"
 	sfccore "github.com/ligato/sfc-controller/controller/core"
 	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/ligato/sfc-controller/plugins/vnfdriver"
-	vppiface "github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
-	"io/ioutil"
-	"github.com/ligato/cn-infra/logging/logroot"
-	"time"
+	vppiface "github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
 )
 
 // AgentTestHelper is similar to what testing.T is in golang packages.
@@ -86,7 +88,7 @@ func (t *AgentTestHelper) DefaultSetup(golangT *testing.T) {
 		panic(err)
 	}
 
-	t.sfcAgent = core.NewAgent(logroot.StandardLogger(), 2000*time.Second, t.sfcFalvor.Plugins()...)
+	t.sfcAgent = core.NewAgent(logrus.DefaultLogger(), 2000*time.Second, t.sfcFalvor.Plugins()...)
 }
 
 // StartAgent in test (if there is error than panic => fail test)

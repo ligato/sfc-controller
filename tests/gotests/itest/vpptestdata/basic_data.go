@@ -1,8 +1,8 @@
 package vpptestdata
 
 import (
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
 )
 
 // VPP1MEMIF1 are test data for vpp1's first memif interface
@@ -59,11 +59,11 @@ var BDINTERNALEWHOST1 = l2.BridgeDomains_BridgeDomain{
 
 // Agent1Afpacket01 are test data of Agent1's AF packet interface
 var Agent1Afpacket01 = interfaces.Interfaces_Interface{
-	Name:        "IF_AFPIF_VSWITCH__agent1_afpacket1",
-	Enabled:     true,
+	Name:    "IF_AFPIF_VSWITCH__agent1_afpacket1",
+	Enabled: true,
 	//PhysAddress: "02:00:00:00:00:02",
-	Mtu:         1500,
-	Type:        interfaces.InterfaceType_AF_PACKET_INTERFACE,
+	Mtu:  1500,
+	Type: interfaces.InterfaceType_AF_PACKET_INTERFACE,
 	//IpAddresses: []string{"10.0.0.10/24"},
 	Afpacket: &interfaces.Interfaces_Interface_Afpacket{
 		HostIfName: "_agent1_",

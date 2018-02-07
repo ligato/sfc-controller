@@ -36,7 +36,7 @@ import (
 	"strings"
 
 	"github.com/ligato/cn-infra/db/keyval"
-	"github.com/ligato/cn-infra/logging/logroot"
+	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/ligato/cn-infra/servicelabel"
 	l2driver "github.com/ligato/sfc-controller/controller/cnpdriver/l2driver/model"
 	"github.com/ligato/sfc-controller/controller/extentitydriver"
@@ -45,14 +45,14 @@ import (
 	"github.com/ligato/sfc-controller/controller/utils/ipam"
 	"github.com/ligato/vpp-agent/clientv1/linux"
 	"github.com/ligato/vpp-agent/clientv1/linux/remoteclient"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l3"
 	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/ifplugin/model/interfaces"
 )
 
 var (
-	log = logroot.StandardLogger()
+	log = logrus.DefaultLogger()
 )
 
 type sfcCtlrL2CNPDriver struct {
@@ -203,9 +203,9 @@ func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToDestinationHostEntity(sh *contro
 
 	// delay adding of vlan tunnel, [static_route] and bridge till an sfc entity specifies one
 	heToHEState = &heToHEStateType{
-		//vlanIf:  vlanIf,
-		//bd:      bd,
-		//l3Route: sr,
+	//vlanIf:  vlanIf,
+	//bd:      bd,
+	//l3Route: sr,
 	}
 
 	// now link the sh to the dh
@@ -268,7 +268,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireExternalEntityToHostEntity(ee *controller.Ex
 		log.Errorf("wireExternalEntityToHostEntity: error creating static route i/f: '%s'", description)
 		return err
 	}
-	
+
 	log.Infof("wireExternalEntityToHostEntity: ee: %s, he: %s, vlanid: %d, static route: %s",
 		ee.Name, he.Name, tmpVlanid, sr.String())
 
@@ -309,9 +309,9 @@ func (cnpd *sfcCtlrL2CNPDriver) WireHostEntityToExternalEntity(he *controller.Ho
 
 	// delay adding of vlan tunnel, [static_route] and bridge till an sfc entity specifies one
 	heToEEState = &heToEEStateType{
-		//vlanIf:  vlanIf,
-		//bd:      bd,
-		//l3Route: sr,
+	//vlanIf:  vlanIf,
+	//bd:      bd,
+	//l3Route: sr,
 	}
 
 	// now link the he to the ee
@@ -493,7 +493,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 				return err
 			}
 			eeSfcElement = sfcEntityElement
-		
+
 		case controller.SfcElementType_HOST_ENTITY:
 			dhCount++
 			if dhCount > 1 {
@@ -512,8 +512,8 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthVXLANElements(sfc *controller.S
 			}
 			dhSfcElement = sfcEntityElement
 		}
-	}		
-	
+	}
+
 	if eeCount == 0 && dhCount == 0 {
 		err := fmt.Errorf("wireSfcNorthSouthVXLANElements: NO ee or dh specified for n/s sfc: '%s'", sfc.Name)
 		log.Error(err.Error())
@@ -853,11 +853,11 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 
 	if sfc.Type == controller.SfcType_SFC_NS_NIC_VRF {
 
-		err := cnpd.createVRFEntries(he.Container, he, he.PortLabel, "VRF_" + sfc.Name + "_" + he.Container + "_" + he.PortLabel)
+		err := cnpd.createVRFEntries(he.Container, he, he.PortLabel, "VRF_"+sfc.Name+"_"+he.Container+"_"+he.PortLabel)
 		if err != nil {
 			log.Errorf("wireSfcNorthSouthNICElements: error creating processing vrf entries i/f: %s/'%s'", he.PortLabel, he)
 			return err
-		}		
+		}
 	}
 
 	// now wire each container to the bridge on the he
@@ -901,11 +901,11 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 				}
 
 				err = cnpd.createVRFEntries(sfcEntityElement.EtcdVppSwitchKey, sfcEntityElement, afIfName,
-					"VRF_" + sfc.Name + "_" + sfcEntityElement.Container + "_" + sfcEntityElement.PortLabel)
+					"VRF_"+sfc.Name+"_"+sfcEntityElement.Container+"_"+sfcEntityElement.PortLabel)
 				if err != nil {
 					log.Errorf("wireSfcNorthSouthNICElements: error creating processing vrf entries i/f: %s/'%s'", afIfName, sfcEntityElement)
 					return err
-				}		
+				}
 
 			} else {
 				// l2xconnect -based wiring
@@ -946,7 +946,7 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 					}
 				}
 
-			}  else if sfc.Type == controller.SfcType_SFC_NS_NIC_VRF {
+			} else if sfc.Type == controller.SfcType_SFC_NS_NIC_VRF {
 				// vrf
 				afIfName, err := cnpd.createAFPacketVEthPair(sfc, sfcEntityElement)
 				if err != nil {
@@ -956,11 +956,11 @@ func (cnpd *sfcCtlrL2CNPDriver) wireSfcNorthSouthNICElements(sfc *controller.Sfc
 				}
 
 				err = cnpd.createVRFEntries(sfcEntityElement.EtcdVppSwitchKey, sfcEntityElement, afIfName,
-					"VRF_" + sfc.Name + "_" + sfcEntityElement.Container + "_" + sfcEntityElement.PortLabel)
+					"VRF_"+sfc.Name+"_"+sfcEntityElement.Container+"_"+sfcEntityElement.PortLabel)
 				if err != nil {
 					log.Errorf("wireSfcNorthSouthNICElements: error creating processing vrf entries i/f: %s/'%s'", afIfName, sfcEntityElement)
 					return err
-				}		
+				}
 
 			} else {
 				// l2xconnect-based wiring
@@ -1025,6 +1025,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createVRFEntries(etcdVppSwitchKey string, sfcEnt
 
 	return nil
 }
+
 // This is a group of containers that need to be wired to an e/w bridge.
 func (cnpd *sfcCtlrL2CNPDriver) wireSfcEastWestElements(sfc *controller.SfcEntity) error {
 
@@ -1398,7 +1399,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 	// create a memif in the vnf container
 	memIfName := vnfChainElement.PortLabel
 	if _, err := cnpd.memIfCreate(vnfChainElement.Container, memIfName, memifID, false, vnfChainElement.EtcdVppSwitchKey,
-		ipv4Address, macAddress, vnfChainElement.Ipv6Addr ,mtu, rxMode); err != nil {
+		ipv4Address, macAddress, vnfChainElement.Ipv6Addr, mtu, rxMode); err != nil {
 		log.Errorf("createMemIfPair: error creating memIf for container: '%s'", memIfName)
 		return "", err
 	}
@@ -1612,7 +1613,7 @@ func (cnpd *sfcCtlrL2CNPDriver) bridgedDomainCreateWithIfs(etcdVppSwitchKey stri
 
 	bd := &l2.BridgeDomains_BridgeDomain{
 		Name:                bdName,
-		Flood:               bdParms.Flood,	
+		Flood:               bdParms.Flood,
 		UnknownUnicastFlood: bdParms.UnknownUnicastFlood,
 		Forward:             bdParms.Forward,
 		Learn:               bdParms.Learn,
@@ -1734,7 +1735,6 @@ func constructIpv4AndV6AddressArray(ipv4 string, ipv6 string) []string {
 	}
 	return ipAddrArray
 }
-
 
 func (cnpd *sfcCtlrL2CNPDriver) memIfCreate(etcdPrefix string, memIfName string, memifID uint32, isMaster bool,
 	masterContainer string, ipv4 string, macAddress string, ipv6 string, mtu uint32,
@@ -1963,39 +1963,38 @@ func (cnpd *sfcCtlrL2CNPDriver) createStaticRoute(vrfID uint32, etcdPrefix strin
 
 func (cnpd *sfcCtlrL2CNPDriver) createStaticArpEntry(etcdPrefix string, destIPAddress string, physAddress string,
 	outGoingIf string) (*l3.ArpTable_ArpTableEntry, error) {
-		
+
 	ae := &l3.ArpTable_ArpTableEntry{
-		Interface: outGoingIf,
-		Static: true,
-		IpAddress: destIPAddress,
+		Interface:   outGoingIf,
+		Static:      true,
+		IpAddress:   destIPAddress,
 		PhysAddress: physAddress,
 	}
 
 	//if cnpd.reconcileInProgress {
-		//cnpd.reconcileStaticArpEntry(etcdPrefix, ae)
+	//cnpd.reconcileStaticArpEntry(etcdPrefix, ae)
 	//} else {
 
-		key := utils.ArpEntryKey(etcdPrefix, outGoingIf, destIPAddress)
+	key := utils.ArpEntryKey(etcdPrefix, outGoingIf, destIPAddress)
 
-		log.Println(key)
-		log.Println(ae)
+	log.Println(key)
+	log.Println(ae)
 
-		log.Info("createStaticArpEntry: arp entry: : ", key, ae)
+	log.Info("createStaticArpEntry: arp entry: : ", key, ae)
 
-		//rc := NewRemoteClientTxn(etcdPrefix, cnpd.dbFactory)
-		err := cnpd.db.Put(key, ae)
-		//err := rc.Put(key, ae)
+	//rc := NewRemoteClientTxn(etcdPrefix, cnpd.dbFactory)
+	err := cnpd.db.Put(key, ae)
+	//err := rc.Put(key, ae)
 
-		if err != nil {
-			log.Error("createStaticArpEntry: databroker.Store: ", err)
-			return nil, err
+	if err != nil {
+		log.Error("createStaticArpEntry: databroker.Store: ", err)
+		return nil, err
 
-		}
+	}
 	//}
 
 	return ae, nil
 }
-
 
 func (cnpd *sfcCtlrL2CNPDriver) createXConnectPair(etcdPrefix, if1, if2 string) error {
 

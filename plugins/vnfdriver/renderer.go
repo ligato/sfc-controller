@@ -3,12 +3,13 @@ package vnfdriver
 import (
 	"fmt"
 
+	"strconv"
+
 	"github.com/ligato/cn-infra/servicelabel"
+	"github.com/ligato/sfc-controller/plugins/vnfdriver/model/vnf"
 	"github.com/ligato/vpp-agent/clientv1/linux"
 	"github.com/ligato/vpp-agent/clientv1/linux/remoteclient"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
-	"github.com/ligato/sfc-controller/plugins/vnfdriver/model/vnf"
-	"strconv"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
 )
 
 func (p *Plugin) renderVNF(vnf *vnf.VnfEntity) error {

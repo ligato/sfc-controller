@@ -17,16 +17,18 @@ package extentitydriver
 
 import (
 	"fmt"
-	"github.com/ligato/sfc-controller/controller/model/controller"
-	"github.com/ligato/sfc-controller/controller/utils"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
 	"strings"
 	"time"
 
-	"github.com/ligato/cn-infra/logging/logroot"
+	"github.com/ligato/cn-infra/logging/logrus"
+	"github.com/ligato/sfc-controller/controller/model/controller"
+	"github.com/ligato/sfc-controller/controller/utils"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l3"
+
+	"net"
+
 	"github.com/ligato/sfc-controller/controller/extentitydriver/iosxecfg"
 	"github.com/ligato/sfc-controller/controller/extentitydriver/iosxecfg/model/iosxe"
-	"net"
 )
 
 // TODO: make these constants configurable in the controller NB API?
@@ -60,7 +62,7 @@ var eeConfigCache map[string]*eeConfig // map of external entity configurations 
 // EEOperationChannel is channel for external entity operations
 var EEOperationChannel = make(chan *EEOperation, 100)
 
-var log = logroot.StandardLogger()
+var log = logrus.DefaultLogger()
 
 // SfcExternalEntityDriverInit starts process for EEOperationChannel
 func SfcExternalEntityDriverInit() {

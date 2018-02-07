@@ -19,21 +19,22 @@
 package core
 
 import (
+	"os"
+	"sync"
+
 	"github.com/ligato/cn-infra/core"
 	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/cn-infra/db/keyval/etcdv3"
 	"github.com/ligato/cn-infra/flavors/local"
+	"github.com/ligato/cn-infra/health/statuscheck"
 	"github.com/ligato/cn-infra/logging"
-	"github.com/ligato/cn-infra/logging/logroot"
+	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/ligato/cn-infra/rpc/rest"
 	"github.com/ligato/cn-infra/utils/safeclose"
 	"github.com/ligato/sfc-controller/controller/cnpdriver"
 	"github.com/ligato/sfc-controller/controller/extentitydriver"
 	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/namsral/flag"
-	"os"
-	"sync"
-	"github.com/ligato/cn-infra/health/statuscheck"
 )
 
 // PluginID is plugin identifier (must be unique throughout the system)
@@ -43,7 +44,7 @@ var (
 	cnpDriverName     string // cli flag - see RegisterFlags
 	sfcConfigFile     string // cli flag - see RegisterFlags
 	cleanSfcDatastore bool   // cli flag - see RegisterFlags
-	log               = logroot.StandardLogger()
+	log               = logrus.DefaultLogger()
 )
 
 // RegisterFlags add command line flags.
@@ -85,8 +86,8 @@ type SfcControllerCacheType struct {
 
 // SfcControllerPluginHandler is handle for SfcControllerPlugin
 type SfcControllerPluginHandler struct {
-	Etcd                  *etcdv3.Plugin
-	HTTPmux               *rest.Plugin
+	Etcd    *etcdv3.Plugin
+	HTTPmux *rest.Plugin
 	*local.FlavorLocal
 	HttpMutex             sync.Mutex
 	cnpDriverPlugin       cnpdriver.SfcControllerCNPDriverAPI
