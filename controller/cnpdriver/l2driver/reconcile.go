@@ -18,12 +18,13 @@ package l2driver
 
 import (
 	"fmt"
+
 	"github.com/ligato/cn-infra/utils/addrs"
 	l2driver "github.com/ligato/sfc-controller/controller/cnpdriver/l2driver/model"
 	"github.com/ligato/sfc-controller/controller/utils"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l3"
 	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/ifplugin/model/interfaces"
 )
 
@@ -108,7 +109,7 @@ func (cnpd *sfcCtlrL2CNPDriver) ReconcileStart(vppEtcdLabels map[string]struct{}
 	cnpd.reconcileLoadHE2HEIDsIntoCache()
 	cnpd.reconcileLoadSFCIDsIntoCache()
 
-    cnpd.sequencerInitFromReconcileCache()
+	cnpd.sequencerInitFromReconcileCache()
 
 	return nil
 }
@@ -578,7 +579,6 @@ func (cnpd *sfcCtlrL2CNPDriver) sequencerInitFromReconcileCache() {
 	maxVlanID := uint32(0)
 	maxMemifID := uint32(0)
 	maxMacAddrID := uint32(0)
-
 
 	// traverse the id caches recording max id's
 

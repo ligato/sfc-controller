@@ -23,11 +23,11 @@ package main
 
 import (
 	"github.com/ligato/cn-infra/logging"
-	"github.com/ligato/cn-infra/logging/logroot"
+	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/ligato/sfc-controller/cmd/sfcdump/sfcdump"
 )
 
-var log = logroot.StandardLogger()
+var log = logrus.DefaultLogger()
 
 func main() {
 	log.SetLevel(logging.DebugLevel)
