@@ -1,12 +1,15 @@
-VERSION=$(shell git rev-parse HEAD)
-DATE=$(shell date +'%Y-%m-%dT%H:%M%:z')
-LDFLAGS=-ldflags '-X github.com/ligato/sfc-controller/vendor/github.com/ligato/cn-infra/core.BuildVersion=$(VERSION) -X github.com/ligato/sfc-controller/vendor/github.com/ligato/cn-infra/core.BuildDate=$(DATE)'
+VERSION	:= $(shell git describe --always --tags --dirty)
+COMMIT	:= $(shell git rev-parse HEAD)
+DATE	:= $(shell date +'%Y-%m-%dT%H:%M%:z')
 
-PLUGIN_SOURCES="sfc_controller.go"
-PLUGIN_BIN="sfc_controller.so"
-ETCD_CONFIG_FILE="etcd/etcd.conf"
-KAFKA_CONFIG_FILE="kafka/kafka.conf"
-SFC_CONFIG_FILE="sfc.conf"
+CNINFRA_CORE := github.com/ligato/sfc-controller/vendor/github.com/ligato/cn-infra/core
+LDFLAGS	= -ldflags '-X $(CNINFRA_CORE).BuildVersion=$(VERSION) -X $(CNINFRA_CORE).CommitHash=$(COMMIT) -X $(CNINFRA_CORE).BuildDate=$(DATE)'
+
+PLUGIN_SOURCES    = "sfc_controller.go"
+PLUGIN_BIN        = "sfc_controller.so"
+ETCD_CONFIG_FILE  = "etcd/etcd.conf"
+KAFKA_CONFIG_FILE = "kafka/kafka.conf"
+SFC_CONFIG_FILE   = "sfc.conf"
 
 # generate go structures from proto files & binapi json files
 define generate_sources
@@ -71,25 +74,6 @@ define test_examples
     @echo "# TODO Testing examples"
 endef
 
-# install dependencies according to glide.yaml & glide.lock (in case vendor dir was deleted)
-define install_dependencies
-	$(if $(shell command -v glide install 2> /dev/null),$(info glide dependency manager is ready),$(error glide dependency manager missing, info about installation can be found here https://github.com/Masterminds/glide))
-	@echo "# installing dependencies, please wait ..."
-	@glide install --strip-vendor
-endef
-
-# clean update dependencies according to glide.yaml (re-downloads all of them)
-define update_dependencies
-	$(if $(shell command -v glide install 2> /dev/null),$(info glide dependency manager is ready),$(error glide dependency manager missing, info about installation can be found here https://github.com/Masterminds/glide))
-	@echo "# updating dependencies, please wait ..."
-	@-cd vendor && rm -rf *
-	@echo "# vendor dir cleared"
-	@-rm -rf glide.lock
-	@glide cc
-	@echo "# glide cache cleared"
-	@glide install --strip-vendor
-endef
-
 # build-only binaries
 define build_only
         @go version
@@ -140,13 +124,19 @@ build:
 install:
 	$(call install_only)
 
-# install dependencies
-install-dep:
-	$(call install_dependencies)
+# Get dependency manager tool
+get-dep:
+	go get -v github.com/golang/dep/cmd/dep
 
-# update dependencies
-update-dep:
-	$(call update_dependencies)
+# Install the project's dependencies
+dep-install: get-dep
+	@echo "# installing project's dependencies"
+	dep ensure
+
+# Update the locked versions of all dependencies
+dep-update: get-dep
+	@echo "# updating all dependencies"
+	dep ensure -update
 
 # generate structures
 generate:
@@ -193,4 +183,4 @@ test-examples:
 test-cover:
 	$(call test_cover_only)
 
-.PHONY: build update-dep install-dep test lint clean
+.PHONY: build get-dep dep-install dep-update test lint clean
