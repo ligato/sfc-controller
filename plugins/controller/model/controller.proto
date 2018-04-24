@@ -1,0 +1,230 @@
+// Copyright (c) 2017 Cisco and/or its affiliates.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package controller;
+
+message L3VRFRoute {
+    uint32 vrf_id = 1;                   /* optional: 0 by default */
+    string description = 2;              /* optional description */
+    string dst_ip_addr = 3;              /* ip address + prefix in format <address>/<prefix> */
+    string next_hop_addr = 4;            /* next hop address */
+    string outgoing_interface = 5;       /* outgoing interface name */
+    uint32 weight = 6;                   /* weight (used for unequal cost load balncing) */
+    uint32 preference = 7;               /* The preference of the path. Lowest preference is preferred.  */
+                                         /* Only paths with the best preference contribute to forwarding. */
+                                         /* (a poor man's primary and backup) */
+};
+
+message L3ArpEntry {
+    string ip_address = 1;               /* IP address */
+    string phys_address = 2;             /* MAC address matching to the IP */
+};
+
+message L2FIBEntry {
+    string dest_mac_address = 1;
+    string bd_name = 2;
+    string outgoing_if = 3;
+    string action = 4; // forward|drop
+    bool bvi = 5;
+};
+
+message BDParms {
+    string name = 1;
+    bool flood = 2;
+    bool unknown_unicast_flood = 3;
+    bool forward = 4;
+    bool learn = 5;
+    bool arp_termination = 6;
+    uint32 mac_age_minutes = 7; // 0 is no aging
+};
+
+message L2BD {
+    string name = 1;
+    BDParms bd_parms = 2;     // use this to customize or refer to a template, but not both
+    string l2bd_template = 3; // use this to refer to a template in system parameters
+}
+
+// IPAM will choose an address using the prefix.  In the example, there is an 8 bit address space [0..255]
+// if 0..255 are not desired then a start and end address can be used.  See comments below.
+message IPAMPoolStatus {
+    string addresses = 1;
+    string status = 2;
+    repeated string msg = 3;
+}
+message IPAMPoolSpec {
+    string scope = 2; // node|system|vnf_service
+    string network = 3; // format 10.1.1.0/24 or ipv6
+    uint32 start_range = 4; // optional: if omitted start at 1, ie 10.1.1.1 or ipv6
+    uint32 end_range = 5;   // optional: if omitted end at (all F's - 1), ie 10.1.1.254 or ipv6
+}
+message IPAMPool {
+    MetaDataType metadata = 1;
+    IPAMPoolSpec spec = 2;
+    IPAMPoolStatus status = 3;
+}
+
+message SystemParameters {
+    uint32 mtu = 1; // optional, overrrides default 1500
+    uint32 default_static_route_weight = 3; // optional, overrrides default 5
+    uint32 default_static_route_preference = 4; // optional, overrrides default 0
+    repeated BDParms l2bd_templates =  5; // L2BDs can referene these
+    string rx_mode = 7; // polling|interrupt|adaptive
+}
+
+message NetworkPodToNodeMap {
+    string pod = 1;
+    string node = 2;
+}
+
+// The rendered vpp agent entry is identified by the key, and type, which are used
+// to read the entry from etcd
+message RenderedVppAgentEntry {
+    string vpp_agent_key = 1;
+    string vpp_agent_type = 3; // see type in vppagentapi/keys.go eg. interface|l2bd|l3vrf, etc
+}
+
+//
+// Interface ... channel?
+//
+message InterfaceStatus {
+    string pod_interface_name = 1; // format: pod/ifname
+    string status = 3; // unknown|up|down
+    repeated string msg = 4;
+    string mac_address = 5;
+    repeated string ip_addresses = 7;
+    uint32 memifID  = 8;
+    uint32 vrfID = 9;
+    string node = 10;
+}
+
+message InterfaceSpec {
+    string if_type = 2;     // ethernet|loopback|vxlan|memif|tap
+    string mac_address = 3; // format mm:aa:cc:aa:dd:rr, if omitted, sys generates one using
+                            // 02:00:00:00:00:00 as base, last octet increments
+    uint32 mtu = 4;         // optional: if omitted, use system parameter default
+    string rx_mode = 5;     // optional: polling|interrupt|adaptive or uses system defaults
+    repeated string ip_addresses = 6; // format i.p.v.4/xx, or ip::v6/xx
+    uint32 vrf_id = 7;
+    string ipam_pool_name = 8;
+    string admin_status = 9; // enabled|disabled
+    message MemIFParms {
+        string mode = 1; //ethernet|ip|puntinject optional/default: ethernet
+        string inter_pod_conn = 2; //direct|vswitch optional/default: direct
+    }
+    MemIFParms memif_parms = 11;
+}
+message Interface {
+    MetaDataType metadata = 1;
+    InterfaceSpec spec = 2;
+}
+
+message NetworkPodSpec {
+    string pod_type = 2; // vppcontainer|nonvppcontainer|vppvswitch
+    repeated Interface interfaces = 3;
+    repeated L2BD l2bds = 4; // per vswitch default l2bds [optional]
+}
+
+message NetworkPod {
+    MetaDataType metadata = 1;
+    NetworkPodSpec spec = 2;
+}
+
+message Connection {
+    string conn_type = 1; // l2pp|l2mp|ip4pp|ip6pp|ip4mp|ip6mp
+    string network_node_overlay_name = 2; // needed if require inter-node vnf's
+    repeated string pod_interfaces = 3; // format: pod/ifname
+    string use_node_l2bd = 4; // optional: use an existing node level l2bd
+                              // only for l2mp connections
+    L2BD l2bd = 5; // optional: if omitted and use_node_l2bd is not set then
+                   // create a l2bd with default parms for l2mp connections
+}
+
+message NetworkServiceStatus {
+    string oper_status = 2; // unknown|up|down
+    repeated string msg = 3;
+    repeated RenderedVppAgentEntry rendered_vpp_agent_entries = 4;
+    repeated InterfaceStatus interfaces = 5;
+}
+message NetworkServiceSpec {
+    repeated NetworkPod network_pods = 3;
+    repeated Connection connections = 4;
+}
+message NetworkService {
+    MetaDataType metadata = 1;
+    NetworkServiceSpec spec = 2;
+    NetworkServiceStatus status = 3;
+}
+
+message NetworkNodeOverlayStatus {
+    string status = 1; // unknown|up|down
+    repeated string msg = 2;
+    repeated RenderedVppAgentEntry rendered_vpp_agent_entries = 3;
+}
+message NetworkNodeOverlaySpec {
+    string service_mesh_type = 2; // hubandspoke|mesh
+    string connection_type = 3;   //vxlan|dot1q|srv6
+    message VxlanHubAndSpokeParms {
+        string hub_node_name = 1;
+        uint32 vni = 2;
+        string loopback_ipam_pool_name = 3;
+        string network_node_interface_label = 4; // needed for static routes of loopback to outgoing i/f
+                                             // all ethernet labels matching will have a static route
+                                             // if this outgoing_interface_label is not provided then
+                                             // static routes will only be created on the first gige
+    }
+    VxlanHubAndSpokeParms vxlan_hub_and_spoke_parms = 8;
+    message VxlanMeshParms {
+        uint32 vni_range_start = 1;
+        uint32 vni_range_end = 2;
+        string loopback_ipam_pool_name = 3;
+        string network_node_interface_label = 4; // needed for static routes of loopback to outgoing i/f
+                                             // all ethernet labels matching will have a static route
+                                             // if this outgoing_interface_label is not provided then
+                                             // static routes will only be created on the first gige
+    }
+    VxlanMeshParms vxlan_mesh_parms = 9;
+}
+message NetworkNodeOverlay {
+    MetaDataType metadata = 1;
+    NetworkNodeOverlaySpec spec = 2;
+    NetworkNodeOverlayStatus status = 3;
+}
+
+// NetworkNodeSpec extends the k8s node
+message NetworkNodeSpec {
+    string k8s_node_name = 1; // if not provided, use network node name
+    string node_type = 2; // host|external
+    repeated Interface interfaces = 4; // use this if modelling only one vswitch per host
+    repeated L2BD l2bds = 5; // per node l2bds
+}
+message NetworkNodeStatus {
+    string status = 1;
+    repeated string msg = 2;
+    repeated RenderedVppAgentEntry rendered_vpp_agent_entries = 3;
+    repeated InterfaceStatus interfaces = 5;
+}
+message NetworkNode {
+    MetaDataType metadata = 1;
+    NetworkNodeSpec spec = 2;
+    NetworkNodeStatus status = 3;
+}
+
+// MetaDataType generic parms for all controller high level objects
+message MetaDataType {
+    string name = 1;
+    repeated string labels = 2;
+}
+

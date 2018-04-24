@@ -1,0 +1,150 @@
+sfc_controller_config_version: 2
+description: 2 vnf chains spanning 2 hosts, memif's and vxlan tunnels
+
+ipam_pools: # allocate internode vxlan mesh enpoints from a pool
+  - metadata:
+      name: vxlan_loopback_pool
+      labels:
+    spec:
+      scope: system
+      network: 192.168.30.0/24 # allocate ip's from 192.168.30.200 to 192.168.30.205
+      start_range: 200
+      end_range: 205
+
+network_pod_to_node_map:
+  - pod: vnf1
+    node: ts1-host1
+  - pod: vnf2
+    node: ts1-host2
+
+network_nodes:
+  - metadata:
+      name: ts1-host1
+    spec:
+      node_type: host
+      interfaces:
+        - metadata:
+            name: GigabitEthernet2/0/1
+            labels:
+              - vxlan
+          spec:
+            if_type: ethernet
+            ip_addresses:
+              - "192.168.16.1/24"
+        - metadata:
+            name: vxlan_endpoint
+          spec:        
+            if_type: vxlan_tunnel
+            ip_addresses:
+              - "200.200.200.1/24"
+
+  - metadata:
+      name: ts1-host2
+    spec:
+      node_type: host
+      interfaces:
+        - metadata:
+            name: GigabitEthernet2/0/2
+            labels:
+              - vxlan
+          spec:
+            if_type: ethernet
+            ip_addresses:
+              - "192.168.16.2/24"
+        - metadata:
+            name: vxlan_endpoint
+          spec:        
+            if_type: vxlan_tunnel
+            ip_addresses:
+              - "200.200.200.2/24"
+
+  - metadata:
+      name: ts1-host3
+    spec:
+      node_type: host
+      interfaces:
+        - metadata:
+            name: GigabitEthernet2/0/3
+            labels:
+              - vxlan
+          spec:
+            if_type: ethernet
+            ip_addresses:
+              - "192.168.16.3/24"
+        - metadata:
+            name: vxlan_endpoint
+          spec:        
+            if_type: vxlan_tunnel
+            ip_addresses:
+              - "200.200.200.3/24"
+                  
+network_services:
+  - metadata:
+      name: l2pp_service_chain1
+    spec:
+      network_pods:
+        - metadata:
+            name: vnf1
+          spec:
+            pod_type: vppcontainer
+            interfaces:
+              - metadata:
+                  name: port1
+                spec:
+                  if_type: memif
+                  ip_addresses:
+                    - "10.0.1.1/24"
+                  memif_parms:
+                    inter_vnf_conn: vswitch
+              - metadata:
+                  name: port2
+                spec:
+                  if_type: memif
+                  ip_addresses:
+                    - "10.0.1.2/24"
+                  memif_parms:
+                    inter_vnf_conn: vswitch
+        - metadata:
+            name: vnf2
+          spec:
+            pod_type: vppcontainer
+            interfaces:
+              - metadata:
+                  name: port1
+                spec:
+                  if_type: memif
+                  ip_addresses:
+                    - "10.0.2.1/24"
+                  memif_parms:
+                    inter_vnf_conn: vswitch
+              - metadata:
+                  name: port2
+                spec:
+                  if_type: memif
+                  ip_addresses:
+                    - "10.0.2.2/24"
+                  memif_parms:
+                    inter_vnf_conn: vswitch
+      connections:
+        - conn_type: l2pp
+          network_service_mesh_name: inter_node_vxlan_mesh
+          pod_interfaces:
+            - vnf1/port1
+            - vnf2/port1
+        - conn_type: l2pp
+          network_service_mesh_name: inter_node_vxlan_mesh
+          pod_interfaces:
+            - vnf1/port2
+            - vnf2/port2
+
+network_service_meshes:
+  - metadata:
+      name: inter_node_vxlan_mesh
+    spec:
+      service_mesh_type: mesh
+      connection_type: vxlan
+      vxlan_mesh_parms:
+        vni_range_start: 5000
+        vni_range_end: 5999
+        loopback_ipam_pool_name: vxlan_loopback_pool
+        network_node_interface_label: vxlan

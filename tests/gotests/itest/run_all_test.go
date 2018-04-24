@@ -1,14 +1,14 @@
 package itest
 
 import (
+	"github.com/ligato/sfc-controller/tests/gotests/itest/sfctestdata"
 	"os"
 	"os/signal"
 	"testing"
-	"github.com/ligato/sfc-controller/tests/gotests/itest/sfctestdata"
 	//"github.com/ligato/sfc-controller/tests/gotests/itest/vpptestdata"
-	"github.com/ligato/sfc-controller/tests/gotests/itest/vpptestdata"
-	"github.com/ligato/sfc-controller/tests/gotests/itest/linuxtestdata"
 	"github.com/golang/protobuf/proto"
+	"github.com/ligato/sfc-controller/tests/gotests/itest/linuxtestdata"
+	"github.com/ligato/sfc-controller/tests/gotests/itest/vpptestdata"
 )
 
 // Test runs all TC methods of multiple test suites in sequence

@@ -33,11 +33,10 @@ COPY docker/dev_sfc_controller/build-controller.sh .
 RUN ./build-controller.sh
 
 COPY docker/dev_sfc_controller/etcd.conf .
-COPY docker/dev_sfc_controller/kafka.conf .
 COPY docker/dev_sfc_controller/sfc.conf .
 
 WORKDIR /root/
 
 # run supervisor as the default executable
-CMD ["/root/go/bin/sfc-controller", "--etcdv3-config=/opt/sfc-controller/dev/etcd.conf", "--sfc-config=/opt/sfc-controller/dev/sfc.conf"]
+CMD ["/root/go/bin/sfc-controller", "--contiv-ksr=true", "--etcdv3-config=/opt/sfc-controller/dev/etcd.conf", "--sfc-config=/opt/sfc-controller/dev/sfc.conf"]
 

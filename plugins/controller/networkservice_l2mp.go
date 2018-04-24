@@ -1,0 +1,281 @@
+// Copyright (c) 2017 Cisco and/or its affiliates.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package controller
+
+import (
+	"fmt"
+
+	"github.com/ligato/sfc-controller/plugins/controller/model"
+	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
+)
+
+// The L2MP topology is rendered in this module for a connection with a vnf-service
+
+// RenderConnL2MP renders this L2MP connection
+func (ns *NetworkService) RenderConnL2MP(
+	conn *controller.Connection,
+	connIndex uint32) error {
+
+	numIFs := len(conn.PodInterfaces)
+
+	// need to order these to match the array of the conn's conn.PodInterfaces
+	var p2nArray []*NetworkPodToNodeMap
+	netPodInterfaces := make([]*controller.Interface, 0)
+	networkPodTypes := make([]string, 0)
+
+	allPodsAssignedToNodes := true
+	var nodeMap = make(map[string]bool, 0) // determine the set of nodes
+
+	log.Debugf("RenderTopologyL2MP: num interfaces: %d", numIFs)
+
+	// let's see if all interfaces in the conn are associated with a node
+	for _, connPodInterface := range conn.PodInterfaces {
+
+		connPodName, connInterfaceName := ConnPodInterfaceNames(connPodInterface)
+		p2n, exists := ctlrPlugin.NetworkPodNodeMapMgr.HandleCRUDOperationR(connPodName)
+		if !exists || p2n.Node == "" {
+			msg := fmt.Sprintf("connection segment: %s, vnf not mapped to a node in vnf_to_node_map",
+				connPodInterface)
+			ns.AppendStatusMsg(msg)
+			allPodsAssignedToNodes = false
+			continue
+		}
+
+		_, exists = ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationR(p2n.Node)
+		if !exists {
+			msg := fmt.Sprintf("connection segment: %s, vnf references non existant host: %s",
+				connPodInterface, p2n.Node)
+			ns.AppendStatusMsg(msg)
+			allPodsAssignedToNodes = false
+			continue
+		}
+
+		nodeMap[p2n.Node] = true // maintain a map of which nodes are in the conn set
+
+		// based on the interfaces in the conn, order the interface info accordingly as the set of
+		// interfaces in the pod/interface stanza can be in a different order
+		p2nArray = append(p2nArray, p2n)
+		netPodInterface, networkPodType := ns.findNetworkPodAndInterfaceInList(connPodName,
+			connInterfaceName, ns.Spec.NetworkPods)
+		netPodInterfaces = append(netPodInterfaces, netPodInterface)
+		networkPodTypes = append(networkPodTypes, networkPodType)
+	}
+
+	if !allPodsAssignedToNodes {
+		return fmt.Errorf("Not all networkPods in this connection are mapped to nodes")
+	}
+
+	log.Debugf("RenderTopologyL2MP: num unique nodes for this connection: %d", len(nodeMap))
+	// log.Debugf("RenderTopologyL2MP: p2n=%v, vnfI=%v, conn=%v", p2n, netPodInterfaces, conn)
+
+	// if an overlay is specified, see if it exists
+	var nno *NetworkNodeOverlay
+	exists := false
+	if conn.NetworkNodeOverlayName != "" {
+		nno, exists = ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationR(conn.NetworkNodeOverlayName)
+		if !exists {
+			msg := fmt.Sprintf("network-service: %s, conn: %d, referencing a missing overlay",
+				ns.Metadata.Name,
+				connIndex)
+			ns.AppendStatusMsg(msg)
+			return fmt.Errorf(msg)
+		}
+	}
+
+	// see if the networkPods are on the same node ...
+	if len(nodeMap) == 1 {
+		return ns.renderConnL2MPSameNode(conn, connIndex, netPodInterfaces,
+			nno, p2nArray, networkPodTypes)
+	}
+
+	// now setup the connection between nodes
+	return ns.renderConnL2MPInterNode(conn, connIndex, netPodInterfaces,
+		nno, p2nArray, networkPodTypes, nodeMap)
+}
+
+// renderToplogySegmentL2MPSameNode renders this L2MP connection set on same node
+func (ns *NetworkService) renderConnL2MPSameNode(
+	conn *controller.Connection,
+	connIndex uint32,
+	netPodInterfaces []*controller.Interface,
+	nno *NetworkNodeOverlay,
+	p2nArray []*NetworkPodToNodeMap,
+	networkPodTypes []string) error {
+
+	// The interfaces should be created in the vnf and the vswitch then the vswitch
+	// interfaces will be added to the bridge.
+
+	var l2bdIFs = make(map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces, 0)
+
+	nodeName := p2nArray[0].Node
+
+	for i := 0; i < len(conn.PodInterfaces); i++ {
+
+		ifName, err := ns.RenderConnInterfacePair(nodeName, conn.PodInterfaces[i],
+			netPodInterfaces[i], networkPodTypes[i])
+		if err != nil {
+			return err
+		}
+		l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+			Name: ifName,
+			BridgedVirtualInterface: false,
+		}
+		l2bdIFs[nodeName] = append(l2bdIFs[nodeName], l2bdIF)
+	}
+
+	// all VNFs are on the same node so no vxlan inter-node mesh code required but
+	// the VNFs might be connected to an external node/router via hub and spoke
+
+	if nno.Spec.ServiceMeshType == controller.NetworkNodeOverlayTypeHubAndSpoke &&
+		nno.Spec.ConnectionType == controller.NetworkNodeOverlayConnectionTypeVxlan {
+
+		// construct a spoke set with this one one
+		singleSpokeMap := make(map[string]bool)
+		singleSpokeMap[nodeName] = true
+
+		return nno.renderConnL2MPVxlanHubAndSpoke(ns,
+			conn,
+			connIndex,
+			netPodInterfaces,
+			p2nArray,
+			networkPodTypes,
+			singleSpokeMap,
+			l2bdIFs)
+	}
+
+	// no external hub and spoke so simply render the nodes l2bd and local vnf interfaces
+	return ns.renderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName])
+}
+
+func (ns *NetworkService) renderL2BD(
+	conn *controller.Connection, connIndex uint32,
+	nodeName string,
+	l2bdIFs []*l2.BridgeDomains_BridgeDomain_Interfaces) error {
+
+	// if using an existing node level bridge, we simply add the i/f's to the bridge
+	if conn.UseNodeL2Bd != "" {
+
+		var nodeL2BD *l2.BridgeDomains_BridgeDomain
+
+		// find the l2db for this node ...
+		//nn, nodeL2BD := ctlrPlugin.NetworkNodeMgr.FindVppL2BDForNode(nodeName, conn.UseNodeL2Bd)
+		nn, nodeL2BD := ctlrPlugin.NetworkNodeMgr.FindVppL2BDForNode(nodeName, conn.UseNodeL2Bd)
+		if nodeL2BD == nil {
+			msg := fmt.Sprintf("network-service: %s, referencing a missing node/l2bd: %s/%s",
+				ns.Metadata.Name, nn.Metadata.Name, conn.UseNodeL2Bd)
+			ns.AppendStatusMsg(msg)
+			return fmt.Errorf(msg)
+		}
+		//vppKV := vppagent.AppendInterfacesToL2BD(nodeName, nodeL2BD, l2bdIFs)
+		//nn.Status.RenderedVppAgentEntries =
+		//	s.ConfigTransactionAddVppEntry(nn.Status..RenderedVppAgentEntries, vppKV)
+
+	} else {
+		var bdParms *controller.BDParms
+		if conn.L2Bd != nil {
+			// need to create a bridge for this conn
+			if conn.L2Bd.L2BdTemplate != "" {
+				bdParms = ctlrPlugin.SysParametersMgr.FindL2BDTemplate(conn.L2Bd.L2BdTemplate)
+			} else {
+				bdParms = conn.L2Bd.BdParms
+			}
+		} else {
+			bdParms = ctlrPlugin.SysParametersMgr.GetDefaultSystemBDParms()
+		}
+		vppKV := vppagent.ConstructL2BD(
+			nodeName,
+			fmt.Sprintf("L2BD_%s_CONN_%d", ns.Metadata.Name, connIndex+1),
+			l2bdIFs,
+			bdParms)
+		log.Printf("%v", vppKV)
+		//ns.Status.RenderedVppAgentEntries =
+		//	s.ConfigTransactionAddVppEntry(ns.Status.RenderedVppAgentEntries, vppKV)
+
+	}
+	return nil
+}
+
+// renderConnL2MPInterNode renders this L2MP connection between nodes
+func (ns *NetworkService) renderConnL2MPInterNode(
+	conn *controller.Connection,
+	connIndex uint32,
+	netPodInterfaces []*controller.Interface,
+	nno *NetworkNodeOverlay,
+	p2nArray []*NetworkPodToNodeMap,
+	networkPodTypes []string,
+	nodeMap map[string]bool) error {
+
+	// The interfaces may be spread across a set of nodes (nodeMap), each of these
+	// interfaces should be created in the pod and node's vswitch.  Then for each
+	// node, these must be associated with a per node l2bd.  This might be an
+	// existing node l2bd, or a bd that must be created.  The other matter is the
+	// inter-node connectivity.  Example: if vxlan mesh is the chosen inter node
+	// strategy, for each node in the nodeMap, a vxlan tunnel mesh must be created
+	// using a free vni from the mesh's vniPool.
+
+	var l2bdIFs = make(map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces, 0)
+
+	// create the interfaces from the pod to the vswitch, note that depending on
+	// the meshing strategy, I might have to create the interfaces with vrf_id's for
+	// example, or ...
+	for i := 0; i < len(conn.PodInterfaces); i++ {
+
+		ifName, err := ns.RenderConnInterfacePair(p2nArray[i].Node, conn.PodInterfaces[i],
+			netPodInterfaces[i], networkPodTypes[i])
+		if err != nil {
+			return err
+		}
+		l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+			Name: ifName,
+			BridgedVirtualInterface: false,
+			SplitHorizonGroup:       0,
+		}
+		l2bdIFs[p2nArray[i].Node] = append(l2bdIFs[p2nArray[i].Node], l2bdIF)
+	}
+
+	switch nno.Spec.ConnectionType {
+	case controller.NetworkNodeOverlayConnectionTypeVxlan:
+		switch nno.Spec.ServiceMeshType {
+		case controller.NetworkNodeOverlayTypeMesh:
+			return nno.renderConnL2MPVxlanMesh(ns,
+				conn,
+				connIndex,
+				netPodInterfaces,
+				p2nArray,
+				networkPodTypes,
+				nodeMap,
+				l2bdIFs)
+		case controller.NetworkNodeOverlayTypeHubAndSpoke:
+			return nno.renderConnL2MPVxlanHubAndSpoke(ns,
+				conn,
+				connIndex,
+				netPodInterfaces,
+				p2nArray,
+				networkPodTypes,
+				nodeMap,
+				l2bdIFs)
+		}
+	default:
+		msg := fmt.Sprintf("network-service: %s, conn: %d, node overlay: %s type not implemented",
+			ns.Metadata.Name,
+			connIndex,
+			nno.Metadata.Name)
+		ns.AppendStatusMsg(msg)
+		return fmt.Errorf(msg)
+	}
+
+	return nil
+}

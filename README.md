@@ -13,15 +13,16 @@ for providing data-plane connectivity for cloud native containers.  The
 containers may be [Ligato VPP-agent][0] enabled containers which in turn use
 [VPP][1] based cloud-native [Virtual Network Functions][2] (VNFs) or the
 containers may be application containers communicating via veth interfaces.
-The VPP Agent is built on top of the [CN-Infra platform][5] for developing 
-cloud-native Virtual Network Functions (VNFs). 
+The VPP Agent is built on top of the [CN-Infra platform][5] for developing
+cloud-native Virtual Network Functions (VNFs).
 
 The SFC Controller supports a wide variety of topologies.  The controller can
 effect connectivity for containers on-host, inter-host and host to external
 router.
 
 ## Architecture
-The SFC Controller system architecture is shown in the following figure: 
+
+The SFC Controller system architecture is shown in the following figure:
 
 ![SFC System](docs/imgs/sfc_system.png "SFC System")
 
@@ -49,36 +50,40 @@ with other containers or externally via veth interfaces.  The VSwitch VPP
 creates the veth interfaces.
 
 ## SFC Topologies
-The SFC Controller supports the following topologies: 
+
+The SFC Controller supports the following topologies:
 
 ![SFC Topolgies](docs/imgs/sfc_topologies.png "SFC Topologies")
 
-## Plugins
+The controller is responsible for supporting connectivity between hosts, between
+hosts and external routers, and between vnfs.  The traffic can be l2, or l3.
+The inter vnf traffic can be intra-host, or inter-host.
 
-The SFC controller is written with a plugin architecture so that functionality
-can be extended.
+```
 
-The set of plugins in the SFC Controller is as follows:
-* [l2_driver][3] - l2 bridge, vxlan tunnel plugin (wire inter-host,
-    and host-external router)
-* [CN-Infra core][5] - lifecycle management of plugins (loading, 
-    initialization, unloading)
+               Topology    |vnf-vnf                         | router-vnf
+                           |l2             l3               | l2    .        l3
+                           |l2pp l2mp      l3pp l3mp        | l2pp l2mp      l3pp l3mp
+--------------------------------------------------------------------------------------
+intra-host     Direct      |
+               Via Vswitch |
+--------------------------------------------------------------------------------------
+inter-host     Vxlan
+               Srv6
 
-## Tools
-The SFC Controller repository also contains tools for building and troubleshooting 
-of VNFs based on the VPP Agent:
+```
 
-* [sfcdump](cmd/sfcdump) - a CLI tool that shows a raw dump of a set of 
-   sfc-controller datastrcutures and VPP agents
+See [here](topologies/topologies.md) for the current set of supported topologies.
+See the [ContivVPP](https://github.com/contiv/vpp) for a description of its policies.
 
 ## Quickstart
+
 For a quick start with the sfc-controller, you can use pre-built Docker images with
 the Agent and VPP on [Dockerhub][6].
 
 0. Start ETCD and Kafka on your host (e.g. in Docker as described [here][7]).
    Note: **The SFC Controller in the pre-built Docker image will not start if it can't 
-   connect to both Etcd and Kafka**.  Note: also start the VSwitch VPP.  See the
-   [Quickstart VSwitch VPP][8]
+   connect to Etcd**.
 
 1. Run VPP + VPP Agent in a Docker image:
 ```
@@ -86,22 +91,21 @@ docker pull ligato/sfc-controller
 docker run -it --name sfc-contoller --rm ligato/sfc-controller
 ```
 
-2. Dump the the SFC Controller ETCD tree using sfcdump:
-```
-docker exec -it sfc-controller sfcdump
-```
-
 ## Documentation
+
 GoDoc can be browsed [online](https://godoc.org/github.com/ligato/sfc-controller).
 
 ## Next Steps
+
 Read the README for the [Development Docker Image](docker/dev_sfc_controller/README.md) for more details.
 
 
 ### Deployment:
+
 [![K8s integration](docs/imgs/k8s_deployment_thumb.png "SFC Controller - K8s integration")](docs/Deployment.md)
 
 ## Contribution:
+
 If you are interested in contributing, please see the [contribution guidelines](CONTRIBUTING.md).
 
 [0]: https://github.com/ligato/vpp-agent

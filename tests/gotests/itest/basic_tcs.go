@@ -1,13 +1,13 @@
 package itest
 
 import (
-	"testing"
-	sfccore "github.com/ligato/sfc-controller/controller/core"
 	"github.com/golang/protobuf/proto"
+	sfccore "github.com/ligato/sfc-controller/controller/core"
+	"testing"
 )
 
 type basicTCSuite struct {
-	T     *testing.T
+	T *testing.T
 	AgentTestHelper
 	Given Given
 	When  When
@@ -24,7 +24,7 @@ func (t *basicTCSuite) DefaultSetup() {
 // TC01ResyncEmptyVpp1Agent asserts that vpp agent writes properly vpp-agent configuration
 // This TC assumes that vpp-agent configuration was empty before the test.
 // Then a specific configuration is written to ETCD and after that SFC Controller starts.
-func (t *basicTCSuite) TC01ResyncEmptyVpp1Agent(sfcCfg *sfccore.YamlConfig, vppAgentCfg ... proto.Message) {
+func (t *basicTCSuite) TC01ResyncEmptyVpp1Agent(sfcCfg *sfccore.YamlConfig, vppAgentCfg ...proto.Message) {
 	t.DefaultSetup()
 	defer t.Teardown()
 
@@ -38,7 +38,7 @@ func (t *basicTCSuite) TC01ResyncEmptyVpp1Agent(sfcCfg *sfccore.YamlConfig, vppA
 // TC02HTTPPostasserts that vpp agent writes properly vpp-agent configuration
 // This TC assumes that vpp-agent configuration was empty before the test.
 // Then SFC Controller starts and after that SFC Controller is configured via REST HTTP posts.
-func (t *basicTCSuite) TC02HTTPPost(sfcCfg *sfccore.YamlConfig, vppAgentCfg ... proto.Message) {
+func (t *basicTCSuite) TC02HTTPPost(sfcCfg *sfccore.YamlConfig, vppAgentCfg ...proto.Message) {
 	t.DefaultSetup()
 	defer t.Teardown()
 

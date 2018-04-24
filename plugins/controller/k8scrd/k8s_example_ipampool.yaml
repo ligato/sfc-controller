@@ -1,0 +1,10 @@
+apiVersion: sfccontroller.ligato.github.com/v2
+kind: IPAMPool
+metadata:
+  name: vxlan_loopback_pool
+spec:
+  scope: system
+  network: 192.168.30.0/24 # allocate ip's from 192.168.30.200 to 192.168.30.205
+  start_range: 200
+  end_range: 205
+

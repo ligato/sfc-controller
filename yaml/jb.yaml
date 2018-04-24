@@ -1,0 +1,69 @@
+sfc_controller_config_version: 2
+description: 2 vnf chains spanning 2 hosts, memif's and vxlan tunnels
+
+ipam_pools: # allocate internode vxlan mesh enpoints from a pool
+  - name: vxlan_loopback_pool
+    scope: system
+    network: 192.168.20.0/24 # allocate ip's from 192.168.20.30 to 192.168.20.40
+    start_range: 30
+    end_range: 40
+
+vnf_to_node_map: # this mapping can be static or supplied by k8s discovering pod placement
+  - vnf: vnf1
+    node: k8s-worker1
+  - vnf: vnf2
+    node: k8s-worker1
+
+nodes:
+  - name: k8s-master
+    node_type: host
+    interfaces:
+      - name: GigabitEthernet13/0/1
+        if_type: ethernet
+        ip_addresses:
+          - "10.100.1.1/24"
+        mac_address: 02:00:00:00:00:01
+
+  - name: k8s-worker1
+    node_type: host
+    interfaces:
+      - name: GigabitEthernet13/0/2
+        if_type: ethernet
+        ip_addresses:
+          - "10.100.2.1/24"
+        mac_address: 02:00:00:00:00:02
+
+vnf_services:
+  - name: l2pp_service_chain1
+    vnfs:
+      - name: vnf1
+        vnf_type: vppcontainer
+        interfaces:
+          - name: port1
+            if_type: memif
+            ip_addresses:
+              - "10.0.10.1/24"
+      - name: vnf2
+        vnf_type: vppcontainer
+        interfaces:
+          - name: port1
+            if_type: memif
+            ip_addresses:
+              - "10.0.10.2/24"
+    connections:
+      - conn_type: l2pp
+        vnf_service_mesh: inter_node_vxlan_mesh
+        interfaces:
+          - vnf: vnf1
+            interface: port1
+          - vnf: vnf2
+            interface: port1
+
+vnf_service_meshes:
+  - name: inter_node_vxlan_mesh
+    service_mesh_type: mesh
+    connection_type: vxlan
+    vxlan_mesh_parms:
+      vni_range_start: 5000
+      vni_range_end: 5999
+      loopback_ipam_pool_name: vxlan_loopback_pool

@@ -15,9 +15,7 @@ SFC_CONFIG_FILE   = "sfc.conf"
 define generate_sources
         $(if $(shell command -v protoc --gogo_out=. 2> /dev/null),$(info gogo/protobuf is installed),$(error gogo/protobuf missing, please install it with go get github.com/gogo/protobuf))
         @echo "# generating sources"
-        @go generate -v
-        @cd plugins/vnfdriver && go generate -v
-        @cd controller/cnpdriver/l2driver && go generate -v
+        @cd plugins/controller && go generate -v
         @echo "# done"
 endef
 
@@ -82,21 +80,10 @@ define build_only
         @echo "# done"
 endef
 
-# build-only sfcdump
-define build_sfcdump_only
-	@echo "# building sfcdump"
-	@cd cmd/sfcdump && go build -v
-	@echo "# done"
-endef
-
 # install-only binaries
 define install_only
         @echo "# installing sfc controller with plugins"
         @go install
-
-        @echo "# installing sfcdump"
-        @cd cmd/sfcdump && go install -v
-
 
         if test "$(ETCDV3_CONFIG)" != "" ; then \
         echo "# Installing '$(ETCD_CONFIG_FILE)' to '$(ETCDV3_CONFIG)''..."; \
@@ -145,7 +132,6 @@ generate:
 # build & install
 all:
 	$(call build_only)
-	$(call build_sfcdump_only)
 	$(call install_only)
 
 # run tests

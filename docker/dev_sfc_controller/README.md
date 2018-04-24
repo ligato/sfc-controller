@@ -107,24 +107,9 @@ mapped onto the host at port 2379; the host's IP address
 will typically be 172.17.0.1, unless you change your Docker 
 networking settings.*
 
-- Edit `/opt/sfc-controller/dev/kafka.conf` to point the agent to a Kafka broker.
-  The default configuration is:
-
-```
-addrs:
- - "172.17.0.1:9092"
-```
-
-*Note that if you start Kafka in its own container on the same
-host as the VPP/Agent container (as described below), you can
-use the default broker address configuration as is. Kafka will
-be mapped  onto the host at port 9092; the host's IP address 
-will typically be 172.17.0.1, unless you change your Docker 
-networking settings.*
-
 - Start the controller:
 ```
-sfc-controller --etcdv3-config=/opt/sfc-controller/dev/etcd.conf --kafka-config=/opt/sfc-controller/dev/kafka.conf
+sfc-controller --etcdv3-config=/opt/sfc-controller/dev/etcd.conf
 ```
 
 ### Running Etcd Server on Local Host
@@ -139,14 +124,6 @@ sudo docker run -p 2379:2379 --name etcd --rm \
 The ETCD server will be available on your host OS IP (most likely 
 `172.17.0.1` in the default docker environment) on port `2379`.
 
-```
-
-### Running Kafka on Local Host
-You can start Kafka in a separate container:
-```
-sudo docker run -p 2181:2181 -p 9092:9092 --name kafka --rm \
- --env ADVERTISED_HOST=172.17.0.1 --env ADVERTISED_PORT=9092 spotify/kafka
-```
 
 ### Rebuilding the Controller
 ```

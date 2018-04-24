@@ -37,17 +37,18 @@ var VPP1MEMIF2LoopbackVETH = sfccore.YamlConfig{
 		}},
 	}},
 	EEs: []controller.ExternalEntity{{
-		Name: "VRouter-1",
-		MgmntIpAddress:"192.168.42.1",
-		BasicAuthUser:"cisco",
-		BasicAuthPasswd:"cisco",
-	},{
-		Name: "RAS-1",
-		MgmntIpAddress:"192.168.42.2",
-		BasicAuthUser:"cisco",
-		BasicAuthPasswd:"cisco",
+		Name:            "VRouter-1",
+		MgmntIpAddress:  "192.168.42.1",
+		BasicAuthUser:   "cisco",
+		BasicAuthPasswd: "cisco",
+	}, {
+		Name:            "RAS-1",
+		MgmntIpAddress:  "192.168.42.2",
+		BasicAuthUser:   "cisco",
+		BasicAuthPasswd: "cisco",
 	}},
 }
+
 /*
 	external_entities:
 	- name: VRouter-1

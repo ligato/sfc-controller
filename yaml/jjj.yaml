@@ -1,0 +1,40 @@
+sfc_controller_config_version: 2
+description: Basic Example static config for hosting 2 containers with a vnf-agent and vpp
+
+vnf_to_node_map:
+  - vnf: agent_1
+    node: agent_vpp_1
+  - vnf: agent_2
+    node: agent_vpp_1
+
+nodes:
+  - name: agent_vpp_1
+    node_type: host
+    l2bds:
+      - name: east-west-bd
+
+vnf_services:
+  - name: two-sample-vnf-containers
+    vnfs:
+      - name: agent_1
+        vnf_type: vppcontainer
+        interfaces:
+          - name: agent1_afpacket1
+            if_type: veth
+            ip_addresses:
+            - 10.0.0.10/24
+      - name: agent_2
+        vnf_type: vppcontainer
+        interfaces:
+          - name: agent2_afpacket1
+            if_type: veth
+            ip_addresses:
+            - 10.0.0.11/24
+    connections:
+      - conn_type: l2mp
+        use_node_l2bd: east-west-bd
+        interfaces:
+          - vnf: agent_1
+            interface: agent1_afpacket1
+          - vnf: agent_2
+            interface: agent2_afpacket1
