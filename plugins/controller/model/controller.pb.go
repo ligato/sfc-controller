@@ -552,7 +552,8 @@ type NetworkNodeStatus struct {
 	Status                  string                   `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
 	Msg                     []string                 `protobuf:"bytes,2,rep,name=msg" json:"msg,omitempty"`
 	RenderedVppAgentEntries []*RenderedVppAgentEntry `protobuf:"bytes,3,rep,name=rendered_vpp_agent_entries" json:"rendered_vpp_agent_entries,omitempty"`
-	Interfaces              []*InterfaceStatus       `protobuf:"bytes,5,rep,name=interfaces" json:"interfaces,omitempty"`
+	// map<string,RenderedVppAgentEntry> rendered_vpp_agent_entries = 3; // key: modeltype/name
+	Interfaces []*InterfaceStatus `protobuf:"bytes,5,rep,name=interfaces" json:"interfaces,omitempty"`
 }
 
 func (m *NetworkNodeStatus) Reset()         { *m = NetworkNodeStatus{} }

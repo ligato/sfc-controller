@@ -20,7 +20,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
-	"github.com/ligato/sfc-controller-v2.1/plugins/controller/utils"
 	"github.com/ligato/sfc-controller/plugins/controller/database"
 	"github.com/ligato/sfc-controller/plugins/controller/idapi/ipam"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
@@ -378,12 +377,12 @@ func getAllHandler(formatter *render.Render) http.HandlerFunc {
 
 // KeyPrefix provides sfc controller's node key prefix
 func (mgr *IPAMPoolMgr) KeyPrefix() string {
-	return utils.SfcControllerConfigPrefix() + "ipam-pool/"
+	return controller.SfcControllerConfigPrefix() + "ipam-pool/"
 }
 
 // GetAllURL allows all to be retrieved
 func (mgr *IPAMPoolMgr) GetAllURL() string {
-	return utils.SfcControllerConfigPrefix() + "ipam-pools"
+	return controller.SfcControllerConfigPrefix() + "ipam-pools"
 }
 
 // NameKey provides sfc controller's entity name key prefix
@@ -481,7 +480,7 @@ func (mgr *IPAMPoolMgr) InitAndRunWatcher() {
 			// if any of the entities required rendering, do it now
 			if renderingRequired {
 				RenderTxnConfigStart()
-				utils.RenderConfigAll()
+				ctlrPlugin.RenderAll()
 				RenderTxnConfigEnd()
 			}
 			tempIPAMPoolMap = nil

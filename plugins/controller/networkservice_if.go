@@ -321,8 +321,13 @@ func (ns *NetworkService) initInterfaceStatus(
 			}
 		}
 	} else {
+		// seems hard coded addresses are provided ... what if they dont match what we have for this
+		// interface in the status section
 		if !ipAddressArraysEqual(ifStatus.IpAddresses, networkPodInterface.Spec.IpAddresses) {
-			// ideally we would free up the addresses of ifStatus and
+			log.Warnf("initInterfaceStatus: provision interface %s, configured ip addreses (%v dont match current state: %v",
+				connPodInterface,
+				networkPodInterface.Spec.IpAddresses,
+				ifStatus.IpAddresses)
 			ifStatus.IpAddresses = networkPodInterface.Spec.IpAddresses
 		}
 	}

@@ -26,7 +26,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
-	"github.com/ligato/sfc-controller-v2.1/plugins/controller/utils"
 	"github.com/ligato/sfc-controller/plugins/controller/database"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/unrolled/render"
@@ -321,7 +320,7 @@ func (mgr *NetworkPodToNodeMapMgr) InitAndRunWatcher() {
 			// if any of the entities required rendering, do it now
 			if renderingRequired {
 				RenderTxnConfigStart()
-				utils.RenderConfigAll()
+				ctlrPlugin.RenderAll()
 				RenderTxnConfigEnd()
 			}
 			tempNetworkPodToNodeMapMap = nil

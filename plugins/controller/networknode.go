@@ -277,7 +277,7 @@ func httpNetworkNodeProcessPost(formatter *render.Render, w http.ResponseWriter,
 		}
 	}
 
-	log.Debugf("procesPost: POST: %v", nn)
+	log.Debugf("processPost: POST: %v", nn)
 	if err := ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationCU(&nn, false); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return

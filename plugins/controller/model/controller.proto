@@ -214,6 +214,7 @@ message NetworkNodeStatus {
     string status = 1;
     repeated string msg = 2;
     repeated RenderedVppAgentEntry rendered_vpp_agent_entries = 3;
+    //map<string,RenderedVppAgentEntry> rendered_vpp_agent_entries = 3; // key: modeltype/name
     repeated InterfaceStatus interfaces = 5;
 }
 message NetworkNode {
