@@ -54,3 +54,22 @@ func ConnPodInterfaceSlashToUScore(connPodInterfaceString string) string {
 	return fmt.Sprintf("%s_%s", s[0], s[1])
 }
 
+func ipAddressArraysEqual(a1 []string, a2 []string) bool {
+	if len(a1) != len(a2) {
+		return false
+	}
+	foundCount := 0
+	for _, e1 := range a1 {
+		for _, e2 := range a2 {
+			if e1 == e2 {
+				foundCount++
+				break
+			}
+		}
+	}
+	if foundCount != len(a1) {
+		return false
+	}
+
+	return true
+}

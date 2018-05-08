@@ -20,8 +20,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"time"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
@@ -100,7 +98,7 @@ func (mgr *NetworkNodeOverlayMgr) AllocateVxlanAddress(poolName string, nodeName
 	if vxlanIPAddress, exists := mgr.vxLanAddresses[nodeName]; exists {
 		return vxlanIPAddress, nil
 	}
-	vxlanIpamPool, err := ctlrPlugin.IpamPoolMgr.FindAllocator(poolName, "") // system level pool for vxlans
+	vxlanIpamPool, err := ctlrPlugin.IpamPoolMgr.FindAllocator(poolName, "") // system txnLevel pool for vxlans
 	if err != nil {
 		return "", fmt.Errorf("Cannot find system vxlan pool %s: %s", poolName, err)
 	}
@@ -402,31 +400,31 @@ func (mgr *NetworkNodeOverlayMgr) InitAndRunWatcher() {
 	log.Info("networkNodeOverlayWatcher: enter ...")
 	defer log.Info("networkNodeOverlayWatcher: exit ...")
 
-	go func() {
-		// back up timer ... paranoid about missing events ...
-		// check every minute just in case
-		ticker := time.NewTicker(1 * time.Minute)
-		for _ = range ticker.C {
-			tempnetworkNodeOverlayMap := make(map[string]*NetworkNodeOverlay)
-			mgr.loadAllFromDatastore(tempnetworkNodeOverlayMap)
-			renderingRequired := false
-			for _, dbEntry := range tempnetworkNodeOverlayMap {
-				ramEntry, exists := mgr.HandleCRUDOperationR(dbEntry.Metadata.Name)
-				if !exists || !ramEntry.ConfigEqual(dbEntry) {
-					log.Debugf("networkNodeOverlayWatcher: timer new config: %v", dbEntry)
-					renderingRequired = true
-					mgr.HandleCRUDOperationCU(dbEntry, false) // render at the end
-				}
-			}
-			// if any of the entities required rendering, do it now
-			if renderingRequired {
-				RenderTxnConfigStart()
-				ctlrPlugin.RenderAll()
-				RenderTxnConfigEnd()
-			}
-			tempnetworkNodeOverlayMap = nil
-		}
-	}()
+	//go func() {
+	//	// back up timer ... paranoid about missing events ...
+	//	// check every minute just in case
+	//	ticker := time.NewTicker(1 * time.Minute)
+	//	for _ = range ticker.C {
+	//		tempnetworkNodeOverlayMap := make(map[string]*NetworkNodeOverlay)
+	//		mgr.loadAllFromDatastore(tempnetworkNodeOverlayMap)
+	//		renderingRequired := false
+	//		for _, dbEntry := range tempnetworkNodeOverlayMap {
+	//			ramEntry, exists := mgr.HandleCRUDOperationR(dbEntry.Metadata.Name)
+	//			if !exists || !ramEntry.ConfigEqual(dbEntry) {
+	//				log.Debugf("networkNodeOverlayWatcher: timer new config: %v", dbEntry)
+	//				renderingRequired = true
+	//				mgr.HandleCRUDOperationCU(dbEntry, false) // render at the end
+	//			}
+	//		}
+	//		// if any of the entities required rendering, do it now
+	//		if renderingRequired {
+	//			RenderTxnConfigStart()
+	//			ctlrPlugin.RenderAll()
+	//			RenderTxnConfigEnd()
+	//		}
+	//		tempnetworkNodeOverlayMap = nil
+	//	}
+	//}()
 
 	respChan := make(chan keyval.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())

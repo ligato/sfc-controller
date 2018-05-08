@@ -20,17 +20,17 @@ package controller
 
 // SfcControllerPrefix is the base for all entries
 func SfcControllerPrefix() string {
-	return "/sfc-controller/"
+	return "/sfc-controller"
 }
 
 // SfcControllerConfigPrefix provides sfc controller prefix
 func SfcControllerConfigPrefix() string {
-	return SfcControllerPrefix() + "v2/config/"
+	return SfcControllerPrefix() + "/v2/config/"
 }
 
 // SfcControllerStatusPrefix provides sfc controller prefix
 func SfcControllerStatusPrefix() string {
-	return SfcControllerPrefix() + "v2/status/"
+	return SfcControllerPrefix() + "/v2/status/"
 }
 
 // SfcControllerContivKSRPrefix is the base for all contiv ksr entries

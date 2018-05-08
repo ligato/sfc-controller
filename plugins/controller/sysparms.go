@@ -20,8 +20,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"time"
-
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/sfc-controller/plugins/controller/database"
@@ -266,20 +264,20 @@ func (mgr *SystemParametersMgr) InitAndRunWatcher() {
 	log.Info("SystemParametersWatcher: enter ...")
 	defer log.Info("SystemParametersWatcher: exit ...")
 
-	go func() {
-		// back up timer ... paranoid about missing events ...
-		// check every minute just in case
-		ticker := time.NewTicker(1 * time.Minute)
-		for _ = range ticker.C {
-			var dbEntry SystemParameters
-			mgr.loadAllFromDatastore(&dbEntry)
-			ramEntry, exists := mgr.HandleCRUDOperationR()
-			if !exists || !ramEntry.ConfigEqual(&dbEntry) {
-				log.Debugf("SystemParametersWatcher: timer new config: %v", dbEntry)
-				mgr.HandleCRUDOperationCU(&dbEntry, true) // render at the end
-			}
-		}
-	}()
+	//go func() {
+	//	// back up timer ... paranoid about missing events ...
+	//	// check every minute just in case
+	//	ticker := time.NewTicker(1 * time.Minute)
+	//	for _ = range ticker.C {
+	//		var dbEntry SystemParameters
+	//		mgr.loadAllFromDatastore(&dbEntry)
+	//		ramEntry, exists := mgr.HandleCRUDOperationR()
+	//		if !exists || !ramEntry.ConfigEqual(&dbEntry) {
+	//			log.Debugf("SystemParametersWatcher: timer new config: %v", dbEntry)
+	//			mgr.HandleCRUDOperationCU(&dbEntry, true) // render at the end
+	//		}
+	//	}
+	//}()
 
 	respChan := make(chan keyval.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())

@@ -21,7 +21,6 @@ It has these top-level messages:
 	NetworkPodToNodeMap
 	RenderedVppAgentEntry
 	InterfaceStatus
-	InterfaceSpec
 	Interface
 	NetworkPodSpec
 	NetworkPod
@@ -196,7 +195,7 @@ func (*NetworkPodToNodeMap) ProtoMessage()    {}
 // to read the entry from etcd
 type RenderedVppAgentEntry struct {
 	VppAgentKey  string `protobuf:"bytes,1,opt,name=vpp_agent_key,proto3" json:"vpp_agent_key,omitempty"`
-	VppAgentType string `protobuf:"bytes,3,opt,name=vpp_agent_type,proto3" json:"vpp_agent_type,omitempty"`
+	VppAgentType string `protobuf:"bytes,2,opt,name=vpp_agent_type,proto3" json:"vpp_agent_type,omitempty"`
 }
 
 func (m *RenderedVppAgentEntry) Reset()         { *m = RenderedVppAgentEntry{} }
@@ -207,75 +206,54 @@ func (*RenderedVppAgentEntry) ProtoMessage()    {}
 // Interface ... channel?
 //
 type InterfaceStatus struct {
-	PodInterfaceName string   `protobuf:"bytes,1,opt,name=pod_interface_name,proto3" json:"pod_interface_name,omitempty"`
-	Status           string   `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
-	Msg              []string `protobuf:"bytes,4,rep,name=msg" json:"msg,omitempty"`
-	MacAddress       string   `protobuf:"bytes,5,opt,name=mac_address,proto3" json:"mac_address,omitempty"`
-	IpAddresses      []string `protobuf:"bytes,7,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
-	MemifID          uint32   `protobuf:"varint,8,opt,name=memifID,proto3" json:"memifID,omitempty"`
-	VrfID            uint32   `protobuf:"varint,9,opt,name=vrfID,proto3" json:"vrfID,omitempty"`
-	Node             string   `protobuf:"bytes,10,opt,name=node,proto3" json:"node,omitempty"`
+	Name        string   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Status      string   `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Msg         []string `protobuf:"bytes,4,rep,name=msg" json:"msg,omitempty"`
+	MacAddress  string   `protobuf:"bytes,5,opt,name=mac_address,proto3" json:"mac_address,omitempty"`
+	IpAddresses []string `protobuf:"bytes,7,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
+	MemifID     uint32   `protobuf:"varint,8,opt,name=memifID,proto3" json:"memifID,omitempty"`
+	VrfID       uint32   `protobuf:"varint,9,opt,name=vrfID,proto3" json:"vrfID,omitempty"`
+	Node        string   `protobuf:"bytes,10,opt,name=node,proto3" json:"node,omitempty"`
 }
 
 func (m *InterfaceStatus) Reset()         { *m = InterfaceStatus{} }
 func (m *InterfaceStatus) String() string { return proto.CompactTextString(m) }
 func (*InterfaceStatus) ProtoMessage()    {}
 
-type InterfaceSpec struct {
-	IfType     string `protobuf:"bytes,2,opt,name=if_type,proto3" json:"if_type,omitempty"`
-	MacAddress string `protobuf:"bytes,3,opt,name=mac_address,proto3" json:"mac_address,omitempty"`
-	// 02:00:00:00:00:00 as base, last octet increments
-	Mtu          uint32                    `protobuf:"varint,4,opt,name=mtu,proto3" json:"mtu,omitempty"`
-	RxMode       string                    `protobuf:"bytes,5,opt,name=rx_mode,proto3" json:"rx_mode,omitempty"`
-	IpAddresses  []string                  `protobuf:"bytes,6,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
-	VrfId        uint32                    `protobuf:"varint,7,opt,name=vrf_id,proto3" json:"vrf_id,omitempty"`
-	IpamPoolName string                    `protobuf:"bytes,8,opt,name=ipam_pool_name,proto3" json:"ipam_pool_name,omitempty"`
-	AdminStatus  string                    `protobuf:"bytes,9,opt,name=admin_status,proto3" json:"admin_status,omitempty"`
-	MemifParms   *InterfaceSpec_MemIFParms `protobuf:"bytes,11,opt,name=memif_parms" json:"memif_parms,omitempty"`
-}
-
-func (m *InterfaceSpec) Reset()         { *m = InterfaceSpec{} }
-func (m *InterfaceSpec) String() string { return proto.CompactTextString(m) }
-func (*InterfaceSpec) ProtoMessage()    {}
-
-func (m *InterfaceSpec) GetMemifParms() *InterfaceSpec_MemIFParms {
-	if m != nil {
-		return m.MemifParms
-	}
-	return nil
-}
-
-type InterfaceSpec_MemIFParms struct {
-	Mode         string `protobuf:"bytes,1,opt,name=mode,proto3" json:"mode,omitempty"`
-	InterPodConn string `protobuf:"bytes,2,opt,name=inter_pod_conn,proto3" json:"inter_pod_conn,omitempty"`
-}
-
-func (m *InterfaceSpec_MemIFParms) Reset()         { *m = InterfaceSpec_MemIFParms{} }
-func (m *InterfaceSpec_MemIFParms) String() string { return proto.CompactTextString(m) }
-func (*InterfaceSpec_MemIFParms) ProtoMessage()    {}
-
 type Interface struct {
-	Metadata *MetaDataType  `protobuf:"bytes,1,opt,name=metadata" json:"metadata,omitempty"`
-	Spec     *InterfaceSpec `protobuf:"bytes,2,opt,name=spec" json:"spec,omitempty"`
+	Name           string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	BypassRenderer bool   `protobuf:"varint,2,opt,name=bypass_renderer,proto3" json:"bypass_renderer,omitempty"`
+	IfType         string `protobuf:"bytes,3,opt,name=if_type,proto3" json:"if_type,omitempty"`
+	MacAddress     string `protobuf:"bytes,4,opt,name=mac_address,proto3" json:"mac_address,omitempty"`
+	// 02:00:00:00:00:00 as base, last octet increments
+	Mtu          uint32                `protobuf:"varint,5,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	RxMode       string                `protobuf:"bytes,6,opt,name=rx_mode,proto3" json:"rx_mode,omitempty"`
+	IpAddresses  []string              `protobuf:"bytes,7,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
+	VrfId        uint32                `protobuf:"varint,8,opt,name=vrf_id,proto3" json:"vrf_id,omitempty"`
+	IpamPoolName string                `protobuf:"bytes,9,opt,name=ipam_pool_name,proto3" json:"ipam_pool_name,omitempty"`
+	AdminStatus  string                `protobuf:"bytes,10,opt,name=admin_status,proto3" json:"admin_status,omitempty"`
+	MemifParms   *Interface_MemIFParms `protobuf:"bytes,11,opt,name=memif_parms" json:"memif_parms,omitempty"`
 }
 
 func (m *Interface) Reset()         { *m = Interface{} }
 func (m *Interface) String() string { return proto.CompactTextString(m) }
 func (*Interface) ProtoMessage()    {}
 
-func (m *Interface) GetMetadata() *MetaDataType {
+func (m *Interface) GetMemifParms() *Interface_MemIFParms {
 	if m != nil {
-		return m.Metadata
+		return m.MemifParms
 	}
 	return nil
 }
 
-func (m *Interface) GetSpec() *InterfaceSpec {
-	if m != nil {
-		return m.Spec
-	}
-	return nil
+type Interface_MemIFParms struct {
+	Mode         string `protobuf:"bytes,1,opt,name=mode,proto3" json:"mode,omitempty"`
+	InterPodConn string `protobuf:"bytes,2,opt,name=inter_pod_conn,proto3" json:"inter_pod_conn,omitempty"`
 }
+
+func (m *Interface_MemIFParms) Reset()         { *m = Interface_MemIFParms{} }
+func (m *Interface_MemIFParms) String() string { return proto.CompactTextString(m) }
+func (*Interface_MemIFParms) ProtoMessage()    {}
 
 type NetworkPodSpec struct {
 	PodType    string       `protobuf:"bytes,2,opt,name=pod_type,proto3" json:"pod_type,omitempty"`
@@ -345,24 +323,25 @@ func (m *Connection) GetL2Bd() *L2BD {
 }
 
 type NetworkServiceStatus struct {
-	OperStatus              string                   `protobuf:"bytes,2,opt,name=oper_status,proto3" json:"oper_status,omitempty"`
-	Msg                     []string                 `protobuf:"bytes,3,rep,name=msg" json:"msg,omitempty"`
-	RenderedVppAgentEntries []*RenderedVppAgentEntry `protobuf:"bytes,4,rep,name=rendered_vpp_agent_entries" json:"rendered_vpp_agent_entries,omitempty"`
-	Interfaces              []*InterfaceStatus       `protobuf:"bytes,5,rep,name=interfaces" json:"interfaces,omitempty"`
+	OperStatus string   `protobuf:"bytes,2,opt,name=oper_status,proto3" json:"oper_status,omitempty"`
+	Msg        []string `protobuf:"bytes,3,rep,name=msg" json:"msg,omitempty"`
+	// repeated RenderedVppAgentEntry rendered_vpp_agent_entries = 4;
+	RenderedVppAgentEntries map[string]*RenderedVppAgentEntry `protobuf:"bytes,4,rep,name=rendered_vpp_agent_entries" json:"rendered_vpp_agent_entries,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
+	Interfaces              map[string]*InterfaceStatus       `protobuf:"bytes,5,rep,name=interfaces" json:"interfaces,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
 }
 
 func (m *NetworkServiceStatus) Reset()         { *m = NetworkServiceStatus{} }
 func (m *NetworkServiceStatus) String() string { return proto.CompactTextString(m) }
 func (*NetworkServiceStatus) ProtoMessage()    {}
 
-func (m *NetworkServiceStatus) GetRenderedVppAgentEntries() []*RenderedVppAgentEntry {
+func (m *NetworkServiceStatus) GetRenderedVppAgentEntries() map[string]*RenderedVppAgentEntry {
 	if m != nil {
 		return m.RenderedVppAgentEntries
 	}
 	return nil
 }
 
-func (m *NetworkServiceStatus) GetInterfaces() []*InterfaceStatus {
+func (m *NetworkServiceStatus) GetInterfaces() map[string]*InterfaceStatus {
 	if m != nil {
 		return m.Interfaces
 	}
@@ -424,16 +403,17 @@ func (m *NetworkService) GetStatus() *NetworkServiceStatus {
 }
 
 type NetworkNodeOverlayStatus struct {
-	Status                  string                   `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	Msg                     []string                 `protobuf:"bytes,2,rep,name=msg" json:"msg,omitempty"`
-	RenderedVppAgentEntries []*RenderedVppAgentEntry `protobuf:"bytes,3,rep,name=rendered_vpp_agent_entries" json:"rendered_vpp_agent_entries,omitempty"`
+	Status string   `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Msg    []string `protobuf:"bytes,2,rep,name=msg" json:"msg,omitempty"`
+	// repeated RenderedVppAgentEntry rendered_vpp_agent_entries = 3;
+	RenderedVppAgentEntries map[string]*RenderedVppAgentEntry `protobuf:"bytes,3,rep,name=rendered_vpp_agent_entries" json:"rendered_vpp_agent_entries,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
 }
 
 func (m *NetworkNodeOverlayStatus) Reset()         { *m = NetworkNodeOverlayStatus{} }
 func (m *NetworkNodeOverlayStatus) String() string { return proto.CompactTextString(m) }
 func (*NetworkNodeOverlayStatus) ProtoMessage()    {}
 
-func (m *NetworkNodeOverlayStatus) GetRenderedVppAgentEntries() []*RenderedVppAgentEntry {
+func (m *NetworkNodeOverlayStatus) GetRenderedVppAgentEntries() map[string]*RenderedVppAgentEntry {
 	if m != nil {
 		return m.RenderedVppAgentEntries
 	}
@@ -549,25 +529,25 @@ func (m *NetworkNodeSpec) GetL2Bds() []*L2BD {
 }
 
 type NetworkNodeStatus struct {
-	Status                  string                   `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	Msg                     []string                 `protobuf:"bytes,2,rep,name=msg" json:"msg,omitempty"`
-	RenderedVppAgentEntries []*RenderedVppAgentEntry `protobuf:"bytes,3,rep,name=rendered_vpp_agent_entries" json:"rendered_vpp_agent_entries,omitempty"`
-	// map<string,RenderedVppAgentEntry> rendered_vpp_agent_entries = 3; // key: modeltype/name
-	Interfaces []*InterfaceStatus `protobuf:"bytes,5,rep,name=interfaces" json:"interfaces,omitempty"`
+	Status string   `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Msg    []string `protobuf:"bytes,2,rep,name=msg" json:"msg,omitempty"`
+	// repeated RenderedVppAgentEntry rendered_vpp_agent_entries = 3;
+	RenderedVppAgentEntries map[string]*RenderedVppAgentEntry `protobuf:"bytes,3,rep,name=rendered_vpp_agent_entries" json:"rendered_vpp_agent_entries,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
+	Interfaces              map[string]*InterfaceStatus       `protobuf:"bytes,5,rep,name=interfaces" json:"interfaces,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
 }
 
 func (m *NetworkNodeStatus) Reset()         { *m = NetworkNodeStatus{} }
 func (m *NetworkNodeStatus) String() string { return proto.CompactTextString(m) }
 func (*NetworkNodeStatus) ProtoMessage()    {}
 
-func (m *NetworkNodeStatus) GetRenderedVppAgentEntries() []*RenderedVppAgentEntry {
+func (m *NetworkNodeStatus) GetRenderedVppAgentEntries() map[string]*RenderedVppAgentEntry {
 	if m != nil {
 		return m.RenderedVppAgentEntries
 	}
 	return nil
 }
 
-func (m *NetworkNodeStatus) GetInterfaces() []*InterfaceStatus {
+func (m *NetworkNodeStatus) GetInterfaces() map[string]*InterfaceStatus {
 	if m != nil {
 		return m.Interfaces
 	}

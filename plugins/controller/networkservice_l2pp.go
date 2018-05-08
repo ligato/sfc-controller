@@ -40,9 +40,9 @@ func (ns *NetworkService) RenderConnL2PP(
 
 		connPodName, connInterfaceName := ConnPodInterfaceNames(connPodInterface)
 
-		p2n, exists := ctlrPlugin.NetworkPodNodeMapMgr.HandleCRUDOperationR(connPodName)
+		p2n, exists := ctlrPlugin.ramConfigCache.NetworkPodToNodeMap[connPodName]
 		if !exists || p2n.Node == "" {
-			msg := fmt.Sprintf("connection segment: %s, pod not mapped to a node in network_pod_to_node_map",
+			msg := fmt.Sprintf("connection segment: %s, network pod not mapped to a node in network_pod_to_node_map",
 				connPodInterface)
 			ns.AppendStatusMsg(msg)
 			allPodsAssignedToNodes = false
@@ -50,7 +50,7 @@ func (ns *NetworkService) RenderConnL2PP(
 		}
 		_, exists = ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationR(p2n.Node)
 		if !exists {
-			msg := fmt.Sprintf("connection segment: %s, pod references non existant host: %s",
+			msg := fmt.Sprintf("connection segment: %s, network pod references non existant host: %s",
 				connPodInterface, p2n.Node)
 			ns.AppendStatusMsg(msg)
 			allPodsAssignedToNodes = false
@@ -65,7 +65,10 @@ func (ns *NetworkService) RenderConnL2PP(
 	}
 
 	if !allPodsAssignedToNodes {
-		return fmt.Errorf("Not all vnfs in this connection are mapped to nodes")
+		msg := fmt.Sprintf("network-service: %s, not all pods in this connection are mapped to nodes",
+			ns.Metadata.Name)
+		ns.AppendStatusMsg(msg)
+		return fmt.Errorf(msg)
 	}
 
 	log.Debugf("RenderConnL2PP: p2nArray=%v, netPodIf=%v, conn=%v", p2nArray, netPodInterfaces, conn)
@@ -118,16 +121,16 @@ func (ns *NetworkService) renderConnL2PPSameNode(
 
 	memifConnType := controller.IfMemifInterPodConnTypeDirect // assume direct
 	for i := 0; i < 2; i++ {
-		if netPodInterfaces[i].Spec.MemifParms != nil {
-			if netPodInterfaces[i].Spec.MemifParms.InterPodConn != "" &&
-				netPodInterfaces[i].Spec.MemifParms.InterPodConn != controller.IfMemifInterPodConnTypeDirect {
-				memifConnType = netPodInterfaces[i].Spec.MemifParms.InterPodConn
+		if netPodInterfaces[i].MemifParms != nil {
+			if netPodInterfaces[i].MemifParms.InterPodConn != "" &&
+				netPodInterfaces[i].MemifParms.InterPodConn != controller.IfMemifInterPodConnTypeDirect {
+				memifConnType = netPodInterfaces[i].MemifParms.InterPodConn
 			}
 		}
 	}
 
-	if netPodInterfaces[0].Spec.IfType == netPodInterfaces[1].Spec.IfType &&
-		netPodInterfaces[0].Spec.IfType == controller.IfTypeMemif &&
+	if netPodInterfaces[0].IfType == netPodInterfaces[1].IfType &&
+		netPodInterfaces[0].IfType == controller.IfTypeMemif &&
 		memifConnType == controller.IfMemifInterPodConnTypeDirect {
 
 		err := ns.RenderConnDirectInterPodMemifPair(conn, netPodInterfaces, controller.IfTypeMemif)
@@ -152,10 +155,9 @@ func (ns *NetworkService) renderConnL2PPSameNode(
 		for i := 0; i < 2; i++ {
 			// create xconns between vswitch side of the container interfaces and the vxlan ifs
 			vppKVs := vppagent.ConstructXConnect(vppAgent, xconn[i], xconn[^i&1])
-			log.Printf("%v", vppKVs)
-			//ns.Status.RenderedVppAgentEntries =
-			//	ns.ConfigTransactionAddVppEntries(ns.Status.RenderedVppAgentEntries, vppKVs)
-
+			RenderTxnAddVppEntriesToTxn(ns.Status.RenderedVppAgentEntries,
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
+				vppKVs)
 		}
 	}
 

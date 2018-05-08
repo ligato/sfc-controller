@@ -107,9 +107,9 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 				vni,
 				vxlanIPFromAddress,
 				vxlanIPToAddress)
-			log.Printf("%v", vppKV)
-			//ns.Status.RenderedVppAgentEntries =
-			//	s.ConfigTransactionAddVppEntry(ns.Status.RenderedVppAgentEntries, vppKV)
+			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
+				vppKV)
 
 			// internode VNFs reach each other via the hub node, need split-horizon 0
 			l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
@@ -123,8 +123,9 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 				vxlanIPFromAddress, vxlanIPToAddress,
 				nno.Spec.VxlanHubAndSpokeParms.NetworkNodeInterfaceLabel)
 
-			ns.Status.RenderedVppAgentEntries = append(ns.Status.RenderedVppAgentEntries,
-				renderedEntries...)
+			for k, v := range renderedEntries {
+				ns.Status.RenderedVppAgentEntries[k] = v
+			}
 		}
 	}
 

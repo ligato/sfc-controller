@@ -247,7 +247,7 @@ func ConstructMemInterface(vppAgent string,
 	rxMode string,
 	memifID uint32,
 	isMaster bool,
-	memifParms *controller.InterfaceSpec_MemIFParms,
+	memifParms *controller.Interface_MemIFParms,
 	masterVppAgent string) *KVType {
 
 	iface := &interfaces.Interfaces_Interface{

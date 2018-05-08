@@ -21,8 +21,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
@@ -34,6 +32,14 @@ import (
 
 type NetworkServiceMgr struct {
 	networkServiceCache map[string]*NetworkService
+}
+
+func (mgr *NetworkServiceMgr) ToArray() []*NetworkService {
+	var array []*NetworkService
+	for _, ns := range mgr.networkServiceCache {
+		array = append(array, ns)
+	}
+	return array
 }
 
 func (mgr *NetworkServiceMgr) Init() {
@@ -314,6 +320,7 @@ func (mgr *NetworkServiceMgr) RenderAll() {
 }
 
 func (ns *NetworkService) renderConfig() error {
+
 	RenderTxnConfigEntityStart()
 	defer RenderTxnConfigEntityEnd()
 
@@ -323,13 +330,15 @@ func (ns *NetworkService) renderConfig() error {
 		return err
 	}
 
-	//if nsState, exists := s.ramConfigCache.NetworkServicesState[ns.Metadata.Name]; exists {
-	//	// add the current rendered etcd keys to the before config transaction
-	//	s.CopyRenderedVppAgentEntriesToBeforeConfigTransaction(nsState.RenderedVppAgentEntries)
-	//}
+	if ns.Status != nil && ns.Status.RenderedVppAgentEntries != nil {
+		// add the current rendered etc keys to the before config transaction
+		CopyRenderedVppAgentEntriesToBeforeCfgTxn(ns.Status.RenderedVppAgentEntries)
+	}
 
 	// initialize the network service status
 	ns.Status = &controller.NetworkServiceStatus{}
+	ns.Status.RenderedVppAgentEntries = make(map[string]*controller.RenderedVppAgentEntry, 0)
+	ns.Status.Interfaces = make(map[string]*controller.InterfaceStatus, 0)
 
 	for i, conn := range ns.Spec.Connections {
 		log.Debugf("RenderNetworkService: network-service/conn: ", ns.Metadata.Name, conn)
@@ -476,7 +485,7 @@ func (ns *NetworkService) findNetworkPodAndInterfaceInList(networkPodName string
 
 	for _, networkPod := range networkPods {
 		for _, iFace := range networkPod.Spec.Interfaces {
-			if networkPod.Metadata.Name == networkPodName && iFace.Metadata.Name == ifName {
+			if networkPod.Metadata.Name == networkPodName && iFace.Name == ifName {
 				return iFace, networkPod.Spec.PodType
 			}
 		}
@@ -501,41 +510,41 @@ func (ns *NetworkService) validateNetworkPod(networkPod *controller.NetworkPod) 
 	}
 
 	for _, iFace := range networkPod.Spec.Interfaces {
-		switch iFace.Spec.IfType {
+		switch iFace.IfType {
 		case controller.IfTypeMemif:
 		case controller.IfTypeEthernet:
 		case controller.IfTypeVeth:
 		case controller.IfTypeTap:
 		default:
 			return fmt.Errorf("network-service/pod: %s/%s has invalid if type '%s'",
-				ns.Metadata.Name, iFace.Metadata.Name, iFace.Spec.IfType)
+				ns.Metadata.Name, iFace.Name, iFace.IfType)
 		}
-		for _, ipAddress := range iFace.Spec.IpAddresses {
+		for _, ipAddress := range iFace.IpAddresses {
 			ip, network, err := net.ParseCIDR(ipAddress)
 			if err != nil {
 				return fmt.Errorf("network-service/if: %s/%s '%s', expected format i.p.v.4/xx, or ip::v6/xx",
-					ns.Metadata.Name, iFace.Metadata.Name, err)
+					ns.Metadata.Name, iFace.Name, err)
 			}
 			log.Debugf("ValidatePod: ip: %s, network: %s", ip, network)
 		}
-		if iFace.Spec.MemifParms != nil {
-			if iFace.Spec.MemifParms.Mode != "" {
-				switch iFace.Spec.MemifParms.Mode {
+		if iFace.MemifParms != nil {
+			if iFace.MemifParms.Mode != "" {
+				switch iFace.MemifParms.Mode {
 				case controller.IfMemifModeEhernet:
 				case controller.IfMemifModeIP:
 				case controller.IfMemifModePuntInject:
 				default:
 					return fmt.Errorf("network-service/if: %s/%s, unsupported memif mode=%s",
-						ns.Metadata.Name, iFace.Metadata.Name, iFace.Spec.MemifParms.Mode)
+						ns.Metadata.Name, iFace.Name, iFace.MemifParms.Mode)
 				}
 			}
-			if iFace.Spec.MemifParms.InterPodConn != "" {
-				switch iFace.Spec.MemifParms.InterPodConn {
+			if iFace.MemifParms.InterPodConn != "" {
+				switch iFace.MemifParms.InterPodConn {
 				case controller.IfMemifInterPodConnTypeDirect:
 				case controller.IfMemifInterPodConnTypeVswitch:
 				default:
 					return fmt.Errorf("network-service/if: %s/%s, unsupported memif inter-vnf connection type=%s",
-						ns.Metadata.Name, iFace.Metadata.Name, iFace.Spec.MemifParms.InterPodConn)
+						ns.Metadata.Name, iFace.Name, iFace.MemifParms.InterPodConn)
 				}
 			}
 		}
@@ -550,31 +559,31 @@ func (mgr *NetworkServiceMgr) InitAndRunWatcher() {
 	log.Info("NetworkServiceWatcher: enter ...")
 	defer log.Info("NetworkServiceWatcher: exit ...")
 
-	go func() {
-		// back up timer ... paranoid about missing events ...
-		// check every minute just in case
-		ticker := time.NewTicker(1 * time.Minute)
-		for _ = range ticker.C {
-			tempNetworkServiceMap := make(map[string]*NetworkService)
-			mgr.loadAllFromDatastore(tempNetworkServiceMap)
-			renderingRequired := false
-			for _, dbNode := range tempNetworkServiceMap {
-				ramNode, exists := mgr.HandleCRUDOperationR(dbNode.Metadata.Name)
-				if !exists || !ramNode.ConfigEqual(dbNode) {
-					log.Debugf("NetworkServiceWatcher: timer new config: %v", dbNode)
-					renderingRequired = true
-					mgr.HandleCRUDOperationCU(dbNode, false) // render at the end
-				}
-			}
-			// if any of the entities required rendering, do it now
-			if renderingRequired {
-				RenderTxnConfigStart()
-				ctlrPlugin.RenderAll()
-				RenderTxnConfigEnd()
-			}
-			tempNetworkServiceMap = nil
-		}
-	}()
+	//go func() {
+	//	// back up timer ... paranoid about missing events ...
+	//	// check every minute just in case
+	//	ticker := time.NewTicker(1 * time.Minute)
+	//	for _ = range ticker.C {
+	//		tempNetworkServiceMap := make(map[string]*NetworkService)
+	//		mgr.loadAllFromDatastore(tempNetworkServiceMap)
+	//		renderingRequired := false
+	//		for _, dbNode := range tempNetworkServiceMap {
+	//			ramNode, exists := mgr.HandleCRUDOperationR(dbNode.Metadata.Name)
+	//			if !exists || !ramNode.ConfigEqual(dbNode) {
+	//				log.Debugf("NetworkServiceWatcher: timer new config: %v", dbNode)
+	//				renderingRequired = true
+	//				mgr.HandleCRUDOperationCU(dbNode, false) // render at the end
+	//			}
+	//		}
+	//		// if any of the entities required rendering, do it now
+	//		if renderingRequired {
+	//			RenderTxnConfigStart()
+	//			ctlrPlugin.RenderAll()
+	//			RenderTxnConfigEnd()
+	//		}
+	//		tempNetworkServiceMap = nil
+	//	}
+	//}()
 
 	respChan := make(chan keyval.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())

@@ -36,6 +36,7 @@ const (
 
 // KVType tracks each allocated key/value vnf/vpp agent
 type KVType struct {
+	modelType    string
 	VppKey       string
 	VppEntryType string
 	IFace        *interfaces.Interfaces_Interface     `json:"IFace,omitempty"`

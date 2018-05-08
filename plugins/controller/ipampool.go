@@ -28,7 +28,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -141,7 +140,7 @@ func contructAllocatorName(ipamPool *IPAMPool, entityName string) string {
 	return ""
 }
 
-// EntityCreate ensures a "scope" level pool allocator exists for this entity
+// EntityCreate ensures a "scope" txnLevel pool allocator exists for this entity
 func (mgr *IPAMPoolMgr) EntityCreate(entityName string, scope string) {
 
 	for _, ipamPool := range mgr.ipamPoolCache {
@@ -158,7 +157,7 @@ func (mgr *IPAMPoolMgr) EntityCreate(entityName string, scope string) {
 
 }
 
-// EntityDelete removes a "scope" level pool allocator for this entity
+// EntityDelete removes a "scope" txnLevel pool allocator for this entity
 func (mgr *IPAMPoolMgr) EntityDelete(entityName string, scope string) {
 
 	for _, ipamPool := range mgr.ipamPoolCache {
@@ -461,31 +460,31 @@ func (mgr *IPAMPoolMgr) InitAndRunWatcher() {
 	log.Info("IPAMPoolWatcher: enter ...")
 	defer log.Info("IPAMPoolWatcher: exit ...")
 
-	go func() {
-		// back up timer ... paranoid about missing events ...
-		// check every minute just in case
-		ticker := time.NewTicker(1 * time.Minute)
-		for _ = range ticker.C {
-			tempIPAMPoolMap := make(map[string]*IPAMPool)
-			mgr.loadAllFromDatastore(tempIPAMPoolMap)
-			renderingRequired := false
-			for _, dbEntry := range tempIPAMPoolMap {
-				ramEntry, exists := mgr.HandleCRUDOperationR(dbEntry.Metadata.Name)
-				if !exists || !ramEntry.ConfigEqual(dbEntry) {
-					log.Debugf("IPAMPoolWatcher: timer new config: %v", dbEntry)
-					renderingRequired = true
-					mgr.HandleCRUDOperationCU(dbEntry, false) // render at the end
-				}
-			}
-			// if any of the entities required rendering, do it now
-			if renderingRequired {
-				RenderTxnConfigStart()
-				ctlrPlugin.RenderAll()
-				RenderTxnConfigEnd()
-			}
-			tempIPAMPoolMap = nil
-		}
-	}()
+	//go func() {
+	//	// back up timer ... paranoid about missing events ...
+	//	// check every minute just in case
+	//	ticker := time.NewTicker(1 * time.Minute)
+	//	for _ = range ticker.C {
+	//		tempIPAMPoolMap := make(map[string]*IPAMPool)
+	//		mgr.loadAllFromDatastore(tempIPAMPoolMap)
+	//		renderingRequired := false
+	//		for _, dbEntry := range tempIPAMPoolMap {
+	//			ramEntry, exists := mgr.HandleCRUDOperationR(dbEntry.Metadata.Name)
+	//			if !exists || !ramEntry.ConfigEqual(dbEntry) {
+	//				log.Debugf("IPAMPoolWatcher: timer new config: %v", dbEntry)
+	//				renderingRequired = true
+	//				mgr.HandleCRUDOperationCU(dbEntry, false) // render at the end
+	//			}
+	//		}
+	//		// if any of the entities required rendering, do it now
+	//		if renderingRequired {
+	//			RenderTxnConfigStart()
+	//			ctlrPlugin.RenderAll()
+	//			RenderTxnConfigEnd()
+	//		}
+	//		tempIPAMPoolMap = nil
+	//	}
+	//}()
 
 	respChan := make(chan keyval.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())

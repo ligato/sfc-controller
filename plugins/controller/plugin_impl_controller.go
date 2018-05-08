@@ -28,11 +28,13 @@ import (
 	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/ligato/cn-infra/rpc/rest"
 	"github.com/ligato/sfc-controller/plugins/controller/database"
-	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/idapi"
 	"github.com/ligato/sfc-controller/plugins/controller/idapi/ipam"
+	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 	"github.com/namsral/flag"
+	"github.com/unrolled/render"
+	"net/http"
 )
 
 // PluginID is plugin identifier (must be unique throughout the system)
@@ -43,8 +45,7 @@ var (
 	cleanSfcDatastore bool   // cli flag - see RegisterFlags
 	contivKSREnabled  bool   // cli flag - see RegisterFlags
 	log               = logrus.DefaultLogger()
-	ctlrPlugin 		*Plugin
-
+	ctlrPlugin        *Plugin
 )
 
 // RegisterFlags add command line flags.
@@ -76,17 +77,18 @@ func init() {
 // CacheType is ram cache of controller entities
 type CacheType struct {
 	// state
-	InterfaceStates    map[string]*controller.InterfaceStatus
-	VppEntries         map[string]*vppagent.KVType
-	MacAddrAllocator   *idapi.MacAddrAllocatorType
-	MemifIDAllocator   *idapi.MemifAllocatorType
-	IPAMPoolAllocators map[string]*ipam.PoolAllocatorType
+	InterfaceStates     map[string]*controller.InterfaceStatus
+	VppEntries          map[string]*vppagent.KVType
+	MacAddrAllocator    *idapi.MacAddrAllocatorType
+	MemifIDAllocator    *idapi.MemifAllocatorType
+	IPAMPoolAllocators  map[string]*ipam.PoolAllocatorType
+	NetworkPodToNodeMap map[string]*NetworkPodToNodeMap
 }
 
 // Plugin contains the controllers information
 type Plugin struct {
-	Etcd                  *etcdv3.Plugin
-	HTTPmux               *rest.Plugin
+	Etcd    *etcdv3.Plugin
+	HTTPmux *rest.Plugin
 	*local.FlavorLocal
 	NetworkNodeMgr        NetworkNodeMgr
 	IpamPoolMgr           IPAMPoolMgr
@@ -97,7 +99,6 @@ type Plugin struct {
 	ramConfigCache        CacheType
 	db                    keyval.ProtoBroker
 }
-
 
 // Init the controller, read the db, reconcile/resync, render config to etcd
 func (s *Plugin) Init() error {
@@ -118,6 +119,8 @@ func (s *Plugin) Init() error {
 	database.InitDatabase(s.db)
 
 	s.RegisterModelTypeManagers()
+
+	s.InitRAMCache()
 
 	s.initMgrs()
 
@@ -164,6 +167,7 @@ func (s *Plugin) initMgrs() {
 }
 
 func (s *Plugin) afterInitMgrs() {
+	s.InitSystemHTTPHandler()
 	for _, entry := range RegisteredManagers {
 		log.Infof("afterInitMgrs: after initing %s ...", entry.modelTypeName)
 		entry.mgr.AfterInit()
@@ -185,7 +189,7 @@ func (s *Plugin) AfterInit() error {
 	s.afterInitMgrs()
 
 	if contivKSREnabled {
-		go s.RunContivKSRVnfToNodeMappingWatcher()
+		go ctlrPlugin.NetworkPodNodeMapMgr.RunContivKSRNetworkPodToNodeMappingWatcher()
 	}
 
 	s.StatusCheck.ReportStateChange(PluginID, statuscheck.OK, nil)
@@ -204,11 +208,6 @@ func (s *Plugin) RenderAll() {
 // InitRAMCache creates the ram cache
 func (s *Plugin) InitRAMCache() {
 
-	for _, entry := range RegisteredManagers {
-		log.Infof("InitRAMCache: %s ...", entry.modelTypeName)
-		entry.mgr.InitRAMCache()
-	}
-
 	s.ramConfigCache.IPAMPoolAllocators = nil
 	s.ramConfigCache.IPAMPoolAllocators = make(map[string]*ipam.PoolAllocatorType)
 
@@ -218,7 +217,6 @@ func (s *Plugin) InitRAMCache() {
 	//s.ramConfigCache.VNFServiceMeshVxLanAddresses = nil
 	//s.ramConfigCache.VNFServiceMeshVxLanAddresses = make(map[string]string)
 
-
 	s.ramConfigCache.VppEntries = nil
 	s.ramConfigCache.VppEntries = make(map[string]*vppagent.KVType)
 
@@ -227,9 +225,66 @@ func (s *Plugin) InitRAMCache() {
 
 	s.ramConfigCache.MemifIDAllocator = nil
 	s.ramConfigCache.MemifIDAllocator = idapi.NewMemifAllocator()
+
+	s.ramConfigCache.InterfaceStates = nil
+	s.ramConfigCache.InterfaceStates = make(map[string]*controller.InterfaceStatus)
+
+	for _, entry := range RegisteredManagers {
+		log.Infof("InitRAMCache: %s ...", entry.modelTypeName)
+		entry.mgr.InitRAMCache()
+	}
+
+	s.ramConfigCache.NetworkPodToNodeMap = make(map[string]*NetworkPodToNodeMap, 0)
 }
 
 // Close performs close down procedures
 func (s *Plugin) Close() error {
 	return nil
+}
+
+// InitHTTPHandlers registers the handler funcs for CRUD operations
+func (s *Plugin) InitSystemHTTPHandler() {
+
+	log.Infof("InitHTTPHandlers: registering ...")
+
+	log.Infof("InitHTTPHandlers: registering GET %s", controller.SfcControllerPrefix())
+	ctlrPlugin.HTTPmux.RegisterHTTPHandler(controller.SfcControllerPrefix(), httpSystemGetAllHandler, "GET")
+	log.Infof("InitHTTPHandlers: registering GET %s/yaml", controller.SfcControllerPrefix())
+	ctlrPlugin.HTTPmux.RegisterHTTPHandler(controller.SfcControllerPrefix()+"/yaml", httpSystemGetAllYamlHandler, "GET")
+}
+
+// curl -X GET http://localhost:9191/sfc_controller/
+func httpSystemGetAllHandler(formatter *render.Render) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, req *http.Request) {
+		log.Debugf("httpSystemGetAllHandler: Method %s, URL: %s", req.Method, req.URL)
+
+		switch req.Method {
+		case "GET":
+			json, err := ctlrPlugin.SfcSystemCacheToJson()
+			if err != nil {
+				formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
+
+			}
+			formatter.Data(w, http.StatusOK, json)
+		}
+	}
+}
+
+// curl -X GET http://localhost:9191/sfc_controller/yaml
+func httpSystemGetAllYamlHandler(formatter *render.Render) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, req *http.Request) {
+		log.Debugf("httpSystemGetAllYamlHandler: Method %s, URL: %s", req.Method, req.URL)
+
+		switch req.Method {
+		case "GET":
+			yaml, err := ctlrPlugin.SfcSystemCacheToYaml()
+			if err != nil {
+				formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
+
+			}
+			formatter.Data(w, http.StatusOK, yaml)
+		}
+	}
 }

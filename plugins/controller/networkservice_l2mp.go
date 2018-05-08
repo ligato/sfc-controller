@@ -45,9 +45,9 @@ func (ns *NetworkService) RenderConnL2MP(
 	for _, connPodInterface := range conn.PodInterfaces {
 
 		connPodName, connInterfaceName := ConnPodInterfaceNames(connPodInterface)
-		p2n, exists := ctlrPlugin.NetworkPodNodeMapMgr.HandleCRUDOperationR(connPodName)
+		p2n, exists := ctlrPlugin.ramConfigCache.NetworkPodToNodeMap[connPodName]
 		if !exists || p2n.Node == "" {
-			msg := fmt.Sprintf("connection segment: %s, vnf not mapped to a node in vnf_to_node_map",
+			msg := fmt.Sprintf("connection segment: %s, network pod not mapped to a node in vnf_to_node_map",
 				connPodInterface)
 			ns.AppendStatusMsg(msg)
 			allPodsAssignedToNodes = false
@@ -56,7 +56,7 @@ func (ns *NetworkService) RenderConnL2MP(
 
 		_, exists = ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationR(p2n.Node)
 		if !exists {
-			msg := fmt.Sprintf("connection segment: %s, vnf references non existant host: %s",
+			msg := fmt.Sprintf("connection segment: %s, network pod references non existant host: %s",
 				connPodInterface, p2n.Node)
 			ns.AppendStatusMsg(msg)
 			allPodsAssignedToNodes = false
@@ -75,7 +75,10 @@ func (ns *NetworkService) RenderConnL2MP(
 	}
 
 	if !allPodsAssignedToNodes {
-		return fmt.Errorf("Not all networkPods in this connection are mapped to nodes")
+		msg := fmt.Sprintf("network-service: %s, Not all networkPods in this connection are mapped to nodes",
+			ns.Metadata.Name)
+		ns.AppendStatusMsg(msg)
+		return fmt.Errorf(msg)
 	}
 
 	log.Debugf("RenderTopologyL2MP: num unique nodes for this connection: %d", len(nodeMap))
@@ -165,13 +168,12 @@ func (ns *NetworkService) renderL2BD(
 	nodeName string,
 	l2bdIFs []*l2.BridgeDomains_BridgeDomain_Interfaces) error {
 
-	// if using an existing node level bridge, we simply add the i/f's to the bridge
+	// if using an existing node txnLevel bridge, we simply add the i/f's to the bridge
 	if conn.UseNodeL2Bd != "" {
 
 		var nodeL2BD *l2.BridgeDomains_BridgeDomain
 
 		// find the l2db for this node ...
-		//nn, nodeL2BD := ctlrPlugin.NetworkNodeMgr.FindVppL2BDForNode(nodeName, conn.UseNodeL2Bd)
 		nn, nodeL2BD := ctlrPlugin.NetworkNodeMgr.FindVppL2BDForNode(nodeName, conn.UseNodeL2Bd)
 		if nodeL2BD == nil {
 			msg := fmt.Sprintf("network-service: %s, referencing a missing node/l2bd: %s/%s",
@@ -181,7 +183,7 @@ func (ns *NetworkService) renderL2BD(
 		}
 		//vppKV := vppagent.AppendInterfacesToL2BD(nodeName, nodeL2BD, l2bdIFs)
 		//nn.Status.RenderedVppAgentEntries =
-		//	s.ConfigTransactionAddVppEntry(nn.Status..RenderedVppAgentEntries, vppKV)
+		//	s.ConfigTransactionAddVppEntry(nn.Status.RenderedVppAgentEntries, vppKV)
 
 	} else {
 		var bdParms *controller.BDParms
@@ -200,10 +202,9 @@ func (ns *NetworkService) renderL2BD(
 			fmt.Sprintf("L2BD_%s_CONN_%d", ns.Metadata.Name, connIndex+1),
 			l2bdIFs,
 			bdParms)
-		log.Printf("%v", vppKV)
-		//ns.Status.RenderedVppAgentEntries =
-		//	s.ConfigTransactionAddVppEntry(ns.Status.RenderedVppAgentEntries, vppKV)
-
+		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
+			vppKV)
 	}
 	return nil
 }

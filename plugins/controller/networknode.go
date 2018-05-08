@@ -21,8 +21,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
@@ -36,6 +34,14 @@ import (
 
 type NetworkNodeMgr struct {
 	networkNodeCache map[string]*NetworkNode
+}
+
+func (mgr *NetworkNodeMgr) ToArray() []*NetworkNode {
+	var array []*NetworkNode
+	for _, nn := range mgr.networkNodeCache {
+		array = append(array, nn)
+	}
+	return array
 }
 
 func (mgr *NetworkNodeMgr) Init() {
@@ -53,7 +59,7 @@ type NetworkNode struct {
 	controller.NetworkNode
 }
 
-// InitRAMCache create a map for all the entites
+// InitRAMCache create a map for all the entities
 func (mgr *NetworkNodeMgr) InitRAMCache() {
 	mgr.networkNodeCache = nil // delete old cache for re-init
 	mgr.networkNodeCache = make(map[string]*NetworkNode)
@@ -95,9 +101,9 @@ func (mgr *NetworkNodeMgr) FindVxlanIPaddress(nodeName string) (string, error) {
 		return "", fmt.Errorf("no vxlan ip address configured for node: %s", nodeName)
 	}
 	for _, iFace := range nn.Spec.Interfaces {
-		switch iFace.Spec.IfType {
+		switch iFace.IfType {
 		case controller.IfTypeVxlanTunnel:
-			for _, ipAddress := range iFace.Spec.IpAddresses {
+			for _, ipAddress := range iFace.IpAddresses {
 				ip, _, err := net.ParseCIDR(ipAddress)
 				if err == nil {
 					log.Debugf("FindVxlanIPaddress: node: %s, found vxlan iupaddr: %s",
@@ -340,12 +346,16 @@ func (nn *NetworkNode) renderConfig() error {
 		return err
 	}
 
+	log.Debugf("recderConfig: before nn.Status=%v", nn.Status)
+
 	if nn.Status != nil && nn.Status.RenderedVppAgentEntries != nil {
 		// add the current rendered etc keys to the before config transaction
-		//RenderTxnCopyRenderedVppAgentEntriesToBeforeConfigTransaction(ns.RenderedVppAgentEntries)
+		CopyRenderedVppAgentEntriesToBeforeCfgTxn(nn.Status.RenderedVppAgentEntries)
 	}
 
 	nn.Status = &controller.NetworkNodeStatus{}
+	nn.Status.RenderedVppAgentEntries = make(map[string]*controller.RenderedVppAgentEntry, 0)
+	nn.Status.Interfaces = make(map[string]*controller.InterfaceStatus, 0)
 
 	defer nn.renderComplete()
 
@@ -362,6 +372,7 @@ func (nn *NetworkNode) renderConfig() error {
 			return err
 		}
 	}
+	log.Debugf("recderConfig: after nn.Status=%v", nn.Status)
 
 	return nil
 }
@@ -397,8 +408,9 @@ func (nn *NetworkNode) renderNodeL2BDs() error {
 			vppKeyL2BDName(nn.Metadata.Name, l2bd.Name),
 			nil,
 			bdParms)
-		nn.Status.RenderedVppAgentEntries =
-			RenderTxnAddVppEntryToTxn(nn.Status.RenderedVppAgentEntries, vppKV)
+		RenderTxnAddVppEntryToTxn(nn.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkNode+"/"+nn.Metadata.Name,
+			vppKV)
 
 		log.Infof("renderNodeL2BDs: vswitch: %s, vppKV: %v", nn.Metadata.Name, vppKV)
 	}
@@ -411,23 +423,36 @@ func (nn *NetworkNode) renderNodeInterfaces() error {
 	var vppKV *vppagent.KVType
 
 	for _, iFace := range nn.Spec.Interfaces {
-		switch iFace.Spec.IfType {
+		switch iFace.IfType {
 		case controller.IfTypeEthernet:
-			if !contivKSREnabled { // do not configure the phys if contiv already did this
-				vppKV = vppagent.ConstructEthernetInterface(
+			if !iFace.BypassRenderer {
+
+				nodeInterfaceStr := nn.Metadata.Name + "/" + iFace.Name
+
+				ifStatus, err := InitInterfaceStatus(nn.Metadata.Name, nn.Metadata.Name,
+					nodeInterfaceStr,
+					iFace)
+				if err != nil {
+					return err
+				}
+				PersistInterfaceStatus(nn.Status.Interfaces, ifStatus, nodeInterfaceStr)
+
+				vppKV := vppagent.ConstructEthernetInterface(
 					nn.Metadata.Name,
-					iFace.Metadata.Name,
-					iFace.Spec.IpAddresses,
-					iFace.Spec.MacAddress,
-					ctlrPlugin.SysParametersMgr.ResolveMtu(iFace.Spec.Mtu),
-					iFace.Spec.AdminStatus,
-					ctlrPlugin.SysParametersMgr.ResolveRxMode(iFace.Spec.RxMode))
-				nn.Status.RenderedVppAgentEntries =
-					RenderTxnAddVppEntryToTxn(nn.Status.RenderedVppAgentEntries, vppKV)
+					iFace.Name,
+					ifStatus.IpAddresses,
+					ifStatus.MacAddress,
+					ctlrPlugin.SysParametersMgr.ResolveMtu(iFace.Mtu),
+					iFace.AdminStatus,
+					ctlrPlugin.SysParametersMgr.ResolveRxMode(iFace.RxMode))
+
+				RenderTxnAddVppEntryToTxn(nn.Status.RenderedVppAgentEntries,
+					ModelTypeNetworkNode+"/"+nn.Metadata.Name,
+					vppKV)
 			}
 		}
 		log.Infof("renderNodeInterfaces: vswitch: %s, ifType: %s, vppKV: %v",
-			nn.Metadata.Name, iFace.Spec.IfType, vppKV)
+			nn.Metadata.Name, iFace.IfType, vppKV)
 	}
 
 	return nil
@@ -473,22 +498,19 @@ func (mgr *NetworkNodeMgr) FindL2BDForNode(nodeName string, l2bdName string) *co
 func (mgr *NetworkNodeMgr) FindVppL2BDForNode(nodeName string, l2bdName string) (*NetworkNode,
 	*l2.BridgeDomains_BridgeDomain) {
 
+	var vppKey *vppagent.KVType
+	var exists bool
+
 	if l2bd := mgr.FindL2BDForNode(nodeName, l2bdName); l2bd == nil {
 		return nil, nil
 	}
 
-	//var vppKey *vppagent.KVType
-	//var exists bool
-	//
-	//// this might be wrong ... do we start rendering with a node l2bd with no if's
-	//
-	//key := vppagent.L2BridgeDomainKey(nodeName, vppKeyL2BDName(nodeName, l2bdName))
-	//if vppKey, exists = s.configTransaction.afterEntriesMap[key]; !exists {
-	//	return nil, nil
-	//}
+	key := vppagent.L2BridgeDomainKey(nodeName, vppKeyL2BDName(nodeName, l2bdName))
+	if vppKey, exists = RenderTxnGetAfterMap(key); !exists {
+		return nil, nil
+	}
 
-	//return mgr.networkNodeCache[nodeName], vppKey.L2BD
-	return mgr.networkNodeCache[nodeName], nil
+	return mgr.networkNodeCache[nodeName], vppKey.L2BD
 }
 
 func findInterfaceLabel(labels []string, label string) bool {
@@ -506,9 +528,9 @@ func (mgr *NetworkNodeMgr) RenderVxlanStaticRoutes(
 	toNode string,
 	fromVxlanAddress string,
 	toVxlanAddress string,
-	networkNodeInterfaceLabel string) []*controller.RenderedVppAgentEntry {
+	networkNodeInterfaceLabel string) map[string]*controller.RenderedVppAgentEntry {
 
-	var renderedEntries []*controller.RenderedVppAgentEntry
+	var renderedEntries map[string]*controller.RenderedVppAgentEntry
 
 	// depending on the number of ethernet/label:vxlan interfaces on the source node and
 	// the number of ethernet/label:vxlan inerfaces on the dest node, a set of static
@@ -618,24 +640,24 @@ func (nn *NetworkNode) validate() error {
 func (nn *NetworkNode) nodeValidateInterfaces(nodeName string, iFaces []*controller.Interface) error {
 
 	for _, iFace := range iFaces {
-		switch iFace.Spec.IfType {
+		switch iFace.IfType {
 		case controller.IfTypeEthernet:
 		case controller.IfTypeVxlanTunnel:
 		default:
 			return fmt.Errorf("node/if: %s/%s has invalid if type '%s'",
-				nodeName, iFace.Metadata.Name, iFace.Spec.IfType)
+				nodeName, iFace.Name, iFace.IfType)
 		}
-		for _, ipAddress := range iFace.Spec.IpAddresses {
+		for _, ipAddress := range iFace.IpAddresses {
 			ip, network, err := net.ParseCIDR(ipAddress)
 			if err != nil {
 				return fmt.Errorf("node/if: %s/%s '%s', expected format i.p.v.4/xx, or ip::v6/xx",
-					nodeName, iFace.Metadata.Name, err)
+					nodeName, iFace.Name, err)
 			}
 			log.Debugf("nodeValidateInterfaces: ip: %s, network: %s", ip, network)
 		}
-		if iFace.Spec.IpAddresses == nil {
+		if iFace.IpAddresses == nil {
 			log.Warnf("nodeValidateInterfaces: node/if: %s/%s, missing ipaddress",
-				nodeName, iFace.Metadata.Name)
+				nodeName, iFace.Name)
 		}
 	}
 
@@ -648,31 +670,31 @@ func (mgr *NetworkNodeMgr) InitAndRunWatcher() {
 	log.Info("NetworkNodeWatcher: enter ...")
 	defer log.Info("NetworkNodeWatcher: exit ...")
 
-	go func() {
-		// back up timer ... paranoid about missing events ...
-		// check every minute just in case
-		ticker := time.NewTicker(1 * time.Minute)
-		for _ = range ticker.C {
-			tempNetworkNodeMap := make(map[string]*NetworkNode)
-			mgr.loadAllFromDatastore(tempNetworkNodeMap)
-			renderingRequired := false
-			for _, dbEntry := range tempNetworkNodeMap {
-				ramEntry, exists := mgr.HandleCRUDOperationR(dbEntry.Metadata.Name)
-				if !exists || !ramEntry.ConfigEqual(dbEntry) {
-					log.Debugf("NetworkNodeWatcher: timer new config: %v", dbEntry)
-					renderingRequired = true
-					mgr.HandleCRUDOperationCU(dbEntry, false) // render at the end
-				}
-			}
-			// if any of the entities required rendering, do it now
-			if renderingRequired {
-				RenderTxnConfigStart()
-				ctlrPlugin.RenderAll()
-				RenderTxnConfigEnd()
-			}
-			tempNetworkNodeMap = nil
-		}
-	}()
+	//go func() {
+	//	// back up timer ... paranoid about missing events ...
+	//	// check every minute just in case
+	//	ticker := time.NewTicker(1 * time.Minute)
+	//	for _ = range ticker.C {
+	//		tempNetworkNodeMap := make(map[string]*NetworkNode)
+	//		mgr.loadAllFromDatastore(tempNetworkNodeMap)
+	//		renderingRequired := false
+	//		for _, dbEntry := range tempNetworkNodeMap {
+	//			ramEntry, exists := mgr.HandleCRUDOperationR(dbEntry.Metadata.Name)
+	//			if !exists || !ramEntry.ConfigEqual(dbEntry) {
+	//				log.Debugf("NetworkNodeWatcher: timer new config: %v", dbEntry)
+	//				renderingRequired = true
+	//				mgr.HandleCRUDOperationCU(dbEntry, false) // render at the end
+	//			}
+	//		}
+	//		// if any of the entities required rendering, do it now
+	//		if renderingRequired {
+	//			RenderTxnConfigStart()
+	//			ctlrPlugin.RenderAll()
+	//			RenderTxnConfigEnd()
+	//		}
+	//		tempNetworkNodeMap = nil
+	//	}
+	//}()
 
 	respChan := make(chan keyval.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())

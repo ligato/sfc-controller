@@ -96,9 +96,9 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 				vni,
 				vxlanIPFromAddress,
 				vxlanIPToAddress)
-			log.Printf("%v", vppKV)
-			//ns.Status.RenderedVppAgentEntries =
-			//	s.ConfigTransactionAddVppEntry(ns.Status.RenderedVppAgentEntries, vppKV)
+			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
+				vppKV)
 
 			l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
 				Name: ifName,
@@ -111,8 +111,9 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 				vxlanIPFromAddress, vxlanIPToAddress,
 				nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 
-			ns.Status.RenderedVppAgentEntries = append(ns.Status.RenderedVppAgentEntries,
-				renderedEntries...)
+			for k, v := range renderedEntries {
+				ns.Status.RenderedVppAgentEntries[k] = v
+			}
 		}
 	}
 
@@ -208,16 +209,18 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 			vni,
 			vxlanIPFromAddress,
 			vxlanIPToAddress)
-		log.Printf("%v", vppKV)
-		//ns.Status.RenderedVppAgentEntries =
-		//	s.ConfigTransactionAddVppEntry(ns.Status.RenderedVppAgentEntries, vppKV)
+		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
+			vppKV)
+
 
 		renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanStaticRoutes(p2nArray[i].Node, p2nArray[^i&1].Node,
 			vxlanIPFromAddress, vxlanIPToAddress,
 			nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 
-		ns.Status.RenderedVppAgentEntries = append(ns.Status.RenderedVppAgentEntries,
-			renderedEntries...)
+		for k, v := range renderedEntries {
+			ns.Status.RenderedVppAgentEntries[k] = v
+		}
 	}
 
 	// create xconns between vswitch side of the container interfaces and the vxlan ifs
@@ -225,8 +228,9 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 		vppKVs := vppagent.ConstructXConnect(p2nArray[i].Node, xconn[0][i], xconn[1][i])
 		log.Printf("%v", vppKVs)
 
-		//ns.Status.RenderedVppAgentEntries =
-		//	s.ConfigTransactionAddVppEntries(ns.Status.RenderedVppAgentEntries, vppKVs)
+		RenderTxnAddVppEntriesToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
+			vppKVs)
 	}
 
 	return nil
