@@ -171,6 +171,10 @@ func (mgr *NetworkNodeMgr) HandleCRUDOperationD(nodeName string, render bool) er
 	// get rid of node scope ipam pool if there is one
 	ctlrPlugin.IpamPoolMgr.EntityDelete(nodeName, controller.IPAMPoolScopeNode)
 
+	if render {
+		log.Errorf("HandleCRUDOperationD: need to implement rerender ...")
+	}
+
 	return nil
 }
 

@@ -22,6 +22,7 @@ import (
 	"github.com/ghodss/yaml"
 	"io/ioutil"
 	"time"
+
 )
 
 // SfcConfigYaml is container struct for yaml config file
@@ -34,6 +35,7 @@ type SfcConfigYaml struct {
 	NetworkNodeOverlays []*NetworkNodeOverlay  `json:"network_node_overlays"`
 	NetworkNodes        []*NetworkNode         `json:"network_nodes"`
 	NetworkServices     []*NetworkService      `json:"network_services"`
+	RamCache          	*CacheType      `json:"ram_cache"`
 }
 
 // SfcConfigYamlReadFromFile parses the yaml into YamlConfig
@@ -54,24 +56,6 @@ func (s *Plugin) SfcConfigYamlReadFromFile(fpath string) (*SfcConfigYaml, error)
 	return yamlConfig, nil
 }
 
-// utility used by http to return the whole system config in JSON format
-func (s *Plugin) SfcSystemCacheToJson() ([]byte, error) {
-	yamlConfig := &SfcConfigYaml{}
-
-	yamlConfig.Version = 2
-	yamlConfig.Description = fmt.Sprintf("Config: %s", time.Now())
-	yamlConfig.NetworkNodes = ctlrPlugin.NetworkNodeMgr.ToArray()
-	yamlConfig.NetworkServices = ctlrPlugin.NetworkServiceMgr.ToArray()
-	yamlBytes, err := yaml.Marshal(yamlConfig)
-	if err != nil {
-		return nil, err
-	}
-	json, err := yaml.YAMLToJSON(yamlBytes)
-	if err != nil {
-		return nil, nil
-	}
-	return json, nil
-}
 
 // utility used by http to return the whole system config in YAML format
 func (s *Plugin) SfcSystemCacheToYaml() ([]byte, error) {
@@ -81,6 +65,8 @@ func (s *Plugin) SfcSystemCacheToYaml() ([]byte, error) {
 	yamlConfig.Description = fmt.Sprintf("Config: %s", time.Now())
 	yamlConfig.NetworkNodes = ctlrPlugin.NetworkNodeMgr.ToArray()
 	yamlConfig.NetworkServices = ctlrPlugin.NetworkServiceMgr.ToArray()
+	yamlConfig.RamCache = &ctlrPlugin.ramConfigCache
+
 	yamlBytes, err := yaml.Marshal(yamlConfig)
 	if err != nil {
 		return nil, err

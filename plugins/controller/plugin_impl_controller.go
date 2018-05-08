@@ -124,15 +124,15 @@ func (s *Plugin) Init() error {
 
 	s.initMgrs()
 
-	//if err := s.LoadVppAgentEntriesFromState(); err != nil {
-	//	os.Exit(1)
-	//}
+	if err := s.LoadVppAgentEntriesFromState(); err != nil {
+		os.Exit(1)
+	}
 
 	// the db has been loaded and vpp entries kown so now we can clean the
 	// db and the vpp agent that the controller has managed/created
 	if cleanSfcDatastore {
 		database.CleanDatastore(controller.SfcControllerConfigPrefix())
-		//s.CleanVppAgentEntriesFromEtcd()
+		s.CleanVppAgentEntriesFromEtcd()
 		s.InitRAMCache()
 	}
 
@@ -248,30 +248,10 @@ func (s *Plugin) InitSystemHTTPHandler() {
 	log.Infof("InitHTTPHandlers: registering ...")
 
 	log.Infof("InitHTTPHandlers: registering GET %s", controller.SfcControllerPrefix())
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(controller.SfcControllerPrefix(), httpSystemGetAllHandler, "GET")
-	log.Infof("InitHTTPHandlers: registering GET %s/yaml", controller.SfcControllerPrefix())
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(controller.SfcControllerPrefix()+"/yaml", httpSystemGetAllYamlHandler, "GET")
+	ctlrPlugin.HTTPmux.RegisterHTTPHandler(controller.SfcControllerPrefix(), httpSystemGetAllYamlHandler, "GET")
 }
 
-// curl -X GET http://localhost:9191/sfc_controller/
-func httpSystemGetAllHandler(formatter *render.Render) http.HandlerFunc {
-
-	return func(w http.ResponseWriter, req *http.Request) {
-		log.Debugf("httpSystemGetAllHandler: Method %s, URL: %s", req.Method, req.URL)
-
-		switch req.Method {
-		case "GET":
-			json, err := ctlrPlugin.SfcSystemCacheToJson()
-			if err != nil {
-				formatter.JSON(w, http.StatusInternalServerError, struct{ Error string }{err.Error()})
-
-			}
-			formatter.Data(w, http.StatusOK, json)
-		}
-	}
-}
-
-// curl -X GET http://localhost:9191/sfc_controller/yaml
+// curl -X GET http://localhost:9191/sfc_controller
 func httpSystemGetAllYamlHandler(formatter *render.Render) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, req *http.Request) {
@@ -286,5 +266,57 @@ func httpSystemGetAllYamlHandler(formatter *render.Render) http.HandlerFunc {
 			}
 			formatter.Data(w, http.StatusOK, yaml)
 		}
+	}
+}
+
+// LoadVppAgentEntriesFromState uses key/type from state to lad vpp entries from etcd
+func (s *Plugin) LoadVppAgentEntriesFromState() error {
+
+	log.Debugf("LoadVppAgentEntriesFromState: processing network services state: num: %d",
+		len(s.NetworkServiceMgr.networkServiceCache))
+	for _, ns := range s.NetworkServiceMgr.networkServiceCache {
+		log.Debugf("LoadVppAgentEntriesFromState: processing vnf service state: %s", ns.Metadata.Name)
+		if err := s.LoadVppAgentEntriesFromRenderedVppAgentEntries(ns.Status.RenderedVppAgentEntries); err != nil {
+			return err
+		}
+	}
+	log.Debugf("LoadVppAgentEntriesFromState: processing nodes state: num: %d",
+		len(s.NetworkNodeMgr.networkNodeCache))
+	for _, nn := range s.NetworkNodeMgr.networkNodeCache {
+		log.Debugf("LoadVppAgentEntriesFromState: processing node state: %s", nn.Metadata.Name)
+		if err := s.LoadVppAgentEntriesFromRenderedVppAgentEntries(nn.Status.RenderedVppAgentEntries); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// LoadVppAgentEntriesFromRenderedVppAgentEntries load from etcd
+func (s *Plugin) LoadVppAgentEntriesFromRenderedVppAgentEntries(
+	vppAgentEntries map[string]*controller.RenderedVppAgentEntry) error {
+
+	log.Debugf("LoadVppAgentEntriesFromRenderedVppAgentEntries: num: %d, %v",
+		len(vppAgentEntries), vppAgentEntries)
+	for _, vppAgentEntry := range vppAgentEntries {
+
+		vppKVEntry := vppagent.NewKVEntry(vppAgentEntry.VppAgentKey, vppAgentEntry.VppAgentType)
+		found, err := vppKVEntry.ReadFromEtcd(s.db)
+		if err != nil {
+			return err
+		}
+		if found {
+			s.ramConfigCache.VppEntries[vppKVEntry.VppKey] = vppKVEntry
+		}
+	}
+
+	return nil
+}
+
+// CleanVppAgentEntriesFromEtcd load from etcd
+func (s *Plugin) CleanVppAgentEntriesFromEtcd() {
+	log.Debugf("CleanVppAgentEntriesFromEtcd: removing all vpp keys managed by the controller")
+	for _, kvEntry := range s.ramConfigCache.VppEntries {
+		database.DeleteFromDatastore(kvEntry.VppKey)
 	}
 }
