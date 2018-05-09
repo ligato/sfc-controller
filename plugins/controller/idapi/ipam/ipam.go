@@ -21,30 +21,30 @@ import (
 
 // PoolAllocatorType data struct
 type PoolAllocatorType struct {
-	name string
-	startRange uint32
-	endRange uint32
-	network string
-	ipv4Pool *Ipv4Pool
+	name       string
+	StartRange uint32
+	EndRange   uint32
+	Network    string
+	ipv4Pool   *Ipv4Pool
 	//ipv6Pool *Ipv6Pool
 }
 
 func (p *PoolAllocatorType) String() string {
 	str := fmt.Sprintf("IPAM Pool %s: addrs's: [%d-%d], %s",
 		p.name,
-		p.startRange,
-		p.endRange,
+		p.StartRange,
+		p.EndRange,
 		p.ipv4Pool.String())
 	return str
 }
 
 // SetAddress sets the address in the range as allocated
 func (p *PoolAllocatorType) SetAddress(addrID uint32) error {
-	if addrID < p.startRange || addrID > p.endRange {
+	if addrID < p.StartRange || addrID > p.EndRange {
 		return fmt.Errorf("SetAddress: addr_id '%d' out of range '%d-%d",
-			addrID, p.startRange, p.endRange)
+			addrID, p.StartRange, p.EndRange)
 	}
-	_, err := p.ipv4Pool.SetIPInPool(addrID - p.startRange + 1)
+	_, err := p.ipv4Pool.SetIPInPool(addrID - p.StartRange + 1)
 	if err != nil {
 		return err
 	}
@@ -75,11 +75,11 @@ func NewIPAMPoolAllocator(
 	fmt.Printf("NewIPAMPoolAllocator: len(ipTo4): %d\n", len(ip.To4()))
 	if len(ip.To4()) == net.IPv4len {
 		poolAllocator := &PoolAllocatorType{
-			name: name,
-			startRange: startRange,
-			endRange: endRange,
-			network: networkStr,
-			ipv4Pool: NewIpv4Pool(networkStr, startRange, endRange),
+			name:       name,
+			StartRange: startRange,
+			EndRange:   endRange,
+			Network:    networkStr,
+			ipv4Pool:   NewIpv4Pool(networkStr, startRange, endRange),
 		}
 		fmt.Printf("NewIPAMPoolAllocator: %v\n", poolAllocator)
 

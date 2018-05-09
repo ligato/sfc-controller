@@ -350,7 +350,7 @@ func (nn *NetworkNode) renderConfig() error {
 		return err
 	}
 
-	log.Debugf("recderConfig: before nn.Status=%v", nn.Status)
+	log.Debugf("renderConfig: before nn.Status=%v", nn.Status)
 
 	if nn.Status != nil && nn.Status.RenderedVppAgentEntries != nil {
 		// add the current rendered etc keys to the before config transaction
@@ -376,7 +376,7 @@ func (nn *NetworkNode) renderConfig() error {
 			return err
 		}
 	}
-	log.Debugf("recderConfig: after nn.Status=%v", nn.Status)
+	log.Debugf("renderConfig: after nn.Status=%v", nn.Status)
 
 	return nil
 }

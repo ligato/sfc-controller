@@ -35,6 +35,14 @@ type IPAMPoolMgr struct {
 	ipamPoolCache map[string]*IPAMPool
 }
 
+func (mgr *IPAMPoolMgr) ToArray() []*IPAMPool {
+	var array []*IPAMPool
+	for _, ipamPool := range mgr.ipamPoolCache {
+		array = append(array, ipamPool)
+	}
+	return array
+}
+
 func (mgr *IPAMPoolMgr) Init() {
 	mgr.InitRAMCache()
 	mgr.LoadAllFromDatastoreIntoCache()

@@ -340,28 +340,39 @@ func (ns *NetworkService) renderConfig() error {
 	ns.Status.RenderedVppAgentEntries = make(map[string]*controller.RenderedVppAgentEntry, 0)
 	ns.Status.Interfaces = make(map[string]*controller.InterfaceStatus, 0)
 
+	defer ns.renderComplete()
+
+
 	for i, conn := range ns.Spec.Connections {
 		log.Debugf("RenderNetworkService: network-service/conn: ", ns.Metadata.Name, conn)
 
 		if err := ns.renderConnectionSegments(conn, uint32(i)); err != nil {
-			//s.ConfigCleanupErrorOcurredDuringRendering()
-			ns.Status.RenderedVppAgentEntries = nil
-			log.Errorf("RenderNetworkService: fail in network-service: %s, state=%v", ns.Metadata.Name, ns.Status)
+			return err
 		}
 	}
+
+	log.Debugf("RenderNetworkService: network-service:%s, status:%v", ns.Metadata.Name, ns.Status)
+
+	return nil
+}
+
+func (ns *NetworkService) renderComplete() error {
 
 	if len(ns.Status.Msg) == 0 {
 		ns.AppendStatusMsg("OK")
 		ns.Status.OperStatus = controller.OperStatusUp
 	} else {
+		RenderTxnConfigEntityRemoveEntries()
+		ns.Status.RenderedVppAgentEntries = nil
 		ns.Status.OperStatus = controller.OperStatusDown
 	}
 
+	// update the status info in the datastore
 	if err := ns.writeToDatastore(); err != nil {
 		return err
 	}
 
-	log.Debugf("RenderNetworkService: network-service:%s, status:%v", ns.Metadata.Name, ns.Status)
+	log.Debugf("renderComplete: %v", ns)
 
 	return nil
 }

@@ -44,7 +44,7 @@ type Ipv4Pool struct {
 }
 
 func (ipv4Pool *Ipv4Pool) String() string {
-	str := fmt.Sprintf("network: %s, %s", ipv4Pool.ipNetwork, ipv4Pool.bm)
+	str := fmt.Sprintf("Network: %s, %s", ipv4Pool.ipNetwork, ipv4Pool.bm)
 	return str
 }
 

@@ -34,6 +34,14 @@ type NetworkPodToNodeMapMgr struct {
 	networkPodNodeCache map[string]*NetworkPodToNodeMap
 }
 
+func (mgr *NetworkPodToNodeMapMgr) ToArray() []*NetworkPodToNodeMap {
+	var array []*NetworkPodToNodeMap
+	for _, p2n := range mgr.networkPodNodeCache {
+		array = append(array, p2n)
+	}
+	return array
+}
+
 func (mgr *NetworkPodToNodeMapMgr) Init() {
 	mgr.InitRAMCache()
 	mgr.LoadAllFromDatastoreIntoCache()

@@ -53,11 +53,11 @@ func formatMacAddress(id32 uint32) string {
 }
 
 // Allocate allocate the next MacAddr
-func (m *MacAddrAllocatorType) Allocate() string {
+func (m *MacAddrAllocatorType) Allocate() (string, uint32) {
 
 	m.MacAddrID++
 
-	return formatMacAddress(m.MacAddrID)
+	return formatMacAddress(m.MacAddrID), m.MacAddrID
 }
 
 // NewMacAddrAllocator allocates a MacAddr id's for memory interfaces

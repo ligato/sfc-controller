@@ -64,7 +64,11 @@ func (s *Plugin) SfcSystemCacheToYaml() ([]byte, error) {
 	yamlConfig.Version = 2
 	yamlConfig.Description = fmt.Sprintf("Config: %s", time.Now())
 	yamlConfig.NetworkNodes = ctlrPlugin.NetworkNodeMgr.ToArray()
+	yamlConfig.NetworkPodToNodeMap = ctlrPlugin.NetworkPodNodeMapMgr.ToArray()
 	yamlConfig.NetworkServices = ctlrPlugin.NetworkServiceMgr.ToArray()
+	yamlConfig.NetworkNodeOverlays = ctlrPlugin.NetworkNodeOverlayMgr.ToArray()
+	yamlConfig.IPAMPools = ctlrPlugin.IpamPoolMgr.ToArray()
+	yamlConfig.SysParms = *ctlrPlugin.SysParametersMgr.sysParmCache
 	yamlConfig.RamCache = &ctlrPlugin.ramConfigCache
 
 	yamlBytes, err := yaml.Marshal(yamlConfig)

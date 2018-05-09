@@ -20,27 +20,27 @@ import (
 
 // MemifAllocatorType data struct
 type MemifAllocatorType struct {
-	memifID uint32
+	MemifID uint32
 }
 
 func (m *MemifAllocatorType) String() string {
-	str := fmt.Sprintf("memif: %d", m.memifID)
+	str := fmt.Sprintf("memif: %d", m.MemifID)
 	return str
 }
 
 // Allocate allocate the next memif id
 func (m *MemifAllocatorType) Allocate() uint32 {
 
-	m.memifID++
+	m.MemifID++
 
-	return m.memifID
+	return m.MemifID
 }
 
 // NewMemifAllocator allocates a memif id's for memory interfaces
 func NewMemifAllocator() *MemifAllocatorType {
 
 	MemifAllocator := &MemifAllocatorType{
-		memifID: 0,
+		MemifID: 0,
 	}
 
 	return MemifAllocator

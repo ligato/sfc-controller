@@ -207,9 +207,10 @@ func (*RenderedVppAgentEntry) ProtoMessage()    {}
 //
 type InterfaceStatus struct {
 	Name        string   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Status      string   `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
-	Msg         []string `protobuf:"bytes,4,rep,name=msg" json:"msg,omitempty"`
-	MacAddress  string   `protobuf:"bytes,5,opt,name=mac_address,proto3" json:"mac_address,omitempty"`
+	Status      string   `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	Msg         []string `protobuf:"bytes,3,rep,name=msg" json:"msg,omitempty"`
+	MacAddress  string   `protobuf:"bytes,4,opt,name=mac_address,proto3" json:"mac_address,omitempty"`
+	MacAddrID   uint32   `protobuf:"varint,5,opt,name=macAddrID,proto3" json:"macAddrID,omitempty"`
 	IpAddresses []string `protobuf:"bytes,7,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
 	MemifID     uint32   `protobuf:"varint,8,opt,name=memifID,proto3" json:"memifID,omitempty"`
 	VrfID       uint32   `protobuf:"varint,9,opt,name=vrfID,proto3" json:"vrfID,omitempty"`

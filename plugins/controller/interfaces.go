@@ -18,7 +18,7 @@ import (
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 )
 
-// Nodes and NetworkServices have interface definitions so entity is either a node or netservice
+// Nodes and NetworkServices have interface definitions so an entity is either a node or netservice
 
 func InitInterfaceStatus(
 	entityName string,
@@ -36,7 +36,8 @@ func InitInterfaceStatus(
 
 	if entityInterface.MacAddress == "" {
 		if ifStatus.MacAddress == "" {
-			ifStatus.MacAddress = ctlrPlugin.ramConfigCache.MacAddrAllocator.Allocate()
+			ifStatus.MacAddress, ifStatus.MacAddrID =
+				ctlrPlugin.ramConfigCache.MacAddrAllocator.Allocate()
 		}
 	} else {
 		if ifStatus.MacAddress != entityInterface.MacAddress {
@@ -77,7 +78,6 @@ func PersistInterfaceStatus(
 	ifStatus *controller.InterfaceStatus,
 	entityInterfaceName string) {
 
-	//ns.InterfaceStateWriteToDatastore(ifState)
 	interfaces[entityInterfaceName] = ifStatus
 	ctlrPlugin.ramConfigCache.InterfaceStates[entityInterfaceName] = ifStatus
 }

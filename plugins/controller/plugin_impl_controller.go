@@ -124,7 +124,7 @@ func (s *Plugin) Init() error {
 
 	s.initMgrs()
 
-	if err := s.LoadVppAgentEntriesFromState(); err != nil {
+	if err := s.PreProcessEntityStatus(); err != nil {
 		os.Exit(1)
 	}
 
@@ -254,6 +254,8 @@ func (s *Plugin) InitSystemHTTPHandler() {
 // curl -X GET http://localhost:9191/sfc_controller
 func httpSystemGetAllYamlHandler(formatter *render.Render) http.HandlerFunc {
 
+	// This routine is a debug dump routine that dumps the config/state of the entire system in yaml format
+
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("httpSystemGetAllYamlHandler: Method %s, URL: %s", req.Method, req.URL)
 
@@ -269,25 +271,55 @@ func httpSystemGetAllYamlHandler(formatter *render.Render) http.HandlerFunc {
 	}
 }
 
-// LoadVppAgentEntriesFromState uses key/type from state to lad vpp entries from etcd
-func (s *Plugin) LoadVppAgentEntriesFromState() error {
+// PreProcessEntityStatus uses key/type from state to lad vpp entries from etcd
+func (s *Plugin) PreProcessEntityStatus() error {
 
-	log.Debugf("LoadVppAgentEntriesFromState: processing network services state: num: %d",
-		len(s.NetworkServiceMgr.networkServiceCache))
-	for _, ns := range s.NetworkServiceMgr.networkServiceCache {
-		log.Debugf("LoadVppAgentEntriesFromState: processing vnf service state: %s", ns.Metadata.Name)
-		if err := s.LoadVppAgentEntriesFromRenderedVppAgentEntries(ns.Status.RenderedVppAgentEntries); err != nil {
-			return err
-		}
-	}
-	log.Debugf("LoadVppAgentEntriesFromState: processing nodes state: num: %d",
+	log.Debugf("PreProcessEntityStatus: processing nodes state: num: %d",
 		len(s.NetworkNodeMgr.networkNodeCache))
 	for _, nn := range s.NetworkNodeMgr.networkNodeCache {
-		log.Debugf("LoadVppAgentEntriesFromState: processing node state: %s", nn.Metadata.Name)
-		if err := s.LoadVppAgentEntriesFromRenderedVppAgentEntries(nn.Status.RenderedVppAgentEntries); err != nil {
-			return err
+		if nn.Status != nil && len(nn.Status.RenderedVppAgentEntries) != 0 {
+
+			log.Debugf("PreProcessEntityStatus: processing node state: %s", nn.Metadata.Name)
+			if err := s.LoadVppAgentEntriesFromRenderedVppAgentEntries(nn.Status.RenderedVppAgentEntries); err != nil {
+				return err
+			}
+		}
+		if nn.Status != nil && len(nn.Status.Interfaces) != 0 {
+			for _, ifStatus := range nn.Status.Interfaces {
+				ctlrPlugin.ramConfigCache.InterfaceStates[ifStatus.Name] = ifStatus
+				if ifStatus.MemifID > ctlrPlugin.ramConfigCache.MemifIDAllocator.MemifID {
+					ctlrPlugin.ramConfigCache.MemifIDAllocator.MemifID = ifStatus.MemifID
+				}
+				if ifStatus.MacAddrID > ctlrPlugin.ramConfigCache.MacAddrAllocator.MacAddrID {
+					ctlrPlugin.ramConfigCache.MacAddrAllocator.MacAddrID = ifStatus.MacAddrID
+				}
+			}
 		}
 	}
+
+	log.Debugf("PreProcessEntityStatus: processing network services state: num: %d",
+		len(s.NetworkServiceMgr.networkServiceCache))
+	for _, ns := range s.NetworkServiceMgr.networkServiceCache {
+		if ns.Status != nil && len(ns.Status.RenderedVppAgentEntries) != 0 {
+			log.Debugf("PreProcessEntityStatus: processing vnf service state: %s", ns.Metadata.Name)
+			if err := s.LoadVppAgentEntriesFromRenderedVppAgentEntries(ns.Status.RenderedVppAgentEntries); err != nil {
+				return err
+			}
+		}
+		if ns.Status != nil && len(ns.Status.Interfaces) != 0 {
+			for _, ifStatus := range ns.Status.Interfaces {
+				ctlrPlugin.ramConfigCache.InterfaceStates[ifStatus.Name] = ifStatus
+				if ifStatus.MemifID > ctlrPlugin.ramConfigCache.MemifIDAllocator.MemifID {
+					ctlrPlugin.ramConfigCache.MemifIDAllocator.MemifID = ifStatus.MemifID
+				}
+				if ifStatus.MacAddrID > ctlrPlugin.ramConfigCache.MacAddrAllocator.MacAddrID {
+					ctlrPlugin.ramConfigCache.MacAddrAllocator.MacAddrID = ifStatus.MacAddrID
+				}
+			}
+		}
+
+	}
+
 
 	return nil
 }

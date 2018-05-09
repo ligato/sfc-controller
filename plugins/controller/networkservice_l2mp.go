@@ -42,13 +42,13 @@ func (ns *NetworkService) RenderConnL2MP(
 	log.Debugf("RenderTopologyL2MP: num interfaces: %d", numIFs)
 
 	// let's see if all interfaces in the conn are associated with a node
-	for _, connPodInterface := range conn.PodInterfaces {
+	for connIndex, connPodInterface := range conn.PodInterfaces {
 
 		connPodName, connInterfaceName := ConnPodInterfaceNames(connPodInterface)
 		p2n, exists := ctlrPlugin.ramConfigCache.NetworkPodToNodeMap[connPodName]
 		if !exists || p2n.Node == "" {
-			msg := fmt.Sprintf("connection segment: %s, network pod not mapped to a node in vnf_to_node_map",
-				connPodInterface)
+			msg := fmt.Sprintf("connection segment %d: %s, network pod not mapped to a node in vnf_to_node_map",
+				connIndex, connPodInterface)
 			ns.AppendStatusMsg(msg)
 			allPodsAssignedToNodes = false
 			continue
@@ -56,8 +56,8 @@ func (ns *NetworkService) RenderConnL2MP(
 
 		_, exists = ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationR(p2n.Node)
 		if !exists {
-			msg := fmt.Sprintf("connection segment: %s, network pod references non existant host: %s",
-				connPodInterface, p2n.Node)
+			msg := fmt.Sprintf("connection segment %d: %s, network pod references non existant host: %s",
+				connIndex, connPodInterface, p2n.Node)
 			ns.AppendStatusMsg(msg)
 			allPodsAssignedToNodes = false
 			continue
@@ -75,7 +75,7 @@ func (ns *NetworkService) RenderConnL2MP(
 	}
 
 	if !allPodsAssignedToNodes {
-		msg := fmt.Sprintf("network-service: %s, Not all networkPods in this connection are mapped to nodes",
+		msg := fmt.Sprintf("network-service: %s, not all network pods in this connection are mapped to nodes",
 			ns.Metadata.Name)
 		ns.AppendStatusMsg(msg)
 		return fmt.Errorf(msg)
@@ -90,9 +90,10 @@ func (ns *NetworkService) RenderConnL2MP(
 	if conn.NetworkNodeOverlayName != "" {
 		nno, exists = ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationR(conn.NetworkNodeOverlayName)
 		if !exists {
-			msg := fmt.Sprintf("network-service: %s, conn: %d, referencing a missing overlay",
+			msg := fmt.Sprintf("network-service: %s, conn: %d, referencing a missing overlay: %s",
 				ns.Metadata.Name,
-				connIndex)
+				connIndex,
+				conn.NetworkNodeOverlayName)
 			ns.AppendStatusMsg(msg)
 			return fmt.Errorf(msg)
 		}
@@ -181,9 +182,10 @@ func (ns *NetworkService) renderL2BD(
 			ns.AppendStatusMsg(msg)
 			return fmt.Errorf(msg)
 		}
-		//vppKV := vppagent.AppendInterfacesToL2BD(nodeName, nodeL2BD, l2bdIFs)
-		//nn.Status.RenderedVppAgentEntries =
-		//	s.ConfigTransactionAddVppEntry(nn.Status.RenderedVppAgentEntries, vppKV)
+		vppKV := vppagent.AppendInterfacesToL2BD(nodeName, nodeL2BD, l2bdIFs)
+		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
+			vppKV)
 
 	} else {
 		var bdParms *controller.BDParms

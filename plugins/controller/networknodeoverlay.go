@@ -36,6 +36,14 @@ type NetworkNodeOverlayMgr struct {
 	vxLanAddresses          map[string]string
 }
 
+func (mgr *NetworkNodeOverlayMgr) ToArray() []*NetworkNodeOverlay {
+	var array []*NetworkNodeOverlay
+	for _, nno := range mgr.networkNodeOverlayCache {
+		array = append(array, nno)
+	}
+	return array
+}
+
 func (mgr *NetworkNodeOverlayMgr) Init() {
 	mgr.InitRAMCache()
 	mgr.LoadAllFromDatastoreIntoCache()
@@ -51,7 +59,7 @@ type NetworkNodeOverlay struct {
 	controller.NetworkNodeOverlay
 }
 
-// InitRAMCache create a map for all the entites
+// InitRAMCache create a map for all the entities
 func (mgr *NetworkNodeOverlayMgr) InitRAMCache() {
 	mgr.networkNodeOverlayCache = nil // delete old cache for re-init
 	mgr.networkNodeOverlayCache = make(map[string]*NetworkNodeOverlay)

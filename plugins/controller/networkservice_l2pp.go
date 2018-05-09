@@ -42,16 +42,16 @@ func (ns *NetworkService) RenderConnL2PP(
 
 		p2n, exists := ctlrPlugin.ramConfigCache.NetworkPodToNodeMap[connPodName]
 		if !exists || p2n.Node == "" {
-			msg := fmt.Sprintf("connection segment: %s, network pod not mapped to a node in network_pod_to_node_map",
-				connPodInterface)
+			msg := fmt.Sprintf("connection segment %d: %s, network pod not mapped to a node in network_pod_to_node_map",
+				i, connPodInterface)
 			ns.AppendStatusMsg(msg)
 			allPodsAssignedToNodes = false
 			continue
 		}
 		_, exists = ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationR(p2n.Node)
 		if !exists {
-			msg := fmt.Sprintf("connection segment: %s, network pod references non existant host: %s",
-				connPodInterface, p2n.Node)
+			msg := fmt.Sprintf("connection segment %d: %s, network pod references non existant host: %s",
+				i, connPodInterface, p2n.Node)
 			ns.AppendStatusMsg(msg)
 			allPodsAssignedToNodes = false
 			continue
@@ -79,7 +79,7 @@ func (ns *NetworkService) RenderConnL2PP(
 			netPodInterfaces, networkPodTypes)
 	}
 
-	// not on same node so ensure there is an NetworkNodeOverlay sepcified
+	// not on same node so ensure there is an NetworkNodeOverlay specified
 	if conn.NetworkNodeOverlayName == "" {
 		msg := fmt.Sprintf("network-service: %s, %s to %s no node overlay specified",
 			ns.Metadata.Name,
@@ -92,10 +92,11 @@ func (ns *NetworkService) RenderConnL2PP(
 	// look up the vnf service mesh
 	nno, exists := ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationR(conn.NetworkNodeOverlayName)
 	if !exists {
-		msg := fmt.Sprintf("network-service: %s, %s to %s referencing a missing node overlay",
+		msg := fmt.Sprintf("network-service: %s, %s to %s referencing a missing node overlay: %s",
 			ns.Metadata.Name,
 			conn.PodInterfaces[0],
-			conn.PodInterfaces[1])
+			conn.PodInterfaces[1],
+			conn.NetworkNodeOverlayName)
 		ns.AppendStatusMsg(msg)
 		return fmt.Errorf(msg)
 	}

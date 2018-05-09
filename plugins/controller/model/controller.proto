@@ -101,9 +101,10 @@ message RenderedVppAgentEntry {
 //
 message InterfaceStatus {
     string name = 1; // format: pod/ifname
-    string status = 3; // unknown|up|down
-    repeated string msg = 4;
-    string mac_address = 5;
+    string status = 2; // unknown|up|down
+    repeated string msg = 3;
+    string mac_address = 4;
+    uint32 macAddrID = 5;
     repeated string ip_addresses = 7;
     uint32 memifID  = 8;
     uint32 vrfID = 9;

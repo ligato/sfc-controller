@@ -20,27 +20,27 @@ import (
 )
 
 type VxlanVniAllocatorType struct {
-	startVni uint32
-	endVni   uint32
+	StartVni uint32 `json:"start_vni,omitempty"`
+	EndVni   uint32 `json:"end_vni,omitempty"`
 	numBits  uint32
-	bm       *bitmap.Bitmap
+	BM       *bitmap.Bitmap `json:"bitmap,omitempty"`
 }
 
 func (v *VxlanVniAllocatorType) String() string {
 	str := fmt.Sprintf("vxlan vni's: [%d-%d], %s",
-		v.startVni,
-		v.endVni,
-		v.bm)
+		v.StartVni,
+		v.EndVni,
+		v.BM)
 	return str
 }
 
 // SetVni marks the vni in teh range as allocated
 func (v *VxlanVniAllocatorType) SetVni(vni uint32) error {
-	if vni < v.startVni || vni > v.endVni {
+	if vni < v.StartVni || vni > v.EndVni {
 		return fmt.Errorf("SetVni: vni '%d' out of range '%d-%d",
-			vni, v.startVni, v.endVni)
+			vni, v.StartVni, v.EndVni)
 	}
-	err := v.bm.Set(vni - v.startVni + 1)
+	err := v.BM.Set(vni - v.StartVni + 1)
 	if err != nil {
 		return err
 	}
@@ -49,14 +49,14 @@ func (v *VxlanVniAllocatorType) SetVni(vni uint32) error {
 
 // AllocateVni allocates a free vni
 func (v *VxlanVniAllocatorType) AllocateVni() (uint32, error) {
-	freeBit := v.bm.FindFirstClear()
+	freeBit := v.BM.FindFirstClear()
 	if freeBit == 0 {
 		return 0, fmt.Errorf("AllocateVni: all vni's allocated")
 	}
 
-	v.bm.Set(freeBit)
+	v.BM.Set(freeBit)
 
-	return freeBit + v.startVni - 1, nil
+	return freeBit + v.StartVni - 1, nil
 }
 
 // NewVxlanVniAllocator allocates a range of id's lfor vni's
@@ -68,9 +68,9 @@ func NewVxlanVniAllocator(startVni uint32, endVni uint32) *VxlanVniAllocatorType
 
 	vxlanVniAllocator := &VxlanVniAllocatorType{
 		numBits:  numBits,
-		bm:       bm,
-		startVni: startVni,
-		endVni:   endVni,
+		BM:       bm,
+		StartVni: startVni,
+		EndVni:   endVni,
 	}
 
 	return vxlanVniAllocator
