@@ -51,7 +51,9 @@ func (mgr *NetworkNodeOverlayMgr) Init() {
 
 func (mgr *NetworkNodeOverlayMgr) AfterInit() {
 	go mgr.InitAndRunWatcher()
-	mgr.InitHTTPHandlers()
+	if !BypassModelTypeHttpHandlers {
+		mgr.InitHTTPHandlers()
+	}
 }
 
 // NetworkNodeOverlay holds all network node specific info

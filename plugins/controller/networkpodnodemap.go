@@ -49,7 +49,9 @@ func (mgr *NetworkPodToNodeMapMgr) Init() {
 
 func (mgr *NetworkPodToNodeMapMgr) AfterInit() {
 	go mgr.InitAndRunWatcher()
-	mgr.InitHTTPHandlers()
+	if !BypassModelTypeHttpHandlers {
+		mgr.InitHTTPHandlers()
+	}
 }
 
 // NetworkPodToNodeMap holds all network node specific info

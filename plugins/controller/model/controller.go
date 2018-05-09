@@ -59,6 +59,7 @@ const (
 
 	NetworkNodeOverlayConnectionTypeVxlan = "vxlan"
 
+	IPAMPoolScopeAny            = "any" // dont use this, this is for cleaning up
 	IPAMPoolScopeSystem         = "system"
 	IPAMPoolScopeNode           = "node"
 	IPAMPoolScopeNetworkService = "network_service"

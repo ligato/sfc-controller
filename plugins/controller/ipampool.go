@@ -17,6 +17,7 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
@@ -28,7 +29,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"github.com/golang/protobuf/proto"
 )
 
 type IPAMPoolMgr struct {
@@ -50,7 +50,9 @@ func (mgr *IPAMPoolMgr) Init() {
 
 func (mgr *IPAMPoolMgr) AfterInit() {
 	go mgr.InitAndRunWatcher()
-	mgr.InitHTTPHandlers()
+	if !BypassModelTypeHttpHandlers {
+		mgr.InitHTTPHandlers()
+	}
 }
 
 // IPAMPool holds all network node specific info
@@ -169,7 +171,7 @@ func (mgr *IPAMPoolMgr) EntityCreate(entityName string, scope string) {
 func (mgr *IPAMPoolMgr) EntityDelete(entityName string, scope string) {
 
 	for _, ipamPool := range mgr.ipamPoolCache {
-		if ipamPool.Spec.Scope == scope {
+		if ipamPool.Spec.Scope == scope || scope == controller.IPAMPoolScopeAny {
 			ipamPoolAllocator, _ := mgr.FindAllocator(ipamPool.Metadata.Name, entityName)
 			if ipamPoolAllocator != nil {
 				allocatorName := contructAllocatorName(ipamPool, entityName)
@@ -230,7 +232,25 @@ func (mgr *IPAMPoolMgr) HandleCRUDOperationR(name string) (*IPAMPool, bool) {
 
 // HandleCRUDOperationD removes from ram cache
 func (mgr *IPAMPoolMgr) HandleCRUDOperationD(name string, render bool) error {
-	return fmt.Errorf("delete not implemented %s", name)
+
+	ipamPool, exists := mgr.ipamPoolCache[name]
+	if !exists {
+		return nil
+	}
+
+	// remove from cache
+	delete(mgr.ipamPoolCache, name)
+
+	// remove from the database
+	database.DeleteFromDatastore(mgr.NameKey(name))
+
+	ctlrPlugin.IpamPoolMgr.EntityDelete(name, ipamPool.Spec.Scope)
+
+	if render {
+		log.Errorf("HandleCRUDOperationD: need to implement rerender ...")
+	}
+
+	return nil
 }
 
 // HandleCRUDOperationGetAll returns the map

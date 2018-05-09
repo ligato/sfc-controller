@@ -44,6 +44,7 @@ var (
 	sfcConfigFile     string // cli flag - see RegisterFlags
 	cleanSfcDatastore bool   // cli flag - see RegisterFlags
 	contivKSREnabled  bool   // cli flag - see RegisterFlags
+	BypassModelTypeHttpHandlers  bool   // cli flag - see RegisterFlags
 	log               = logrus.DefaultLogger()
 	ctlrPlugin        *Plugin
 )
@@ -56,6 +57,8 @@ func RegisterFlags() {
 		"Clean the SFC datastore entries")
 	flag.BoolVar(&contivKSREnabled, "contiv-ksr", false,
 		"Interact with contiv ksr to learn k8s config/state")
+	flag.BoolVar(&BypassModelTypeHttpHandlers, "bypass-rest-for-model-objects", false,
+		"Disable HTTP handling for controller objects")
 }
 
 // LogFlags dumps the command line flags
@@ -64,6 +67,7 @@ func LogFlags() {
 	log.Debugf("\tsfcConfigFile:'%s'", sfcConfigFile)
 	log.Debugf("\tclean:'%v'", cleanSfcDatastore)
 	log.Debugf("\tcontiv ksr:'%v'", contivKSREnabled)
+	log.Debugf("\tmodel REST disabled:'%v'", BypassModelTypeHttpHandlers)
 }
 
 func init() {
@@ -90,14 +94,14 @@ type Plugin struct {
 	Etcd    *etcdv3.Plugin
 	HTTPmux *rest.Plugin
 	*local.FlavorLocal
-	NetworkNodeMgr        NetworkNodeMgr
-	IpamPoolMgr           IPAMPoolMgr
-	SysParametersMgr      SystemParametersMgr
-	NetworkServiceMgr     NetworkServiceMgr
-	NetworkNodeOverlayMgr NetworkNodeOverlayMgr
-	NetworkPodNodeMapMgr  NetworkPodToNodeMapMgr
-	ramConfigCache        CacheType
-	db                    keyval.ProtoBroker
+	NetworkNodeMgr              NetworkNodeMgr
+	IpamPoolMgr                 IPAMPoolMgr
+	SysParametersMgr            SystemParametersMgr
+	NetworkServiceMgr           NetworkServiceMgr
+	NetworkNodeOverlayMgr       NetworkNodeOverlayMgr
+	NetworkPodNodeMapMgr        NetworkPodToNodeMapMgr
+	ramConfigCache              CacheType
+	db                          keyval.ProtoBroker
 }
 
 // Init the controller, read the db, reconcile/resync, render config to etcd
@@ -168,6 +172,7 @@ func (s *Plugin) initMgrs() {
 
 func (s *Plugin) afterInitMgrs() {
 	s.InitSystemHTTPHandler()
+
 	for _, entry := range RegisteredManagers {
 		log.Infof("afterInitMgrs: after initing %s ...", entry.modelTypeName)
 		entry.mgr.AfterInit()
@@ -319,7 +324,6 @@ func (s *Plugin) PreProcessEntityStatus() error {
 		}
 
 	}
-
 
 	return nil
 }

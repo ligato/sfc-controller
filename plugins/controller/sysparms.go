@@ -38,7 +38,9 @@ func (mgr *SystemParametersMgr) Init() {
 
 func (mgr *SystemParametersMgr) AfterInit() {
 	go mgr.InitAndRunWatcher()
-	mgr.InitHTTPHandlers()
+	if !BypassModelTypeHttpHandlers {
+		mgr.InitHTTPHandlers()
+	}
 }
 
 // SystemParameters holds all network node specific info

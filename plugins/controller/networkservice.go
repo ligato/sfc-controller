@@ -49,7 +49,9 @@ func (mgr *NetworkServiceMgr) Init() {
 
 func (mgr *NetworkServiceMgr) AfterInit() {
 	go mgr.InitAndRunWatcher()
-	mgr.InitHTTPHandlers()
+	if !BypassModelTypeHttpHandlers {
+		mgr.InitHTTPHandlers()
+	}
 }
 
 // NetworkService holds all network node specific info

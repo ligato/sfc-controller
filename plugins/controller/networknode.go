@@ -51,7 +51,9 @@ func (mgr *NetworkNodeMgr) Init() {
 
 func (mgr *NetworkNodeMgr) AfterInit() {
 	go mgr.InitAndRunWatcher()
-	mgr.InitHTTPHandlers()
+	if !BypassModelTypeHttpHandlers {
+		mgr.InitHTTPHandlers()
+	}
 }
 
 // NetworkNode holds all network node specific info
@@ -169,7 +171,7 @@ func (mgr *NetworkNodeMgr) HandleCRUDOperationD(nodeName string, render bool) er
 	database.DeleteFromDatastore(mgr.NameKey(nodeName))
 
 	// get rid of node scope ipam pool if there is one
-	ctlrPlugin.IpamPoolMgr.EntityDelete(nodeName, controller.IPAMPoolScopeNode)
+	ctlrPlugin.IpamPoolMgr.EntityDelete(nodeName, controller.IPAMPoolScopeAny)
 
 	if render {
 		log.Errorf("HandleCRUDOperationD: need to implement rerender ...")
