@@ -17,10 +17,6 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net"
-	"net/http"
-	"os"
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
@@ -30,6 +26,10 @@ import (
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
 	"github.com/unrolled/render"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"os"
 )
 
 type NetworkNodeMgr struct {
@@ -119,6 +119,49 @@ func (mgr *NetworkNodeMgr) FindVxlanIPaddress(nodeName string) (string, error) {
 	return "", fmt.Errorf("no vxlan ip address found for node: %s", nodeName)
 }
 
+func (mgr *NetworkNodeMgr) FindInterfaceInNode(nodeName string, ifName string) (*controller.Interface, string) {
+
+	nn, exists := mgr.networkNodeCache[nodeName]
+	if !exists {
+		return nil, ""
+	}
+	for _, iFace := range nn.Spec.Interfaces {
+		if iFace.Name == ifName {
+			return iFace, iFace.IfType
+		}
+	}
+
+	return nil, ""
+}
+
+func (mgr *NetworkNodeMgr) FindInterfacesForThisLabelInNode(nodeName string,
+	labels []string) ([]*controller.Interface, []string) {
+
+	var interfaces []*controller.Interface
+	var ifTypes []string
+
+	nn, exists := mgr.networkNodeCache[nodeName]
+	if !exists {
+		log.Debugf("FindInterfacesForThisLabelInNode: node not found: %s", nodeName)
+		return interfaces, ifTypes
+	}
+	for _, iFace := range nn.Spec.Interfaces {
+		for _, ifaceLabel := range iFace.Labels {
+			for _, label := range labels {
+				if ifaceLabel == label {
+					log.Debugf("FindInterfacesForThisLabelInNode: label matched: node/iface/label: %s/%s/%s",
+						nodeName, iFace.Name, label)
+					interfaces = append(interfaces, iFace)
+					ifTypes = append(ifTypes, iFace.IfType)
+					break
+				}
+			}
+		}
+	}
+
+	return interfaces, ifTypes
+}
+
 // HandleCRUDOperationCU add to ram cache and render
 func (mgr *NetworkNodeMgr) HandleCRUDOperationCU(_nn *NetworkNode, render bool) error {
 
@@ -170,8 +213,8 @@ func (mgr *NetworkNodeMgr) HandleCRUDOperationD(nodeName string, render bool) er
 	// remove from the database
 	database.DeleteFromDatastore(mgr.NameKey(nodeName))
 
-	// get rid of node scope ipam pool if there is one
-	ctlrPlugin.IpamPoolMgr.EntityDelete(nodeName, controller.IPAMPoolScopeAny)
+	// get rid of allocated ipam pool for this node if there is one
+	ctlrPlugin.IpamPoolMgr.EntityDelete(nodeName, controller.IPAMPoolScopeNode)
 
 	if render {
 		log.Errorf("HandleCRUDOperationD: need to implement rerender ...")
@@ -433,15 +476,14 @@ func (nn *NetworkNode) renderNodeInterfaces() error {
 		case controller.IfTypeEthernet:
 			if !iFace.BypassRenderer {
 
-				nodeInterfaceStr := nn.Metadata.Name + "/" + iFace.Name
-
-				ifStatus, err := InitInterfaceStatus(nn.Metadata.Name, nn.Metadata.Name,
-					nodeInterfaceStr,
-					iFace)
+				ifStatus, err := InitInterfaceStatus(nn.Metadata.Name, nn.Metadata.Name, iFace)
 				if err != nil {
+					RemoveInterfaceStatus(nn.Status.Interfaces, iFace.Parent, iFace.Name)
+					msg := fmt.Sprintf("node interface: %s/%s, %s", iFace.Parent, iFace.Name, err)
+					nn.AppendStatusMsg(msg)
 					return err
 				}
-				PersistInterfaceStatus(nn.Status.Interfaces, ifStatus, nodeInterfaceStr)
+				PersistInterfaceStatus(nn.Status.Interfaces, ifStatus, iFace.Parent, iFace.Name)
 
 				vppKV := vppagent.ConstructEthernetInterface(
 					nn.Metadata.Name,
@@ -653,6 +695,7 @@ func (nn *NetworkNode) nodeValidateInterfaces(nodeName string, iFaces []*control
 			return fmt.Errorf("node/if: %s/%s has invalid if type '%s'",
 				nodeName, iFace.Name, iFace.IfType)
 		}
+		iFace.Parent = nn.Metadata.Name
 		for _, ipAddress := range iFace.IpAddresses {
 			ip, network, err := net.ParseCIDR(ipAddress)
 			if err != nil {
@@ -660,10 +703,6 @@ func (nn *NetworkNode) nodeValidateInterfaces(nodeName string, iFaces []*control
 					nodeName, iFace.Name, err)
 			}
 			log.Debugf("nodeValidateInterfaces: ip: %s, network: %s", ip, network)
-		}
-		if iFace.IpAddresses == nil {
-			log.Warnf("nodeValidateInterfaces: node/if: %s/%s, missing ipaddress",
-				nodeName, iFace.Name)
 		}
 	}
 

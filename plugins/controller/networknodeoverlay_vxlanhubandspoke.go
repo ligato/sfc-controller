@@ -27,7 +27,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 	conn *controller.Connection,
 	connIndex uint32,
 	networkPodInterfaces []*controller.Interface,
-	p2nArray []*NetworkPodToNodeMap,
+	p2nArray []NetworkPodToNodeMap,
 	vnfTypes []string,
 	spokeNodeMap map[string]bool,
 	l2bdIFs map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces) error {

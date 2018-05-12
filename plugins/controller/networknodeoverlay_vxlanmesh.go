@@ -27,7 +27,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 	conn *controller.Connection,
 	connIndex uint32,
 	vnfInterfaces []*controller.Interface,
-	p2nArray []*NetworkPodToNodeMap,
+	p2nArray []NetworkPodToNodeMap,
 	vnfTypes []string,
 	nodeMap map[string]bool,
 	l2bdIFs map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces) error {
@@ -133,7 +133,7 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 	conn *controller.Connection,
 	connIndex uint32,
 	networkPodInterfaces []*controller.Interface,
-	p2nArray [2]*NetworkPodToNodeMap,
+	p2nArray [2]NetworkPodToNodeMap,
 	xconn [2][2]string) error {
 
 	// The nodeMap contains the set of nodes involved in the l2mp connection.  There

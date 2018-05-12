@@ -60,9 +60,7 @@ message L2BD {
 // IPAM will choose an address using the prefix.  In the example, there is an 8 bit address space [0..255]
 // if 0..255 are not desired then a start and end address can be used.  See comments below.
 message IPAMPoolStatus {
-    string addresses = 1;
-    string status = 2;
-    repeated string msg = 3;
+    map<string,string> addresses = 1; // foramt: scope.name, allocated addr count
 }
 message IPAMPoolSpec {
     string scope = 2; // node|system|vnf_service
@@ -105,6 +103,7 @@ message InterfaceStatus {
     repeated string msg = 3;
     string mac_address = 4;
     uint32 macAddrID = 5;
+    map<string,uint32> ipam_pool_nums = 6; // format: pool_name/ipNum
     repeated string ip_addresses = 7;
     uint32 memifID  = 8;
     uint32 vrfID = 9;
@@ -121,13 +120,15 @@ message Interface {
     string rx_mode = 6;     // optional: polling|interrupt|adaptive or uses system defaults
     repeated string ip_addresses = 7; // format i.p.v.4/xx, or ip::v6/xx
     uint32 vrf_id = 8;
-    string ipam_pool_name = 9;
+    repeated string ipam_pool_names = 9;
     string admin_status = 10; // enabled|disabled
     message MemIFParms {
         string mode = 1; //ethernet|ip|puntinject optional/default: ethernet
         string inter_pod_conn = 2; //direct|vswitch optional/default: direct
     }
     MemIFParms memif_parms = 11;
+    repeated string labels = 12;
+    string parent = 13; // internal field: could be a node or pod
 }
 
 message NetworkPodSpec {
@@ -145,9 +146,11 @@ message Connection {
     string conn_type = 1; // l2pp|l2mp|ip4pp|ip6pp|ip4mp|ip6mp
     string network_node_overlay_name = 2; // needed if require inter-node vnf's
     repeated string pod_interfaces = 3; // format: pod/ifname
-    string use_node_l2bd = 4; // optional: use an existing node level l2bd
+    repeated string node_interfaces = 4; // format: pod/ifname
+    repeated string node_interface_labels = 5; // format: node/ifname
+    string use_node_l2bd = 6; // optional: use an existing node level l2bd
                               // only for l2mp connections
-    L2BD l2bd = 5; // optional: if omitted and use_node_l2bd is not set then
+    L2BD l2bd = 7; // optional: if omitted and use_node_l2bd is not set then
                    // create a l2bd with default parms for l2mp connections
 }
 

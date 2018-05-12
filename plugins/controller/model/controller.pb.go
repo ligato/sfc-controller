@@ -112,14 +112,19 @@ func (m *L2BD) GetBdParms() *BDParms {
 // IPAM will choose an address using the prefix.  In the example, there is an 8 bit address space [0..255]
 // if 0..255 are not desired then a start and end address can be used.  See comments below.
 type IPAMPoolStatus struct {
-	Addresses string   `protobuf:"bytes,1,opt,name=addresses,proto3" json:"addresses,omitempty"`
-	Status    string   `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	Msg       []string `protobuf:"bytes,3,rep,name=msg" json:"msg,omitempty"`
+	Addresses map[string]string `protobuf:"bytes,1,rep,name=addresses" json:"addresses,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (m *IPAMPoolStatus) Reset()         { *m = IPAMPoolStatus{} }
 func (m *IPAMPoolStatus) String() string { return proto.CompactTextString(m) }
 func (*IPAMPoolStatus) ProtoMessage()    {}
+
+func (m *IPAMPoolStatus) GetAddresses() map[string]string {
+	if m != nil {
+		return m.Addresses
+	}
+	return nil
+}
 
 type IPAMPoolSpec struct {
 	Scope      string `protobuf:"bytes,2,opt,name=scope,proto3" json:"scope,omitempty"`
@@ -206,20 +211,28 @@ func (*RenderedVppAgentEntry) ProtoMessage()    {}
 // Interface ... channel?
 //
 type InterfaceStatus struct {
-	Name        string   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Status      string   `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	Msg         []string `protobuf:"bytes,3,rep,name=msg" json:"msg,omitempty"`
-	MacAddress  string   `protobuf:"bytes,4,opt,name=mac_address,proto3" json:"mac_address,omitempty"`
-	MacAddrID   uint32   `protobuf:"varint,5,opt,name=macAddrID,proto3" json:"macAddrID,omitempty"`
-	IpAddresses []string `protobuf:"bytes,7,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
-	MemifID     uint32   `protobuf:"varint,8,opt,name=memifID,proto3" json:"memifID,omitempty"`
-	VrfID       uint32   `protobuf:"varint,9,opt,name=vrfID,proto3" json:"vrfID,omitempty"`
-	Node        string   `protobuf:"bytes,10,opt,name=node,proto3" json:"node,omitempty"`
+	Name         string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Status       string            `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	Msg          []string          `protobuf:"bytes,3,rep,name=msg" json:"msg,omitempty"`
+	MacAddress   string            `protobuf:"bytes,4,opt,name=mac_address,proto3" json:"mac_address,omitempty"`
+	MacAddrID    uint32            `protobuf:"varint,5,opt,name=macAddrID,proto3" json:"macAddrID,omitempty"`
+	IpamPoolNums map[string]uint32 `protobuf:"bytes,6,rep,name=ipam_pool_nums" json:"ipam_pool_nums,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	IpAddresses  []string          `protobuf:"bytes,7,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
+	MemifID      uint32            `protobuf:"varint,8,opt,name=memifID,proto3" json:"memifID,omitempty"`
+	VrfID        uint32            `protobuf:"varint,9,opt,name=vrfID,proto3" json:"vrfID,omitempty"`
+	Node         string            `protobuf:"bytes,10,opt,name=node,proto3" json:"node,omitempty"`
 }
 
 func (m *InterfaceStatus) Reset()         { *m = InterfaceStatus{} }
 func (m *InterfaceStatus) String() string { return proto.CompactTextString(m) }
 func (*InterfaceStatus) ProtoMessage()    {}
+
+func (m *InterfaceStatus) GetIpamPoolNums() map[string]uint32 {
+	if m != nil {
+		return m.IpamPoolNums
+	}
+	return nil
+}
 
 type Interface struct {
 	Name           string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -227,13 +240,15 @@ type Interface struct {
 	IfType         string `protobuf:"bytes,3,opt,name=if_type,proto3" json:"if_type,omitempty"`
 	MacAddress     string `protobuf:"bytes,4,opt,name=mac_address,proto3" json:"mac_address,omitempty"`
 	// 02:00:00:00:00:00 as base, last octet increments
-	Mtu          uint32                `protobuf:"varint,5,opt,name=mtu,proto3" json:"mtu,omitempty"`
-	RxMode       string                `protobuf:"bytes,6,opt,name=rx_mode,proto3" json:"rx_mode,omitempty"`
-	IpAddresses  []string              `protobuf:"bytes,7,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
-	VrfId        uint32                `protobuf:"varint,8,opt,name=vrf_id,proto3" json:"vrf_id,omitempty"`
-	IpamPoolName string                `protobuf:"bytes,9,opt,name=ipam_pool_name,proto3" json:"ipam_pool_name,omitempty"`
-	AdminStatus  string                `protobuf:"bytes,10,opt,name=admin_status,proto3" json:"admin_status,omitempty"`
-	MemifParms   *Interface_MemIFParms `protobuf:"bytes,11,opt,name=memif_parms" json:"memif_parms,omitempty"`
+	Mtu           uint32                `protobuf:"varint,5,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	RxMode        string                `protobuf:"bytes,6,opt,name=rx_mode,proto3" json:"rx_mode,omitempty"`
+	IpAddresses   []string              `protobuf:"bytes,7,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
+	VrfId         uint32                `protobuf:"varint,8,opt,name=vrf_id,proto3" json:"vrf_id,omitempty"`
+	IpamPoolNames []string              `protobuf:"bytes,9,rep,name=ipam_pool_names" json:"ipam_pool_names,omitempty"`
+	AdminStatus   string                `protobuf:"bytes,10,opt,name=admin_status,proto3" json:"admin_status,omitempty"`
+	MemifParms    *Interface_MemIFParms `protobuf:"bytes,11,opt,name=memif_parms" json:"memif_parms,omitempty"`
+	Labels        []string              `protobuf:"bytes,12,rep,name=labels" json:"labels,omitempty"`
+	Parent        string                `protobuf:"bytes,13,opt,name=parent,proto3" json:"parent,omitempty"`
 }
 
 func (m *Interface) Reset()         { *m = Interface{} }
@@ -307,9 +322,11 @@ type Connection struct {
 	ConnType               string   `protobuf:"bytes,1,opt,name=conn_type,proto3" json:"conn_type,omitempty"`
 	NetworkNodeOverlayName string   `protobuf:"bytes,2,opt,name=network_node_overlay_name,proto3" json:"network_node_overlay_name,omitempty"`
 	PodInterfaces          []string `protobuf:"bytes,3,rep,name=pod_interfaces" json:"pod_interfaces,omitempty"`
-	UseNodeL2Bd            string   `protobuf:"bytes,4,opt,name=use_node_l2bd,proto3" json:"use_node_l2bd,omitempty"`
+	NodeInterfaces         []string `protobuf:"bytes,4,rep,name=node_interfaces" json:"node_interfaces,omitempty"`
+	NodeInterfaceLabels    []string `protobuf:"bytes,5,rep,name=node_interface_labels" json:"node_interface_labels,omitempty"`
+	UseNodeL2Bd            string   `protobuf:"bytes,6,opt,name=use_node_l2bd,proto3" json:"use_node_l2bd,omitempty"`
 	// only for l2mp connections
-	L2Bd *L2BD `protobuf:"bytes,5,opt,name=l2bd" json:"l2bd,omitempty"`
+	L2Bd *L2BD `protobuf:"bytes,7,opt,name=l2bd" json:"l2bd,omitempty"`
 }
 
 func (m *Connection) Reset()         { *m = Connection{} }

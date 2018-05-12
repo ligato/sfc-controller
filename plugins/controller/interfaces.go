@@ -23,14 +23,15 @@ import (
 func InitInterfaceStatus(
 	entityName string,
 	vppAgent string,
-	connPodInterface string,
 	entityInterface *controller.Interface) (*controller.InterfaceStatus, error) {
 
-	ifStatus, exists := ctlrPlugin.ramConfigCache.InterfaceStates[connPodInterface]
+	entityInterfaceName := 	entityInterface.Parent + "/" + entityInterface.Name
+	ifStatus, exists := ctlrPlugin.ramConfigCache.InterfaceStates[entityInterfaceName]
 	if !exists {
 		ifStatus = &controller.InterfaceStatus{
-			Name: connPodInterface,
+			Name: entityInterfaceName,
 			Node: vppAgent,
+			IpamPoolNums: make(map[string]uint32,0),
 		}
 	}
 
@@ -44,29 +45,36 @@ func InitInterfaceStatus(
 			ifStatus.MacAddress = entityInterface.MacAddress
 		}
 	}
-	if len(entityInterface.IpAddresses) == 0 {
-		if len(ifStatus.IpAddresses) == 0 {
-			if entityInterface.IpamPoolName != "" {
-				ipAddress, err := ctlrPlugin.IpamPoolMgr.AllocateAddress(entityInterface.IpamPoolName,
-					vppAgent, entityName)
-				if err != nil {
-					return nil, err
-				}
-				ifStatus.IpAddresses = []string{ipAddress}
-			}
-		}
-	} else {
-		// seems hard coded addresses are provided ... what if they dont match what we have for this
-		// interface in the status section
-		if len(ifStatus.IpAddresses) == 0 {
-			ifStatus.IpAddresses = entityInterface.IpAddresses
 
-		} else if !ipAddressArraysEqual(ifStatus.IpAddresses, entityInterface.IpAddresses) {
-			log.Warnf("initInterfaceStatus: provision interface %s, configured ip addresses (%v dont match current state: %v",
-				connPodInterface,
-				entityInterface.IpAddresses,
-				ifStatus.IpAddresses)
-			ifStatus.IpAddresses = entityInterface.IpAddresses
+	// rebuild the status ip addresses from the statically defined ones, then add the ones allocated
+	// already from pools, then if pool addreesses are not allocated yet, then allocate as well
+	ifStatus.IpAddresses = entityInterface.IpAddresses
+	// for all already allocated from pool ip addresses, set as used in the allocators
+	for poolName, ipNum := range ifStatus.IpamPoolNums {
+		// if already have an allocated ipNum, ensure it is marked as used/set in the allocator
+		ipAddress, err := ctlrPlugin.IpamPoolMgr.SetAddress(poolName, vppAgent, entityName, ipNum)
+		if err != nil {
+			return nil, err
+		}
+		ifStatus.IpAddresses = append(ifStatus.IpAddresses, ipAddress)
+	}
+	for _, poolName := range entityInterface.IpamPoolNames {
+		if _, exists := ifStatus.IpamPoolNums[poolName]; !exists {
+			ipAddress, ipNum, err := ctlrPlugin.IpamPoolMgr.AllocateAddress(poolName,
+				vppAgent, entityName)
+			if err != nil {
+				return nil, err
+			}
+			ifStatus.IpAddresses = append(ifStatus.IpAddresses, ipAddress)
+			ifStatus.IpamPoolNums[poolName] = ipNum
+		}
+	}
+
+	for _, ipAddress := range ifStatus.IpAddresses {
+		// make sure we set any static addresses in any of the pools, in case of overlap
+		for _, ipamPool := range ctlrPlugin.IpamPoolMgr.ipamPoolCache {
+			// if already have an allocated ipNum, ensure it is marked as used/set in the allocator
+			ctlrPlugin.IpamPoolMgr.SetAddressIfInPool(ipamPool.Metadata.Name, vppAgent, entityName, ipAddress)
 		}
 	}
 
@@ -76,8 +84,47 @@ func InitInterfaceStatus(
 func PersistInterfaceStatus(
 	interfaces map[string]*controller.InterfaceStatus,
 	ifStatus *controller.InterfaceStatus,
-	entityInterfaceName string) {
+	podName string, ifName string) {
+
+	entityInterfaceName := 	podName + "/" + ifName
 
 	interfaces[entityInterfaceName] = ifStatus
 	ctlrPlugin.ramConfigCache.InterfaceStates[entityInterfaceName] = ifStatus
+}
+
+func RemoveInterfaceStatus(
+	interfaces map[string]*controller.InterfaceStatus,
+	podName string, ifName string) {
+
+	entityInterfaceName := 	podName + "/" + ifName
+
+	delete(interfaces, entityInterfaceName)
+	delete(ctlrPlugin.ramConfigCache.InterfaceStates, entityInterfaceName)
+}
+
+func UpdateRamCacheAllocatorsForInterfaceStatus(
+	ifStatus *controller.InterfaceStatus,
+	entityName string) error {
+
+	// do not need to worry about set-ing the mac/memif id as we simply increment those so no need
+	// to track them in the "allocator" ... which is really an "incrementor"
+
+	// for all already allocated from pool ip addresses, set as used in the allocators
+	for poolName, ipNum := range ifStatus.IpamPoolNums {
+		// if already have an allocated ipNum, ensure it is marked as used/set in the allocator
+		_, err := ctlrPlugin.IpamPoolMgr.SetAddress(poolName, ifStatus.Node, entityName, ipNum)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, ipAddress := range ifStatus.IpAddresses {
+		// make sure we set any static addresses in any of the pools
+		for _, ipamPool := range ctlrPlugin.IpamPoolMgr.ipamPoolCache {
+			// if already have an allocated ipNum, ensure it is marked as used/set in the allocator
+			ctlrPlugin.IpamPoolMgr.SetAddressIfInPool(ipamPool.Metadata.Name, ifStatus.Node, entityName, ipAddress)
+		}
+	}
+
+	return nil
 }

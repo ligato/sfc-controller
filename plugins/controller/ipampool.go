@@ -89,11 +89,6 @@ func (ipamPool *IPAMPool) ConfigEqual(ipamPool2 *IPAMPool) bool {
 	return true
 }
 
-// AppendStatusMsg adds the message to the status section
-func (ipamPool *IPAMPool) AppendStatusMsg(msg string) {
-	ipamPool.Status.Msg = append(ipamPool.Status.Msg, msg)
-}
-
 // FindAllocator returns a scoped allocator for this pool entity
 func (mgr *IPAMPoolMgr) FindAllocator(poolName string, entityName string) (*ipam.PoolAllocatorType, error) {
 
@@ -114,7 +109,37 @@ func (mgr *IPAMPoolMgr) FindAllocator(poolName string, entityName string) (*ipam
 }
 
 // AllocateAddress returns a scoped ip address
-func (mgr *IPAMPoolMgr) AllocateAddress(poolName string, nodeName string, vsName string) (string, error) {
+func (mgr *IPAMPoolMgr) AllocateAddress(poolName string, nodeName string, vsName string) (string, uint32, error) {
+
+	ipamPool, exists := mgr.ipamPoolCache[poolName]
+	if !exists {
+		return "", 0, fmt.Errorf("Cannot find ipam pool %s", poolName)
+	}
+	entityName := ""
+	switch ipamPool.Spec.Scope {
+	case controller.IPAMPoolScopeNode:
+		entityName = nodeName
+	case controller.IPAMPoolScopeNetworkService:
+		entityName = vsName
+	}
+	allocatorPool, err := mgr.FindAllocator(poolName, entityName)
+	if err != nil {
+		return "", 0, fmt.Errorf("Cannot find ipam pool allocator for %s: %s", poolName, err)
+	}
+	ipAddress, ipNum, err := allocatorPool.AllocateIPAddress()
+	if err != nil {
+		return "", 0, fmt.Errorf("Cannot allocate address from ipam pool %s", poolName)
+	}
+
+	log.Errorf("AllocateAddress: allocatorPool: %v", allocatorPool)
+
+	ipamPool.Status.Addresses[allocatorPool.Name] = allocatorPool.GetAllocatedAddressesStatus()
+
+	return ipAddress, ipNum, nil
+}
+
+// SetAddress sets the address as used in the allocator ... startup case
+func (mgr *IPAMPoolMgr) SetAddress(poolName string, nodeName string, vsName string, ipNum uint32) (string, error) {
 
 	ipamPool, exists := mgr.ipamPoolCache[poolName]
 	if !exists {
@@ -127,15 +152,43 @@ func (mgr *IPAMPoolMgr) AllocateAddress(poolName string, nodeName string, vsName
 	case controller.IPAMPoolScopeNetworkService:
 		entityName = vsName
 	}
-	vxlanIpamPool, err := mgr.FindAllocator(poolName, entityName)
+	allocatorPool, err := mgr.FindAllocator(poolName, entityName)
 	if err != nil {
-		return "", fmt.Errorf("Cannot find ipam pool %s: %s", poolName, err)
+		return "", fmt.Errorf("Cannot find ipam pool allocator for %s: %s", poolName, err)
 	}
-	ipAddress, _, err := vxlanIpamPool.AllocateIPAddress()
+	ipAddrStr, err := allocatorPool.SetAddress(ipNum)
 	if err != nil {
-		return "", fmt.Errorf("Cannot allocate address from ipamn pool %s", poolName)
+		return "", fmt.Errorf("Cannot allocate address from ipam pool %s", poolName)
 	}
-	return ipAddress, nil
+
+	log.Errorf("AllocateAddress: allocatorPool: %v", allocatorPool)
+
+	ipamPool.Status.Addresses[allocatorPool.Name] = allocatorPool.GetAllocatedAddressesStatus()
+
+	return ipAddrStr, nil
+}
+
+// SetAddressIfInPool sets the address as used in the allocator ... if it is in a pool
+func (mgr *IPAMPoolMgr) SetAddressIfInPool(poolName string, nodeName string, vsName string, ipAddress string) {
+
+	ipamPool, exists := mgr.ipamPoolCache[poolName]
+	if !exists {
+		return
+	}
+	entityName := ""
+	switch ipamPool.Spec.Scope {
+	case controller.IPAMPoolScopeNode:
+		entityName = nodeName
+	case controller.IPAMPoolScopeNetworkService:
+		entityName = vsName
+	}
+	allocatorPool, err := mgr.FindAllocator(poolName, entityName)
+	if err != nil {
+		return
+	}
+	allocatorPool.SetIPAddrIfInsidePool(ipAddress)
+
+	ipamPool.Status.Addresses[allocatorPool.Name] = allocatorPool.GetAllocatedAddressesStatus()
 }
 
 func contructAllocatorName(ipamPool *IPAMPool, entityName string) string {
@@ -157,9 +210,9 @@ func (mgr *IPAMPoolMgr) EntityCreate(entityName string, scope string) {
 		if ipamPool.Spec.Scope == scope {
 			ipamPoolAllocator, err := mgr.FindAllocator(ipamPool.Metadata.Name, entityName)
 			if err != nil {
-				ipamPoolAllocator = ipam.NewIPAMPoolAllocator(ipamPool.Spec.Network,
-					ipamPool.Spec.StartRange, ipamPool.Spec.EndRange, ipamPool.Spec.Network)
 				allocatorName := contructAllocatorName(ipamPool, entityName)
+				ipamPoolAllocator = ipam.NewIPAMPoolAllocator(allocatorName,
+					ipamPool.Spec.StartRange, ipamPool.Spec.EndRange, ipamPool.Spec.Network)
 				ctlrPlugin.ramConfigCache.IPAMPoolAllocators[allocatorName] = ipamPoolAllocator
 			}
 		}
@@ -175,6 +228,7 @@ func (mgr *IPAMPoolMgr) EntityDelete(entityName string, scope string) {
 			ipamPoolAllocator, _ := mgr.FindAllocator(ipamPool.Metadata.Name, entityName)
 			if ipamPoolAllocator != nil {
 				allocatorName := contructAllocatorName(ipamPool, entityName)
+				delete(ipamPool.Status.Addresses, allocatorName)
 				delete(ctlrPlugin.ramConfigCache.IPAMPoolAllocators, allocatorName)
 			}
 		}
@@ -211,6 +265,11 @@ func (mgr *IPAMPoolMgr) HandleCRUDOperationCU(_ipamPool *IPAMPool, render bool) 
 		for _, ns := range ctlrPlugin.NetworkServiceMgr.HandleCRUDOperationGetAll() {
 			mgr.EntityCreate(ns.Metadata.Name, ipamPool.Spec.Scope)
 		}
+	}
+
+	ipamPool.Status = nil
+	ipamPool.Status = &controller.IPAMPoolStatus{
+		Addresses: make(map[string]string, 0),
 	}
 
 	if err := ipamPool.writeToDatastore(); err != nil {

@@ -132,8 +132,8 @@ func (s *Plugin) Init() error {
 		os.Exit(1)
 	}
 
-	// the db has been loaded and vpp entries kown so now we can clean the
-	// db and the vpp agent that the controller has managed/created
+	// the db has been loaded and vpp entries known so now we can clean up the
+	// db and remove the vpp agent entries that the controller has managed/created
 	if cleanSfcDatastore {
 		database.CleanDatastore(controller.SfcControllerConfigPrefix())
 		s.CleanVppAgentEntriesFromEtcd()
@@ -202,12 +202,14 @@ func (s *Plugin) AfterInit() error {
 	return nil
 }
 
-// RenderAll calls each managers causing them to render
+// RenderAll calls only node and service as the rest are resources used by these
 func (s *Plugin) RenderAll() {
-	for _, entry := range RegisteredManagers {
-		log.Infof("RenderAll: initial rendering %s ...", entry.modelTypeName)
-		entry.mgr.RenderAll()
-	}
+	ctlrPlugin.NetworkNodeMgr.RenderAll()
+	ctlrPlugin.NetworkServiceMgr.RenderAll()
+	//for _, entry := range RegisteredManagers {
+	//	log.Infof("RenderAll: initial rendering %s ...", entry.modelTypeName)
+	//	entry.mgr.RenderAll()
+	//}
 }
 
 // InitRAMCache creates the ram cache
@@ -279,9 +281,26 @@ func httpSystemGetAllYamlHandler(formatter *render.Render) http.HandlerFunc {
 // PreProcessEntityStatus uses key/type from state to lad vpp entries from etcd
 func (s *Plugin) PreProcessEntityStatus() error {
 
+	log.Debugf("PreProcessEntityStatus: processing ipam pool state: num: %d",
+		len(s.IpamPoolMgr.ipamPoolCache))
+	for _, ipamPool := range s.IpamPoolMgr.ipamPoolCache {
+		if ipamPool.Status == nil {
+			ipamPool.Status = &controller.IPAMPoolStatus{
+				Addresses: make(map[string]string, 0),
+			}
+		} else {
+			if ipamPool.Status.Addresses == nil {
+				ipamPool.Status.Addresses = make(map[string]string, 0)
+			}
+		}
+	}
+
 	log.Debugf("PreProcessEntityStatus: processing nodes state: num: %d",
 		len(s.NetworkNodeMgr.networkNodeCache))
 	for _, nn := range s.NetworkNodeMgr.networkNodeCache {
+
+		ctlrPlugin.IpamPoolMgr.EntityCreate(nn.Metadata.Name, controller.IPAMPoolScopeNode)
+
 		if nn.Status != nil && len(nn.Status.RenderedVppAgentEntries) != 0 {
 
 			log.Debugf("PreProcessEntityStatus: processing node state: %s", nn.Metadata.Name)
@@ -298,6 +317,7 @@ func (s *Plugin) PreProcessEntityStatus() error {
 				if ifStatus.MacAddrID > ctlrPlugin.ramConfigCache.MacAddrAllocator.MacAddrID {
 					ctlrPlugin.ramConfigCache.MacAddrAllocator.MacAddrID = ifStatus.MacAddrID
 				}
+				UpdateRamCacheAllocatorsForInterfaceStatus(ifStatus, nn.Metadata.Name)
 			}
 		}
 	}
@@ -305,6 +325,9 @@ func (s *Plugin) PreProcessEntityStatus() error {
 	log.Debugf("PreProcessEntityStatus: processing network services state: num: %d",
 		len(s.NetworkServiceMgr.networkServiceCache))
 	for _, ns := range s.NetworkServiceMgr.networkServiceCache {
+
+		ctlrPlugin.IpamPoolMgr.EntityCreate(ns.Metadata.Name, controller.IPAMPoolScopeNetworkService)
+
 		if ns.Status != nil && len(ns.Status.RenderedVppAgentEntries) != 0 {
 			log.Debugf("PreProcessEntityStatus: processing vnf service state: %s", ns.Metadata.Name)
 			if err := s.LoadVppAgentEntriesFromRenderedVppAgentEntries(ns.Status.RenderedVppAgentEntries); err != nil {
@@ -320,6 +343,7 @@ func (s *Plugin) PreProcessEntityStatus() error {
 				if ifStatus.MacAddrID > ctlrPlugin.ramConfigCache.MacAddrAllocator.MacAddrID {
 					ctlrPlugin.ramConfigCache.MacAddrAllocator.MacAddrID = ifStatus.MacAddrID
 				}
+				UpdateRamCacheAllocatorsForInterfaceStatus(ifStatus, ns.Metadata.Name)
 			}
 		}
 

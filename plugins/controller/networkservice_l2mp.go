@@ -29,25 +29,27 @@ func (ns *NetworkService) RenderConnL2MP(
 	conn *controller.Connection,
 	connIndex uint32) error {
 
-	numIFs := len(conn.PodInterfaces)
-
 	// need to order these to match the array of the conn's conn.PodInterfaces
-	var p2nArray []*NetworkPodToNodeMap
+	var p2nArray []NetworkPodToNodeMap
 	netPodInterfaces := make([]*controller.Interface, 0)
 	networkPodTypes := make([]string, 0)
 
 	allPodsAssignedToNodes := true
+	staticNodesInInterfacesSpecified := false
 	var nodeMap = make(map[string]bool, 0) // determine the set of nodes
 
-	log.Debugf("RenderTopologyL2MP: num interfaces: %d", numIFs)
+	log.Debugf("RenderConnL2MP: num pod interfaces: %d", len(conn.PodInterfaces))
+	log.Debugf("RenderConnL2MP: num node interfaces: %d", len(conn.NodeInterfaces))
+	log.Debugf("RenderConnL2MP: num node labels: %d", len(conn.NodeInterfaceLabels))
 
 	// let's see if all interfaces in the conn are associated with a node
 	for connIndex, connPodInterface := range conn.PodInterfaces {
 
 		connPodName, connInterfaceName := ConnPodInterfaceNames(connPodInterface)
+
 		p2n, exists := ctlrPlugin.ramConfigCache.NetworkPodToNodeMap[connPodName]
 		if !exists || p2n.Node == "" {
-			msg := fmt.Sprintf("connection segment %d: %s, network pod not mapped to a node in vnf_to_node_map",
+			msg := fmt.Sprintf("connection segment %d: %s, network pod not mapped to a node in network-pod-to-node-map",
 				connIndex, connPodInterface)
 			ns.AppendStatusMsg(msg)
 			allPodsAssignedToNodes = false
@@ -67,11 +69,29 @@ func (ns *NetworkService) RenderConnL2MP(
 
 		// based on the interfaces in the conn, order the interface info accordingly as the set of
 		// interfaces in the pod/interface stanza can be in a different order
-		p2nArray = append(p2nArray, p2n)
+		p2nArray = append(p2nArray, *p2n)
 		netPodInterface, networkPodType := ns.findNetworkPodAndInterfaceInList(connPodName,
 			connInterfaceName, ns.Spec.NetworkPods)
+		netPodInterface.Parent = connPodName
 		netPodInterfaces = append(netPodInterfaces, netPodInterface)
 		networkPodTypes = append(networkPodTypes, networkPodType)
+	}
+
+	for _, nodeInterface := range conn.NodeInterfaces {
+
+		connNodeName, connInterfaceName := NodePodInterfaceNames(nodeInterface)
+
+		nodeInterface, nodeIfType := ctlrPlugin.NetworkNodeMgr.FindInterfaceInNode(connNodeName, connInterfaceName)
+		nodeInterface.Parent = connNodeName
+		var p2n NetworkPodToNodeMap
+		p2n.Node = connNodeName
+		p2n.Pod = connNodeName
+		p2nArray = append(p2nArray, p2n)
+		netPodInterfaces = append(netPodInterfaces, nodeInterface)
+		networkPodTypes = append(networkPodTypes, nodeIfType)
+		staticNodesInInterfacesSpecified = true
+
+		nodeMap[connNodeName] = true // maintain a map of which nodes are in the conn set
 	}
 
 	if !allPodsAssignedToNodes {
@@ -99,10 +119,54 @@ func (ns *NetworkService) RenderConnL2MP(
 		}
 	}
 
+	if len(conn.NodeInterfaceLabels) != 0 {
+
+		if len(nodeMap) == 0 {
+			msg := fmt.Sprintf("network service: %s, no interfaces specified to connect to node interface label",
+				ns.Metadata.Name)
+			ns.AppendStatusMsg(msg)
+			return fmt.Errorf(msg)
+		}
+
+		if len(nodeMap) != 1 {
+			msg := fmt.Sprintf("network service: %s, all interfaces must be on smae node to connect to node interface label",
+				ns.Metadata.Name)
+			ns.AppendStatusMsg(msg)
+			return fmt.Errorf(msg)
+		}
+
+		nodeInterfaces, nodeIfTypes := ctlrPlugin.NetworkNodeMgr.FindInterfacesForThisLabelInNode(p2nArray[0].Node, conn.NodeInterfaceLabels)
+		if len(nodeInterfaces) == 0 {
+			msg := fmt.Sprintf("network service: %s, nodeLabels %v: must match at least one node interface: incorrect config",
+				ns.Metadata.Name, conn.NodeInterfaceLabels)
+			ns.AppendStatusMsg(msg)
+			return fmt.Errorf(msg)
+		}
+
+		for _, nodeInterface := range nodeInterfaces {
+			nodeInterface.Parent = p2nArray[0].Node
+			var p2n NetworkPodToNodeMap
+			p2n.Node = p2nArray[0].Node
+			p2n.Pod = p2nArray[0].Node
+			p2nArray = append(p2nArray, p2n)
+			netPodInterfaces = append(netPodInterfaces, nodeInterface)
+		}
+		for _, nodeIfType := range nodeIfTypes {
+			networkPodTypes = append(networkPodTypes, nodeIfType)
+		}
+	}
+
 	// see if the networkPods are on the same node ...
 	if len(nodeMap) == 1 {
 		return ns.renderConnL2MPSameNode(conn, connIndex, netPodInterfaces,
 			nno, p2nArray, networkPodTypes)
+	} else if staticNodesInInterfacesSpecified {
+		msg := fmt.Sprintf("network service: %s, nodes %s/%s must be the same",
+			ns.Metadata.Name,
+			p2nArray[0].Node,
+			p2nArray[1].Node)
+		ns.AppendStatusMsg(msg)
+		return fmt.Errorf(msg)
 	}
 
 	// now setup the connection between nodes
@@ -116,7 +180,7 @@ func (ns *NetworkService) renderConnL2MPSameNode(
 	connIndex uint32,
 	netPodInterfaces []*controller.Interface,
 	nno *NetworkNodeOverlay,
-	p2nArray []*NetworkPodToNodeMap,
+	p2nArray []NetworkPodToNodeMap,
 	networkPodTypes []string) error {
 
 	// The interfaces should be created in the vnf and the vswitch then the vswitch
@@ -126,10 +190,9 @@ func (ns *NetworkService) renderConnL2MPSameNode(
 
 	nodeName := p2nArray[0].Node
 
-	for i := 0; i < len(conn.PodInterfaces); i++ {
+	for i := 0; i < len(netPodInterfaces); i++ {
 
-		ifName, err := ns.RenderConnInterfacePair(nodeName, conn.PodInterfaces[i],
-			netPodInterfaces[i], networkPodTypes[i])
+		ifName, err := ns.RenderConnInterfacePair(nodeName, netPodInterfaces[i], networkPodTypes[i])
 		if err != nil {
 			return err
 		}
@@ -143,21 +206,23 @@ func (ns *NetworkService) renderConnL2MPSameNode(
 	// all VNFs are on the same node so no vxlan inter-node mesh code required but
 	// the VNFs might be connected to an external node/router via hub and spoke
 
-	if nno.Spec.ServiceMeshType == controller.NetworkNodeOverlayTypeHubAndSpoke &&
-		nno.Spec.ConnectionType == controller.NetworkNodeOverlayConnectionTypeVxlan {
+	if nno != nil {
+		if nno.Spec.ServiceMeshType == controller.NetworkNodeOverlayTypeHubAndSpoke &&
+			nno.Spec.ConnectionType == controller.NetworkNodeOverlayConnectionTypeVxlan {
 
-		// construct a spoke set with this one one
-		singleSpokeMap := make(map[string]bool)
-		singleSpokeMap[nodeName] = true
+			// construct a spoke set with this one one
+			singleSpokeMap := make(map[string]bool)
+			singleSpokeMap[nodeName] = true
 
-		return nno.renderConnL2MPVxlanHubAndSpoke(ns,
-			conn,
-			connIndex,
-			netPodInterfaces,
-			p2nArray,
-			networkPodTypes,
-			singleSpokeMap,
-			l2bdIFs)
+			return nno.renderConnL2MPVxlanHubAndSpoke(ns,
+				conn,
+				connIndex,
+				netPodInterfaces,
+				p2nArray,
+				networkPodTypes,
+				singleSpokeMap,
+				l2bdIFs)
+		}
 	}
 
 	// no external hub and spoke so simply render the nodes l2bd and local vnf interfaces
@@ -217,7 +282,7 @@ func (ns *NetworkService) renderConnL2MPInterNode(
 	connIndex uint32,
 	netPodInterfaces []*controller.Interface,
 	nno *NetworkNodeOverlay,
-	p2nArray []*NetworkPodToNodeMap,
+	p2nArray []NetworkPodToNodeMap,
 	networkPodTypes []string,
 	nodeMap map[string]bool) error {
 
@@ -234,10 +299,9 @@ func (ns *NetworkService) renderConnL2MPInterNode(
 	// create the interfaces from the pod to the vswitch, note that depending on
 	// the meshing strategy, I might have to create the interfaces with vrf_id's for
 	// example, or ...
-	for i := 0; i < len(conn.PodInterfaces); i++ {
+	for i := 0; i < len(netPodInterfaces); i++ {
 
-		ifName, err := ns.RenderConnInterfacePair(p2nArray[i].Node, conn.PodInterfaces[i],
-			netPodInterfaces[i], networkPodTypes[i])
+		ifName, err := ns.RenderConnInterfacePair(p2nArray[i].Node, netPodInterfaces[i], networkPodTypes[i])
 		if err != nil {
 			return err
 		}

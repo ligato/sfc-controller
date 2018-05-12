@@ -24,23 +24,22 @@ import (
 // RenderConnInterfacePair renders this interface pair on the vnf and vswitch
 func (ns *NetworkService) RenderConnInterfacePair(
 	vppAgent string,
-	connPodInterface string,
-	vnfInterface *controller.Interface,
+	netPodInterface *controller.Interface,
 	networkPodType string) (string, error) {
 
 	// The interface should be created in the vnf and the vswitch then the nsitch
 	// interfaces will be added to the bridge.
 
-	switch vnfInterface.IfType {
+	switch netPodInterface.IfType {
 	case controller.IfTypeMemif:
-		return ns.RenderConnMemifPair(vppAgent, connPodInterface, vnfInterface, networkPodType)
+		return ns.RenderConnMemifPair(vppAgent, netPodInterface, networkPodType)
 	case controller.IfTypeVeth:
-		return ns.RenderConnVethAfpPair(vppAgent, connPodInterface, vnfInterface, networkPodType)
+		return ns.RenderConnVethAfpPair(vppAgent, netPodInterface, networkPodType)
 	case controller.IfTypeTap:
-		return ns.RenderConnTapPair(vppAgent, connPodInterface, vnfInterface, networkPodType)
+		return ns.RenderConnTapPair(vppAgent, netPodInterface, networkPodType)
 	case controller.IfTypeEthernet:
 		// the ethernet interface is special and has been created by the node already
-		return vnfInterface.Name, nil
+		return netPodInterface.Name, nil
 	}
 
 	return "", nil
@@ -49,22 +48,25 @@ func (ns *NetworkService) RenderConnInterfacePair(
 // RenderConnMemifPair renders this vnf/vswitch interface pair
 func (ns *NetworkService) RenderConnMemifPair(
 	vppAgent string,
-	connPodInterface string,
 	networkPodInterface *controller.Interface,
 	networkPodType string) (string, error) {
 
 	var ifName string
 
-	connPodName, connInterfaceName := ConnPodInterfaceNames(connPodInterface)
+	connPodName := networkPodInterface.Parent
+	connInterfaceName := networkPodInterface.Name
 
-	ifStatus, err := InitInterfaceStatus(ns.Metadata.Name, vppAgent, connPodInterface, networkPodInterface)
+	ifStatus, err := InitInterfaceStatus(ns.Metadata.Name, vppAgent, networkPodInterface)
 	if err != nil {
+		RemoveInterfaceStatus(ns.Status.Interfaces, connPodName, connInterfaceName)
+		msg := fmt.Sprintf("network pod interface: %s/%s, %s", connPodName, connInterfaceName, err)
+		ns.AppendStatusMsg(msg)
 		return "", err
 	}
 	if ifStatus.MemifID == 0 {
 		ifStatus.MemifID = ctlrPlugin.ramConfigCache.MemifIDAllocator.Allocate()
 	}
-	PersistInterfaceStatus(ns.Status.Interfaces, ifStatus, connPodInterface)
+	PersistInterfaceStatus(ns.Status.Interfaces, ifStatus, connPodName, connInterfaceName)
 
 	vppKV := vppagent.ConstructMemInterface(
 		connPodName,
@@ -84,7 +86,7 @@ func (ns *NetworkService) RenderConnMemifPair(
 
 	log.Debugf("RenderToplogyMemifPair: ifName: %s, %v", connInterfaceName, vppKV)
 
-	ifName = "IF_MEMIF_VSWITCH_" + ConnPodInterfaceSlashToUScore(connPodInterface)
+	ifName = "IF_MEMIF_VSWITCH_" + connPodName + "_" + connInterfaceName
 
 	vppKV = vppagent.ConstructMemInterface(
 		vppAgent,
@@ -109,66 +111,73 @@ func (ns *NetworkService) RenderConnMemifPair(
 
 // RenderConnDirectInterPodMemifPair renders this pod-pod interface pair
 func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
-	conn *controller.Connection,
-	netPodInterfaces []*controller.Interface,
+	networkPodInterfaces []*controller.Interface,
 	networkPodType string) error {
 
-	connPodName0, connInterfaceName0 := ConnPodInterfaceNames(conn.PodInterfaces[0])
-	connPodName1, connInterfaceName1 := ConnPodInterfaceNames(conn.PodInterfaces[1])
+	connPodName0 := networkPodInterfaces[0].Parent
+	connInterfaceName0 := networkPodInterfaces[0].Name
+	connPodName1 := networkPodInterfaces[1].Parent
+	connInterfaceName1 := networkPodInterfaces[1].Name
 
-	if0Status, err := InitInterfaceStatus(ns.Metadata.Name, connPodName0, conn.PodInterfaces[0], netPodInterfaces[0])
+	if0Status, err := InitInterfaceStatus(ns.Metadata.Name, connPodName0, networkPodInterfaces[0])
 	if err != nil {
+		RemoveInterfaceStatus(ns.Status.Interfaces, connPodName0, connInterfaceName0)
+		msg := fmt.Sprintf("network pod interface: %s/%s, %s", connPodName0, connInterfaceName0, err)
+		ns.AppendStatusMsg(msg)
 		return err
 	}
 	if if0Status.MemifID == 0 {
 		if0Status.MemifID = ctlrPlugin.ramConfigCache.MemifIDAllocator.Allocate()
 	}
-	PersistInterfaceStatus(ns.Status.Interfaces, if0Status, conn.PodInterfaces[0])
+	PersistInterfaceStatus(ns.Status.Interfaces, if0Status, connPodName0, connInterfaceName0)
 
 	vppKV := vppagent.ConstructMemInterface(
 		connPodName0,
 		connInterfaceName0,
 		if0Status.IpAddresses,
 		if0Status.MacAddress,
-		ctlrPlugin.SysParametersMgr.ResolveMtu(netPodInterfaces[0].Mtu),
-		netPodInterfaces[0].AdminStatus,
-		ctlrPlugin.SysParametersMgr.ResolveRxMode(netPodInterfaces[0].RxMode),
+		ctlrPlugin.SysParametersMgr.ResolveMtu(networkPodInterfaces[0].Mtu),
+		networkPodInterfaces[0].AdminStatus,
+		ctlrPlugin.SysParametersMgr.ResolveRxMode(networkPodInterfaces[0].RxMode),
 		if0Status.MemifID,
 		false,
-		netPodInterfaces[0].MemifParms,
+		networkPodInterfaces[0].MemifParms,
 		connPodName1)
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
 
-	log.Debugf("RenderToplogyDirectInterVnfMemifPair: ifName0: %s, %v",
-		conn.PodInterfaces[0], vppKV)
+	log.Debugf("RenderToplogyDirectInterVnfMemifPair: ifName0: %s/%s, %v",
+		connPodName0, connInterfaceName0, vppKV)
 
-	if1Status, err := InitInterfaceStatus(ns.Metadata.Name, connPodName1, conn.PodInterfaces[1], netPodInterfaces[1])
+	if1Status, err := InitInterfaceStatus(ns.Metadata.Name, connPodName1, networkPodInterfaces[1])
 	if err != nil {
+		RemoveInterfaceStatus(ns.Status.Interfaces, connPodName1, connInterfaceName1)
+		msg := fmt.Sprintf("network pod interface: %s/%s, %s", connPodName1, connInterfaceName1, err)
+		ns.AppendStatusMsg(msg)
 		return err
 	}
 	if1Status.MemifID = if0Status.MemifID
-	PersistInterfaceStatus(ns.Status.Interfaces, if1Status, conn.PodInterfaces[1])
+	PersistInterfaceStatus(ns.Status.Interfaces, if1Status, connPodName1, connInterfaceName1)
 
 	vppKV = vppagent.ConstructMemInterface(
 		connPodName1,
 		connInterfaceName1,
 		if1Status.IpAddresses,
 		if1Status.MacAddress,
-		ctlrPlugin.SysParametersMgr.ResolveMtu(netPodInterfaces[1].Mtu),
-		netPodInterfaces[1].AdminStatus,
-		ctlrPlugin.SysParametersMgr.ResolveRxMode(netPodInterfaces[1].RxMode),
+		ctlrPlugin.SysParametersMgr.ResolveMtu(networkPodInterfaces[1].Mtu),
+		networkPodInterfaces[1].AdminStatus,
+		ctlrPlugin.SysParametersMgr.ResolveRxMode(networkPodInterfaces[1].RxMode),
 		if1Status.MemifID,
 		true,
-		netPodInterfaces[1].MemifParms,
+		networkPodInterfaces[1].MemifParms,
 		connPodName1)
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
 
-	log.Debugf("RenderToplogyDirectInterVnfMemifPair: ifName1: %s, %v",
-		conn.PodInterfaces[1], vppKV)
+	log.Debugf("RenderToplogyDirectInterVnfMemifPair: ifName1: %s/%s, %v",
+		connPodName1, connInterfaceName1, vppKV)
 
 	return nil
 }
@@ -176,8 +185,7 @@ func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
 // RenderConnTapPair renders this pod/vswitch tap interface pair
 func (ns *NetworkService) RenderConnTapPair(
 	vppAgent string,
-	connPodInterface string,
-	vnfInterface *controller.Interface,
+	networkPodInterface *controller.Interface,
 	networkPodType string) (string, error) {
 
 	return "", fmt.Errorf("tap not supported")
@@ -186,19 +194,22 @@ func (ns *NetworkService) RenderConnTapPair(
 // RenderConnVethAfpPair renders this pod/vswitch veth/afp interface pair
 func (ns *NetworkService) RenderConnVethAfpPair(
 	vppAgent string,
-	connPodInterface string,
 	networkPodInterface *controller.Interface,
 	networkPodType string) (string, error) {
 
 	var ifName string
 
-	connPodName, connInterfaceName := ConnPodInterfaceNames(connPodInterface)
+	connPodName := networkPodInterface.Parent
+	connInterfaceName := networkPodInterface.Name
 
-	ifStatus, err := InitInterfaceStatus(ns.Metadata.Name, vppAgent, connPodName, networkPodInterface)
+	ifStatus, err := InitInterfaceStatus(ns.Metadata.Name, vppAgent, networkPodInterface)
 	if err != nil {
+		RemoveInterfaceStatus(ns.Status.Interfaces, connPodName, connInterfaceName)
+		msg := fmt.Sprintf("network pod interface: %s/%s, %s", connPodName, connInterfaceName, err)
+		ns.AppendStatusMsg(msg)
 		return "", err
 	}
-	PersistInterfaceStatus(ns.Status.Interfaces, ifStatus, connPodInterface)
+	PersistInterfaceStatus(ns.Status.Interfaces, ifStatus, connPodName, connInterfaceName)
 
 	// Create a VETH i/f for the vnf container, the ETH will get created
 	// by the vpp-agent in a more privileged vswitch.

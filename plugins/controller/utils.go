@@ -23,35 +23,36 @@ import (
 )
 
 func ConnPodName(connPodInterfaceString string) string {
-	s := strings.Split(connPodInterfaceString, "/")
-	if len(s) != 2 {
+	n := strings.Index(connPodInterfaceString, "/")
+	if n == -1 {
 		return ""
 	}
-	return s[0]
+	return connPodInterfaceString[0:n]
 }
 
 func ConnInterfaceName(connPodInterfaceString string) string {
-	s := strings.Split(connPodInterfaceString, "/")
-	if len(s) != 2 {
+	n := strings.Index(connPodInterfaceString, "/")
+	if n == -1 {
 		return ""
 	}
-	return s[1]
+	return connPodInterfaceString[n+1:]
 }
 
 func ConnPodInterfaceNames(connPodInterfaceString string) (string, string) {
-	s := strings.Split(connPodInterfaceString, "/")
-	if len(s) != 2 {
+	n := strings.Index(connPodInterfaceString, "/")
+	if n == -1 {
 		return "", ""
 	}
-	return s[0], s[1]
+	return connPodInterfaceString[0:n], connPodInterfaceString[n+1:]
+}
+
+func NodePodInterfaceNames(nodePodInterfaceString string) (string, string) {
+	return ConnPodInterfaceNames(nodePodInterfaceString)
 }
 
 func ConnPodInterfaceSlashToUScore(connPodInterfaceString string) string {
-	s := strings.Split(connPodInterfaceString, "/")
-	if len(s) != 2 {
-		return ""
-	}
-	return fmt.Sprintf("%s_%s", s[0], s[1])
+	s0, s1 := ConnPodInterfaceNames(connPodInterfaceString)
+	return fmt.Sprintf("%s_%s", s0, s1)
 }
 
 func ipAddressArraysEqual(a1 []string, a2 []string) bool {

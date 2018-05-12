@@ -404,10 +404,10 @@ func (ns *NetworkService) validate() error {
 
 	log.Debugf("Validating NetworkService: %v", ns)
 
-	if ns.Spec.NetworkPods == nil || len(ns.Spec.NetworkPods) == 0 {
-		return fmt.Errorf("network-service: %s netwrok pods's are missing from this service",
-			ns.Metadata.Name)
-	}
+	//if ns.Spec.NetworkPods == nil || len(ns.Spec.NetworkPods) == 0 {
+	//	return fmt.Errorf("network-service: %s network pods's are missing from this service",
+	//		ns.Metadata.Name)
+	//}
 
 	if err := ns.validateNetworkPods(); err != nil {
 		return err
@@ -432,13 +432,13 @@ func (ns *NetworkService) validateConnections() error {
 
 		switch conn.ConnType {
 		case controller.ConnTypeL2PP:
-			if len(conn.PodInterfaces) != 2 {
+			if len(conn.PodInterfaces) + len(conn.NodeInterfaces) + len(conn.NodeInterfaceLabels) != 2 {
 				return fmt.Errorf("network-service: %s conn: p2p must have 2 interfaces only",
 					ns.Metadata.Name)
 			}
 		case controller.ConnTypeL2MP:
-			if len(conn.PodInterfaces) == 0 {
-				return fmt.Errorf("network-service: %s conn: must have at least one interface only",
+			if len(conn.PodInterfaces) + len(conn.NodeInterfaces) == 0 {
+				return fmt.Errorf("network-service: %s conn: p2pm must have at least one interface",
 					ns.Metadata.Name)
 			}
 			if conn.UseNodeL2Bd != "" && conn.L2Bd != nil {
@@ -466,9 +466,14 @@ func (ns *NetworkService) validateConnections() error {
 		}
 
 		for _, connPodInterface := range conn.PodInterfaces {
+			connPodName, connInterfaceName := ConnPodInterfaceNames(connPodInterface)
+			if connPodName == "" || connInterfaceName == "" {
+				return fmt.Errorf("network-service: %s conn: pod/port: %s must be of pod/interface format",
+					ns.Metadata.Name, connPodInterface)
+			}
 			if iface, _ := ns.findNetworkPodAndInterfaceInList(ConnPodName(connPodInterface),
 				ConnInterfaceName(connPodInterface), ns.Spec.NetworkPods); iface == nil {
-				return fmt.Errorf("network-service: %s conn: NetworkPod/port: %s not found in NetworkPod interfaces",
+				return fmt.Errorf("network-service: %s conn: pod/port: %s not found in NetworkPod interfaces",
 					ns.Metadata.Name, connPodInterface)
 			}
 		}
