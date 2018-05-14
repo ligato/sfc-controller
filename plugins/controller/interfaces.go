@@ -78,6 +78,8 @@ func InitInterfaceStatus(
 		}
 	}
 
+	log.Debugf("InitInterfaceStatus: %v", ifStatus)
+
 	return ifStatus, nil
 }
 
@@ -90,6 +92,9 @@ func PersistInterfaceStatus(
 
 	interfaces[entityInterfaceName] = ifStatus
 	ctlrPlugin.ramConfigCache.InterfaceStates[entityInterfaceName] = ifStatus
+
+	log.Debugf("PersistInterfaceStatus: entityInterfaceName: %s, %v", entityInterfaceName, ifStatus)
+
 }
 
 func RemoveInterfaceStatus(
@@ -100,13 +105,15 @@ func RemoveInterfaceStatus(
 
 	delete(interfaces, entityInterfaceName)
 	delete(ctlrPlugin.ramConfigCache.InterfaceStates, entityInterfaceName)
+
+	log.Debugf("RemoveInterfaceStatus: entityInterfaceName: %s, %v", entityInterfaceName)
 }
 
 func UpdateRamCacheAllocatorsForInterfaceStatus(
 	ifStatus *controller.InterfaceStatus,
 	entityName string) error {
 
-	// do not need to worry about set-ing the mac/memif id as we simply increment those so no need
+	// do not need to worry about setting the mac/memif id as we simply increment those so no need
 	// to track them in the "allocator" ... which is really an "incrementor"
 
 	// for all already allocated from pool ip addresses, set as used in the allocators

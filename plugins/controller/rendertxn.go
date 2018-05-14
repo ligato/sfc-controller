@@ -92,8 +92,9 @@ func removeLevelMap(level int) {
 // RenderTxnConfigEntityRemoveEntries removes the rendered entries
 func RenderTxnConfigEntityRemoveEntries() {
 
-	// by removing the after entries, the end of transaction processing below will
-	// be able to cleanup properly
+	// disguard these entries for this transaction, RenderTxnConfigEnd will clean
+	// up by looking at the saved entries before this transaction took place
+	// and remove the old/before entries
 	afterMap[txnLevel] = nil
 	afterMap[txnLevel] = make(map[string]*vppagent.KVType)
 }
@@ -117,23 +118,6 @@ func RenderTxnConfigEnd() error {
 	// and awaits transaction end "after" cache post processing.  Once all the
 	// before entries have been processed, the after cache is processed.
 	// If there are still entries in this cache, they are all written to ETCD.
-
-	// The reason for this transactional approach is as follows: some ETCD entries
-	// will be added and updated multiple times during processing of the
-	// configuration and there is NO sense continually changing ETCD for an entry
-	// until it is fully modified by the configuration processing.  This is why
-	// an "after" cache is maintained.  Then post processing will ensure the
-	// "final" values of an object are written only ONCE to the ETCD cache.
-	// An example of this is bridge domains.  Initially for a host, a default
-	// east-west BD is added to the system, then as interfaces are associated
-	// with the BD, the BD is updated.  If we tried to continually update the
-	// ETCD entry for this BD as we went along, we would improperly set the BD
-	// to interim configs until it all the config is performed and the BD reaches
-	// its final config.  This would have bad effects on the vpp-agents
-	// as they would be forced to react to each BD change and data flow would
-	// be affected.  The goal of the reconcile resync is to ONLY make changes
-	// if there are new and/or obselete configs.  Existing configs should
-	// reamin un-affected by the transaction process.
 
 	defer configMutex.Unlock()
 
@@ -204,14 +188,17 @@ func RenderTxnAddVppEntryToTxn(
 	// add the new or existing kv entry to the config transaction after map
 	afterMap[txnLevel][vppKV.VppKey] = vppKV
 
-	log.Debugf("CfgTxnAddVppEntry: rendered map len: %d, kv:%v, ",
-		len(renderedVppAgentEntries), vppKV)
+	log.Debugf("CfgTxnAddVppEntry: rendered map len: %d, txnLevel: %d kv:%v, ",
+		len(renderedVppAgentEntries), txnLevel, vppKV)
 }
 
 // CopyRenderedVppAgentEntriesToBeforeCfgTxn cache the existing set before new keys are rendered
-func CopyRenderedVppAgentEntriesToBeforeCfgTxn(
-	vppAgentEntries map[string]*controller.RenderedVppAgentEntry) {
+func CopyRenderedVppAgentEntriesToBeforeCfgTxn(entityName string) {
 
+	vppAgentEntries, exists := ctlrPlugin.ramConfigCache.RenderedEntitesStates[entityName]
+	if !exists {
+		return
+	}
 	for _, vppAgentEntry := range vppAgentEntries {
 		log.Debugf("CopyRendered...BeforeCfgTxn: entry=%v", vppAgentEntry)
 		if vppKV, exists := ctlrPlugin.ramConfigCache.VppEntries[vppAgentEntry.VppAgentKey]; !exists {

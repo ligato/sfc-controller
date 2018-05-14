@@ -397,10 +397,10 @@ func (nn *NetworkNode) renderConfig() error {
 
 	log.Debugf("renderConfig: before nn.Status=%v", nn.Status)
 
-	if nn.Status != nil && nn.Status.RenderedVppAgentEntries != nil {
+	//if nn.Status != nil && nn.Status.RenderedVppAgentEntries != nil {
 		// add the current rendered etc keys to the before config transaction
-		CopyRenderedVppAgentEntriesToBeforeCfgTxn(nn.Status.RenderedVppAgentEntries)
-	}
+		CopyRenderedVppAgentEntriesToBeforeCfgTxn(ModelTypeNetworkNode + "/" + nn.Metadata.Name)
+	//}
 
 	nn.Status = &controller.NetworkNodeStatus{}
 	nn.Status.RenderedVppAgentEntries = make(map[string]*controller.RenderedVppAgentEntry, 0)
@@ -485,7 +485,7 @@ func (nn *NetworkNode) renderNodeInterfaces() error {
 				}
 				PersistInterfaceStatus(nn.Status.Interfaces, ifStatus, iFace.Parent, iFace.Name)
 
-				vppKV := vppagent.ConstructEthernetInterface(
+				vppKV = vppagent.ConstructEthernetInterface(
 					nn.Metadata.Name,
 					iFace.Name,
 					ifStatus.IpAddresses,

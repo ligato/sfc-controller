@@ -41,12 +41,12 @@ import (
 const PluginID core.PluginName = "SfcController"
 
 var (
-	sfcConfigFile     string // cli flag - see RegisterFlags
-	cleanSfcDatastore bool   // cli flag - see RegisterFlags
-	contivKSREnabled  bool   // cli flag - see RegisterFlags
-	BypassModelTypeHttpHandlers  bool   // cli flag - see RegisterFlags
-	log               = logrus.DefaultLogger()
-	ctlrPlugin        *Plugin
+	sfcConfigFile               string // cli flag - see RegisterFlags
+	cleanSfcDatastore           bool   // cli flag - see RegisterFlags
+	contivKSREnabled            bool   // cli flag - see RegisterFlags
+	BypassModelTypeHttpHandlers bool   // cli flag - see RegisterFlags
+	log                         = logrus.DefaultLogger()
+	ctlrPlugin                  *Plugin
 )
 
 // RegisterFlags add command line flags.
@@ -81,12 +81,13 @@ func init() {
 // CacheType is ram cache of controller entities
 type CacheType struct {
 	// state
-	InterfaceStates     map[string]*controller.InterfaceStatus
-	VppEntries          map[string]*vppagent.KVType
-	MacAddrAllocator    *idapi.MacAddrAllocatorType
-	MemifIDAllocator    *idapi.MemifAllocatorType
-	IPAMPoolAllocators  map[string]*ipam.PoolAllocatorType
-	NetworkPodToNodeMap map[string]*NetworkPodToNodeMap
+	InterfaceStates       map[string]*controller.InterfaceStatus // key[entity/ifname]
+	RenderedEntitesStates map[string]map[string]*controller.RenderedVppAgentEntry // key[modelType/name][vppkey]
+	VppEntries            map[string]*vppagent.KVType // key[vppkey]
+	MacAddrAllocator      *idapi.MacAddrAllocatorType
+	MemifIDAllocator      *idapi.MemifAllocatorType
+	IPAMPoolAllocators    map[string]*ipam.PoolAllocatorType // key[modelType/ipamPoolName]
+	NetworkPodToNodeMap   map[string]*NetworkPodToNodeMap // key[pod]
 }
 
 // Plugin contains the controllers information
@@ -94,14 +95,14 @@ type Plugin struct {
 	Etcd    *etcdv3.Plugin
 	HTTPmux *rest.Plugin
 	*local.FlavorLocal
-	NetworkNodeMgr              NetworkNodeMgr
-	IpamPoolMgr                 IPAMPoolMgr
-	SysParametersMgr            SystemParametersMgr
-	NetworkServiceMgr           NetworkServiceMgr
-	NetworkNodeOverlayMgr       NetworkNodeOverlayMgr
-	NetworkPodNodeMapMgr        NetworkPodToNodeMapMgr
-	ramConfigCache              CacheType
-	db                          keyval.ProtoBroker
+	NetworkNodeMgr        NetworkNodeMgr
+	IpamPoolMgr           IPAMPoolMgr
+	SysParametersMgr      SystemParametersMgr
+	NetworkServiceMgr     NetworkServiceMgr
+	NetworkNodeOverlayMgr NetworkNodeOverlayMgr
+	NetworkPodNodeMapMgr  NetworkPodToNodeMapMgr
+	ramConfigCache        CacheType
+	db                    keyval.ProtoBroker
 }
 
 // Init the controller, read the db, reconcile/resync, render config to etcd
@@ -128,7 +129,7 @@ func (s *Plugin) Init() error {
 
 	s.initMgrs()
 
-	if err := s.PreProcessEntityStatus(); err != nil {
+	if err := s.PostProcessLoadedDatastore(); err != nil {
 		os.Exit(1)
 	}
 
@@ -218,14 +219,11 @@ func (s *Plugin) InitRAMCache() {
 	s.ramConfigCache.IPAMPoolAllocators = nil
 	s.ramConfigCache.IPAMPoolAllocators = make(map[string]*ipam.PoolAllocatorType)
 
-	//s.ramConfigCache.NetworkNodeOverlayVniAllocators = nil
-	//s.ramConfigCache.VNFServiceMeshVniAllocators = make(map[string]*idapi.VxlanVniAllocatorType)
-	//
-	//s.ramConfigCache.VNFServiceMeshVxLanAddresses = nil
-	//s.ramConfigCache.VNFServiceMeshVxLanAddresses = make(map[string]string)
-
 	s.ramConfigCache.VppEntries = nil
 	s.ramConfigCache.VppEntries = make(map[string]*vppagent.KVType)
+
+	s.ramConfigCache.RenderedEntitesStates = nil
+	s.ramConfigCache.RenderedEntitesStates = make(map[string]map[string]*controller.RenderedVppAgentEntry)
 
 	s.ramConfigCache.MacAddrAllocator = nil
 	s.ramConfigCache.MacAddrAllocator = idapi.NewMacAddrAllocator()
@@ -241,6 +239,7 @@ func (s *Plugin) InitRAMCache() {
 		entry.mgr.InitRAMCache()
 	}
 
+	// ksr state updates are stored here
 	s.ramConfigCache.NetworkPodToNodeMap = make(map[string]*NetworkPodToNodeMap, 0)
 }
 
@@ -278,10 +277,10 @@ func httpSystemGetAllYamlHandler(formatter *render.Render) http.HandlerFunc {
 	}
 }
 
-// PreProcessEntityStatus uses key/type from state to lad vpp entries from etcd
-func (s *Plugin) PreProcessEntityStatus() error {
+// PostProcessLoadedDatastore uses key/type from state to load vpp entries from etcd
+func (s *Plugin) PostProcessLoadedDatastore() error {
 
-	log.Debugf("PreProcessEntityStatus: processing ipam pool state: num: %d",
+	log.Debugf("PostProcessLoadedDatastore: processing ipam pool state: num: %d",
 		len(s.IpamPoolMgr.ipamPoolCache))
 	for _, ipamPool := range s.IpamPoolMgr.ipamPoolCache {
 		if ipamPool.Status == nil {
@@ -295,7 +294,7 @@ func (s *Plugin) PreProcessEntityStatus() error {
 		}
 	}
 
-	log.Debugf("PreProcessEntityStatus: processing nodes state: num: %d",
+	log.Debugf("PostProcessLoadedDatastore: processing nodes state: num: %d",
 		len(s.NetworkNodeMgr.networkNodeCache))
 	for _, nn := range s.NetworkNodeMgr.networkNodeCache {
 
@@ -303,13 +302,21 @@ func (s *Plugin) PreProcessEntityStatus() error {
 
 		if nn.Status != nil && len(nn.Status.RenderedVppAgentEntries) != 0 {
 
-			log.Debugf("PreProcessEntityStatus: processing node state: %s", nn.Metadata.Name)
-			if err := s.LoadVppAgentEntriesFromRenderedVppAgentEntries(nn.Status.RenderedVppAgentEntries); err != nil {
+			log.Debugf("PostProcessLoadedDatastore: processing node state: %s", nn.Metadata.Name)
+			if err := s.LoadVppAgentEntriesFromRenderedVppAgentEntries(
+				ModelTypeNetworkNode + "/" + nn.Metadata.Name,
+				nn.Status.RenderedVppAgentEntries); err != nil {
 				return err
 			}
 		}
 		if nn.Status != nil && len(nn.Status.Interfaces) != 0 {
+
+			log.Debugf("PostProcessLoadedDatastore: processing node interfaces: %s", nn.Metadata.Name)
+
 			for _, ifStatus := range nn.Status.Interfaces {
+
+				log.Debugf("PostProcessLoadedDatastore: ifStatus: %v", ifStatus)
+
 				ctlrPlugin.ramConfigCache.InterfaceStates[ifStatus.Name] = ifStatus
 				if ifStatus.MemifID > ctlrPlugin.ramConfigCache.MemifIDAllocator.MemifID {
 					ctlrPlugin.ramConfigCache.MemifIDAllocator.MemifID = ifStatus.MemifID
@@ -322,20 +329,29 @@ func (s *Plugin) PreProcessEntityStatus() error {
 		}
 	}
 
-	log.Debugf("PreProcessEntityStatus: processing network services state: num: %d",
+	log.Debugf("PostProcessLoadedDatastore: processing network services state: num: %d",
 		len(s.NetworkServiceMgr.networkServiceCache))
 	for _, ns := range s.NetworkServiceMgr.networkServiceCache {
 
 		ctlrPlugin.IpamPoolMgr.EntityCreate(ns.Metadata.Name, controller.IPAMPoolScopeNetworkService)
 
 		if ns.Status != nil && len(ns.Status.RenderedVppAgentEntries) != 0 {
-			log.Debugf("PreProcessEntityStatus: processing vnf service state: %s", ns.Metadata.Name)
-			if err := s.LoadVppAgentEntriesFromRenderedVppAgentEntries(ns.Status.RenderedVppAgentEntries); err != nil {
+
+			log.Debugf("PostProcessLoadedDatastore: processing network service state: %s", ns.Metadata.Name)
+			if err := s.LoadVppAgentEntriesFromRenderedVppAgentEntries(
+				ModelTypeNetworkService + "/" + ns.Metadata.Name,
+				ns.Status.RenderedVppAgentEntries); err != nil {
 				return err
 			}
 		}
 		if ns.Status != nil && len(ns.Status.Interfaces) != 0 {
+
+			log.Debugf("PostProcessLoadedDatastore: processing netwrok service interfaces: %s", ns.Metadata.Name)
+
 			for _, ifStatus := range ns.Status.Interfaces {
+
+				log.Debugf("PostProcessLoadedDatastore: ifStatus: %v", ifStatus)
+
 				ctlrPlugin.ramConfigCache.InterfaceStates[ifStatus.Name] = ifStatus
 				if ifStatus.MemifID > ctlrPlugin.ramConfigCache.MemifIDAllocator.MemifID {
 					ctlrPlugin.ramConfigCache.MemifIDAllocator.MemifID = ifStatus.MemifID
@@ -354,10 +370,11 @@ func (s *Plugin) PreProcessEntityStatus() error {
 
 // LoadVppAgentEntriesFromRenderedVppAgentEntries load from etcd
 func (s *Plugin) LoadVppAgentEntriesFromRenderedVppAgentEntries(
+	entityName string,
 	vppAgentEntries map[string]*controller.RenderedVppAgentEntry) error {
 
-	log.Debugf("LoadVppAgentEntriesFromRenderedVppAgentEntries: num: %d, %v",
-		len(vppAgentEntries), vppAgentEntries)
+	log.Debugf("LoadVppAgentEntriesFromRenderedVppAgentEntries: entity: %s, num: %d, %v",
+		entityName, len(vppAgentEntries), vppAgentEntries)
 	for _, vppAgentEntry := range vppAgentEntries {
 
 		vppKVEntry := vppagent.NewKVEntry(vppAgentEntry.VppAgentKey, vppAgentEntry.VppAgentType)
@@ -366,7 +383,16 @@ func (s *Plugin) LoadVppAgentEntriesFromRenderedVppAgentEntries(
 			return err
 		}
 		if found {
+			// add ref to VppEntries indexed by the vppKey
 			s.ramConfigCache.VppEntries[vppKVEntry.VppKey] = vppKVEntry
+
+			// add ref to the rendering entity
+			if renderedEntities, exists := s.ramConfigCache.RenderedEntitesStates[entityName]; !exists {
+				renderedEntities = make(map[string]*controller.RenderedVppAgentEntry,0)
+				s.ramConfigCache.RenderedEntitesStates[entityName] = renderedEntities
+
+			}
+			s.ramConfigCache.RenderedEntitesStates[entityName][vppAgentEntry.VppAgentKey] = vppAgentEntry
 		}
 	}
 

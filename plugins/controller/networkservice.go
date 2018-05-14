@@ -332,10 +332,8 @@ func (ns *NetworkService) renderConfig() error {
 		return err
 	}
 
-	if ns.Status != nil && ns.Status.RenderedVppAgentEntries != nil {
-		// add the current rendered etc keys to the before config transaction
-		CopyRenderedVppAgentEntriesToBeforeCfgTxn(ns.Status.RenderedVppAgentEntries)
-	}
+	// remember the existing entries for this entity so we can compare afterwards to see what changed
+	CopyRenderedVppAgentEntriesToBeforeCfgTxn(ModelTypeNetworkService + "/" + ns.Metadata.Name)
 
 	// initialize the network service status
 	ns.Status = &controller.NetworkServiceStatus{}

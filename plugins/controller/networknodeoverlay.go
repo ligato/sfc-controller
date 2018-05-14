@@ -282,7 +282,7 @@ func networkNodeOverlayProcessPost(formatter *render.Render, w http.ResponseWrit
 		}
 	}
 
-	log.Debugf("procesPost: POST: %v", nno)
+	log.Debugf("processPost: POST: %v", nno)
 	if err := ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationCU(&nno, true); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
