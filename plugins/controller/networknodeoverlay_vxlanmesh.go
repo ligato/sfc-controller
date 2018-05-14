@@ -107,7 +107,9 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 			}
 			l2bdIFs[fromNode] = append(l2bdIFs[fromNode], l2bdIF)
 
-			renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanStaticRoutes(fromNode, toNode,
+			renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanStaticRoutes(
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
+				fromNode, toNode,
 				vxlanIPFromAddress, vxlanIPToAddress,
 				nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 
@@ -214,7 +216,9 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 			vppKV)
 
 
-		renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanStaticRoutes(p2nArray[i].Node, p2nArray[^i&1].Node,
+		renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanStaticRoutes(
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
+			p2nArray[i].Node, p2nArray[^i&1].Node,
 			vxlanIPFromAddress, vxlanIPToAddress,
 			nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 

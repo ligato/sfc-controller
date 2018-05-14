@@ -119,7 +119,9 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 			}
 			l2bdIFs[fromNode] = append(l2bdIFs[fromNode], l2bdIF)
 
-			renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanStaticRoutes(fromNode, toNode,
+			renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanStaticRoutes(
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
+				fromNode, toNode,
 				vxlanIPFromAddress, vxlanIPToAddress,
 				nno.Spec.VxlanHubAndSpokeParms.NetworkNodeInterfaceLabel)
 

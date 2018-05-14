@@ -100,7 +100,7 @@ func (mgr *NetworkNodeMgr) FindVxlanIPaddress(nodeName string) (string, error) {
 
 	nn, exists := mgr.HandleCRUDOperationR(nodeName)
 	if !exists {
-		return "", fmt.Errorf("no vxlan ip address configured for node: %s", nodeName)
+		return "", fmt.Errorf("node not found: %s", nodeName)
 	}
 	for _, iFace := range nn.Spec.Interfaces {
 		switch iFace.IfType {
@@ -572,13 +572,15 @@ func findInterfaceLabel(labels []string, label string) bool {
 
 // RenderVxlanStaticRoutes renders static routes for the vxlan
 func (mgr *NetworkNodeMgr) RenderVxlanStaticRoutes(
+	renderingEntity string,
 	fromNode string,
 	toNode string,
 	fromVxlanAddress string,
 	toVxlanAddress string,
 	networkNodeInterfaceLabel string) map[string]*controller.RenderedVppAgentEntry {
 
-	var renderedEntries map[string]*controller.RenderedVppAgentEntry
+	//var renderedEntries map[string]*controller.RenderedVppAgentEntry
+	var renderedEntries = make(map[string]*controller.RenderedVppAgentEntry)
 
 	// depending on the number of ethernet/label:vxlan interfaces on the source node and
 	// the number of ethernet/label:vxlan inerfaces on the dest node, a set of static
@@ -586,46 +588,46 @@ func (mgr *NetworkNodeMgr) RenderVxlanStaticRoutes(
 
 	// for now assume 1 address per node and soon there will ba a v4 and a v6 ?
 
-	//n1 := mgr.networkNodeCache[fromNode]
-	//
-	//// make sure there is a loopback i/f entry for this vxlan endpoint
-	//vppKV := vppagent.ConstructLoopbackInterface(n1.Metadata.Name,
-	//	"IF_VXLAN_LOOPBACK_"+fromNode,
-	//	[]string{fromVxlanAddress},
-	//	"",
-	//	ctlrPlugin.SysParametersMgr.sysParmCache.Mtu,
-	//	controller.IfAdminStatusEnabled,
-	//	ctlrPlugin.SysParametersMgr.sysParmCache.RxMode)
-	//renderedEntries = s.ConfigTransactionAddVppEntry(renderedEntries, vppKV)
-	//
-	//n2 := mgr.networkNodeCache[toNode]
-	//
-	//for _, node1Iface := range n1.Spec.Interfaces {
-	//	if node1Iface.Spec.IfType != controller.IfTypeEthernet ||
-	//		!(findInterfaceLabel(node1Iface.Metadata.Labels, networkNodeInterfaceLabel) ||
-	//			len(n1.Spec.Interfaces) == 1) { // if only one ethernet if, it does not need the label
-	//		continue
-	//	}
-	//	for _, node2Iface := range n2.Spec.Interfaces {
-	//		if node2Iface.Spec.IfType != controller.IfTypeEthernet ||
-	//			!(findInterfaceLabel(node2Iface.Metadata.Labels, networkNodeInterfaceLabel) ||
-	//				len(n2.Spec.Interfaces) == 1) { // if only one ethernet if, it does not need the label
-	//			continue
-	//		}
-	//
-	//		l3sr := &controller.L3VRFRoute{
-	//			VrfId:             0,
-	//			Description:       fmt.Sprintf("L3VRF_VXLAN Node:%s to Node:%s", fromNode, toNode),
-	//			DstIpAddr:         toVxlanAddress, // des node vxlan address
-	//			NextHopAddr:       node2Iface.Spec.IpAddresses[0],
-	//			OutgoingInterface: node1Iface.Metadata.Name,
-	//			Weight:            ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRouteWeight,
-	//			Preference:        ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRoutePreference,
-	//		}
-	//		vppKV := vppagent.ConstructStaticRoute(n1.Metadata.Name, l3sr)
-	//		renderedEntries = s.ConfigTransactionAddVppEntry(renderedEntries, vppKV)
-	//	}
-	//}
+	n1 := mgr.networkNodeCache[fromNode]
+
+	// make sure there is a loopback i/f entry for this vxlan endpoint
+	vppKV := vppagent.ConstructLoopbackInterface(n1.Metadata.Name,
+		"IF_VXLAN_LOOPBACK_"+fromNode,
+		[]string{fromVxlanAddress},
+		"",
+		ctlrPlugin.SysParametersMgr.sysParmCache.Mtu,
+		controller.IfAdminStatusEnabled,
+		ctlrPlugin.SysParametersMgr.sysParmCache.RxMode)
+	RenderTxnAddVppEntryToTxn(renderedEntries, renderingEntity, vppKV)
+
+	n2 := mgr.networkNodeCache[toNode]
+
+	for _, node1Iface := range n1.Spec.Interfaces {
+		if node1Iface.IfType != controller.IfTypeEthernet ||
+			!(findInterfaceLabel(node1Iface.Labels, networkNodeInterfaceLabel) ||
+				len(n1.Spec.Interfaces) == 1) { // if only one ethernet if, it does not need the label
+			continue
+		}
+		for _, node2Iface := range n2.Spec.Interfaces {
+			if node2Iface.IfType != controller.IfTypeEthernet ||
+				!(findInterfaceLabel(node2Iface.Labels, networkNodeInterfaceLabel) ||
+					len(n2.Spec.Interfaces) == 1) { // if only one ethernet if, it does not need the label
+				continue
+			}
+
+			l3sr := &controller.L3VRFRoute{
+				VrfId:             0,
+				Description:       fmt.Sprintf("L3VRF_VXLAN Node:%s to Node:%s", fromNode, toNode),
+				DstIpAddr:         toVxlanAddress, // des node vxlan address
+				NextHopAddr:       node2Iface.IpAddresses[0],
+				OutgoingInterface: node1Iface.Name,
+				Weight:            ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRouteWeight,
+				Preference:        ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRoutePreference,
+			}
+			vppKV := vppagent.ConstructStaticRoute(n1.Metadata.Name, l3sr)
+			RenderTxnAddVppEntryToTxn(renderedEntries, renderingEntity, vppKV)
+		}
+	}
 	return renderedEntries
 }
 

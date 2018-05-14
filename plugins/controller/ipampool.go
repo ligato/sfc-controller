@@ -489,7 +489,7 @@ func (ip *IPAMPool) renderConfig() error {
 	return nil
 }
 
-// RenderAll renders all entites in the cache
+// RenderAll renders all entities in the cache
 func (mgr *IPAMPoolMgr) RenderAll() {
 	for _, ip := range mgr.ipamPoolCache {
 		ip.renderConfig()
@@ -499,6 +499,11 @@ func (mgr *IPAMPoolMgr) RenderAll() {
 func (ip *IPAMPool) validate() error {
 
 	log.Debugf("Validating IPAMPool: %v ...", ip)
+
+	if ip.Metadata == nil || ip.Spec == nil {
+		return fmt.Errorf("IPAM pool: Metadata: '%v' or Spec: '%v' config is missing",
+			ip.Metadata, ip.Spec)
+	}
 
 	switch ip.Spec.Scope {
 	case controller.IPAMPoolScopeSystem:
