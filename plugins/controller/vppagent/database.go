@@ -21,7 +21,7 @@ import (
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/interfaces"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
 	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l3"
-	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/ifplugin/model/interfaces"
+	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/common/model/interfaces"
 )
 
 // Types in the model were defined as strings for readability not enums with

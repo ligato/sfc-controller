@@ -605,10 +605,17 @@ func (m *NetworkNode) GetStatus() *NetworkNodeStatus {
 
 // MetaDataType generic parms for all controller high level objects
 type MetaDataType struct {
-	Name   string   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Labels []string `protobuf:"bytes,2,rep,name=labels" json:"labels,omitempty"`
+	Name   string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Labels map[string]string `protobuf:"bytes,2,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (m *MetaDataType) Reset()         { *m = MetaDataType{} }
 func (m *MetaDataType) String() string { return proto.CompactTextString(m) }
 func (*MetaDataType) ProtoMessage()    {}
+
+func (m *MetaDataType) GetLabels() map[string]string {
+	if m != nil {
+		return m.Labels
+	}
+	return nil
+}

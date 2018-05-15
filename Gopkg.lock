@@ -204,29 +204,19 @@
     "utils/addrs",
     "utils/safeclose"
   ]
-  revision = "39925ecc46ce2ed75c36869d584925963a3314d4"
-  version = "v1.1"
+  revision = "e3b8c2a73fdfb66fe7654d1c3377ed5c1762a3b2"
+  version = "v1.2.0"
 
 [[projects]]
   name = "github.com/ligato/vpp-agent"
   packages = [
-    "clientv1/defaultplugins",
-    "clientv1/defaultplugins/dbadapter",
-    "clientv1/linux",
-    "clientv1/linux/dbadapter",
-    "clientv1/linux/remoteclient",
-    "plugins/defaultplugins/common/model/acl",
-    "plugins/defaultplugins/common/model/bfd",
     "plugins/defaultplugins/common/model/interfaces",
     "plugins/defaultplugins/common/model/l2",
     "plugins/defaultplugins/common/model/l3",
-    "plugins/defaultplugins/common/model/l4",
-    "plugins/defaultplugins/common/model/stn",
-    "plugins/linuxplugin/ifplugin/model/interfaces",
-    "plugins/linuxplugin/l3plugin/model/l3"
+    "plugins/linuxplugin/common/model/interfaces"
   ]
-  revision = "90733ada9424f6181a3736f41469fdfa600cdbfd"
-  version = "v1.2"
+  revision = "1a961e0b76e53fb206348dfb8a18a12f3325d661"
+  version = "v1.3"
 
 [[projects]]
   name = "github.com/matttproud/golang_protobuf_extensions"
@@ -337,16 +327,9 @@
   packages = [
     "bcrypt",
     "blowfish",
-    "curve25519",
-    "ed25519",
-    "ed25519/internal/edwards25519",
-    "internal/chacha20",
-    "poly1305",
-    "ssh",
     "ssh/terminal"
   ]
   revision = "d9133f5469342136e669e85192a26056b587f503"
-  source = "https://github.com/golang/crypto.git"
 
 [[projects]]
   branch = "master"
@@ -434,6 +417,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "febcc2d4f26b80b7769095c36927cdcba1699c2d6055d7152eb6890b6ac21a2f"
+  inputs-digest = "631b3231c7b2a36c85202a7bf8bb3c2c84040ac71a857808eb376b69782aaee9"
   solver-name = "gps-cdcl"
   solver-version = 1

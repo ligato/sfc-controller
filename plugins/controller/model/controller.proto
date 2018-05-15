@@ -230,6 +230,6 @@ message NetworkNode {
 // MetaDataType generic parms for all controller high level objects
 message MetaDataType {
     string name = 1;
-    repeated string labels = 2;
+    map<string,string> labels = 2;
 }
 
