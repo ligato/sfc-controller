@@ -8,114 +8,18 @@
   revision = "4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9"
 
 [[projects]]
-  name = "github.com/boltdb/bolt"
-  packages = ["."]
-  revision = "2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8"
-  version = "v1.3.1"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/cockroachdb/cmux"
-  packages = ["."]
-  revision = "30d10be492927e2dcae0089c374c455d42414fcb"
-
-[[projects]]
   name = "github.com/coreos/etcd"
   packages = [
-    "alarm",
-    "auth",
     "auth/authpb",
-    "client",
     "clientv3",
-    "clientv3/concurrency",
     "clientv3/namespace",
-    "compactor",
-    "discovery",
-    "embed",
-    "error",
-    "etcdserver",
-    "etcdserver/api",
-    "etcdserver/api/v2http",
-    "etcdserver/api/v2http/httptypes",
-    "etcdserver/api/v3client",
-    "etcdserver/api/v3election",
-    "etcdserver/api/v3election/v3electionpb",
-    "etcdserver/api/v3election/v3electionpb/gw",
-    "etcdserver/api/v3lock",
-    "etcdserver/api/v3lock/v3lockpb",
-    "etcdserver/api/v3lock/v3lockpb/gw",
-    "etcdserver/api/v3rpc",
     "etcdserver/api/v3rpc/rpctypes",
-    "etcdserver/auth",
     "etcdserver/etcdserverpb",
-    "etcdserver/etcdserverpb/gw",
-    "etcdserver/membership",
-    "etcdserver/stats",
-    "lease",
-    "lease/leasehttp",
-    "lease/leasepb",
-    "mvcc",
-    "mvcc/backend",
     "mvcc/mvccpb",
-    "pkg/adt",
-    "pkg/contention",
-    "pkg/cors",
-    "pkg/cpuutil",
-    "pkg/crc",
-    "pkg/debugutil",
-    "pkg/fileutil",
-    "pkg/httputil",
-    "pkg/idutil",
-    "pkg/ioutil",
-    "pkg/logutil",
-    "pkg/monotime",
-    "pkg/netutil",
-    "pkg/pathutil",
-    "pkg/pbutil",
-    "pkg/runtime",
-    "pkg/schedule",
-    "pkg/srv",
-    "pkg/tlsutil",
-    "pkg/transport",
-    "pkg/types",
-    "pkg/wait",
-    "proxy/grpcproxy/adapter",
-    "raft",
-    "raft/raftpb",
-    "rafthttp",
-    "snap",
-    "snap/snappb",
-    "store",
-    "version",
-    "wal",
-    "wal/walpb"
+    "pkg/tlsutil"
   ]
   revision = "66722b1ada68fcd5227db853ee92003169a975c8"
   version = "v3.2.0"
-
-[[projects]]
-  name = "github.com/coreos/go-semver"
-  packages = ["semver"]
-  revision = "8ab6407b697782a06568d4b7f1db25550ec2e4c6"
-  version = "v0.2.0"
-
-[[projects]]
-  name = "github.com/coreos/go-systemd"
-  packages = ["journal"]
-  revision = "40e2722dffead74698ca12a750f64ef313ddce05"
-  version = "v16"
-
-[[projects]]
-  name = "github.com/coreos/pkg"
-  packages = ["capnslog"]
-  revision = "3ac0863d7acf3bc44daf49afef8919af12f704ef"
-  version = "v3"
-
-[[projects]]
-  name = "github.com/dgrijalva/jwt-go"
-  packages = ["."]
-  revision = "dbeaa9332f19a944acb5736b4456cfcc02140e29"
-  version = "v3.1.0"
 
 [[projects]]
   name = "github.com/ghodss/yaml"
@@ -132,18 +36,8 @@
 [[projects]]
   branch = "master"
   name = "github.com/golang/protobuf"
-  packages = [
-    "jsonpb",
-    "proto",
-    "ptypes/struct"
-  ]
+  packages = ["proto"]
   revision = "bbd03ef6da3a115852eaf24c8a1c46aeb39aa175"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/google/btree"
-  packages = ["."]
-  revision = "e89373fe6b4a7413d7acd6da1725b83ef713e6e4"
 
 [[projects]]
   name = "github.com/gorilla/context"
@@ -158,28 +52,6 @@
   version = "v1.6.1"
 
 [[projects]]
-  name = "github.com/grpc-ecosystem/go-grpc-prometheus"
-  packages = ["."]
-  revision = "6b7015e65d366bf3f19b2b2a000a831940f0f7e0"
-  version = "v1.1"
-
-[[projects]]
-  name = "github.com/grpc-ecosystem/grpc-gateway"
-  packages = [
-    "runtime",
-    "runtime/internal",
-    "utilities"
-  ]
-  revision = "589b126116b5fc961939b3e156c29e4d9d58222f"
-  version = "v1.2.2"
-
-[[projects]]
-  name = "github.com/jonboulle/clockwork"
-  packages = ["."]
-  revision = "2eee05ed794112d45db504eb05aa693efd2b8b09"
-  version = "v0.1.0"
-
-[[projects]]
   name = "github.com/ligato/cn-infra"
   packages = [
     "config",
@@ -187,7 +59,6 @@
     "datasync",
     "db/keyval",
     "db/keyval/etcdv3",
-    "db/keyval/etcdv3/mocks",
     "db/keyval/kvproto",
     "db/keyval/plugin",
     "flavors/local",
@@ -199,7 +70,6 @@
     "logging/logrus",
     "rpc/prometheus",
     "rpc/rest",
-    "rpc/rest/mock",
     "servicelabel",
     "utils/addrs",
     "utils/safeclose"
@@ -229,31 +99,6 @@
   packages = ["."]
   revision = "71ceffbeb0ba60fccc853971bb3ed4d7d90bfd04"
   version = "v1.7.4-pre"
-
-[[projects]]
-  name = "github.com/onsi/gomega"
-  packages = [
-    ".",
-    "format",
-    "internal/assertion",
-    "internal/asyncassertion",
-    "internal/oraclematcher",
-    "internal/testingtsupport",
-    "matchers",
-    "matchers/support/goraph/bipartitegraph",
-    "matchers/support/goraph/edge",
-    "matchers/support/goraph/node",
-    "matchers/support/goraph/util",
-    "types"
-  ]
-  revision = "003f63b7f4cff3fc95357005358af2de0f5fe152"
-  version = "v1.3.0"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/petar/GoLLRB"
-  packages = ["llrb"]
-  revision = "53be0d36a84c2a886ca057d34b6aa4468df9ccb4"
 
 [[projects]]
   name = "github.com/prometheus/client_golang"
@@ -304,31 +149,15 @@
   version = "v1.0.4"
 
 [[projects]]
-  name = "github.com/ugorji/go"
-  packages = ["codec"]
-  revision = "9831f2c3ac1068a78f50999a30db84270f647af6"
-  version = "v1.1"
-
-[[projects]]
   branch = "master"
   name = "github.com/unrolled/render"
   packages = ["."]
   revision = "65450fb6b2d3595beca39f969c411db8f8d5c806"
 
 [[projects]]
-  name = "github.com/xiang90/probing"
-  packages = ["."]
-  revision = "07dd2e8dfe18522e9c447ba95f2fe95262f63bb2"
-  version = "0.0.1"
-
-[[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
-  packages = [
-    "bcrypt",
-    "blowfish",
-    "ssh/terminal"
-  ]
+  packages = ["ssh/terminal"]
   revision = "d9133f5469342136e669e85192a26056b587f503"
 
 [[projects]]
@@ -336,9 +165,6 @@
   name = "golang.org/x/net"
   packages = [
     "context",
-    "html",
-    "html/atom",
-    "html/charset",
     "http2",
     "http2/hpack",
     "idna",
@@ -363,24 +189,12 @@
   packages = [
     "collate",
     "collate/build",
-    "encoding",
-    "encoding/charmap",
-    "encoding/htmlindex",
-    "encoding/internal",
-    "encoding/internal/identifier",
-    "encoding/japanese",
-    "encoding/korean",
-    "encoding/simplifiedchinese",
-    "encoding/traditionalchinese",
-    "encoding/unicode",
     "internal/colltab",
     "internal/gen",
     "internal/tag",
     "internal/triegen",
     "internal/ucd",
-    "internal/utf8internal",
     "language",
-    "runes",
     "secure/bidirule",
     "transform",
     "unicode/bidi",
@@ -417,6 +231,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "631b3231c7b2a36c85202a7bf8bb3c2c84040ac71a857808eb376b69782aaee9"
+  inputs-digest = "1790684301ae25194790e96885a5b0aba8466a8cbeb0f254ef305778caa80700"
   solver-name = "gps-cdcl"
   solver-version = 1
