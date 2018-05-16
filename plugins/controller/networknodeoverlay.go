@@ -100,11 +100,26 @@ func (nno *NetworkNodeOverlay) AppendStatusMsg(msg string) {
 }
 
 // AllocateVxlanAddress allocates a free address from the pool
-func (mgr *NetworkNodeOverlayMgr) AllocateVxlanAddress(poolName string, nodeName string) (string, error) {
+func (mgr *NetworkNodeOverlayMgr) AllocateVxlanAddress(poolName string, nodeName string, nodeLabel string) (string, error) {
 
 	if poolName == "" { // no pool specified ... try the hard coded vxlan endpoints in the node i/f list
-		return ctlrPlugin.NetworkNodeMgr.FindVxlanIPaddress(nodeName)
+		ipAddress, err := ctlrPlugin.NetworkNodeMgr.FindVxlanIPaddress(nodeName)
+		if err == nil {
+			return ipAddress, err
+		}
+		if nodeLabel != "" {
+			nodeInterfaces, nodeIfTypes := ctlrPlugin.NetworkNodeMgr.FindInterfacesForThisLabelInNode(nodeName , []string{nodeLabel})
+			if len(nodeInterfaces) != 1 {
+				return "", fmt.Errorf("One interface must have a label: %s", nodeLabel)
+			}
+			if nodeIfTypes[0] != controller.IfTypeEthernet || len(nodeInterfaces[0].IpAddresses) != 1 {
+				return "", fmt.Errorf("An ethernet interface with an ip_address is required for this label: %s", nodeLabel)
+			}
+			return nodeInterfaces[0].IpAddresses[0], nil
+		}
+		return ipAddress, err
 	}
+
 	if vxlanIPAddress, exists := mgr.vxLanAddresses[nodeName]; exists {
 		return vxlanIPAddress, nil
 	}
@@ -114,7 +129,7 @@ func (mgr *NetworkNodeOverlayMgr) AllocateVxlanAddress(poolName string, nodeName
 	}
 	vxlanIPAddress, _, err := vxlanIpamPool.AllocateIPAddress()
 	if err != nil {
-		return "", fmt.Errorf("Cannot allocate address from VNF service mesh vxlan pool %s", poolName)
+		return "", fmt.Errorf("Cannot allocate address from node overlay vxlan pool %s", poolName)
 	}
 
 	mgr.vxLanAddresses[nodeName] = vxlanIPAddress
@@ -346,6 +361,8 @@ func (nno *NetworkNodeOverlay) renderConfig() error {
 	if err := nno.validate(); err != nil {
 		return err
 	}
+
+	ctlrPlugin.RenderAll()
 
 	return nil
 }

@@ -184,7 +184,9 @@ message NetworkNodeOverlaySpec {
         string hub_node_name = 1;
         uint32 vni = 2;
         string loopback_ipam_pool_name = 3;
-        string network_node_interface_label = 4; // needed for static routes of loopback to outgoing i/f
+        bool create_loopback_interface = 4;
+        bool create_loopback_static_routes = 5;
+        string network_node_interface_label = 6; // needed for static routes of loopback to outgoing i/f
                                              // all ethernet labels matching will have a static route
                                              // if this outgoing_interface_label is not provided then
                                              // static routes will only be created on the first gige
@@ -194,7 +196,9 @@ message NetworkNodeOverlaySpec {
         uint32 vni_range_start = 1;
         uint32 vni_range_end = 2;
         string loopback_ipam_pool_name = 3;
-        string network_node_interface_label = 4; // needed for static routes of loopback to outgoing i/f
+        bool create_loopback_interface = 4;
+        bool create_loopback_static_routes = 5;
+        string network_node_interface_label = 6; // needed for static routes of loopback to outgoing i/f
                                              // all ethernet labels matching will have a static route
                                              // if this outgoing_interface_label is not provided then
                                              // static routes will only be created on the first gige

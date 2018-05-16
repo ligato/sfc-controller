@@ -486,6 +486,8 @@ func (ip *IPAMPool) renderConfig() error {
 		return err
 	}
 
+	ctlrPlugin.RenderAll()
+
 	return nil
 }
 

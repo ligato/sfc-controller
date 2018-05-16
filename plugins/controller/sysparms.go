@@ -224,11 +224,13 @@ func (sp *SystemParameters) renderConfig() error {
 	RenderTxnConfigEntityStart()
 	defer RenderTxnConfigEntityEnd()
 
-	// first validate the config as it may have come in via a dartastore
+	// first validate the config as it may have come in via a datastore
 	// update from outside rest, startup yaml ... crd?
 	if err := sp.validate(); err != nil {
 		return err
 	}
+
+	ctlrPlugin.RenderAll()
 
 	return nil
 }

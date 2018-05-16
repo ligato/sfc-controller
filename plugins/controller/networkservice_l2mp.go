@@ -49,8 +49,8 @@ func (ns *NetworkService) RenderConnL2MP(
 
 		p2n, exists := ctlrPlugin.ramConfigCache.NetworkPodToNodeMap[connPodName]
 		if !exists || p2n.Node == "" {
-			msg := fmt.Sprintf("connection segment %d: %s, network pod not mapped to a node in network-pod-to-node-map",
-				connIndex, connPodInterface)
+			msg := fmt.Sprintf("conn: %d: %s, network pod not mapped to a node in network-pod-to-node-map",
+				connIndex+1, connPodInterface)
 			ns.AppendStatusMsg(msg)
 			allPodsAssignedToNodes = false
 			continue
@@ -58,8 +58,8 @@ func (ns *NetworkService) RenderConnL2MP(
 
 		_, exists = ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationR(p2n.Node)
 		if !exists {
-			msg := fmt.Sprintf("connection segment %d: %s, network pod references non existant host: %s",
-				connIndex, connPodInterface, p2n.Node)
+			msg := fmt.Sprintf("conn: %d: %s, network pod references non existant host: %s",
+				connIndex+1, connPodInterface, p2n.Node)
 			ns.AppendStatusMsg(msg)
 			allPodsAssignedToNodes = false
 			continue
@@ -112,7 +112,7 @@ func (ns *NetworkService) RenderConnL2MP(
 		if !exists {
 			msg := fmt.Sprintf("network-service: %s, conn: %d, referencing a missing overlay: %s",
 				ns.Metadata.Name,
-				connIndex,
+				connIndex+1,
 				conn.NetworkNodeOverlayName)
 			ns.AppendStatusMsg(msg)
 			return fmt.Errorf(msg)
@@ -338,7 +338,7 @@ func (ns *NetworkService) renderConnL2MPInterNode(
 	default:
 		msg := fmt.Sprintf("network-service: %s, conn: %d, node overlay: %s type not implemented",
 			ns.Metadata.Name,
-			connIndex,
+			connIndex+1,
 			nno.Metadata.Name)
 		ns.AppendStatusMsg(msg)
 		return fmt.Errorf(msg)

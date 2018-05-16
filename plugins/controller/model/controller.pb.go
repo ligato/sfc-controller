@@ -464,10 +464,12 @@ func (m *NetworkNodeOverlaySpec) GetVxlanMeshParms() *NetworkNodeOverlaySpec_Vxl
 }
 
 type NetworkNodeOverlaySpec_VxlanHubAndSpokeParms struct {
-	HubNodeName               string `protobuf:"bytes,1,opt,name=hub_node_name,proto3" json:"hub_node_name,omitempty"`
-	Vni                       uint32 `protobuf:"varint,2,opt,name=vni,proto3" json:"vni,omitempty"`
-	LoopbackIpamPoolName      string `protobuf:"bytes,3,opt,name=loopback_ipam_pool_name,proto3" json:"loopback_ipam_pool_name,omitempty"`
-	NetworkNodeInterfaceLabel string `protobuf:"bytes,4,opt,name=network_node_interface_label,proto3" json:"network_node_interface_label,omitempty"`
+	HubNodeName                string `protobuf:"bytes,1,opt,name=hub_node_name,proto3" json:"hub_node_name,omitempty"`
+	Vni                        uint32 `protobuf:"varint,2,opt,name=vni,proto3" json:"vni,omitempty"`
+	LoopbackIpamPoolName       string `protobuf:"bytes,3,opt,name=loopback_ipam_pool_name,proto3" json:"loopback_ipam_pool_name,omitempty"`
+	CreateLoopbackInterface    bool   `protobuf:"varint,4,opt,name=create_loopback_interface,proto3" json:"create_loopback_interface,omitempty"`
+	CreateLoopbackStaticRoutes bool   `protobuf:"varint,5,opt,name=create_loopback_static_routes,proto3" json:"create_loopback_static_routes,omitempty"`
+	NetworkNodeInterfaceLabel  string `protobuf:"bytes,6,opt,name=network_node_interface_label,proto3" json:"network_node_interface_label,omitempty"`
 }
 
 func (m *NetworkNodeOverlaySpec_VxlanHubAndSpokeParms) Reset() {
@@ -479,10 +481,12 @@ func (m *NetworkNodeOverlaySpec_VxlanHubAndSpokeParms) String() string {
 func (*NetworkNodeOverlaySpec_VxlanHubAndSpokeParms) ProtoMessage() {}
 
 type NetworkNodeOverlaySpec_VxlanMeshParms struct {
-	VniRangeStart             uint32 `protobuf:"varint,1,opt,name=vni_range_start,proto3" json:"vni_range_start,omitempty"`
-	VniRangeEnd               uint32 `protobuf:"varint,2,opt,name=vni_range_end,proto3" json:"vni_range_end,omitempty"`
-	LoopbackIpamPoolName      string `protobuf:"bytes,3,opt,name=loopback_ipam_pool_name,proto3" json:"loopback_ipam_pool_name,omitempty"`
-	NetworkNodeInterfaceLabel string `protobuf:"bytes,4,opt,name=network_node_interface_label,proto3" json:"network_node_interface_label,omitempty"`
+	VniRangeStart              uint32 `protobuf:"varint,1,opt,name=vni_range_start,proto3" json:"vni_range_start,omitempty"`
+	VniRangeEnd                uint32 `protobuf:"varint,2,opt,name=vni_range_end,proto3" json:"vni_range_end,omitempty"`
+	LoopbackIpamPoolName       string `protobuf:"bytes,3,opt,name=loopback_ipam_pool_name,proto3" json:"loopback_ipam_pool_name,omitempty"`
+	CreateLoopbackInterface    bool   `protobuf:"varint,4,opt,name=create_loopback_interface,proto3" json:"create_loopback_interface,omitempty"`
+	CreateLoopbackStaticRoutes bool   `protobuf:"varint,5,opt,name=create_loopback_static_routes,proto3" json:"create_loopback_static_routes,omitempty"`
+	NetworkNodeInterfaceLabel  string `protobuf:"bytes,6,opt,name=network_node_interface_label,proto3" json:"network_node_interface_label,omitempty"`
 }
 
 func (m *NetworkNodeOverlaySpec_VxlanMeshParms) Reset()         { *m = NetworkNodeOverlaySpec_VxlanMeshParms{} }

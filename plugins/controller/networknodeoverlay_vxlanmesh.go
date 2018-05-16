@@ -42,7 +42,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 	if !exists {
 		msg := fmt.Sprintf("network-service: %s, conn: %d, node overlay: %s out of vni's",
 			ns.Metadata.Name,
-			connIndex,
+			connIndex+1,
 			nno.Metadata.Name)
 		ns.AppendStatusMsg(msg)
 		return fmt.Errorf(msg)
@@ -51,7 +51,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 	if err != nil {
 		msg := fmt.Sprintf("network-service: %s, conn: %d, node overlay: %s out of vni's",
 			ns.Metadata.Name,
-			connIndex,
+			connIndex+1,
 			nno.Metadata.Name)
 		ns.AppendStatusMsg(msg)
 		return fmt.Errorf(msg)
@@ -66,25 +66,25 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 				continue
 			}
 
-			ifName := fmt.Sprintf("IF_VXLAN_MESH_VSRVC_%s_CONN_%d_FROM_%s_TO_%s_VNI_%d",
+			ifName := fmt.Sprintf("IF_VXLAN_MESH_NET_SRVC_%s_CONN_%d_FROM_%s_TO_%s_VNI_%d",
 				ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 
 			vxlanIPFromAddress, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
-				nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, fromNode)
+				nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, fromNode, nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 			if err != nil {
-				msg := fmt.Sprintf("vnf-service: %s, conn: %d, service mesh: %s %s",
+				msg := fmt.Sprintf("network service: %s, conn: %d, overlay: %s %s",
 					ns.Metadata.Name,
-					connIndex,
+					connIndex+1,
 					nno.Metadata.Name, err)
 				ns.AppendStatusMsg(msg)
 				return fmt.Errorf(msg)
 			}
 			vxlanIPToAddress, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
-				nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, toNode)
+				nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, toNode, nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 			if err != nil {
-				msg := fmt.Sprintf("vnf-service: %s, conn: %d, service mesh: %s %s",
+				msg := fmt.Sprintf("network service: %s, conn: %d, overlay: %s %s",
 					ns.Metadata.Name,
-					connIndex,
+					connIndex+1,
 					nno.Metadata.Name, err)
 				ns.AppendStatusMsg(msg)
 				return fmt.Errorf(msg)
@@ -107,10 +107,12 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 			}
 			l2bdIFs[fromNode] = append(l2bdIFs[fromNode], l2bdIF)
 
-			renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanStaticRoutes(
+			renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanLoopbackInterfaceAndStaticRoutes(
 				ModelTypeNetworkService+"/"+ns.Metadata.Name,
 				fromNode, toNode,
 				vxlanIPFromAddress, vxlanIPToAddress,
+				nno.Spec.VxlanMeshParms.CreateLoopbackInterface,
+				nno.Spec.VxlanMeshParms.CreateLoopbackStaticRoutes,
 				nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 
 			for k, v := range renderedEntries {
@@ -119,7 +121,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 		}
 	}
 
-	// create the perNode lsbd's and add the vnf interfaces
+	// create the perNode L2BD's and add the vnf interfaces
 	for nodeName := range nodeMap {
 		if err := ns.renderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
 			return err
@@ -146,9 +148,9 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 	// create the vxlan endpoints
 	vniAllocator, exists := ctlrPlugin.NetworkNodeOverlayMgr.vniAllocators[nno.Metadata.Name]
 	if !exists {
-		msg := fmt.Sprintf("vnf-service: %s, conn: %d, %s to %s node overlay: %s out of vni's",
+		msg := fmt.Sprintf("network service: %s, conn: %d, %s to %s node overlay: %s out of vni's",
 			ns.Metadata.Name,
-			connIndex,
+			connIndex+1,
 			conn.PodInterfaces[0],
 			conn.PodInterfaces[1],
 			nno.Metadata.Name)
@@ -157,9 +159,9 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 	}
 	vni, err := vniAllocator.AllocateVni()
 	if err != nil {
-		msg := fmt.Sprintf("vnf-service: %s, conn: %d, %s/%s to %s/%s service mesh: %s out of vni's",
+		msg := fmt.Sprintf("network service: %s, conn: %d, %s/%s to %s/%s overlay: %s out of vni's",
 			ns.Metadata.Name,
-			connIndex,
+			connIndex+1,
 			conn.PodInterfaces[0],
 			conn.PodInterfaces[1],
 			nno.Metadata.Name)
@@ -181,11 +183,12 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 		xconn[1][i] = ifName
 
 		vxlanIPFromAddress, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
-			nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, p2nArray[i].Node)
+			nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, p2nArray[i].Node,
+			nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 		if err != nil {
 			msg := fmt.Sprintf("network-service: %s, conn: %d, %s to %s node overlay: %s, %s",
 				ns.Metadata.Name,
-				connIndex,
+				connIndex+1,
 				conn.PodInterfaces[0],
 				conn.PodInterfaces[1],
 				nno.Metadata.Name, err)
@@ -193,11 +196,12 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 			return fmt.Errorf(msg)
 		}
 		vxlanIPToAddress, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
-			nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, p2nArray[^i&1].Node)
+			nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, p2nArray[^i&1].Node,
+			nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 		if err != nil {
 			msg := fmt.Sprintf("network-service: %s, conn: %d, %s to %s node overlay: %s %s",
 				ns.Metadata.Name,
-				connIndex,
+				connIndex+1,
 				conn.PodInterfaces[0],
 				conn.PodInterfaces[1],
 				nno.Metadata.Name, err)
@@ -216,10 +220,12 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 			vppKV)
 
 
-		renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanStaticRoutes(
+		renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanLoopbackInterfaceAndStaticRoutes(
 			ModelTypeNetworkService+"/"+ns.Metadata.Name,
 			p2nArray[i].Node, p2nArray[^i&1].Node,
 			vxlanIPFromAddress, vxlanIPToAddress,
+			nno.Spec.VxlanMeshParms.CreateLoopbackInterface,
+			nno.Spec.VxlanMeshParms.CreateLoopbackStaticRoutes,
 			nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 
 		for k, v := range renderedEntries {

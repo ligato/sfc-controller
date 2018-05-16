@@ -108,7 +108,7 @@ func (mgr *NetworkNodeMgr) FindVxlanIPaddress(nodeName string) (string, error) {
 			for _, ipAddress := range iFace.IpAddresses {
 				ip, _, err := net.ParseCIDR(ipAddress)
 				if err == nil {
-					log.Debugf("FindVxlanIPaddress: node: %s, found vxlan iupaddr: %s",
+					log.Debugf("FindVxlanIPaddress: node: %s, found vxlan ipaddr: %s",
 						nodeName, ip)
 					return ip.String(), nil
 				}
@@ -570,13 +570,15 @@ func findInterfaceLabel(labels []string, label string) bool {
 	return false
 }
 
-// RenderVxlanStaticRoutes renders static routes for the vxlan
-func (mgr *NetworkNodeMgr) RenderVxlanStaticRoutes(
+// RenderVxlanLoopbackInterfaceAndStaticRoutes renders static routes for the vxlan
+func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 	renderingEntity string,
 	fromNode string,
 	toNode string,
 	fromVxlanAddress string,
 	toVxlanAddress string,
+	createLoopbackInterface bool,
+	createLoopbackStaticRoutes bool,
 	networkNodeInterfaceLabel string) map[string]*controller.RenderedVppAgentEntry {
 
 	//var renderedEntries map[string]*controller.RenderedVppAgentEntry
@@ -590,42 +592,46 @@ func (mgr *NetworkNodeMgr) RenderVxlanStaticRoutes(
 
 	n1 := mgr.networkNodeCache[fromNode]
 
-	// make sure there is a loopback i/f entry for this vxlan endpoint
-	vppKV := vppagent.ConstructLoopbackInterface(n1.Metadata.Name,
-		"IF_VXLAN_LOOPBACK_"+fromNode,
-		[]string{fromVxlanAddress},
-		"",
-		ctlrPlugin.SysParametersMgr.sysParmCache.Mtu,
-		controller.IfAdminStatusEnabled,
-		ctlrPlugin.SysParametersMgr.sysParmCache.RxMode)
-	RenderTxnAddVppEntryToTxn(renderedEntries, renderingEntity, vppKV)
+	if createLoopbackInterface {
+		// make sure there is a loopback i/f entry for this vxlan endpoint
+		vppKV := vppagent.ConstructLoopbackInterface(n1.Metadata.Name,
+			"IF_VXLAN_LOOPBACK_"+fromNode,
+			[]string{fromVxlanAddress},
+			"",
+			ctlrPlugin.SysParametersMgr.sysParmCache.Mtu,
+			controller.IfAdminStatusEnabled,
+			ctlrPlugin.SysParametersMgr.sysParmCache.RxMode)
+		RenderTxnAddVppEntryToTxn(renderedEntries, renderingEntity, vppKV)
+	}
 
 	n2 := mgr.networkNodeCache[toNode]
 
-	for _, node1Iface := range n1.Spec.Interfaces {
-		if node1Iface.IfType != controller.IfTypeEthernet ||
-			!(findInterfaceLabel(node1Iface.Labels, networkNodeInterfaceLabel) ||
-				len(n1.Spec.Interfaces) == 1) { // if only one ethernet if, it does not need the label
-			continue
-		}
-		for _, node2Iface := range n2.Spec.Interfaces {
-			if node2Iface.IfType != controller.IfTypeEthernet ||
-				!(findInterfaceLabel(node2Iface.Labels, networkNodeInterfaceLabel) ||
-					len(n2.Spec.Interfaces) == 1) { // if only one ethernet if, it does not need the label
+	if createLoopbackStaticRoutes {
+		for _, node1Iface := range n1.Spec.Interfaces {
+			if node1Iface.IfType != controller.IfTypeEthernet ||
+				!(findInterfaceLabel(node1Iface.Labels, networkNodeInterfaceLabel) ||
+					len(n1.Spec.Interfaces) == 1) { // if only one ethernet if, it does not need the label
 				continue
 			}
+			for _, node2Iface := range n2.Spec.Interfaces {
+				if node2Iface.IfType != controller.IfTypeEthernet ||
+					!(findInterfaceLabel(node2Iface.Labels, networkNodeInterfaceLabel) ||
+						len(n2.Spec.Interfaces) == 1) { // if only one ethernet if, it does not need the label
+					continue
+				}
 
-			l3sr := &controller.L3VRFRoute{
-				VrfId:             0,
-				Description:       fmt.Sprintf("L3VRF_VXLAN Node:%s to Node:%s", fromNode, toNode),
-				DstIpAddr:         toVxlanAddress, // des node vxlan address
-				NextHopAddr:       node2Iface.IpAddresses[0],
-				OutgoingInterface: node1Iface.Name,
-				Weight:            ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRouteWeight,
-				Preference:        ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRoutePreference,
+				l3sr := &controller.L3VRFRoute{
+					VrfId:             0,
+					Description:       fmt.Sprintf("L3VRF_VXLAN Node:%s to Node:%s", fromNode, toNode),
+					DstIpAddr:         toVxlanAddress, // des node vxlan address
+					NextHopAddr:       node2Iface.IpAddresses[0],
+					OutgoingInterface: node1Iface.Name,
+					Weight:            ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRouteWeight,
+					Preference:        ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRoutePreference,
+				}
+				vppKV := vppagent.ConstructStaticRoute(n1.Metadata.Name, l3sr)
+				RenderTxnAddVppEntryToTxn(renderedEntries, renderingEntity, vppKV)
 			}
-			vppKV := vppagent.ConstructStaticRoute(n1.Metadata.Name, l3sr)
-			RenderTxnAddVppEntryToTxn(renderedEntries, renderingEntity, vppKV)
 		}
 	}
 	return renderedEntries

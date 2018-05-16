@@ -43,7 +43,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 	if _, exists := ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationR(hubNodeName); !exists {
 		msg := fmt.Sprintf("network-service: %s, conn: %d, network node overlay: %s, hub_node: %s not found",
 			ns.Metadata.Name,
-			connIndex,
+			connIndex+1,
 			nno.Metadata.Name,
 			hubNodeName)
 		ns.AppendStatusMsg(msg)
@@ -58,7 +58,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 		if hubNodeName == spokeNodeName {
 			msg := fmt.Sprintf("network-service: %s, conn: %d, network node overlay: %s hub node same as spoke %s",
 				ns.Metadata.Name,
-				connIndex,
+				connIndex+1,
 				nno.Metadata.Name, hubNodeName)
 			ns.AppendStatusMsg(msg)
 			return fmt.Errorf(msg)
@@ -74,28 +74,30 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 			var ifName string
 			if i == 0 {
 				ifName = fmt.Sprintf("IF_VXLAN_NET_SRVC_%s_CONN_%d_FROM_HUB_%s_TO_SPOKE_%s_VNI_%d",
-					ns.Metadata.Name, connIndex, fromNode, toNode, vni)
+					ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 			} else {
 				ifName = fmt.Sprintf("IF_VXLAN_NET_SRVC_%s_CONN_%d_FROM_SPOKE_%s_TO_HUB_%s_VNI_%d",
-					ns.Metadata.Name, connIndex, fromNode, toNode, vni)
+					ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 			}
 
 			vxlanIPFromAddress, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
-				nno.Spec.VxlanHubAndSpokeParms.LoopbackIpamPoolName, fromNode)
+				nno.Spec.VxlanHubAndSpokeParms.LoopbackIpamPoolName, fromNode,
+				nno.Spec.VxlanHubAndSpokeParms.NetworkNodeInterfaceLabel)
 			if err != nil {
 				msg := fmt.Sprintf("network-service: %s, conn: %d, network node overlay: %s %s",
 					ns.Metadata.Name,
-					connIndex,
+					connIndex+1,
 					nno.Metadata.Name, err)
 				ns.AppendStatusMsg(msg)
 				return fmt.Errorf(msg)
 			}
 			vxlanIPToAddress, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
-				nno.Spec.VxlanHubAndSpokeParms.LoopbackIpamPoolName, toNode)
+				nno.Spec.VxlanHubAndSpokeParms.LoopbackIpamPoolName, toNode,
+				nno.Spec.VxlanHubAndSpokeParms.NetworkNodeInterfaceLabel)
 			if err != nil {
 				msg := fmt.Sprintf("network-service: %s, conn: %d, network node overlay: %s %s",
 					ns.Metadata.Name,
-					connIndex,
+					connIndex+1,
 					nno.Metadata.Name, err)
 				ns.AppendStatusMsg(msg)
 				return fmt.Errorf(msg)
@@ -119,10 +121,12 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 			}
 			l2bdIFs[fromNode] = append(l2bdIFs[fromNode], l2bdIF)
 
-			renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanStaticRoutes(
+			renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanLoopbackInterfaceAndStaticRoutes(
 				ModelTypeNetworkService+"/"+ns.Metadata.Name,
 				fromNode, toNode,
 				vxlanIPFromAddress, vxlanIPToAddress,
+				nno.Spec.VxlanHubAndSpokeParms.CreateLoopbackInterface,
+				nno.Spec.VxlanHubAndSpokeParms.CreateLoopbackStaticRoutes,
 				nno.Spec.VxlanHubAndSpokeParms.NetworkNodeInterfaceLabel)
 
 			for k, v := range renderedEntries {
