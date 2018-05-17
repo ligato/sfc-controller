@@ -15,6 +15,8 @@
 package controller
 
 import (
+	"github.com/golang/protobuf/proto"
+	"github.com/ligato/sfc-controller/plugins/controller/database"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 )
 
@@ -25,7 +27,8 @@ func InitInterfaceStatus(
 	vppAgent string,
 	entityInterface *controller.Interface) (*controller.InterfaceStatus, error) {
 
-	entityInterfaceName := 	entityInterface.Parent + "/" + entityInterface.Name
+	entityInterfaceName := entityInterface.Parent + "/" + entityInterface.Name
+
 	ifStatus, exists := ctlrPlugin.ramConfigCache.InterfaceStates[entityInterfaceName]
 	if !exists {
 		ifStatus = &controller.InterfaceStatus{
@@ -89,9 +92,11 @@ func PersistInterfaceStatus(
 	podName string, ifName string) {
 
 	entityInterfaceName := 	podName + "/" + ifName
+	interfaceKey := InterfaceKeyPrefix() + entityInterfaceName
 
 	interfaces[entityInterfaceName] = ifStatus
 	ctlrPlugin.ramConfigCache.InterfaceStates[entityInterfaceName] = ifStatus
+	database.WriteToDatastore(interfaceKey, ifStatus)
 
 	log.Debugf("PersistInterfaceStatus: entityInterfaceName: %s, %v", entityInterfaceName, ifStatus)
 
@@ -102,9 +107,11 @@ func RemoveInterfaceStatus(
 	podName string, ifName string) {
 
 	entityInterfaceName := 	podName + "/" + ifName
+	interfaceKey := InterfaceKeyPrefix() + entityInterfaceName
 
 	delete(interfaces, entityInterfaceName)
 	delete(ctlrPlugin.ramConfigCache.InterfaceStates, entityInterfaceName)
+	database.DeleteFromDatastore(interfaceKey)
 
 	log.Debugf("RemoveInterfaceStatus: entityInterfaceName: %s, %v", entityInterfaceName)
 }
@@ -134,4 +141,29 @@ func UpdateRamCacheAllocatorsForInterfaceStatus(
 	}
 
 	return nil
+}
+
+// KeyPrefix provides sfc controller's interface
+func InterfaceKeyPrefix() string {
+	return controller.SfcControllerStatusPrefix() + "interface/"
+}
+
+// LoadAllInterfacesFromDatastoreIntoCache iterates over the etcd set
+func LoadAllInterfacesFromDatastoreIntoCache() error {
+	log.Debugf("LoadAllInterfacesFromDatastoreIntoCache: ...")
+	return loadAllInterfacesFromDatastore(ctlrPlugin.ramConfigCache.InterfaceStates)
+}
+
+// loadAllInterfacesFromDatastore iterates over the etcd set
+func loadAllInterfacesFromDatastore(iFaces map[string]*controller.InterfaceStatus) error {
+	var iFace *controller.InterfaceStatus
+	return database.ReadIterate(InterfaceKeyPrefix(),
+		func() proto.Message {
+			iFace = &controller.InterfaceStatus{}
+			return iFace
+		},
+		func(data proto.Message) {
+			iFaces[iFace.Name] = iFace
+			//log.Debugf("loadAllInterfacesFromDatastore: n=%v", ip)
+		})
 }

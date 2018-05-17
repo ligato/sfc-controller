@@ -318,7 +318,7 @@ func (mgr *NetworkPodToNodeMapMgr) NameKey(name string) string {
 // ContivKsrNetworkPodToNodePrefix: ContivKSR writes k8s updates using this prefix
 func (mgr *NetworkPodToNodeMapMgr) ContivKsrNetworkPodToNodePrefix() string {
 	return controller.SfcControllerContivKSRPrefix() + controller.SfcControllerStatusPrefix() +
-		"vnf-to-node/"
+		"network-pod-to-node-map/"
 }
 
 func (p2n *NetworkPodToNodeMap) renderConfig() error {
@@ -355,31 +355,31 @@ func (mgr *NetworkPodToNodeMapMgr) InitAndRunWatcher() {
 	log.Info("NetworkPodToNodeMapWatcher: enter ...")
 	defer log.Info("NetworkPodToNodeMapWatcher: exit ...")
 
-	go func() {
-		// back up timer ... paranoid about missing events ...
-		// check every minute just in case
-		ticker := time.NewTicker(1 * time.Minute)
-		for _ = range ticker.C {
-			tempNetworkPodToNodeMapMap := make(map[string]*NetworkPodToNodeMap)
-			mgr.loadAllFromDatastore(mgr.KeyPrefix(), tempNetworkPodToNodeMapMap)
-			renderingRequired := false
-			for _, dbEntry := range tempNetworkPodToNodeMapMap {
-				ramEntry, exists := mgr.HandleCRUDOperationR(dbEntry.Pod)
-				if !exists || !ramEntry.ConfigEqual(dbEntry) {
-					log.Debugf("NetworkPodToNodeMapWatcher: timer new config: %v", dbEntry)
-					renderingRequired = true
-					mgr.HandleCRUDOperationCU(dbEntry, false) // render at the end
-				}
-			}
-			// if any of the entities required rendering, do it now
-			if renderingRequired {
-				RenderTxnConfigStart()
-				ctlrPlugin.RenderAll()
-				RenderTxnConfigEnd()
-			}
-			tempNetworkPodToNodeMapMap = nil
-		}
-	}()
+	//go func() {
+	//	// back up timer ... paranoid about missing events ...
+	//	// check every minute just in case
+	//	ticker := time.NewTicker(1 * time.Minute)
+	//	for _ = range ticker.C {
+	//		tempNetworkPodToNodeMapMap := make(map[string]*NetworkPodToNodeMap)
+	//		mgr.loadAllFromDatastore(mgr.KeyPrefix(), tempNetworkPodToNodeMapMap)
+	//		renderingRequired := false
+	//		for _, dbEntry := range tempNetworkPodToNodeMapMap {
+	//			ramEntry, exists := mgr.HandleCRUDOperationR(dbEntry.Pod)
+	//			if !exists || !ramEntry.ConfigEqual(dbEntry) {
+	//				log.Debugf("NetworkPodToNodeMapWatcher: timer new config: %v", dbEntry)
+	//				renderingRequired = true
+	//				mgr.HandleCRUDOperationCU(dbEntry, false) // render at the end
+	//			}
+	//		}
+	//		// if any of the entities required rendering, do it now
+	//		if renderingRequired {
+	//			RenderTxnConfigStart()
+	//			ctlrPlugin.RenderAll()
+	//			RenderTxnConfigEnd()
+	//		}
+	//		tempNetworkPodToNodeMapMap = nil
+	//	}
+	//}()
 
 	respChan := make(chan keyval.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())

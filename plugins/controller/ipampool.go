@@ -421,7 +421,7 @@ func processPost(formatter *render.Render, w http.ResponseWriter, req *http.Requ
 		}
 	}
 
-	log.Debugf("procesPost: POST: %v", ip)
+	log.Debugf("processPost: POST: %v", ip)
 	if err := ctlrPlugin.IpamPoolMgr.HandleCRUDOperationCU(&ip, true); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
