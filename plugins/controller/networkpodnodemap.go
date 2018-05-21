@@ -49,7 +49,7 @@ func (mgr *NetworkPodToNodeMapMgr) Init() {
 
 func (mgr *NetworkPodToNodeMapMgr) AfterInit() {
 	go mgr.InitAndRunWatcher()
-	if !BypassModelTypeHttpHandlers {
+	if !ctlrPlugin.BypassModelTypeHttpHandlers {
 		mgr.InitHTTPHandlers()
 	}
 }
@@ -91,7 +91,7 @@ func (mgr *NetworkPodToNodeMapMgr) HandleContivKSRStatusUpdate(p2n *NetworkPodTo
 		return err
 	}
 
-	ctlrPlugin.ramConfigCache.NetworkPodToNodeMap[p2n.Pod] = p2n
+	ctlrPlugin.ramCache.NetworkPodToNodeMap[p2n.Pod] = p2n
 
 
 	if render {
@@ -104,7 +104,7 @@ func (mgr *NetworkPodToNodeMapMgr) HandleContivKSRStatusUpdate(p2n *NetworkPodTo
 // HandleContivKSRStatusDelete add to ram cache and render
 func (mgr *NetworkPodToNodeMapMgr) HandleContivKSRStatusDelete(podName string, render bool) error {
 
-	delete(ctlrPlugin.ramConfigCache.NetworkPodToNodeMap, podName)
+	delete(ctlrPlugin.ramCache.NetworkPodToNodeMap, podName)
 
 	if render {
 		mgr.RenderAll()
@@ -121,7 +121,7 @@ func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationCU(p2n *NetworkPodToNodeMa
 	}
 
 	mgr.networkPodNodeCache[p2n.Pod] = p2n
-	ctlrPlugin.ramConfigCache.NetworkPodToNodeMap[p2n.Pod] = p2n
+	ctlrPlugin.ramCache.NetworkPodToNodeMap[p2n.Pod] = p2n
 
 	if err := p2n.writeToDatastore(); err != nil {
 		return err
@@ -432,7 +432,7 @@ func (mgr *NetworkPodToNodeMapMgr) RunContivKSRNetworkPodToNodeMappingWatcher() 
 			mgr.loadAllFromDatastore(mgr.ContivKsrNetworkPodToNodePrefix(), tempNetworkPodToNodeMapMap)
 			renderingRequired := false
 			for _, dbEntry := range tempNetworkPodToNodeMapMap {
-				ramEntry, exists := ctlrPlugin.ramConfigCache.NetworkPodToNodeMap[dbEntry.Pod]
+				ramEntry, exists := ctlrPlugin.ramCache.NetworkPodToNodeMap[dbEntry.Pod]
 				if !exists || !ramEntry.ConfigEqual(dbEntry) {
 					log.Debugf("ContivKSRNetworkPodToNodeMappingWatcher: timer new config: %v", dbEntry)
 					renderingRequired = true

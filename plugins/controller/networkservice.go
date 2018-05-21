@@ -49,7 +49,7 @@ func (mgr *NetworkServiceMgr) Init() {
 
 func (mgr *NetworkServiceMgr) AfterInit() {
 	go mgr.InitAndRunWatcher()
-	if !BypassModelTypeHttpHandlers {
+	if !ctlrPlugin.BypassModelTypeHttpHandlers {
 		mgr.InitHTTPHandlers()
 	}
 }

@@ -51,7 +51,7 @@ func (ns *NetworkService) RenderConnL2PP(
 
 		connPodName, connInterfaceName := ConnPodInterfaceNames(connPodInterface)
 
-		p2n, exists := ctlrPlugin.ramConfigCache.NetworkPodToNodeMap[connPodName]
+		p2n, exists := ctlrPlugin.ramCache.NetworkPodToNodeMap[connPodName]
 		if !exists || p2n.Node == "" {
 			msg := fmt.Sprintf("connection segment %d: %s, network pod not mapped to a node in network_pod_to_node_map",
 				i, connPodInterface)

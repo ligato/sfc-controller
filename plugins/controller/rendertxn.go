@@ -129,8 +129,8 @@ func RenderTxnConfigEnd() error {
 		before := beforeMap[0][key]
 		after, existsInAfterCache := afterMap[0][key]
 		if !existsInAfterCache {
-			exists, err := ctlrPlugin.db.Delete(key)          // remove from etcd
-			delete(ctlrPlugin.ramConfigCache.VppEntries, key) // remove from sys ram cache
+			exists, err := ctlrPlugin.db.Delete(key)    // remove from etcd
+			delete(ctlrPlugin.ramCache.VppEntries, key) // remove from sys ram cache
 			log.Info("ConfigEnd: remove key from etcd and system cache: ", key, exists, err)
 			log.Info("ConfigEnd: remove before entry: ", before)
 			delete(beforeMap[0], key)
@@ -195,13 +195,13 @@ func RenderTxnAddVppEntryToTxn(
 // CopyRenderedVppAgentEntriesToBeforeCfgTxn cache the existing set before new keys are rendered
 func CopyRenderedVppAgentEntriesToBeforeCfgTxn(entityName string) {
 
-	vppAgentEntries, exists := ctlrPlugin.ramConfigCache.RenderedEntitesStates[entityName]
+	vppAgentEntries, exists := ctlrPlugin.ramCache.RenderedEntitesStates[entityName]
 	if !exists {
 		return
 	}
 	for _, vppAgentEntry := range vppAgentEntries {
 		log.Debugf("CopyRendered...BeforeCfgTxn: entry=%v", vppAgentEntry)
-		if vppKV, exists := ctlrPlugin.ramConfigCache.VppEntries[vppAgentEntry.VppAgentKey]; !exists {
+		if vppKV, exists := ctlrPlugin.ramCache.VppEntries[vppAgentEntry.VppAgentKey]; !exists {
 			log.Warnf("CopyRendered...BeforeCfgTxn: ouch ... missing vpp cache entry: %s",
 				vppAgentEntry.VppAgentKey)
 			vppKV = &vppagent.KVType{
@@ -220,7 +220,7 @@ func CopyRenderedVppAgentEntriesToBeforeCfgTxn(entityName string) {
 func transferAfterVppKVEntriesToSystemCache() {
 
 	for _, vppKV := range afterMap[0] {
-		ctlrPlugin.ramConfigCache.VppEntries[vppKV.VppKey] = vppKV
+		ctlrPlugin.ramCache.VppEntries[vppKV.VppKey] = vppKV
 	}
 }
 

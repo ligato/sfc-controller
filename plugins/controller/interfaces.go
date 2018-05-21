@@ -29,7 +29,7 @@ func InitInterfaceStatus(
 
 	entityInterfaceName := entityInterface.Parent + "/" + entityInterface.Name
 
-	ifStatus, exists := ctlrPlugin.ramConfigCache.InterfaceStates[entityInterfaceName]
+	ifStatus, exists := ctlrPlugin.ramCache.InterfaceStates[entityInterfaceName]
 	if !exists {
 		ifStatus = &controller.InterfaceStatus{
 			Name: entityInterfaceName,
@@ -41,7 +41,7 @@ func InitInterfaceStatus(
 	if entityInterface.MacAddress == "" {
 		if ifStatus.MacAddress == "" {
 			ifStatus.MacAddress, ifStatus.MacAddrID =
-				ctlrPlugin.ramConfigCache.MacAddrAllocator.Allocate()
+				ctlrPlugin.ramCache.MacAddrAllocator.Allocate()
 		}
 	} else {
 		if ifStatus.MacAddress != entityInterface.MacAddress {
@@ -95,7 +95,7 @@ func PersistInterfaceStatus(
 	interfaceKey := InterfaceKeyPrefix() + entityInterfaceName
 
 	interfaces[entityInterfaceName] = ifStatus
-	ctlrPlugin.ramConfigCache.InterfaceStates[entityInterfaceName] = ifStatus
+	ctlrPlugin.ramCache.InterfaceStates[entityInterfaceName] = ifStatus
 	database.WriteToDatastore(interfaceKey, ifStatus)
 
 	log.Debugf("PersistInterfaceStatus: entityInterfaceName: %s, %v", entityInterfaceName, ifStatus)
@@ -110,7 +110,7 @@ func RemoveInterfaceStatus(
 	interfaceKey := InterfaceKeyPrefix() + entityInterfaceName
 
 	delete(interfaces, entityInterfaceName)
-	delete(ctlrPlugin.ramConfigCache.InterfaceStates, entityInterfaceName)
+	delete(ctlrPlugin.ramCache.InterfaceStates, entityInterfaceName)
 	database.DeleteFromDatastore(interfaceKey)
 
 	log.Debugf("RemoveInterfaceStatus: entityInterfaceName: %s, %v", entityInterfaceName)
@@ -151,7 +151,7 @@ func InterfaceKeyPrefix() string {
 // LoadAllInterfacesFromDatastoreIntoCache iterates over the etcd set
 func LoadAllInterfacesFromDatastoreIntoCache() error {
 	log.Debugf("LoadAllInterfacesFromDatastoreIntoCache: ...")
-	return loadAllInterfacesFromDatastore(ctlrPlugin.ramConfigCache.InterfaceStates)
+	return loadAllInterfacesFromDatastore(ctlrPlugin.ramCache.InterfaceStates)
 }
 
 // loadAllInterfacesFromDatastore iterates over the etcd set

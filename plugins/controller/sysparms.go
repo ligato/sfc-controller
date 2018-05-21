@@ -38,7 +38,7 @@ func (mgr *SystemParametersMgr) Init() {
 
 func (mgr *SystemParametersMgr) AfterInit() {
 	go mgr.InitAndRunWatcher()
-	if !BypassModelTypeHttpHandlers {
+	if !ctlrPlugin.BypassModelTypeHttpHandlers {
 		mgr.InitHTTPHandlers()
 	}
 }

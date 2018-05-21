@@ -50,7 +50,7 @@ func (mgr *IPAMPoolMgr) Init() {
 
 func (mgr *IPAMPoolMgr) AfterInit() {
 	go mgr.InitAndRunWatcher()
-	if !BypassModelTypeHttpHandlers {
+	if !ctlrPlugin.BypassModelTypeHttpHandlers {
 		mgr.InitHTTPHandlers()
 	}
 }
@@ -99,7 +99,7 @@ func (mgr *IPAMPoolMgr) FindAllocator(poolName string, entityName string) (*ipam
 
 	allocatorName := contructAllocatorName(ipamPool, entityName)
 
-	ipamAllocator, exists := ctlrPlugin.ramConfigCache.IPAMPoolAllocators[allocatorName]
+	ipamAllocator, exists := ctlrPlugin.ramCache.IPAMPoolAllocators[allocatorName]
 	if !exists {
 		return nil, fmt.Errorf("Cannot find allocator pool %s: allocator: %s",
 			poolName, allocatorName)
@@ -213,7 +213,7 @@ func (mgr *IPAMPoolMgr) EntityCreate(entityName string, scope string) {
 				allocatorName := contructAllocatorName(ipamPool, entityName)
 				ipamPoolAllocator = ipam.NewIPAMPoolAllocator(allocatorName,
 					ipamPool.Spec.StartRange, ipamPool.Spec.EndRange, ipamPool.Spec.Network)
-				ctlrPlugin.ramConfigCache.IPAMPoolAllocators[allocatorName] = ipamPoolAllocator
+				ctlrPlugin.ramCache.IPAMPoolAllocators[allocatorName] = ipamPoolAllocator
 			}
 		}
 	}
@@ -229,7 +229,7 @@ func (mgr *IPAMPoolMgr) EntityDelete(entityName string, scope string) {
 			if ipamPoolAllocator != nil {
 				allocatorName := contructAllocatorName(ipamPool, entityName)
 				delete(ipamPool.Status.Addresses, allocatorName)
-				delete(ctlrPlugin.ramConfigCache.IPAMPoolAllocators, allocatorName)
+				delete(ctlrPlugin.ramCache.IPAMPoolAllocators, allocatorName)
 			}
 		}
 	}

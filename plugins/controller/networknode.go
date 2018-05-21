@@ -51,7 +51,7 @@ func (mgr *NetworkNodeMgr) Init() {
 
 func (mgr *NetworkNodeMgr) AfterInit() {
 	go mgr.InitAndRunWatcher()
-	if !BypassModelTypeHttpHandlers {
+	if !ctlrPlugin.BypassModelTypeHttpHandlers {
 		mgr.InitHTTPHandlers()
 	}
 }

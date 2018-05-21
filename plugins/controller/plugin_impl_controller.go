@@ -42,9 +42,9 @@ const PluginID core.PluginName = "SfcController"
 
 var (
 	sfcConfigFile               string // cli flag - see RegisterFlags
-	cleanSfcDatastore           bool   // cli flag - see RegisterFlags
-	contivKSREnabled            bool   // cli flag - see RegisterFlags
-	BypassModelTypeHttpHandlers bool   // cli flag - see RegisterFlags
+	CleanDatastore              bool
+	ContivKSREnabled              bool
+	BypassModelTypeHttpHandlers              bool
 	log                         = logrus.DefaultLogger()
 	ctlrPlugin                  *Plugin
 )
@@ -53,9 +53,9 @@ var (
 func RegisterFlags() {
 	flag.StringVar(&sfcConfigFile, "sfc-config", "",
 		"Name of a sfc config (yaml) file to load at startup")
-	flag.BoolVar(&cleanSfcDatastore, "clean", false,
-		"Clean the SFC datastore entries")
-	flag.BoolVar(&contivKSREnabled, "contiv-ksr", false,
+	flag.BoolVar(&CleanDatastore, "clean", false,
+		"Clean the controller datastore entries")
+	flag.BoolVar(&ContivKSREnabled, "contiv-ksr", false,
 		"Interact with contiv ksr to learn k8s config/state")
 	flag.BoolVar(&BypassModelTypeHttpHandlers, "bypass-rest-for-model-objects", false,
 		"Disable HTTP handling for controller objects")
@@ -65,8 +65,8 @@ func RegisterFlags() {
 func LogFlags() {
 	log.Debugf("LogFlags:")
 	log.Debugf("\tsfcConfigFile:'%s'", sfcConfigFile)
-	log.Debugf("\tclean:'%v'", cleanSfcDatastore)
-	log.Debugf("\tcontiv ksr:'%v'", contivKSREnabled)
+	log.Debugf("\tclean:'%v'", CleanDatastore)
+	log.Debugf("\tcontiv ksr:'%v'", ContivKSREnabled)
 	log.Debugf("\tmodel REST disabled:'%v'", BypassModelTypeHttpHandlers)
 }
 
@@ -74,8 +74,8 @@ func init() {
 	// Logger must be initialized for each s individually.
 	//log.SetLevel(logging.DebugLevel)
 	log.SetLevel(logging.InfoLevel)
-
 	RegisterFlags()
+
 }
 
 // CacheType is ram cache of controller entities
@@ -92,8 +92,8 @@ type CacheType struct {
 
 // Plugin contains the controllers information
 type Plugin struct {
-	Etcd    *etcdv3.Plugin
-	HTTPmux *rest.Plugin
+	Etcd                  *etcdv3.Plugin
+	HTTPmux               *rest.Plugin
 	*local.FlavorLocal
 	NetworkNodeMgr        NetworkNodeMgr
 	IpamPoolMgr           IPAMPoolMgr
@@ -101,14 +101,21 @@ type Plugin struct {
 	NetworkServiceMgr     NetworkServiceMgr
 	NetworkNodeOverlayMgr NetworkNodeOverlayMgr
 	NetworkPodNodeMapMgr  NetworkPodToNodeMapMgr
-	ramConfigCache        CacheType
+	ramCache              CacheType
 	db                    keyval.ProtoBroker
+	BypassModelTypeHttpHandlers bool   // cli flag - see RegisterFlags
+	CleanDatastore           bool   // cli flag - see RegisterFlags
+	ContivKSREnabled            bool   // cli flag - see RegisterFlags
 }
 
 // Init the controller, read the db, reconcile/resync, render config to etcd
 func (s *Plugin) Init() error {
 
 	ctlrPlugin = s
+
+	s.CleanDatastore = CleanDatastore
+	s.ContivKSREnabled = ContivKSREnabled
+	s.BypassModelTypeHttpHandlers = BypassModelTypeHttpHandlers
 
 	log.Infof("Init: %s enter ...", PluginID)
 	defer log.Infof("Init: %s exit ", PluginID)
@@ -135,7 +142,7 @@ func (s *Plugin) Init() error {
 
 	// the db has been loaded and vpp entries known so now we can clean up the
 	// db and remove the vpp agent entries that the controller has managed/created
-	if cleanSfcDatastore {
+	if s.CleanDatastore {
 		database.CleanDatastore(controller.SfcControllerConfigPrefix())
 		s.CleanVppAgentEntriesFromEtcd()
 		s.InitRAMCache()
@@ -155,7 +162,7 @@ func (s *Plugin) Init() error {
 		}
 	}
 
-	log.Infof("Dumping: controller cache: %v", s.ramConfigCache)
+	log.Infof("Dumping: controller cache: %v", s.ramCache)
 	for _, entry := range RegisteredManagers {
 		log.Infof("Init: dumping %s ...", entry.modelTypeName)
 		entry.mgr.DumpCache()
@@ -194,7 +201,7 @@ func (s *Plugin) AfterInit() error {
 
 	s.afterInitMgrs()
 
-	if contivKSREnabled {
+	if s.ContivKSREnabled {
 		go ctlrPlugin.NetworkPodNodeMapMgr.RunContivKSRNetworkPodToNodeMappingWatcher()
 	}
 
@@ -216,23 +223,23 @@ func (s *Plugin) RenderAll() {
 // InitRAMCache creates the ram cache
 func (s *Plugin) InitRAMCache() {
 
-	s.ramConfigCache.IPAMPoolAllocators = nil
-	s.ramConfigCache.IPAMPoolAllocators = make(map[string]*ipam.PoolAllocatorType)
+	s.ramCache.IPAMPoolAllocators = nil
+	s.ramCache.IPAMPoolAllocators = make(map[string]*ipam.PoolAllocatorType)
 
-	s.ramConfigCache.VppEntries = nil
-	s.ramConfigCache.VppEntries = make(map[string]*vppagent.KVType)
+	s.ramCache.VppEntries = nil
+	s.ramCache.VppEntries = make(map[string]*vppagent.KVType)
 
-	s.ramConfigCache.RenderedEntitesStates = nil
-	s.ramConfigCache.RenderedEntitesStates = make(map[string]map[string]*controller.RenderedVppAgentEntry)
+	s.ramCache.RenderedEntitesStates = nil
+	s.ramCache.RenderedEntitesStates = make(map[string]map[string]*controller.RenderedVppAgentEntry)
 
-	s.ramConfigCache.MacAddrAllocator = nil
-	s.ramConfigCache.MacAddrAllocator = idapi.NewMacAddrAllocator()
+	s.ramCache.MacAddrAllocator = nil
+	s.ramCache.MacAddrAllocator = idapi.NewMacAddrAllocator()
 
-	s.ramConfigCache.MemifIDAllocator = nil
-	s.ramConfigCache.MemifIDAllocator = idapi.NewMemifAllocator()
+	s.ramCache.MemifIDAllocator = nil
+	s.ramCache.MemifIDAllocator = idapi.NewMemifAllocator()
 
-	s.ramConfigCache.InterfaceStates = nil
-	s.ramConfigCache.InterfaceStates = make(map[string]*controller.InterfaceStatus)
+	s.ramCache.InterfaceStates = nil
+	s.ramCache.InterfaceStates = make(map[string]*controller.InterfaceStatus)
 
 	for _, entry := range RegisteredManagers {
 		log.Infof("InitRAMCache: %s ...", entry.modelTypeName)
@@ -240,7 +247,7 @@ func (s *Plugin) InitRAMCache() {
 	}
 
 	// ksr state updates are stored here
-	s.ramConfigCache.NetworkPodToNodeMap = make(map[string]*NetworkPodToNodeMap, 0)
+	s.ramCache.NetworkPodToNodeMap = make(map[string]*NetworkPodToNodeMap, 0)
 }
 
 // Close performs close down procedures
@@ -317,12 +324,12 @@ func (s *Plugin) PostProcessLoadedDatastore() error {
 
 				log.Debugf("PostProcessLoadedDatastore: ifStatus: %v", ifStatus)
 
-				ctlrPlugin.ramConfigCache.InterfaceStates[ifStatus.Name] = ifStatus
-				if ifStatus.MemifID > ctlrPlugin.ramConfigCache.MemifIDAllocator.MemifID {
-					ctlrPlugin.ramConfigCache.MemifIDAllocator.MemifID = ifStatus.MemifID
+				ctlrPlugin.ramCache.InterfaceStates[ifStatus.Name] = ifStatus
+				if ifStatus.MemifID > ctlrPlugin.ramCache.MemifIDAllocator.MemifID {
+					ctlrPlugin.ramCache.MemifIDAllocator.MemifID = ifStatus.MemifID
 				}
-				if ifStatus.MacAddrID > ctlrPlugin.ramConfigCache.MacAddrAllocator.MacAddrID {
-					ctlrPlugin.ramConfigCache.MacAddrAllocator.MacAddrID = ifStatus.MacAddrID
+				if ifStatus.MacAddrID > ctlrPlugin.ramCache.MacAddrAllocator.MacAddrID {
+					ctlrPlugin.ramCache.MacAddrAllocator.MacAddrID = ifStatus.MacAddrID
 				}
 				UpdateRamCacheAllocatorsForInterfaceStatus(ifStatus, nn.Metadata.Name)
 			}
@@ -352,12 +359,12 @@ func (s *Plugin) PostProcessLoadedDatastore() error {
 
 				log.Debugf("PostProcessLoadedDatastore: ifStatus: %v", ifStatus)
 
-				ctlrPlugin.ramConfigCache.InterfaceStates[ifStatus.Name] = ifStatus
-				if ifStatus.MemifID > ctlrPlugin.ramConfigCache.MemifIDAllocator.MemifID {
-					ctlrPlugin.ramConfigCache.MemifIDAllocator.MemifID = ifStatus.MemifID
+				ctlrPlugin.ramCache.InterfaceStates[ifStatus.Name] = ifStatus
+				if ifStatus.MemifID > ctlrPlugin.ramCache.MemifIDAllocator.MemifID {
+					ctlrPlugin.ramCache.MemifIDAllocator.MemifID = ifStatus.MemifID
 				}
-				if ifStatus.MacAddrID > ctlrPlugin.ramConfigCache.MacAddrAllocator.MacAddrID {
-					ctlrPlugin.ramConfigCache.MacAddrAllocator.MacAddrID = ifStatus.MacAddrID
+				if ifStatus.MacAddrID > ctlrPlugin.ramCache.MacAddrAllocator.MacAddrID {
+					ctlrPlugin.ramCache.MacAddrAllocator.MacAddrID = ifStatus.MacAddrID
 				}
 				UpdateRamCacheAllocatorsForInterfaceStatus(ifStatus, ns.Metadata.Name)
 			}
@@ -384,15 +391,15 @@ func (s *Plugin) LoadVppAgentEntriesFromRenderedVppAgentEntries(
 		}
 		if found {
 			// add ref to VppEntries indexed by the vppKey
-			s.ramConfigCache.VppEntries[vppKVEntry.VppKey] = vppKVEntry
+			s.ramCache.VppEntries[vppKVEntry.VppKey] = vppKVEntry
 
 			// add ref to the rendering entity
-			if renderedEntities, exists := s.ramConfigCache.RenderedEntitesStates[entityName]; !exists {
+			if renderedEntities, exists := s.ramCache.RenderedEntitesStates[entityName]; !exists {
 				renderedEntities = make(map[string]*controller.RenderedVppAgentEntry,0)
-				s.ramConfigCache.RenderedEntitesStates[entityName] = renderedEntities
+				s.ramCache.RenderedEntitesStates[entityName] = renderedEntities
 
 			}
-			s.ramConfigCache.RenderedEntitesStates[entityName][vppAgentEntry.VppAgentKey] = vppAgentEntry
+			s.ramCache.RenderedEntitesStates[entityName][vppAgentEntry.VppAgentKey] = vppAgentEntry
 		}
 	}
 
@@ -402,7 +409,7 @@ func (s *Plugin) LoadVppAgentEntriesFromRenderedVppAgentEntries(
 // CleanVppAgentEntriesFromEtcd load from etcd
 func (s *Plugin) CleanVppAgentEntriesFromEtcd() {
 	log.Debugf("CleanVppAgentEntriesFromEtcd: removing all vpp keys managed by the controller")
-	for _, kvEntry := range s.ramConfigCache.VppEntries {
+	for _, kvEntry := range s.ramCache.VppEntries {
 		database.DeleteFromDatastore(kvEntry.VppKey)
 	}
 }

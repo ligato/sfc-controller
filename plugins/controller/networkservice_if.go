@@ -64,7 +64,7 @@ func (ns *NetworkService) RenderConnMemifPair(
 		return "", err
 	}
 	if ifStatus.MemifID == 0 {
-		ifStatus.MemifID = ctlrPlugin.ramConfigCache.MemifIDAllocator.Allocate()
+		ifStatus.MemifID = ctlrPlugin.ramCache.MemifIDAllocator.Allocate()
 	}
 	PersistInterfaceStatus(ns.Status.Interfaces, ifStatus, connPodName, connInterfaceName)
 
@@ -127,7 +127,7 @@ func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
 		return err
 	}
 	if if0Status.MemifID == 0 {
-		if0Status.MemifID = ctlrPlugin.ramConfigCache.MemifIDAllocator.Allocate()
+		if0Status.MemifID = ctlrPlugin.ramCache.MemifIDAllocator.Allocate()
 	}
 	PersistInterfaceStatus(ns.Status.Interfaces, if0Status, connPodName0, connInterfaceName0)
 

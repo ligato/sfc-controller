@@ -25,6 +25,8 @@ import (
 
 )
 
+const sfcYamlVersion = 2
+
 // SfcConfigYaml is container struct for yaml config file
 type SfcConfigYaml struct {
 	Version             int                    `json:"sfc_controller_config_version"`
@@ -61,7 +63,7 @@ func (s *Plugin) SfcConfigYamlReadFromFile(fpath string) (*SfcConfigYaml, error)
 func (s *Plugin) SfcSystemCacheToYaml() ([]byte, error) {
 	yamlConfig := &SfcConfigYaml{}
 
-	yamlConfig.Version = 2
+	yamlConfig.Version = sfcYamlVersion
 	yamlConfig.Description = fmt.Sprintf("Config: %s", time.Now())
 	yamlConfig.NetworkNodes = ctlrPlugin.NetworkNodeMgr.ToArray()
 	yamlConfig.NetworkPodToNodeMap = ctlrPlugin.NetworkPodNodeMapMgr.ToArray()
@@ -69,7 +71,7 @@ func (s *Plugin) SfcSystemCacheToYaml() ([]byte, error) {
 	yamlConfig.NetworkNodeOverlays = ctlrPlugin.NetworkNodeOverlayMgr.ToArray()
 	yamlConfig.IPAMPools = ctlrPlugin.IpamPoolMgr.ToArray()
 	yamlConfig.SysParms = *ctlrPlugin.SysParametersMgr.sysParmCache
-	yamlConfig.RamCache = &ctlrPlugin.ramConfigCache
+	yamlConfig.RamCache = &ctlrPlugin.ramCache
 
 	yamlBytes, err := yaml.Marshal(yamlConfig)
 	if err != nil {
@@ -81,9 +83,9 @@ func (s *Plugin) SfcSystemCacheToYaml() ([]byte, error) {
 // SfcConfigYamlProcessConfig processes each object and adds it to the system
 func (s *Plugin) SfcConfigYamlProcessConfig(y *SfcConfigYaml) error {
 
-	if y.Version != 2 {
-		return fmt.Errorf("SfcConfigYamlProcessConfig: incorrect yaml version, expecting 2, got: %d",
-			y.Version)
+	if y.Version != sfcYamlVersion {
+		return fmt.Errorf("SfcConfigYamlProcessConfig: incorrect yaml version, expecting %d, got: %d",
+			sfcYamlVersion, y.Version)
 	}
 
 	log.Debugf("SfcConfigYamlProcessConfig: system parameters: ", y.SysParms)
