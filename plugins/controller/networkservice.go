@@ -454,7 +454,7 @@ func (ns *NetworkService) validateConnections() error {
 							ns.Metadata.Name, conn.L2Bd.Name, conn.L2Bd.L2BdTemplate)
 					}
 				} else if conn.L2Bd.BdParms == nil {
-					return fmt.Errorf("network-service: %s, conn: l2bd: %s has no db parms nor refer to a template",
+					return fmt.Errorf("network-service: %s, conn: l2bd: %s has no DB parms nor refer to a template",
 						ns.Metadata.Name, conn.L2Bd.Name)
 				}
 			}
@@ -566,6 +566,20 @@ func (ns *NetworkService) validateNetworkPod(networkPod *controller.NetworkPod) 
 		}
 	}
 
+	return nil
+}
+
+func (ns *NetworkService) findInterfaceStatus(podInterfaceName string) (*controller.InterfaceStatus, bool) {
+
+	return RetrieveInterfaceStatusFromRamCache(ns.Status.Interfaces, podInterfaceName)
+}
+
+func (mgr *NetworkServiceMgr) FindInterfaceStatus(podInterfaceName string) *controller.InterfaceStatus {
+	for _, ns := range mgr.networkServiceCache {
+		if ifStatus, exists := ns.findInterfaceStatus(podInterfaceName); exists {
+			return ifStatus
+		}
+	}
 	return nil
 }
 

@@ -23,7 +23,7 @@ import (
 // a cache of before and after entries per
 // transaction type where a transaction could be a nb_api rest request,
 // or a complete system resync which is initiated at startup after the
-// db has been read in, or a loss of comms with etcd has occurred.
+// DB has been read in, or a loss of comms with etcd has occurred.
 // Note: NO nb_api's are accepted during transaction processing as they
 // are atomic operations and are mutex protected during each txn.
 var beforeMap map[int]map[string]*vppagent.KVType
@@ -129,7 +129,7 @@ func RenderTxnConfigEnd() error {
 		before := beforeMap[0][key]
 		after, existsInAfterCache := afterMap[0][key]
 		if !existsInAfterCache {
-			exists, err := ctlrPlugin.db.Delete(key)    // remove from etcd
+			exists, err := ctlrPlugin.DB.Delete(key)    // remove from etcd
 			delete(ctlrPlugin.ramCache.VppEntries, key) // remove from sys ram cache
 			log.Info("ConfigEnd: remove key from etcd and system cache: ", key, exists, err)
 			log.Info("ConfigEnd: remove before entry: ", before)
@@ -146,7 +146,7 @@ func RenderTxnConfigEnd() error {
 	// now post process the after cache, write the remaining entries to etcd
 	for key, after := range afterMap[0] {
 		log.Info("ConfigEnd: add key to etcd: ", key, after)
-		err := after.WriteToEtcd(ctlrPlugin.db)
+		err := after.WriteToEtcd(ctlrPlugin.DB)
 		if err != nil {
 			return err
 		}

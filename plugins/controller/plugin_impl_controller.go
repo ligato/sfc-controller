@@ -43,8 +43,8 @@ const PluginID core.PluginName = "SfcController"
 var (
 	sfcConfigFile               string // cli flag - see RegisterFlags
 	CleanDatastore              bool
-	ContivKSREnabled              bool
-	BypassModelTypeHttpHandlers              bool
+	ContivKSREnabled            bool
+	BypassModelTypeHttpHandlers bool
 	log                         = logrus.DefaultLogger()
 	ctlrPlugin                  *Plugin
 )
@@ -92,23 +92,23 @@ type CacheType struct {
 
 // Plugin contains the controllers information
 type Plugin struct {
-	Etcd                  *etcdv3.Plugin
-	HTTPmux               *rest.Plugin
+	Etcd                        *etcdv3.Plugin
+	HTTPmux                     *rest.Plugin
 	*local.FlavorLocal
-	NetworkNodeMgr        NetworkNodeMgr
-	IpamPoolMgr           IPAMPoolMgr
-	SysParametersMgr      SystemParametersMgr
-	NetworkServiceMgr     NetworkServiceMgr
-	NetworkNodeOverlayMgr NetworkNodeOverlayMgr
-	NetworkPodNodeMapMgr  NetworkPodToNodeMapMgr
-	ramCache              CacheType
-	db                    keyval.ProtoBroker
+	NetworkNodeMgr              NetworkNodeMgr
+	IpamPoolMgr                 IPAMPoolMgr
+	SysParametersMgr            SystemParametersMgr
+	NetworkServiceMgr           NetworkServiceMgr
+	NetworkNodeOverlayMgr       NetworkNodeOverlayMgr
+	NetworkPodNodeMapMgr        NetworkPodToNodeMapMgr
+	ramCache                    CacheType
+	DB                          keyval.ProtoBroker
 	BypassModelTypeHttpHandlers bool   // cli flag - see RegisterFlags
-	CleanDatastore           bool   // cli flag - see RegisterFlags
+	CleanDatastore              bool   // cli flag - see RegisterFlags
 	ContivKSREnabled            bool   // cli flag - see RegisterFlags
 }
 
-// Init the controller, read the db, reconcile/resync, render config to etcd
+// Init the controller, read the DB, reconcile/resync, render config to etcd
 func (s *Plugin) Init() error {
 
 	ctlrPlugin = s
@@ -127,8 +127,8 @@ func (s *Plugin) Init() error {
 	s.StatusCheck.Register(PluginID, nil)
 	s.StatusCheck.ReportStateChange(PluginID, statuscheck.Init, nil)
 
-	s.db = s.Etcd.NewBroker(keyval.Root)
-	database.InitDatabase(s.db)
+	s.DB = s.Etcd.NewBroker(keyval.Root)
+	database.InitDatabase(s.DB)
 
 	s.RegisterModelTypeManagers()
 
@@ -140,8 +140,8 @@ func (s *Plugin) Init() error {
 		os.Exit(1)
 	}
 
-	// the db has been loaded and vpp entries known so now we can clean up the
-	// db and remove the vpp agent entries that the controller has managed/created
+	// the DB has been loaded and vpp entries known so now we can clean up the
+	// DB and remove the vpp agent entries that the controller has managed/created
 	if s.CleanDatastore {
 		database.CleanDatastore(controller.SfcControllerConfigPrefix())
 		s.CleanVppAgentEntriesFromEtcd()
@@ -385,7 +385,7 @@ func (s *Plugin) LoadVppAgentEntriesFromRenderedVppAgentEntries(
 	for _, vppAgentEntry := range vppAgentEntries {
 
 		vppKVEntry := vppagent.NewKVEntry(vppAgentEntry.VppAgentKey, vppAgentEntry.VppAgentType)
-		found, err := vppKVEntry.ReadFromEtcd(s.db)
+		found, err := vppKVEntry.ReadFromEtcd(s.DB)
 		if err != nil {
 			return err
 		}

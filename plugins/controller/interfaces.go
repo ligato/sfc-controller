@@ -102,6 +102,19 @@ func PersistInterfaceStatus(
 
 }
 
+func RetrieveInterfaceStatusFromRamCache(
+	interfaces map[string]*controller.InterfaceStatus,
+	podInterfaceName string) (*controller.InterfaceStatus, bool) {
+
+	ifStatus ,exists := interfaces[podInterfaceName]
+
+	log.Debugf("RetrieveInterfaceStatusFromRamCache: podInterfaceName: %s, value: %v, exists: %b",
+		podInterfaceName, ifStatus, exists)
+
+	return ifStatus, exists
+
+}
+
 func RemoveInterfaceStatus(
 	interfaces map[string]*controller.InterfaceStatus,
 	podName string, ifName string) {

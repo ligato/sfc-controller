@@ -389,7 +389,7 @@ func (nn *NetworkNode) renderConfig() error {
 	RenderTxnConfigEntityStart()
 	defer RenderTxnConfigEntityEnd()
 
-	// first validate the config as it may have come in via a db
+	// first validate the config as it may have come in via a DB
 	// update from outside rest, startup yaml ... crd?
 	if err := nn.validate(); err != nil {
 		return err
