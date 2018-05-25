@@ -64,7 +64,9 @@ typedef enum
   VPPCOM_EINVAL = -EINVAL,
   VPPCOM_EBADFD = -EBADFD,
   VPPCOM_EAFNOSUPPORT = -EAFNOSUPPORT,
+  VPPCOM_ECONNABORTED = -ECONNABORTED,
   VPPCOM_ECONNRESET = -ECONNRESET,
+  VPPCOM_ENOTCONN = -ENOTCONN,
   VPPCOM_ECONNREFUSED = -ECONNREFUSED,
   VPPCOM_ETIMEDOUT = -ETIMEDOUT,
 } vppcom_error_t;
@@ -103,6 +105,10 @@ vppcom_retval_str (int retval)
       st = "VPPCOM_EAGAIN";
       break;
 
+    case VPPCOM_ENOMEM:
+      st = "VPPCOM_ENOMEM";
+      break;
+
     case VPPCOM_EINVAL:
       st = "VPPCOM_EINVAL";
       break;
@@ -115,8 +121,16 @@ vppcom_retval_str (int retval)
       st = "VPPCOM_EAFNOSUPPORT";
       break;
 
+    case VPPCOM_ECONNABORTED:
+      st = "VPPCOM_ECONNABORTED";
+      break;
+
     case VPPCOM_ECONNRESET:
       st = "VPPCOM_ECONNRESET";
+      break;
+
+    case VPPCOM_ENOTCONN:
+      st = "VPPCOM_ENOTCONN";
       break;
 
     case VPPCOM_ECONNREFUSED:

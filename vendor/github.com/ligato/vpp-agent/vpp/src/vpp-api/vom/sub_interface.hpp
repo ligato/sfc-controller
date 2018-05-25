@@ -44,25 +44,21 @@ public:
   sub_interface(const sub_interface& o);
 
   /**
+   * comparison operator - for UT
+   */
+  bool operator==(const sub_interface& s) const;
+
+  /**
    * Return the matching 'singular instance' of the sub-interface
    */
   std::shared_ptr<sub_interface> singular() const;
 
+  /**
+   * Find a subinterface from its key
+   */
+  static std::shared_ptr<sub_interface> find(const key_t& k);
+
 private:
-  /**
-   * Construct with handle
-   */
-  sub_interface(const handle_t& handle,
-                const interface& parent,
-                admin_state_t state,
-                vlan_id_t vlan);
-  friend class interface_factory;
-
-  /**
-   * The interface class can construct interfaces with handles
-   */
-  friend class interface;
-
   /**
    * Return the matching 'instance' of the sub-interface
    *  over-ride from the base class

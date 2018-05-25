@@ -162,14 +162,12 @@ vlib_buffer_contents (vlib_main_t * vm, u32 buffer_index, u8 * contents)
 always_inline u64
 vlib_get_buffer_data_physical_address (vlib_main_t * vm, u32 buffer_index)
 {
-  vlib_physmem_region_index_t pri;
+  vlib_buffer_main_t *bm = vm->buffer_main;
   vlib_buffer_t *b = vlib_get_buffer (vm, buffer_index);
-  pri = vm->buffer_main->buffer_pools[b->buffer_pool_index].physmem_region;
-  return vlib_physmem_offset_to_physical (vm, pri,
-					  (((uword) buffer_index) <<
-					   CLIB_LOG2_CACHE_LINE_BYTES) +
-					  STRUCT_OFFSET_OF (vlib_buffer_t,
-							    data));
+  vlib_buffer_pool_t *pool = vec_elt_at_index (bm->buffer_pools,
+					       b->buffer_pool_index);
+
+  return vlib_physmem_virtual_to_physical (vm, pool->physmem_region, b->data);
 }
 
 /** \brief Prefetch buffer metadata by buffer index
@@ -218,6 +216,11 @@ typedef enum
   VLIB_BUFFER_KNOWN_ALLOCATED,
 } vlib_buffer_known_state_t;
 
+void vlib_buffer_validate_alloc_free (vlib_main_t * vm, u32 * buffers,
+				      uword n_buffers,
+				      vlib_buffer_known_state_t
+				      expected_state);
+
 always_inline vlib_buffer_known_state_t
 vlib_buffer_is_known (vlib_main_t * vm, u32 buffer_index)
 {
@@ -244,24 +247,6 @@ vlib_buffer_set_known_state (vlib_main_t * vm,
    Returns format'ed vector with error message if any. */
 u8 *vlib_validate_buffer (vlib_main_t * vm, u32 buffer_index,
 			  uword follow_chain);
-
-/** \brief Allocate buffers into supplied array
-
-    @param vm - (vlib_main_t *) vlib main data structure pointer
-    @param buffers - (u32 * ) buffer index array
-    @param n_buffers - (u32) number of buffers requested
-    @return - (u32) number of buffers actually allocated, may be
-    less than the number requested or zero
-*/
-always_inline u32
-vlib_buffer_alloc (vlib_main_t * vm, u32 * buffers, u32 n_buffers)
-{
-  vlib_buffer_main_t *bm = vm->buffer_main;
-
-  ASSERT (bm->cb.vlib_buffer_alloc_cb);
-
-  return bm->cb.vlib_buffer_alloc_cb (vm, buffers, n_buffers);
-}
 
 always_inline u32
 vlib_buffer_round_size (u32 size)
@@ -301,11 +286,62 @@ vlib_buffer_alloc_from_free_list (vlib_main_t * vm,
 				  u32 n_buffers, u32 free_list_index)
 {
   vlib_buffer_main_t *bm = vm->buffer_main;
+  vlib_buffer_free_list_t *fl;
+  u32 *src;
+  uword len;
 
-  ASSERT (bm->cb.vlib_buffer_alloc_from_free_list_cb);
+  ASSERT (bm->cb.vlib_buffer_fill_free_list_cb);
 
-  return bm->cb.vlib_buffer_alloc_from_free_list_cb (vm, buffers, n_buffers,
-						     free_list_index);
+  fl = pool_elt_at_index (bm->buffer_free_list_pool, free_list_index);
+
+  len = vec_len (fl->buffers);
+
+  if (PREDICT_FALSE (len < n_buffers))
+    {
+      bm->cb.vlib_buffer_fill_free_list_cb (vm, fl, n_buffers);
+      len = vec_len (fl->buffers);
+
+      /* even if fill free list didn't manage to refill free list
+         we should give what we have */
+      n_buffers = clib_min (len, n_buffers);
+
+      /* following code is intentionaly duplicated to allow compiler
+         to optimize fast path when n_buffers is constant value */
+      src = fl->buffers + len - n_buffers;
+      clib_memcpy (buffers, src, n_buffers * sizeof (u32));
+      _vec_len (fl->buffers) -= n_buffers;
+
+      /* Verify that buffers are known free. */
+      vlib_buffer_validate_alloc_free (vm, buffers, n_buffers,
+				       VLIB_BUFFER_KNOWN_FREE);
+
+      return n_buffers;
+    }
+
+  src = fl->buffers + len - n_buffers;
+  clib_memcpy (buffers, src, n_buffers * sizeof (u32));
+  _vec_len (fl->buffers) -= n_buffers;
+
+  /* Verify that buffers are known free. */
+  vlib_buffer_validate_alloc_free (vm, buffers, n_buffers,
+				   VLIB_BUFFER_KNOWN_FREE);
+
+  return n_buffers;
+}
+
+/** \brief Allocate buffers into supplied array
+
+    @param vm - (vlib_main_t *) vlib main data structure pointer
+    @param buffers - (u32 * ) buffer index array
+    @param n_buffers - (u32) number of buffers requested
+    @return - (u32) number of buffers actually allocated, may be
+    less than the number requested or zero
+*/
+always_inline u32
+vlib_buffer_alloc (vlib_main_t * vm, u32 * buffers, u32 n_buffers)
+{
+  return vlib_buffer_alloc_from_free_list (vm, buffers, n_buffers,
+					   VLIB_BUFFER_DEFAULT_FREE_LIST_INDEX);
 }
 
 /** \brief Free buffers

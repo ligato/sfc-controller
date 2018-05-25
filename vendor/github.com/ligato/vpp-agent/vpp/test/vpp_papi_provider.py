@@ -603,6 +603,18 @@ class VppPapiProvider(object):
                          'tag1': tag1,
                          'tag2': tag2})
 
+    def sw_interface_set_l2_emulation(
+            self,
+            sw_if_index,
+            enable=1):
+        """L2 Emulation
+        :param sw_if_index - interface the operation is applied to
+
+        """
+        return self.api(self.papi.l2_emulation,
+                        {'sw_if_index': sw_if_index,
+                         'enable': enable})
+
     def sw_interface_set_flags(self, sw_if_index, admin_up_down):
         """
 
@@ -747,7 +759,7 @@ class VppPapiProvider(object):
             is_local=0,
             is_classify=0,
             is_multipath=0,
-            is_l2_bridged=0,
+            is_dvr=0,
             is_udp_encap=0,
             is_source_lookup=0):
         """
@@ -768,7 +780,7 @@ class VppPapiProvider(object):
         :param is_multipath:  (Default value = 0)
         :param is_resolve_host:  (Default value = 0)
         :param is_resolve_attached:  (Default value = 0)
-        :param is_l2_bridged:  (Default value = 0)
+        :param is_dvr:  (Default value = 0)
         :param is_source_lookup:  (Default value = 0)
         :param next_hop_weight:  (Default value = 1)
 
@@ -790,7 +802,7 @@ class VppPapiProvider(object):
              'is_multipath': is_multipath,
              'is_resolve_host': is_resolve_host,
              'is_resolve_attached': is_resolve_attached,
-             'is_l2_bridged': is_l2_bridged,
+             'is_dvr': is_dvr,
              'is_source_lookup': is_source_lookup,
              'is_udp_encap': is_udp_encap,
              'next_hop_weight': next_hop_weight,
@@ -1222,6 +1234,7 @@ class VppPapiProvider(object):
             addr_only=1,
             vrf_id=0,
             protocol=0,
+            twice_nat=0,
             is_add=1):
         """Add/delete NAT44 static mapping
 
@@ -1233,6 +1246,7 @@ class VppPapiProvider(object):
         :param addr_only: 1 if address only mapping, 0 if address and port
         :param vrf_id: VRF ID
         :param protocol: IP protocol (Default value = 0)
+        :param twice_nat: 1 if translate external host address and port
         :param is_add: 1 if add, 0 if delete (Default value = 1)
         """
         return self.api(
@@ -1245,6 +1259,36 @@ class VppPapiProvider(object):
              'external_port': external_port,
              'external_sw_if_index': external_sw_if_index,
              'vrf_id': vrf_id,
+             'protocol': protocol,
+             'twice_nat': twice_nat})
+
+    def nat44_add_del_identity_mapping(
+            self,
+            ip='0',
+            sw_if_index=0xFFFFFFFF,
+            port=0,
+            addr_only=1,
+            vrf_id=0,
+            protocol=0,
+            is_add=1):
+        """Add/delete NAT44 identity mapping
+
+        :param ip: IP address (Default value = 0)
+        :param sw_if_index: Interface instead of IP address
+        :param port: Port number (Default value = 0)
+        :param addr_only: 1 if address only mapping, 0 if address and port
+        :param vrf_id: VRF ID
+        :param protocol: IP protocol (Default value = 0)
+        :param is_add: 1 if add, 0 if delete (Default value = 1)
+        """
+        return self.api(
+            self.papi.nat44_add_del_identity_mapping,
+            {'is_add': is_add,
+             'addr_only': addr_only,
+             'ip_address': ip,
+             'port': port,
+             'sw_if_index': sw_if_index,
+             'vrf_id': vrf_id,
              'protocol': protocol})
 
     def nat44_add_del_address_range(
@@ -1252,12 +1296,14 @@ class VppPapiProvider(object):
             first_ip_address,
             last_ip_address,
             is_add=1,
-            vrf_id=0xFFFFFFFF):
+            vrf_id=0xFFFFFFFF,
+            twice_nat=0):
         """Add/del NAT44 address range
 
         :param first_ip_address: First IP address
         :param last_ip_address: Last IP address
         :param vrf_id: VRF id for the address range
+        :param twice_nat: twice NAT address for extenal hosts
         :param is_add: 1 if add, 0 if delete (Default value = 1)
         """
         return self.api(
@@ -1265,6 +1311,7 @@ class VppPapiProvider(object):
             {'first_ip_address': first_ip_address,
              'last_ip_address': last_ip_address,
              'vrf_id': vrf_id,
+             'twice_nat': twice_nat,
              'is_add': is_add})
 
     def nat44_address_dump(self):
@@ -1291,6 +1338,12 @@ class VppPapiProvider(object):
         """
         return self.api(self.papi.nat44_static_mapping_dump, {})
 
+    def nat44_identity_mapping_dump(self):
+        """Dump NAT44 identity mappings
+        :return: Dictionary of NAT44 identity mappings
+        """
+        return self.api(self.papi.nat44_identity_mapping_dump, {})
+
     def nat_show_config(self):
         """Show NAT plugin config
         :return: NAT plugin config parameters
@@ -1300,14 +1353,19 @@ class VppPapiProvider(object):
     def nat44_add_interface_addr(
             self,
             sw_if_index,
+            twice_nat=0,
             is_add=1):
         """Add/del NAT44 address from interface
 
         :param sw_if_index: Software index of the interface
+        :param twice_nat: twice NAT address for extenal hosts
         :param is_add: 1 if add, 0 if delete (Default value = 1)
         """
-        return self.api(self.papi.nat44_add_del_interface_addr,
-                        {'is_add': is_add, 'sw_if_index': sw_if_index})
+        return self.api(
+            self.papi.nat44_add_del_interface_addr,
+            {'is_add': is_add,
+             'sw_if_index': sw_if_index,
+             'twice_nat': twice_nat})
 
     def nat44_interface_addr_dump(self):
         """Dump NAT44 addresses interfaces
@@ -1361,11 +1419,13 @@ class VppPapiProvider(object):
             external_port,
             protocol,
             vrf_id=0,
+            twice_nat=0,
             local_num=0,
             locals=[],
             is_add=1):
         """Add/delete NAT44 load balancing static mapping
 
+        :param twice_nat: 1 if translate external host address and port
         :param is_add - 1 if add, 0 if delete
         """
         return self.api(
@@ -1375,6 +1435,7 @@ class VppPapiProvider(object):
              'external_port': external_port,
              'protocol': protocol,
              'vrf_id': vrf_id,
+             'twice_nat': twice_nat,
              'local_num': local_num,
              'locals': locals})
 
@@ -1407,6 +1468,17 @@ class VppPapiProvider(object):
              'protocol': protocol,
              'vrf_id': vrf_id,
              'is_in': is_in})
+
+    def nat44_forwarding_enable_disable(
+            self,
+            enable):
+        """Enable/disable forwarding for NAT44
+
+        :param enable: 1 for enable, 0 for disable
+        """
+        return self.api(
+            self.papi.nat44_forwarding_enable_disable,
+            {'enable': enable})
 
     def nat_set_reass(
             self,
@@ -2243,6 +2315,7 @@ class VppPapiProvider(object):
                        psid_offset=0,
                        psid_length=0,
                        is_translation=0,
+                       is_rfc6052=0,
                        mtu=1280):
         return self.api(
             self.papi.map_add_domain,
@@ -2257,6 +2330,7 @@ class VppPapiProvider(object):
                 'psid_offset': psid_offset,
                 'psid_length': psid_length,
                 'is_translation': is_translation,
+                'is_rfc6052': is_rfc6052,
                 'mtu': mtu
             })
 
@@ -2666,24 +2740,28 @@ class VppPapiProvider(object):
     def bier_route_add_del(self,
                            bti,
                            bp,
-                           next_hop,
-                           next_hop_label,
-                           next_hop_table_id,
-                           next_hop_is_ip4=1,
+                           paths,
                            is_add=1):
         """ BIER Route add/del """
+        br_paths = []
+        for p in paths:
+            br_paths.append({'next_hop': p.nh_addr,
+                             'weight': 1,
+                             'afi': 0,
+                             'preference': 0,
+                             'table_id': p.nh_table_id,
+                             'next_hop_id': p.next_hop_id,
+                             'is_udp_encap': p.is_udp_encap,
+                             'n_labels': len(p.nh_labels),
+                             'label_stack': p.nh_labels})
         return self.api(
             self.papi.bier_route_add_del,
             {'br_tbl_id': {"bt_set": bti.set_id,
                            "bt_sub_domain": bti.sub_domain_id,
                            "bt_hdr_len_id": bti.hdr_len_id},
              'br_bp': bp,
-             'br_n_paths': 1,
-             'br_paths': [{'next_hop': next_hop,
-                           'afi': 0,
-                           'n_labels': 1,
-                           'table_id': next_hop_table_id,
-                           'label_stack': [next_hop_label]}],
+             'br_n_paths': len(br_paths),
+             'br_paths': br_paths,
              'br_is_add': is_add})
 
     def bier_route_dump(self, bti):
@@ -2767,3 +2845,185 @@ class VppPapiProvider(object):
         return self.api(self.papi.add_node_next,
                         {'node_name': node_name,
                          'next_name': next_name})
+
+    def session_enable_disable(self, is_enabled):
+        return self.api(
+            self.papi.session_enable_disable,
+            {'is_enable': is_enabled})
+
+    def ipsec_spd_add_del(self, spd_id, is_add=1):
+        """ SPD add/del - Wrapper to add or del ipsec SPD
+        Sample CLI : 'ipsec spd add 1'
+
+        :param spd_id - SPD ID to be created in the vpp . mandatory
+        :param is_add - create (1) or delete(0) SPD (Default 1 - add) .
+              optional
+        :returns: reply from the API
+        """
+        return self.api(
+            self.papi.ipsec_spd_add_del, {
+                'spd_id': spd_id, 'is_add': is_add})
+
+    def ipsec_interface_add_del_spd(self, spd_id, sw_if_index, is_add=1):
+        """ IPSEC interface SPD add/del - \
+             Wrapper to associate/disassociate SPD to interface in VPP
+        Sample CLI : 'set interface ipsec spd GigabitEthernet0/6/0 1'
+
+        :param spd_id - SPD ID to associate with the interface . mandatory
+        :param sw_if_index - Interface Index which needs to ipsec \
+            association mandatory
+        :param is_add - add(1) or del(0) association with interface \
+                (Default 1 - add) . optional
+        :returns: reply from the API
+        """
+        return self.api(
+            self.papi.ipsec_interface_add_del_spd, {
+                'spd_id': spd_id,
+                'sw_if_index': sw_if_index, 'is_add': is_add})
+
+    def ipsec_sad_add_del_entry(self,
+                                sad_id,
+                                spi,
+                                tunnel_src_address='',
+                                tunnel_dst_address='',
+                                protocol=0,
+                                integrity_algorithm=2,
+                                integrity_key_length=0,
+                                integrity_key='C91KUR9GYMm5GfkEvNjX',
+                                crypto_algorithm=1,
+                                crypto_key_length=0,
+                                crypto_key='JPjyOWBeVEQiMe7h',
+                                is_add=1,
+                                is_tunnel=1):
+        """ IPSEC SA add/del
+        Sample CLI : 'ipsec sa add 10 spi 1001 esp \
+            crypto-key 4a506a794f574265564551694d653768 \
+            crypto-alg aes-cbc-128 \
+            integ-key 4339314b55523947594d6d3547666b45764e6a58 \
+            integ-alg sha1-96 tunnel-src 192.168.100.3 \
+            tunnel-dst 192.168.100.2'
+        Sample CLI : 'ipsec sa add 20 spi 2001 \
+            integ-key 4339314b55523947594d6d3547666b45764e6a58 \
+            integ-alg sha1-96'
+
+        :param sad_id -  Security Association ID to be \
+            created or deleted. mandatory
+        :param spi - security param index of the SA in decimal. mandatory
+        :param tunnel_src_address - incase of tunnel mode outer src address .\
+             mandatory for tunnel mode
+        :param tunnel_dst_address - incase of transport mode \
+             outer dst address. mandatory for tunnel mode
+        :param protocol - AH(0) or ESP(1) protocol (Default 0 - AH). optional
+        :param integrity_algorithm - value range 1-6 Default(2 - SHA1_96).\
+             optional **
+        :param integrity_key - value in string \
+             (Default C91KUR9GYMm5GfkEvNjX).optional
+        :param integrity_key_length - length of the key string in bytes\
+             (Default 0 - integrity disabled). optional
+        :param crypto_algorithm - value range 1-11 Default \
+             (1- AES_CBC_128).optional **
+        :param crypto_key - value in string(Default JPjyOWBeVEQiMe7h).optional
+        :param crypto_key_length - length of the key string in bytes\
+             (Default 0 - crypto disabled). optional
+        :param is_add - add(1) or del(0) ipsec SA entry(Default 1 - add) .\
+             optional
+        :param is_tunnel - tunnel mode (1) or transport mode(0) \
+             (Default 1 - tunnel). optional
+        :returns: reply from the API
+        :** reference /vpp/src/vnet/ipsec/ipsec.h file for enum values of
+             crypto and ipsec algorithms
+        """
+        return self.api(
+            self.papi.ipsec_sad_add_del_entry,
+            {'sad_id': sad_id,
+             'spi': spi,
+             'tunnel_src_address': tunnel_src_address,
+             'tunnel_dst_address': tunnel_dst_address,
+             'protocol': protocol,
+             'integrity_algorithm': integrity_algorithm,
+             'integrity_key_length': integrity_key_length,
+             'integrity_key': integrity_key,
+             'crypto_algorithm': crypto_algorithm,
+             'crypto_key_length': crypto_key_length,
+             'crypto_key': crypto_key,
+             'is_add': is_add,
+             'is_tunnel': is_tunnel})
+
+    def ipsec_spd_add_del_entry(self,
+                                spd_id,
+                                local_address_start,
+                                local_address_stop,
+                                remote_address_start,
+                                remote_address_stop,
+                                local_port_start=0,
+                                local_port_stop=65535,
+                                remote_port_start=0,
+                                remote_port_stop=65535,
+                                protocol=0,
+                                sa_id=10,
+                                policy=0,
+                                priority=100,
+                                is_outbound=1,
+                                is_add=1,
+                                is_ip_any=0):
+        """ IPSEC policy SPD add/del   -
+                    Wrapper to configure ipsec SPD policy entries in VPP
+        Sample CLI : 'ipsec policy add spd 1 inbound priority 10 action \
+                     protect sa 20 local-ip-range 192.168.4.4 - 192.168.4.4 \
+                     remote-ip-range 192.168.3.3 - 192.168.3.3'
+
+        :param spd_id -  SPD ID for the policy . mandatory
+        :param local_address_start - local-ip-range start address . mandatory
+        :param local_address_stop  - local-ip-range stop address . mandatory
+        :param remote_address_start - remote-ip-range start address . mandatory
+        :param remote_address_stop  - remote-ip-range stop address . mandatory
+        :param local_port_start - (Default 0) . optional
+        :param local_port_stop - (Default 65535). optional
+        :param remote_port_start - (Default 0). optional
+        :param remote_port_stop - (Default 65535). optional
+        :param protocol - Any(0), AH(51) & ESP(50) protocol (Default 0 - Any).
+               optional
+        :param sa_id -  Security Association ID for mapping it to SPD
+               (default 10).   optional
+        :param policy - bypass(0), discard(1), resolve(2) or protect(3)action
+               (Default 0 - bypass). optional
+        :param priotity - value for the spd action (Default 100). optional
+        :param is_outbound - flag for inbound(0) or outbound(1)
+               (Default 1 - outbound). optional
+        :param is_add flag - for addition(1) or deletion(0) of the spd
+               (Default 1 - addtion). optional
+        :returns: reply from the API
+        """
+        return self.api(
+            self.papi.ipsec_spd_add_del_entry,
+            {'spd_id': spd_id,
+             'local_address_start': local_address_start,
+             'local_address_stop': local_address_stop,
+             'remote_address_start': remote_address_start,
+             'remote_address_stop': remote_address_stop,
+             'local_port_start': local_port_start,
+             'local_port_stop': local_port_stop,
+             'remote_port_start': remote_port_start,
+             'remote_port_stop': remote_port_stop,
+             'is_add': is_add,
+             'protocol': protocol,
+             'policy': policy,
+             'priority': priority,
+             'is_outbound': is_outbound,
+             'sa_id': sa_id,
+             'is_ip_any': is_ip_any})
+
+    def app_namespace_add(self,
+                          namespace_id,
+                          ip4_fib_id=0,
+                          ip6_fib_id=0,
+                          sw_if_index=0xFFFFFFFF,
+                          secret=0):
+        return self.api(
+            self.papi.app_namespace_add_del,
+            {'secret': secret,
+             'sw_if_index': sw_if_index,
+             'ip4_fib_id': ip4_fib_id,
+             'ip6_fib_id': ip6_fib_id,
+             'namespace_id': namespace_id,
+             'namespace_id_len': len(namespace_id)})

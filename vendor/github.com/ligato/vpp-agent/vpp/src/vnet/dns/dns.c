@@ -197,9 +197,9 @@ static void vl_api_dns_name_server_add_del_t_handler
   REPLY_MACRO (VL_API_DNS_NAME_SERVER_ADD_DEL_REPLY);
 }
 
-static void
-send_dns4_request (dns_main_t * dm,
-		   dns_cache_entry_t * ep, ip4_address_t * server)
+void
+vnet_dns_send_dns4_request (dns_main_t * dm,
+			    dns_cache_entry_t * ep, ip4_address_t * server)
 {
   vlib_main_t *vm = dm->vlib_main;
   f64 now = vlib_time_now (vm);
@@ -247,7 +247,7 @@ send_dns4_request (dns_main_t * dm,
     {
       clib_warning
 	("route to %U exists, fei %d, get_resolving_interface returned"
-	 " ~0", fei, format_ip4_address, &prefix.fp_addr);
+	 " ~0", format_ip4_address, &prefix.fp_addr, fei);
       return;
     }
 
@@ -313,9 +313,9 @@ found_src_address:
   ep->retry_timer = now + 2.0;
 }
 
-static void
-send_dns6_request (dns_main_t * dm,
-		   dns_cache_entry_t * ep, ip6_address_t * server)
+void
+vnet_dns_send_dns6_request (dns_main_t * dm,
+			    dns_cache_entry_t * ep, ip6_address_t * server)
 {
   vlib_main_t *vm = dm->vlib_main;
   f64 now = vlib_time_now (vm);
@@ -517,11 +517,11 @@ vnet_send_dns_request (dns_main_t * dm, dns_cache_entry_t * ep)
   dns_header_t *h;
   dns_query_t *qp;
   u16 tmp;
-  u8 *request;
+  u8 *request, *name_copy;
   u32 qp_offset;
 
   /* This can easily happen if sitting in GDB, etc. */
-  if (ep->flags & DNS_CACHE_ENTRY_FLAG_VALID)
+  if (ep->flags & DNS_CACHE_ENTRY_FLAG_VALID || ep->server_fails > 1)
     return;
 
   /* Construct the dns request, if we haven't been here already */
@@ -533,14 +533,29 @@ vnet_send_dns_request (dns_main_t * dm, dns_cache_entry_t * ep)
        * per label is 63, enforce that.
        */
       request = name_to_labels (ep->name);
+      name_copy = vec_dup (request);
       qp_offset = vec_len (request);
 
+      /*
+       * At least when testing against "known good" DNS servers:
+       * it turns out that sending 2x requests - one for an A-record
+       * and another for a AAAA-record - seems to work better than
+       * sending a DNS_TYPE_ALL request.
+       */
+
       /* Add space for the query header */
-      vec_validate (request, qp_offset + sizeof (dns_query_t) - 1);
+      vec_validate (request, 2 * qp_offset + 2 * sizeof (dns_query_t) - 1);
 
       qp = (dns_query_t *) (request + qp_offset);
 
-      qp->type = clib_host_to_net_u16 (DNS_TYPE_ALL);
+      qp->type = clib_host_to_net_u16 (DNS_TYPE_A);
+      qp->class = clib_host_to_net_u16 (DNS_CLASS_IN);
+      qp++;
+      clib_memcpy (qp, name_copy, vec_len (name_copy));
+      qp = (dns_query_t *) (((u8 *) qp) + vec_len (name_copy));
+      vec_free (name_copy);
+
+      qp->type = clib_host_to_net_u16 (DNS_TYPE_AAAA);
       qp->class = clib_host_to_net_u16 (DNS_CLASS_IN);
 
       /* Punch in space for the dns_header_t */
@@ -554,7 +569,7 @@ vnet_send_dns_request (dns_main_t * dm, dns_cache_entry_t * ep)
       /* Ask for a recursive lookup */
       tmp = DNS_RD | DNS_OPCODE_QUERY;
       h->flags = clib_host_to_net_u16 (tmp);
-      h->qdcount = clib_host_to_net_u16 (1);
+      h->qdcount = clib_host_to_net_u16 (2);
       h->nscount = 0;
       h->arcount = 0;
 
@@ -570,8 +585,8 @@ vnet_send_dns_request (dns_main_t * dm, dns_cache_entry_t * ep)
 	{
 	  if (vec_len (dm->ip6_name_servers))
 	    {
-	      send_dns6_request (dm, ep,
-				 dm->ip6_name_servers + ep->server_rotor);
+	      vnet_dns_send_dns6_request
+		(dm, ep, dm->ip6_name_servers + ep->server_rotor);
 	      goto out;
 	    }
 	  else
@@ -579,7 +594,8 @@ vnet_send_dns_request (dns_main_t * dm, dns_cache_entry_t * ep)
 	}
       if (vec_len (dm->ip4_name_servers))
 	{
-	  send_dns4_request (dm, ep, dm->ip4_name_servers + ep->server_rotor);
+	  vnet_dns_send_dns4_request
+	    (dm, ep, dm->ip4_name_servers + ep->server_rotor);
 	  goto out;
 	}
     }
@@ -606,9 +622,11 @@ vnet_send_dns_request (dns_main_t * dm, dns_cache_entry_t * ep)
     }
 
   if (ep->server_af == 1 /* ip6 */ )
-    send_dns6_request (dm, ep, dm->ip6_name_servers + ep->server_rotor);
+    vnet_dns_send_dns6_request
+      (dm, ep, dm->ip6_name_servers + ep->server_rotor);
   else
-    send_dns4_request (dm, ep, dm->ip4_name_servers + ep->server_rotor);
+    vnet_dns_send_dns4_request
+      (dm, ep, dm->ip4_name_servers + ep->server_rotor);
 
 out:
 
@@ -947,7 +965,7 @@ vnet_dns_cname_indirection_nolock (dns_main_t * dm, u32 ep_index, u8 * reply)
     case DNS_RCODE_SERVER_FAILURE:
     case DNS_RCODE_NOT_IMPLEMENTED:
     case DNS_RCODE_REFUSED:
-      return 0;
+      return -1;
     }
 
   curpos = (u8 *) (h + 1);
@@ -971,12 +989,34 @@ vnet_dns_cname_indirection_nolock (dns_main_t * dm, u32 ep_index, u8 * reply)
   else
     return 0;
 
-  rr = (dns_rr_t *) pos;
+  /* Walk the answer(s) to see what to do next */
+  for (i = 0; i < clib_net_to_host_u16 (h->anscount); i++)
+    {
+      rr = (dns_rr_t *) pos;
+      switch (clib_net_to_host_u16 (rr->type))
+	{
+	  /* Real address record? Done.. */
+	case DNS_TYPE_A:
+	case DNS_TYPE_AAAA:
+	  return 0;
+	  /* Chase a CNAME pointer? */
+	case DNS_TYPE_CNAME:
+	  goto chase_chain;
 
-  /* This is a real record, not a CNAME record */
-  if (clib_net_to_host_u16 (rr->type) != DNS_TYPE_CNAME)
-    return 0;
+	  /* Some other junk, e.g. a nameserver... */
+	default:
+	  break;
+	}
+      pos += sizeof (*rr) + clib_net_to_host_u16 (rr->rdlength);
+    }
 
+  /* Neither a CNAME nor a real address. Try another server */
+  flags &= ~DNS_RCODE_MASK;
+  flags |= DNS_RCODE_NAME_ERROR;
+  h->flags = clib_host_to_net_u16 (flags);
+  return -1;
+
+chase_chain:
   /* This is a CNAME record, chase the name chain. */
 
   /* The last request is no longer pending.. */
@@ -999,6 +1039,8 @@ found_last_request:
   ep->cname = cname;
   ep->flags |= (DNS_CACHE_ENTRY_FLAG_CNAME | DNS_CACHE_ENTRY_FLAG_VALID);
   /* Save the response */
+  if (ep->dns_response)
+    vec_free (ep->dns_response);
   ep->dns_response = reply;
   /* Set up expiration time */
   ep->expiration_time = now + clib_net_to_host_u32 (rr->ttl);
@@ -1075,10 +1117,11 @@ vnet_dns_response_to_reply (u8 * response,
   dns_rr_t *rr;
   int i, limit;
   u8 len;
-  u8 *curpos, *pos;
+  u8 *curpos, *pos, *pos2;
   u16 flags;
   u16 rcode;
   u32 ttl;
+  int pointer_chase;
 
   h = (dns_header_t *) response;
   flags = clib_net_to_host_u16 (h->flags);
@@ -1134,29 +1177,42 @@ vnet_dns_response_to_reply (u8 * response,
 
   for (i = 0; i < limit; i++)
     {
-      pos = curpos;
+      pos = pos2 = curpos;
+      pointer_chase = 0;
 
       /* Expect pointer chases in the answer section... */
-      if ((pos[0] & 0xC0) == 0xC0)
-	curpos += 2;
-      else
+      if ((pos2[0] & 0xC0) == 0xC0)
 	{
-	  len = *pos++;
-	  while (len)
-	    {
-	      if ((pos[0] & 0xC0) == 0xC0)
-		{
-		  curpos = pos + 2;
-		  goto curpos_set;
-		}
-	      pos += len;
-	      len = *pos++;
-	    }
-	  curpos = pos;
+	  pos = pos2 + 2;
+	  pos2 = response + ((pos2[0] & 0x3f) << 8) + pos2[1];
+	  pointer_chase = 1;
 	}
 
-    curpos_set:
-      rr = (dns_rr_t *) curpos;
+      len = *pos2++;
+
+      while (len)
+	{
+	  pos2 += len;
+	  if ((pos2[0] & 0xc0) == 0xc0)
+	    {
+	      /*
+	       * If we've already done one pointer chase,
+	       * do not move the pos pointer.
+	       */
+	      if (pointer_chase == 0)
+		pos = pos2 + 2;
+	      pos2 = response + ((pos2[0] & 0x3f) << 8) + pos2[1];
+	      len = *pos2++;
+	      pointer_chase = 1;
+	    }
+	  else
+	    len = *pos2++;
+	}
+
+      if (pointer_chase == 0)
+	pos = pos2;
+
+      rr = (dns_rr_t *) pos;
 
       switch (clib_net_to_host_u16 (rr->type))
 	{
@@ -1176,13 +1232,15 @@ vnet_dns_response_to_reply (u8 * response,
 	    *min_ttlp = ttl;
 	  rmp->ip6_set = 1;
 	  break;
+
 	default:
 	  break;
 	}
       /* Might as well stop ASAP */
       if (rmp->ip4_set && rmp->ip6_set)
 	break;
-      curpos += sizeof (*rr) + clib_net_to_host_u16 (rr->rdlength);
+      pos += sizeof (*rr) + clib_net_to_host_u16 (rr->rdlength);
+      curpos = pos;
     }
 
   if ((rmp->ip4_set + rmp->ip6_set) == 0)
@@ -1200,13 +1258,14 @@ vnet_dns_response_to_name (u8 * response,
   dns_rr_t *rr;
   int i, limit;
   u8 len;
-  u8 *curpos, *pos;
+  u8 *curpos, *pos, *pos2;
   u16 flags;
   u16 rcode;
   u8 *name;
   u32 ttl;
   u8 *junk __attribute__ ((unused));
   int name_set = 0;
+  int pointer_chase;
 
   h = (dns_header_t *) response;
   flags = clib_net_to_host_u16 (h->flags);
@@ -1262,29 +1321,42 @@ vnet_dns_response_to_name (u8 * response,
 
   for (i = 0; i < limit; i++)
     {
-      pos = curpos;
+      pos = pos2 = curpos;
+      pointer_chase = 0;
 
       /* Expect pointer chases in the answer section... */
-      if ((pos[0] & 0xC0) == 0xC0)
-	curpos += 2;
-      else
+      if ((pos2[0] & 0xC0) == 0xC0)
 	{
-	  len = *pos++;
-	  while (len)
-	    {
-	      if ((pos[0] & 0xC0) == 0xC0)
-		{
-		  curpos = pos + 2;
-		  goto curpos_set;
-		}
-	      pos += len;
-	      len = *pos++;
-	    }
-	  curpos = pos;
+	  pos = pos2 + 2;
+	  pos2 = response + ((pos2[0] & 0x3f) << 8) + pos2[1];
+	  pointer_chase = 1;
 	}
 
-    curpos_set:
-      rr = (dns_rr_t *) curpos;
+      len = *pos2++;
+
+      while (len)
+	{
+	  pos2 += len;
+	  if ((pos2[0] & 0xc0) == 0xc0)
+	    {
+	      /*
+	       * If we've already done one pointer chase,
+	       * do not move the pos pointer.
+	       */
+	      if (pointer_chase == 0)
+		pos = pos2 + 2;
+	      pos2 = response + ((pos2[0] & 0x3f) << 8) + pos2[1];
+	      len = *pos2++;
+	      pointer_chase = 1;
+	    }
+	  else
+	    len = *pos2++;
+	}
+
+      if (pointer_chase == 0)
+	pos = pos2;
+
+      rr = (dns_rr_t *) pos;
 
       switch (clib_net_to_host_u16 (rr->type))
 	{
@@ -1292,7 +1364,7 @@ vnet_dns_response_to_name (u8 * response,
 	  name = vnet_dns_labels_to_name (rr->rdata, response, &junk);
 	  memcpy (rmp->name, name, vec_len (name));
 	  ttl = clib_net_to_host_u32 (rr->ttl);
-	  if (*min_ttlp)
+	  if (min_ttlp)
 	    *min_ttlp = ttl;
 	  rmp->name[vec_len (name)] = 0;
 	  name_set = 1;
@@ -1303,7 +1375,8 @@ vnet_dns_response_to_name (u8 * response,
       /* Might as well stop ASAP */
       if (name_set == 1)
 	break;
-      curpos += sizeof (*rr) + clib_net_to_host_u16 (rr->rdlength);
+      pos += sizeof (*rr) + clib_net_to_host_u16 (rr->rdlength);
+      curpos = pos;
     }
 
   if (name_set == 0)
@@ -1700,7 +1773,7 @@ format_dns_reply_data (u8 * s, va_list * args)
   u8 *pos, *pos2;
   dns_rr_t *rr;
   int i;
-  int initial_pointer_chase = 0;
+  int pointer_chase = 0;
   u16 *tp;
   u16 rrtype_host_byte_order;
 
@@ -1710,11 +1783,11 @@ format_dns_reply_data (u8 * s, va_list * args)
     s = format (s, "    ");
 
   /* chase pointer? almost always yes here... */
-  if (pos2[0] == 0xc0)
+  if ((pos2[0] & 0xc0) == 0xc0)
     {
-      pos2 = reply + pos2[1];
-      pos += 2;
-      initial_pointer_chase = 1;
+      pos = pos2 + 2;
+      pos2 = reply + ((pos2[0] & 0x3f) << 8) + pos2[1];
+      pointer_chase = 1;
     }
 
   len = *pos2++;
@@ -1727,7 +1800,20 @@ format_dns_reply_data (u8 * s, va_list * args)
 	    vec_add1 (s, *pos2);
 	  pos2++;
 	}
-      len = *pos2++;
+      if ((pos2[0] & 0xc0) == 0xc0)
+	{
+	  /*
+	   * If we've already done one pointer chase,
+	   * do not move the pos pointer.
+	   */
+	  if (pointer_chase == 0)
+	    pos = pos2 + 2;
+	  pos2 = reply + ((pos2[0] & 0x3f) << 8) + pos2[1];
+	  len = *pos2++;
+	  pointer_chase = 1;
+	}
+      else
+	len = *pos2++;
       if (len)
 	{
 	  if (verbose > 1)
@@ -1740,7 +1826,7 @@ format_dns_reply_data (u8 * s, va_list * args)
 	}
     }
 
-  if (initial_pointer_chase == 0)
+  if (pointer_chase == 0)
     pos = pos2;
 
   rr = (dns_rr_t *) pos;
@@ -1826,8 +1912,11 @@ format_dns_reply_data (u8 * s, va_list * args)
 	  pos2 = rr->rdata;
 
 	  /* chase pointer? */
-	  if (pos2[0] == 0xc0)
-	    pos2 = reply + pos2[1];
+	  if ((pos2[0] & 0xc0) == 0xc0)
+	    {
+	      pos = pos2 + 2;
+	      pos2 = reply + ((pos2[0] & 0x3f) << 8) + pos2[1];
+	    }
 
 	  len = *pos2++;
 
@@ -2334,7 +2423,78 @@ static u8 dns_reply_data_initializer[] = {
   0x03, 0x63, 0x6f, 0x6d, 0x06, 0x61, 0x6b, 0x61, 0x64,
   0x6e, 0x73, 0x03, 0x6e, 0x65, 0x74, 0x00,
 };
-#else
+
+/* bind8 (linux widget, w/ nasty double pointer chasees */
+static u8 dns_reply_data_initializer[] = {
+  /* 0 */
+  0x00, 0x01, 0x81, 0x80, 0x00, 0x01, 0x00, 0x08,
+  /* 8 */
+  0x00, 0x06, 0x00, 0x06, 0x0a, 0x6f, 0x72, 0x69,
+  /* 16 */
+  0x67, 0x69, 0x6e, 0x2d, 0x77, 0x77, 0x77, 0x05,
+  /* 24 */
+  0x63, 0x69, 0x73, 0x63, 0x6f, 0x03, 0x63, 0x6f,
+  /* 32 */
+  0x6d, 0x00, 0x00, 0xff, 0x00, 0x01, 0x0a, 0x6f,
+  /* 40 */
+  0x72, 0x69, 0x67, 0x69, 0x6e, 0x2d, 0x77, 0x77,
+  /* 48 */
+  0x77, 0x05, 0x43, 0x49, 0x53, 0x43, 0x4f, 0xc0,
+
+  /* 56 */
+  0x1d, 0x00, 0x02, 0x00, 0x01, 0x00, 0x00, 0x05,
+
+  /* 64 */
+  0x9a, 0x00, 0x18, 0x15, 0x72, 0x63, 0x64,
+  0x6e, 0x39, 0x2d, 0x31, 0x34, 0x70, 0x2d, 0x64, 0x63,
+  0x7a, 0x30, 0x35, 0x6e, 0x2d, 0x67, 0x73, 0x73, 0x31,
+  0xc0, 0x17, 0xc0, 0x26, 0x00, 0x02, 0x00, 0x01, 0x00,
+  0x00, 0x05, 0x9a, 0x00, 0x1a, 0x17, 0x61, 0x6c, 0x6c,
+  0x6e, 0x30, 0x31, 0x2d, 0x61, 0x67, 0x30, 0x39, 0x2d,
+  0x64, 0x63, 0x7a, 0x30, 0x33, 0x6e, 0x2d, 0x67, 0x73,
+  0x73, 0x31, 0xc0, 0x17, 0xc0, 0x26, 0x00, 0x02, 0x00,
+  0x01, 0x00, 0x00, 0x05, 0x9a, 0x00, 0x10, 0x0d, 0x72,
+  0x74, 0x70, 0x35, 0x2d, 0x64, 0x6d, 0x7a, 0x2d, 0x67,
+  0x73, 0x73, 0x31, 0xc0, 0x17, 0xc0, 0x26, 0x00, 0x02,
+  0x00, 0x01, 0x00, 0x00, 0x05, 0x9a, 0x00, 0x18, 0x15,
+  0x6d, 0x74, 0x76, 0x35, 0x2d, 0x61, 0x70, 0x31, 0x30,
+  0x2d, 0x64, 0x63, 0x7a, 0x30, 0x36, 0x6e, 0x2d, 0x67,
+  0x73, 0x73, 0x31, 0xc0, 0x17, 0xc0, 0x26, 0x00, 0x02,
+  0x00, 0x01, 0x00, 0x00, 0x05, 0x9a, 0x00, 0x1b, 0x18,
+  0x73, 0x6e, 0x67, 0x64, 0x63, 0x30, 0x31, 0x2d, 0x61,
+  0x62, 0x30, 0x37, 0x2d, 0x64, 0x63, 0x7a, 0x30, 0x31,
+  0x6e, 0x2d, 0x67, 0x73, 0x73, 0x31, 0xc0, 0x17, 0xc0,
+  0x26, 0x00, 0x02, 0x00, 0x01, 0x00, 0x00, 0x05, 0x9a,
+  0x00, 0x1a, 0x17, 0x61, 0x65, 0x72, 0x30, 0x31, 0x2d,
+  0x72, 0x34, 0x63, 0x32, 0x35, 0x2d, 0x64, 0x63, 0x7a,
+  0x30, 0x31, 0x6e, 0x2d, 0x67, 0x73, 0x73, 0x31, 0xc0,
+  0x17, 0xc0, 0x26, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+  0x00, 0x81, 0x00, 0x04, 0x48, 0xa3, 0x04, 0xa1, 0xc0,
+  0x26, 0x00, 0x1c, 0x00, 0x01, 0x00, 0x00, 0x00, 0x82,
+  0x00, 0x10, 0x20, 0x01, 0x04, 0x20, 0x12, 0x01, 0x00,
+  0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a,
+  0xc0, 0x0c, 0x00, 0x02, 0x00, 0x01, 0x00, 0x00, 0x05,
+  0x9a, 0x00, 0x02, 0xc0, 0xf4, 0xc0, 0x0c, 0x00, 0x02,
+  0x00, 0x01, 0x00, 0x00, 0x05, 0x9a, 0x00, 0x02, 0xc0,
+  0xcd, 0xc0, 0x0c, 0x00, 0x02, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x9a, 0x00, 0x02, 0xc0, 0x8d, 0xc0, 0x0c, 0x00,
+  0x02, 0x00, 0x01, 0x00, 0x00, 0x05, 0x9a, 0x00, 0x02,
+  0xc0, 0x43, 0xc0, 0x0c, 0x00, 0x02, 0x00, 0x01, 0x00,
+  0x00, 0x05, 0x9a, 0x00, 0x02, 0xc0, 0xa9, 0xc0, 0x0c,
+  0x00, 0x02, 0x00, 0x01, 0x00, 0x00, 0x05, 0x9a, 0x00,
+  0x02, 0xc0, 0x67, 0xc0, 0x8d, 0x00, 0x01, 0x00, 0x01,
+  0x00, 0x00, 0x07, 0x08, 0x00, 0x04, 0x40, 0x66, 0xf6,
+  0x05, 0xc0, 0xa9, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+  0x07, 0x08, 0x00, 0x04, 0xad, 0x24, 0xe0, 0x64, 0xc0,
+  0x43, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x07, 0x08,
+  0x00, 0x04, 0x48, 0xa3, 0x04, 0x1c, 0xc0, 0xf4, 0x00,
+  0x01, 0x00, 0x01, 0x00, 0x00, 0x07, 0x08, 0x00, 0x04,
+  0xad, 0x26, 0xd4, 0x6c, 0xc0, 0x67, 0x00, 0x01, 0x00,
+  0x01, 0x00, 0x00, 0x07, 0x08, 0x00, 0x04, 0xad, 0x25,
+  0x90, 0x64, 0xc0, 0xcd, 0x00, 0x01, 0x00, 0x01, 0x00,
+  0x00, 0x07, 0x08, 0x00, 0x04, 0xad, 0x27, 0x70, 0x44,
+};
+
 /* google.com */
 static u8 dns_reply_data_initializer[] =
   { 0x0, 0x0, 0x81, 0x80, 0x0, 0x1, 0x0, 0xe, 0x0, 0x0, 0x0, 0x0, 0x6,
@@ -2368,6 +2528,21 @@ static u8 dns_reply_data_initializer[] =
   0x57,
   0x0, 0x9, 0x0, 0x14, 0x4, 0x61, 0x6c, 0x74, 0x31, 0xc0, 0x9b
 };
+
+#else
+/* www.weatherlink.com */
+static u8 dns_reply_data_initializer[] = {
+  0x00, 0x00, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01,
+  0x00, 0x00, 0x00, 0x00, 0x03, 0x77, 0x77, 0x77, 0x0b,
+  0x77, 0x65, 0x61, 0x74, 0x68, 0x65, 0x72, 0x6c, 0x69,
+  0x6e, 0x6b, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0xff,
+  0x00, 0x01, 0xc0, 0x0c, 0x00, 0x05, 0x00, 0x01, 0x00,
+  0x00, 0x0c, 0x9e, 0x00, 0x1f, 0x0e, 0x64, 0x33, 0x6b,
+  0x72, 0x30, 0x67, 0x75, 0x62, 0x61, 0x31, 0x64, 0x76,
+  0x77, 0x66, 0x0a, 0x63, 0x6c, 0x6f, 0x75, 0x64, 0x66,
+  0x72, 0x6f, 0x6e, 0x74, 0x03, 0x6e, 0x65, 0x74, 0x00,
+};
+
 #endif
 
 static clib_error_t *
@@ -2534,7 +2709,7 @@ vnet_send_dns4_reply (dns_main_t * dm, dns_pending_request_t * pr,
 		      dns_cache_entry_t * ep, vlib_buffer_t * b0)
 {
   vlib_main_t *vm = dm->vlib_main;
-  u32 bi;
+  u32 bi = 0;
   fib_prefix_t prefix;
   fib_node_index_t fei;
   u32 sw_if_index, fib_index;

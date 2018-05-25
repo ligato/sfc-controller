@@ -80,7 +80,7 @@ public:
 class MockListener : public interface::event_listener,
                      public interface::stat_listener
 {
-    void handle_interface_stat(interface_cmds::stats_cmd *cmd)
+    void handle_interface_stat(interface_cmds::stats_enable_cmd *cmd)
     {
     }
     void handle_interface_event(interface_cmds::events_cmd *cmd)
@@ -472,7 +472,7 @@ public:
     }
 };
 
-BOOST_AUTO_TEST_SUITE(VppOM_test)
+BOOST_AUTO_TEST_SUITE(vom)
 
 #define TRY_CHECK_RC(stmt)                    \
 {                                             \
@@ -736,6 +736,7 @@ BOOST_AUTO_TEST_CASE(test_bridge) {
     VppInit vi;
     const std::string franz = "FranzKafka";
     const std::string dante = "Dante";
+    const std::string jkr = "jkrowling";
     rc_t rc = rc_t::OK;
 
     /*
@@ -801,14 +802,15 @@ BOOST_AUTO_TEST_CASE(test_bridge) {
     HW::item<bool> hw_be1(true, rc_t::OK);
     mac_address_t mac1({0,1,2,3,4,5});
     bridge_domain_entry *be1 = new bridge_domain_entry(bd1, mac1, itf2);
-    ADD_EXPECT(bridge_domain_entry_cmds::create_cmd(hw_be1, mac1, bd1.id(), hw_ifh2.data()));
+    ADD_EXPECT(bridge_domain_entry_cmds::create_cmd(hw_be1, mac1, bd1.id(), hw_ifh2.data(),
+		                                    false));
     TRY_CHECK_RC(OM::write(dante, *be1));
 
     // Add some entries to the bridge-domain ARP termination table
     HW::item<bool> hw_bea1(true, rc_t::OK);
     boost::asio::ip::address ip1 = boost::asio::ip::address::from_string("10.10.10.10");
 
-    bridge_domain_arp_entry *bea1 = new bridge_domain_arp_entry(bd1, mac1, ip1);
+    bridge_domain_arp_entry *bea1 = new bridge_domain_arp_entry(bd1, ip1, mac1);
     ADD_EXPECT(bridge_domain_arp_entry_cmds::create_cmd(hw_be1, bd1.id(), mac1, ip1));
     TRY_CHECK_RC(OM::write(dante, *bea1));
 
@@ -827,13 +829,53 @@ BOOST_AUTO_TEST_CASE(test_bridge) {
     delete be1;
     delete bea1;
     STRICT_ORDER_OFF();
+    ADD_EXPECT(bridge_domain_arp_entry_cmds::delete_cmd(hw_be1, bd1.id(), mac1, ip1));
+    ADD_EXPECT(bridge_domain_entry_cmds::delete_cmd(hw_be1, mac1, bd1.id(), false));
     ADD_EXPECT(l2_binding_cmds::unbind_cmd(hw_l2_bind, hw_ifh2.data(), hw_bd.data(), false));
+
+    ADD_EXPECT(bridge_domain_cmds::delete_cmd(hw_bd));
     ADD_EXPECT(interface_cmds::state_change_cmd(hw_as_down, hw_ifh2));
     ADD_EXPECT(interface_cmds::af_packet_delete_cmd(hw_ifh2, itf2_name));
-    ADD_EXPECT(bridge_domain_entry_cmds::delete_cmd(hw_be1, mac1, bd1.id()));
-    ADD_EXPECT(bridge_domain_arp_entry_cmds::delete_cmd(hw_be1, bd1.id(), mac1, ip1));
-    ADD_EXPECT(bridge_domain_cmds::delete_cmd(hw_bd));
     TRY_CHECK(OM::remove(dante));
+
+    // test the BVI entry in l2fib
+    bridge_domain bd2(99);
+
+    HW::item<uint32_t> hw_bd2(99, rc_t::OK);
+    ADD_EXPECT(bridge_domain_cmds::create_cmd(hw_bd2, bridge_domain::learning_mode_t::ON));
+
+    TRY_CHECK_RC(OM::write(jkr, bd2));
+
+    std::string itf3_name = "bvi";
+    interface itf3(itf3_name,
+                   interface::type_t::BVI,
+                   interface::admin_state_t::UP);
+
+    HW::item<handle_t> hw_ifh3(5, rc_t::OK);
+    ADD_EXPECT(interface_cmds::loopback_create_cmd(hw_ifh3, itf3_name));
+    ADD_EXPECT(interface_cmds::set_tag(hw_ifh3, itf3_name));
+    ADD_EXPECT(interface_cmds::state_change_cmd(hw_as_up, hw_ifh3));
+    TRY_CHECK_RC(OM::write(jkr, itf3));
+
+    l2_binding *l2itf3 = new l2_binding(itf3, bd2);
+    ADD_EXPECT(l2_binding_cmds::bind_cmd(hw_l2_bind, hw_ifh3.data(), hw_bd2.data(), true));
+    TRY_CHECK_RC(OM::write(jkr, *l2itf3));
+
+    HW::item<bool> hw_be2(true, rc_t::OK);
+    mac_address_t mac2({0,1,2,3,4,5});
+    bridge_domain_entry *be2 = new bridge_domain_entry(bd2, mac2, itf3);
+    ADD_EXPECT(bridge_domain_entry_cmds::create_cmd(hw_be2, mac2, bd2.id(), hw_ifh3.data(), true));
+    TRY_CHECK_RC(OM::write(jkr, *be2));
+
+    delete l2itf3;
+    delete be2;
+    STRICT_ORDER_OFF();
+    ADD_EXPECT(l2_binding_cmds::unbind_cmd(hw_l2_bind, hw_ifh3.data(), hw_bd2.data(), true));
+    ADD_EXPECT(bridge_domain_entry_cmds::delete_cmd(hw_be2, mac2, bd2.id(), true));
+    ADD_EXPECT(interface_cmds::state_change_cmd(hw_as_down, hw_ifh3));
+    ADD_EXPECT(interface_cmds::loopback_delete_cmd(hw_ifh3));
+    ADD_EXPECT(bridge_domain_cmds::delete_cmd(hw_bd2));
+    TRY_CHECK(OM::remove(jkr));
 }
 
 BOOST_AUTO_TEST_CASE(test_vxlan) {
@@ -1315,7 +1357,7 @@ BOOST_AUTO_TEST_CASE(test_routing) {
      */
     HW::item<bool> hw_neighbour(true, rc_t::OK);
     mac_address_t mac_n({0,1,2,4,5,6});
-    neighbour *ne = new neighbour(itf1, mac_n, nh_10);
+    neighbour *ne = new neighbour(itf1, nh_10, mac_n);
     ADD_EXPECT(neighbour_cmds::create_cmd(hw_neighbour, hw_ifh.data(), mac_n, nh_10));
     TRY_CHECK_RC(OM::write(ian, *ne));
 
@@ -1463,8 +1505,6 @@ BOOST_AUTO_TEST_CASE(test_interface_events) {
 
     HW::enqueue(itf);
     HW::write();
-
-    HW::dequeue(itf);
 }
 
 BOOST_AUTO_TEST_CASE(test_interface_route_domain_change) {
@@ -1552,6 +1592,44 @@ BOOST_AUTO_TEST_CASE(test_interface_route_domain_change) {
     ADD_EXPECT(route_domain_cmds::delete_cmd(hw_rd_delete, l3_proto_t::IPV6, 1));
 
     TRY_CHECK(OM::remove(rene));
+}
+
+BOOST_AUTO_TEST_CASE(test_prefixes) {
+    route::prefix_t p6_s_16(boost::asio::ip::address::from_string("2001::"), 16);
+
+    BOOST_CHECK(p6_s_16.mask() == boost::asio::ip::address::from_string("ffff::"));
+
+    route::prefix_t p6_s_17(boost::asio::ip::address::from_string("2001:ff00::"), 17);
+
+    BOOST_CHECK(p6_s_17.mask() == boost::asio::ip::address::from_string("ffff:8000::"));
+    BOOST_CHECK(p6_s_17.low().address() == boost::asio::ip::address::from_string("2001:8000::"));
+
+    route::prefix_t p6_s_15(boost::asio::ip::address::from_string("2001:ff00::"), 15);
+    BOOST_CHECK(p6_s_15.mask() == boost::asio::ip::address::from_string("fffe::"));
+    BOOST_CHECK(p6_s_15.low().address() == boost::asio::ip::address::from_string("2000::"));
+
+    route::prefix_t p4_s_16(boost::asio::ip::address::from_string("192.168.0.0"), 16);
+
+    BOOST_CHECK(p4_s_16.mask() == boost::asio::ip::address::from_string("255.255.0.0"));
+
+    route::prefix_t p4_s_17(boost::asio::ip::address::from_string("192.168.127.0"), 17);
+
+    BOOST_CHECK(p4_s_17.mask() == boost::asio::ip::address::from_string("255.255.128.0"));
+    BOOST_CHECK(p4_s_17.low().address() == boost::asio::ip::address::from_string("192.168.0.0"));
+    BOOST_CHECK(p4_s_17.high().address() == boost::asio::ip::address::from_string("192.168.127.255"));
+
+    route::prefix_t p4_s_15(boost::asio::ip::address::from_string("192.168.255.255"), 15);
+
+    BOOST_CHECK(p4_s_15.mask() == boost::asio::ip::address::from_string("255.254.0.0"));
+    BOOST_CHECK(p4_s_15.low().address() == boost::asio::ip::address::from_string("192.168.0.0"));
+    BOOST_CHECK(p4_s_15.high().address() == boost::asio::ip::address::from_string("192.169.255.255"));
+
+    route::prefix_t p4_s_32(boost::asio::ip::address::from_string("192.168.1.1"), 32);
+
+    BOOST_CHECK(p4_s_32.mask() == boost::asio::ip::address::from_string("255.255.255.255"));
+    BOOST_CHECK(p4_s_32.low().address() == boost::asio::ip::address::from_string("192.168.1.1"));
+    BOOST_CHECK(p4_s_32.high().address() == boost::asio::ip::address::from_string("192.168.1.1"));
+
 }
 
 BOOST_AUTO_TEST_SUITE_END()

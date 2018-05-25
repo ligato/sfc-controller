@@ -43,6 +43,12 @@ route_domain::route_domain(const route_domain& o)
 {
 }
 
+bool
+route_domain::operator==(const route_domain& r) const
+{
+  return (m_table_id == r.m_table_id);
+}
+
 route::table_id_t
 route_domain::table_id() const
 {
@@ -95,8 +101,8 @@ route_domain::to_string() const
 {
   std::ostringstream s;
   s << "route-domain:["
-    << "table-id:" << m_table_id << " v4:" << m_hw_v4 << " v6:" << m_hw_v6
-    << "]";
+    << "table-id:" << m_table_id << " v4:" << m_hw_v4.to_string()
+    << " v6:" << m_hw_v6.to_string() << "]";
 
   return (s.str());
 }

@@ -106,12 +106,6 @@ struct rc_t : public enum_base<rc_t>
   const static rc_t OK;
 
   /**
-   * HW write is in progress. Also used for the 'want' events
-   * that never complete
-   */
-  const static rc_t INPROGRESS;
-
-  /**
    * HW write reported invalid input
    */
   const static rc_t INVALID;
@@ -158,6 +152,11 @@ struct direction_t : public enum_base<direction_t>
    */
   const static direction_t OUTPUT;
 };
+
+/**
+ * Output ostream for direction_t
+ */
+std::ostream& operator<<(std::ostream& os, const direction_t& dir);
 
 /**
  * A type declaration of an interface handle in VPP
@@ -222,6 +221,7 @@ std::ostream& operator<<(std::ostream& os, const handle_t& h);
 struct mac_address_t
 {
   mac_address_t(uint8_t bytes[6]);
+  mac_address_t(const std::string& str);
   mac_address_t(std::initializer_list<uint8_t> bytes);
   /**
    * Convert to byte array

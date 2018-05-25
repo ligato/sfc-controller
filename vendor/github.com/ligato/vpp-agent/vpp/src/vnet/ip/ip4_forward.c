@@ -470,11 +470,17 @@ ip4_lookup (vlib_main_t * vm,
 
 static u8 *format_ip4_lookup_trace (u8 * s, va_list * args);
 
+/* *INDENT-OFF* */
 VLIB_REGISTER_NODE (ip4_lookup_node) =
 {
-.function = ip4_lookup,.name = "ip4-lookup",.vector_size =
-    sizeof (u32),.format_trace = format_ip4_lookup_trace,.n_next_nodes =
-    IP_LOOKUP_N_NEXT,.next_nodes = IP4_LOOKUP_NEXT_NODES,};
+  .function = ip4_lookup,
+  .name = "ip4-lookup",
+  .vector_size = sizeof (u32),
+  .format_trace = format_ip4_lookup_trace,
+  .n_next_nodes = IP_LOOKUP_N_NEXT,
+  .next_nodes = IP4_LOOKUP_NEXT_NODES,
+};
+/* *INDENT-ON* */
 
 VLIB_NODE_FUNCTION_MULTIARCH (ip4_lookup_node, ip4_lookup);
 
@@ -665,11 +671,17 @@ ip4_load_balance (vlib_main_t * vm,
   return frame->n_vectors;
 }
 
+/* *INDENT-OFF* */
 VLIB_REGISTER_NODE (ip4_load_balance_node) =
 {
-.function = ip4_load_balance,.name = "ip4-load-balance",.vector_size =
-    sizeof (u32),.sibling_of = "ip4-lookup",.format_trace =
-    format_ip4_lookup_trace,};
+  .function = ip4_load_balance,
+  .name = "ip4-load-balance",
+  .vector_size = sizeof (u32),
+  .sibling_of = "ip4-lookup",
+  .format_trace =
+  format_ip4_lookup_trace,
+};
+/* *INDENT-ON* */
 
 VLIB_NODE_FUNCTION_MULTIARCH (ip4_load_balance_node, ip4_load_balance);
 
@@ -1101,7 +1113,7 @@ VNET_FEATURE_INIT (ip4_lookup_mc, static) =
 VNET_FEATURE_ARC_INIT (ip4_output, static) =
 {
   .arc_name = "ip4-output",
-  .start_nodes = VNET_FEATURES ("ip4-rewrite", "ip4-midchain"),
+  .start_nodes = VNET_FEATURES ("ip4-rewrite", "ip4-midchain", "ip4-dvr-dpo"),
   .arc_index_ptr = &ip4_main.lookup_main.output_feature_arc_index,
 };
 
@@ -1176,6 +1188,12 @@ ip4_lookup_init (vlib_main_t * vm)
   uword i;
 
   if ((error = vlib_call_init_function (vm, vnet_feature_init)))
+    return error;
+  if ((error = vlib_call_init_function (vm, ip4_mtrie_module_init)))
+    return (error);
+  if ((error = vlib_call_init_function (vm, fib_module_init)))
+    return error;
+  if ((error = vlib_call_init_function (vm, mfib_module_init)))
     return error;
 
   for (i = 0; i < ARRAY_LEN (im->fib_masks); i++)
@@ -2134,25 +2152,36 @@ static char *ip4_arp_error_strings[] = {
   [IP4_ARP_ERROR_NO_SOURCE_ADDRESS] = "no source address for ARP request",
 };
 
+/* *INDENT-OFF* */
 VLIB_REGISTER_NODE (ip4_arp_node) =
 {
-  .function = ip4_arp,.name = "ip4-arp",.vector_size =
-    sizeof (u32),.format_trace = format_ip4_forward_next_trace,.n_errors =
-    ARRAY_LEN (ip4_arp_error_strings),.error_strings =
-    ip4_arp_error_strings,.n_next_nodes = IP4_ARP_N_NEXT,.next_nodes =
+  .function = ip4_arp,
+  .name = "ip4-arp",
+  .vector_size = sizeof (u32),
+  .format_trace = format_ip4_forward_next_trace,
+  .n_errors = ARRAY_LEN (ip4_arp_error_strings),
+  .error_strings = ip4_arp_error_strings,
+  .n_next_nodes = IP4_ARP_N_NEXT,
+  .next_nodes =
   {
-  [IP4_ARP_NEXT_DROP] = "error-drop",}
-,};
+    [IP4_ARP_NEXT_DROP] = "error-drop",
+  },
+};
 
 VLIB_REGISTER_NODE (ip4_glean_node) =
 {
-  .function = ip4_glean,.name = "ip4-glean",.vector_size =
-    sizeof (u32),.format_trace = format_ip4_forward_next_trace,.n_errors =
-    ARRAY_LEN (ip4_arp_error_strings),.error_strings =
-    ip4_arp_error_strings,.n_next_nodes = IP4_ARP_N_NEXT,.next_nodes =
-  {
-  [IP4_ARP_NEXT_DROP] = "error-drop",}
-,};
+  .function = ip4_glean,
+  .name = "ip4-glean",
+  .vector_size = sizeof (u32),
+  .format_trace = format_ip4_forward_next_trace,
+  .n_errors = ARRAY_LEN (ip4_arp_error_strings),
+  .error_strings = ip4_arp_error_strings,
+  .n_next_nodes = IP4_ARP_N_NEXT,
+  .next_nodes = {
+  [IP4_ARP_NEXT_DROP] = "error-drop",
+  },
+};
+/* *INDENT-ON* */
 
 #define foreach_notrace_ip4_arp_error           \
 _(DROP)                                         \
@@ -2448,6 +2477,16 @@ ip4_rewrite_inline (vlib_main_t * vm,
 	     rewrite_header.max_l3_packet_bytes ? IP4_ERROR_MTU_EXCEEDED :
 	     error1);
 
+	  if (is_mcast)
+	    {
+	      error0 = ((adj0[0].rewrite_header.sw_if_index ==
+			 vnet_buffer (p0)->sw_if_index[VLIB_RX]) ?
+			IP4_ERROR_SAME_INTERFACE : error0);
+	      error1 = ((adj1[0].rewrite_header.sw_if_index ==
+			 vnet_buffer (p1)->sw_if_index[VLIB_RX]) ?
+			IP4_ERROR_SAME_INTERFACE : error1);
+	    }
+
 	  /* Don't adjust the buffer for ttl issue; icmp-error node wants
 	   * to see the IP headerr */
 	  if (PREDICT_TRUE (error0 == IP4_ERROR_NONE))
@@ -2607,7 +2646,12 @@ ip4_rewrite_inline (vlib_main_t * vm,
 	  error0 = (vlib_buffer_length_in_chain (vm, p0)
 		    > adj0[0].rewrite_header.max_l3_packet_bytes
 		    ? IP4_ERROR_MTU_EXCEEDED : error0);
-
+	  if (is_mcast)
+	    {
+	      error0 = ((adj0[0].rewrite_header.sw_if_index ==
+			 vnet_buffer (p0)->sw_if_index[VLIB_RX]) ?
+			IP4_ERROR_SAME_INTERFACE : error0);
+	    }
 	  p0->error = error_node->errors[error0];
 
 	  /* Don't adjust the buffer for ttl issue; icmp-error node wants
@@ -2683,7 +2727,7 @@ ip4_rewrite_inline (vlib_main_t * vm,
 
     <em>Next Indices:</em>
     - <code> adj->rewrite_header.next_index </code>
-      or @c error-drop
+      or @c ip4-drop
 */
 static uword
 ip4_rewrite (vlib_main_t * vm,
@@ -2735,7 +2779,7 @@ VLIB_REGISTER_NODE (ip4_rewrite_node) = {
 
   .n_next_nodes = 2,
   .next_nodes = {
-    [IP4_REWRITE_NEXT_DROP] = "error-drop",
+    [IP4_REWRITE_NEXT_DROP] = "ip4-drop",
     [IP4_REWRITE_NEXT_ICMP_ERROR] = "ip4-icmp-error",
   },
 };
@@ -3142,6 +3186,29 @@ VLIB_CLI_COMMAND (set_ip_classify_command, static) =
     .function = set_ip_classify_command_fn,
 };
 /* *INDENT-ON* */
+
+static clib_error_t *
+ip4_config (vlib_main_t * vm, unformat_input_t * input)
+{
+  ip4_main_t *im = &ip4_main;
+  uword heapsize = 0;
+
+  while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
+    {
+      if (unformat (input, "heap-size %U", unformat_memory_size, &heapsize))
+	;
+      else
+	return clib_error_return (0,
+				  "invalid heap-size parameter `%U'",
+				  format_unformat_error, input);
+    }
+
+  im->mtrie_heap_size = heapsize;
+
+  return 0;
+}
+
+VLIB_EARLY_CONFIG_FUNCTION (ip4_config, "ip");
 
 /*
  * fd.io coding-style-patch-verification: ON

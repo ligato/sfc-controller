@@ -787,6 +787,7 @@ lisp_gpe_l2_update_fwding (lisp_gpe_fwd_entry_t * lfe)
     {
       fib_path_list_contribute_forwarding (lfe->l2.path_list_index,
 					   FIB_FORW_CHAIN_TYPE_ETHERNET,
+					   FIB_PATH_LIST_FWD_FLAG_NONE,
 					   &lfe->l2.dpo);
       dpo_copy (&dpo, &lfe->l2.dpo);
     }
@@ -1048,6 +1049,7 @@ lisp_gpe_nsh_update_fwding (lisp_gpe_fwd_entry_t * lfe)
     {
       fib_path_list_contribute_forwarding (lfe->nsh.path_list_index,
 					   FIB_FORW_CHAIN_TYPE_NSH,
+					   FIB_PATH_LIST_FWD_FLAG_NONE,
 					   &lfe->nsh.dpo);
 
       /*
@@ -1286,6 +1288,9 @@ vnet_lisp_flush_stats (void)
   lisp_gpe_main_t *lgm = vnet_lisp_gpe_get_main ();
   vlib_combined_counter_main_t *cm = &lgm->counters;
   u32 i;
+
+  if (cm->counters == NULL)
+    return 0;
 
   for (i = 0; i < vlib_combined_counter_n_counters (cm); i++)
     vlib_zero_combined_counter (cm, i);

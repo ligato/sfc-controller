@@ -233,6 +233,8 @@ tcp_connection_reset (tcp_connection_t * tc)
       tcp_connection_cleanup (tc);
       break;
     case TCP_STATE_ESTABLISHED:
+      stream_session_reset_notify (&tc->connection);
+      /* fall through */
     case TCP_STATE_CLOSE_WAIT:
     case TCP_STATE_FIN_WAIT_1:
     case TCP_STATE_FIN_WAIT_2:
@@ -242,7 +244,6 @@ tcp_connection_reset (tcp_connection_t * tc)
 
       /* Make sure all timers are cleared */
       tcp_connection_timers_reset (tc);
-      stream_session_reset_notify (&tc->connection);
 
       /* Wait for cleanup from session layer but not forever */
       tcp_timer_update (tc, TCP_TIMER_WAITCLOSE, TCP_CLEANUP_TIME);
@@ -1008,8 +1009,18 @@ tcp_session_tx_fifo_offset (transport_connection_t * trans_conn)
   return (tc->snd_nxt - tc->snd_una);
 }
 
+void
+tcp_update_time (f64 now, u8 thread_index)
+{
+  tcp_set_time_now (thread_index);
+  tw_timer_expire_timers_16t_2w_512sl (&tcp_main.timer_wheels[thread_index],
+				       now);
+  tcp_flush_frames_to_output (thread_index);
+}
+
 /* *INDENT-OFF* */
 const static transport_proto_vft_t tcp_proto = {
+  .enable = vnet_tcp_enable_disable,
   .bind = tcp_session_bind,
   .unbind = tcp_session_unbind,
   .push_header = tcp_push_header,
@@ -1021,6 +1032,7 @@ const static transport_proto_vft_t tcp_proto = {
   .cleanup = tcp_session_cleanup,
   .send_mss = tcp_session_send_mss,
   .send_space = tcp_session_send_space,
+  .update_time = tcp_update_time,
   .tx_fifo_offset = tcp_session_tx_fifo_offset,
   .format_connection = format_tcp_session,
   .format_listener = format_tcp_listener_session,
@@ -1151,8 +1163,6 @@ clib_error_t *
 tcp_main_enable (vlib_main_t * vm)
 {
   tcp_main_t *tm = vnet_get_tcp_main ();
-  ip_protocol_info_t *pi;
-  ip_main_t *im = &ip_main;
   vlib_thread_main_t *vtm = vlib_get_thread_main ();
   clib_error_t *error = 0;
   u32 num_threads;
@@ -1171,19 +1181,8 @@ tcp_main_enable (vlib_main_t * vm)
    * Registrations
    */
 
-  /* Register with IP */
-  pi = ip_get_protocol_info (im, IP_PROTOCOL_TCP);
-  if (pi == 0)
-    return clib_error_return (0, "TCP protocol info AWOL");
-  pi->format_header = format_tcp_header;
-  pi->unformat_pg_edit = unformat_pg_tcp_header;
-
   ip4_register_protocol (IP_PROTOCOL_TCP, tcp4_input_node.index);
   ip6_register_protocol (IP_PROTOCOL_TCP, tcp6_input_node.index);
-
-  /* Register as transport with session layer */
-  transport_register_protocol (TRANSPORT_PROTO_TCP, 1, &tcp_proto);
-  transport_register_protocol (TRANSPORT_PROTO_TCP, 0, &tcp_proto);
 
   /*
    * Initialize data structures
@@ -1282,7 +1281,25 @@ clib_error_t *
 tcp_init (vlib_main_t * vm)
 {
   tcp_main_t *tm = vnet_get_tcp_main ();
+  ip_main_t *im = &ip_main;
+  ip_protocol_info_t *pi;
+
+  /* Session layer, and by implication tcp, are disabled by default */
   tm->is_enabled = 0;
+
+  /* Register with IP for header parsing */
+  pi = ip_get_protocol_info (im, IP_PROTOCOL_TCP);
+  if (pi == 0)
+    return clib_error_return (0, "TCP protocol info AWOL");
+  pi->format_header = format_tcp_header;
+  pi->unformat_pg_edit = unformat_pg_tcp_header;
+
+  /* Register as transport with session layer */
+  transport_register_protocol (TRANSPORT_PROTO_TCP, &tcp_proto,
+			       FIB_PROTOCOL_IP4, tcp4_output_node.index);
+  transport_register_protocol (TRANSPORT_PROTO_TCP, &tcp_proto,
+			       FIB_PROTOCOL_IP6, tcp6_output_node.index);
+
   tcp_api_reference ();
   return 0;
 }
@@ -1293,7 +1310,6 @@ static clib_error_t *
 tcp_config_fn (vlib_main_t * vm, unformat_input_t * input)
 {
   tcp_main_t *tm = vnet_get_tcp_main ();
-  u64 tmp;
 
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
@@ -1304,19 +1320,9 @@ tcp_config_fn (vlib_main_t * vm, unformat_input_t * input)
       else if (unformat (input, "preallocated-half-open-connections %d",
 			 &tm->preallocated_half_open_connections))
 	;
-      else if (unformat (input, "local-endpoints-table-memory %U",
-			 unformat_memory_size, &tmp))
-	{
-	  if (tmp >= 0x100000000)
-	    return clib_error_return (0, "memory size %llx (%lld) too large",
-				      tmp, tmp);
-	  tm->local_endpoints_table_memory = tmp;
-	}
-      else if (unformat (input, "local-endpoints-table-buckets %d",
-			 &tm->local_endpoints_table_buckets))
+      else if (unformat (input, "buffer-fail-fraction %f",
+			 &tm->buffer_fail_fraction))
 	;
-
-
       else
 	return clib_error_return (0, "unknown input `%U'",
 				  format_unformat_error, input);

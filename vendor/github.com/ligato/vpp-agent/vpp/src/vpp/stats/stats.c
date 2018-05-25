@@ -16,6 +16,7 @@
 #include <signal.h>
 #include <vnet/fib/ip4_fib.h>
 #include <vnet/fib/fib_entry.h>
+#include <vnet/mfib/mfib_entry.h>
 #include <vnet/dpo/load_balance.h>
 
 #define STATS_DEBUG 0
@@ -55,6 +56,8 @@ _(VNET_IP4_FIB_COUNTERS, vnet_ip4_fib_counters)				\
 _(WANT_IP4_FIB_STATS, want_ip4_fib_stats)            \
 _(VNET_IP6_FIB_COUNTERS, vnet_ip6_fib_counters)				\
 _(WANT_IP6_FIB_STATS, want_ip6_fib_stats)        \
+_(WANT_IP4_MFIB_STATS, want_ip4_mfib_stats)                             \
+_(WANT_IP6_MFIB_STATS, want_ip6_mfib_stats)                             \
 _(VNET_IP4_NBR_COUNTERS, vnet_ip4_nbr_counters)				\
 _(WANT_IP4_NBR_STATS, want_ip4_nbr_stats)            \
 _(VNET_IP6_NBR_COUNTERS, vnet_ip6_nbr_counters) \
@@ -80,6 +83,8 @@ setup_message_id_table (api_main_t * am)
 #define COMBINED_COUNTER_BATCH_SIZE	63
 #define IP4_FIB_COUNTER_BATCH_SIZE	48
 #define IP6_FIB_COUNTER_BATCH_SIZE	30
+#define IP4_MFIB_COUNTER_BATCH_SIZE	24
+#define IP6_MFIB_COUNTER_BATCH_SIZE	15
 
 /* 5ms */
 #define STATS_RELEASE_DELAY_NS (1000 * 1000 * 5)
@@ -189,7 +194,7 @@ format_vnet_interface_simple_counters (u8 * s, va_list * args)
   return s;
 }
 
-void
+static void
 dslock (stats_main_t * sm, int release_hint, int tag)
 {
   u32 thread_index;
@@ -222,7 +227,7 @@ stats_dslock_with_hint (int hint, int tag)
   dslock (sm, hint, tag);
 }
 
-void
+static void
 dsunlock (stats_main_t * sm)
 {
   u32 thread_index;
@@ -443,7 +448,7 @@ do_simple_interface_counters (stats_main_t * sm)
   vnet_interface_main_t *im = sm->interface_main;
   api_main_t *am = sm->api_main;
   vl_shmem_hdr_t *shmem_hdr = am->shmem_hdr;
-  unix_shared_memory_queue_t *q = shmem_hdr->vl_input_queue;
+  svm_queue_t *q = shmem_hdr->vl_input_queue;
   vlib_simple_counter_main_t *cm;
   u32 items_this_message = 0;
   u64 v, *vp = 0;
@@ -539,7 +544,7 @@ static void
   vl_api_want_interface_combined_stats_reply_t *rmp;
   uword *p;
   i32 retval = 0;
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   u32 swif;
 
   swif = ~0;			//Using same mechanism as _per_interface_
@@ -574,7 +579,7 @@ static void
 {
   vpe_client_registration_t *clients, client;
   stats_main_t *sm = &stats_main;
-  unix_shared_memory_queue_t *q, *q_prev = NULL;
+  svm_queue_t *q, *q_prev = NULL;
   vl_api_vnet_interface_combined_counters_t *mp_copy = NULL;
   u32 mp_size;
   int i;
@@ -622,7 +627,7 @@ do_combined_interface_counters (stats_main_t * sm)
   vnet_interface_main_t *im = sm->interface_main;
   api_main_t *am = sm->api_main;
   vl_shmem_hdr_t *shmem_hdr = am->shmem_hdr;
-  unix_shared_memory_queue_t *q = shmem_hdr->vl_input_queue;
+  svm_queue_t *q = shmem_hdr->vl_input_queue;
   vlib_combined_counter_main_t *cm;
   u32 items_this_message = 0;
   vlib_counter_t v, *vp = 0;
@@ -682,7 +687,7 @@ static void
   vlib_combined_counter_main_t *cm;
   uword *p;
   i32 retval = 0;
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   int i;
   u32 swif;
 
@@ -743,7 +748,7 @@ do_combined_per_interface_counters (stats_main_t * sm)
   vnet_interface_main_t *im = sm->interface_main;
   api_main_t *am = sm->api_main;
   vl_shmem_hdr_t *shmem_hdr = am->shmem_hdr;
-  unix_shared_memory_queue_t *q = NULL;
+  svm_queue_t *q = NULL;
   vlib_combined_counter_main_t *cm;
   /*
    * items_this_message will eventually be used to optimise the batching
@@ -877,7 +882,7 @@ static void
   vlib_simple_counter_main_t *cm;
   uword *p;
   i32 retval = 0;
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   int i;
   u32 swif;
 
@@ -940,7 +945,7 @@ do_simple_per_interface_counters (stats_main_t * sm)
   vnet_interface_main_t *im = sm->interface_main;
   api_main_t *am = sm->api_main;
   vl_shmem_hdr_t *shmem_hdr = am->shmem_hdr;
-  unix_shared_memory_queue_t *q = NULL;
+  svm_queue_t *q = NULL;
   vlib_simple_counter_main_t *cm;
   /*
    * items_this_message will eventually be used to optimise the batching
@@ -1159,7 +1164,7 @@ ip4_nbr_ship (stats_main_t * sm, ip4_nbr_stats_ctx_t * ctx)
 {
   api_main_t *am = sm->api_main;
   vl_shmem_hdr_t *shmem_hdr = am->shmem_hdr;
-  unix_shared_memory_queue_t *q = shmem_hdr->vl_input_queue;
+  svm_queue_t *q = shmem_hdr->vl_input_queue;
   vl_api_vnet_ip4_nbr_counters_t *mp = 0;
   int first = 0;
 
@@ -1199,11 +1204,11 @@ ip4_nbr_ship (stats_main_t * sm, ip4_nbr_stats_ctx_t * ctx)
       /*
        * send to the shm q
        */
-      unix_shared_memory_queue_lock (q);
-      pause = unix_shared_memory_queue_is_full (q);
+      svm_queue_lock (q);
+      pause = svm_queue_is_full (q);
 
       vl_msg_api_send_shmem_nolock (q, (u8 *) & mp);
-      unix_shared_memory_queue_unlock (q);
+      svm_queue_unlock (q);
       dsunlock (sm);
 
       if (pause)
@@ -1314,7 +1319,7 @@ ip6_nbr_ship (stats_main_t * sm,
 {
   api_main_t *am = sm->api_main;
   vl_shmem_hdr_t *shmem_hdr = am->shmem_hdr;
-  unix_shared_memory_queue_t *q = shmem_hdr->vl_input_queue;
+  svm_queue_t *q = shmem_hdr->vl_input_queue;
   vl_api_vnet_ip6_nbr_counters_t *mp = 0;
   int first = 0;
 
@@ -1354,11 +1359,11 @@ ip6_nbr_ship (stats_main_t * sm,
       /*
        * send to the shm q
        */
-      unix_shared_memory_queue_lock (q);
-      pause = unix_shared_memory_queue_is_full (q);
+      svm_queue_lock (q);
+      pause = svm_queue_is_full (q);
 
       vl_msg_api_send_shmem_nolock (q, (u8 *) & mp);
-      unix_shared_memory_queue_unlock (q);
+      svm_queue_unlock (q);
       dsunlock (sm);
 
       if (pause)
@@ -1425,7 +1430,7 @@ do_ip4_fib_counters (stats_main_t * sm)
   ip4_main_t *im4 = &ip4_main;
   api_main_t *am = sm->api_main;
   vl_shmem_hdr_t *shmem_hdr = am->shmem_hdr;
-  unix_shared_memory_queue_t *q = shmem_hdr->vl_input_queue;
+  svm_queue_t *q = shmem_hdr->vl_input_queue;
   ip4_route_t *r;
   fib_table_t *fib;
   ip4_fib_t *v4_fib;
@@ -1546,19 +1551,19 @@ again:
 		 * drop the data structure lock (which the main thread
 		 * may want), and take a pause.
 		 */
-		unix_shared_memory_queue_lock (q);
-		if (unix_shared_memory_queue_is_full (q))
+		svm_queue_lock (q);
+		if (svm_queue_is_full (q))
 		  {
 		    dsunlock (sm);
 		    vl_msg_api_send_shmem_nolock (q, (u8 *) & mp);
-		    unix_shared_memory_queue_unlock (q);
+		    svm_queue_unlock (q);
 		    mp = 0;
 		    ip46_fib_stats_delay (sm, 0 /* sec */ ,
 					  STATS_RELEASE_DELAY_NS);
 		    goto again;
 		  }
 		vl_msg_api_send_shmem_nolock (q, (u8 *) & mp);
-		unix_shared_memory_queue_unlock (q);
+		svm_queue_unlock (q);
 
 		items_this_message = IP4_FIB_COUNTER_BATCH_SIZE;
 		mp = vl_msg_api_alloc_as_if_client
@@ -1584,6 +1589,299 @@ again:
       dsunlock (sm);
 
       /* Flush any data from this fib */
+      if (mp->count)
+	{
+	  mp->count = htonl (mp->count);
+	  vl_msg_api_send_shmem (q, (u8 *) & mp);
+	  mp = 0;
+	}
+    }
+
+  /* If e.g. the last FIB had no reportable routes, free the buffer */
+  if (mp)
+    vl_msg_api_free (mp);
+}
+
+static int
+mfib_table_stats_walk_cb (fib_node_index_t fei, void *ctx)
+{
+  stats_main_t *sm = ctx;
+  do_ip46_fibs_t *do_fibs;
+  mfib_entry_t *entry;
+
+  do_fibs = &sm->do_ip46_fibs;
+  entry = mfib_entry_get (fei);
+
+  vec_add1 (do_fibs->mroutes, entry->mfe_prefix);
+
+  return (1);
+}
+
+static void
+do_ip4_mfib_counters (stats_main_t * sm)
+{
+  ip4_main_t *im4 = &ip4_main;
+  api_main_t *am = sm->api_main;
+  vl_shmem_hdr_t *shmem_hdr = am->shmem_hdr;
+  svm_queue_t *q = shmem_hdr->vl_input_queue;
+  mfib_prefix_t *pfx;
+  mfib_table_t *mfib;
+  do_ip46_fibs_t *do_fibs;
+  vl_api_vnet_ip4_mfib_counters_t *mp = 0;
+  u32 items_this_message;
+  vl_api_ip4_mfib_counter_t *ctrp = 0;
+  u32 start_at_mfib_index = 0;
+  int i, j, k;
+
+  do_fibs = &sm->do_ip46_fibs;
+
+  vec_reset_length (do_fibs->mfibs);
+  /* *INDENT-OFF* */
+  pool_foreach (mfib, im4->mfibs, ({vec_add1(do_fibs->mfibs, mfib);}));
+  /* *INDENT-ON* */
+
+  for (j = 0; j < vec_len (do_fibs->mfibs); j++)
+    {
+      mfib = do_fibs->mfibs[j];
+      /* We may have bailed out due to control-plane activity */
+      while ((mfib - im4->mfibs) < start_at_mfib_index)
+	continue;
+
+      if (mp == 0)
+	{
+	  items_this_message = IP4_MFIB_COUNTER_BATCH_SIZE;
+	  mp = vl_msg_api_alloc_as_if_client
+	    (sizeof (*mp) +
+	     items_this_message * sizeof (vl_api_ip4_mfib_counter_t));
+	  mp->_vl_msg_id = ntohs (VL_API_VNET_IP4_MFIB_COUNTERS);
+	  mp->count = 0;
+	  mp->vrf_id = ntohl (mfib->mft_table_id);
+	  ctrp = (vl_api_ip4_mfib_counter_t *) mp->c;
+	}
+      else
+	{
+	  /* happens if the last MFIB was empty... */
+	  ASSERT (mp->count == 0);
+	  mp->vrf_id = ntohl (mfib->mft_table_id);
+	}
+
+      vec_reset_length (do_fibs->mroutes);
+
+      /*
+       * walk the table with table updates blocked
+       */
+      dslock (sm, 0 /* release hint */ , 1 /* tag */ );
+
+      mfib_table_walk (mfib->mft_index,
+		       FIB_PROTOCOL_IP4, mfib_table_stats_walk_cb, sm);
+      dsunlock (sm);
+
+      vec_foreach (pfx, do_fibs->mroutes)
+      {
+	const dpo_id_t *dpo_id;
+	fib_node_index_t mfei;
+	vlib_counter_t c;
+	u32 index;
+
+	/*
+	 * re-lookup the entry, since we suspend during the collection
+	 */
+	mfei = mfib_table_lookup (mfib->mft_index, pfx);
+
+	if (FIB_NODE_INDEX_INVALID == mfei)
+	  continue;
+
+	dpo_id = mfib_entry_contribute_ip_forwarding (mfei);
+	index = (u32) dpo_id->dpoi_index;
+
+	vlib_get_combined_counter (&replicate_main.repm_counters,
+				   dpo_id->dpoi_index, &c);
+	/*
+	 * If it has seen at least one packet, send it.
+	 */
+	if (c.packets > 0)
+	  {
+	    /* already in net byte order */
+	    memcpy (ctrp->group, &pfx->fp_grp_addr.ip4, 4);
+	    memcpy (ctrp->source, &pfx->fp_src_addr.ip4, 4);
+	    ctrp->group_length = pfx->fp_len;
+	    ctrp->packets = clib_host_to_net_u64 (c.packets);
+	    ctrp->bytes = clib_host_to_net_u64 (c.bytes);
+	    mp->count++;
+	    ctrp++;
+
+	    if (mp->count == items_this_message)
+	      {
+		mp->count = htonl (items_this_message);
+		/*
+		 * If the main thread's input queue is stuffed,
+		 * drop the data structure lock (which the main thread
+		 * may want), and take a pause.
+		 */
+		svm_queue_lock (q);
+
+		while (svm_queue_is_full (q))
+		  {
+		    svm_queue_unlock (q);
+		    ip46_fib_stats_delay (sm, 0 /* sec */ ,
+					  STATS_RELEASE_DELAY_NS);
+		    svm_queue_lock (q);
+		  }
+		vl_msg_api_send_shmem_nolock (q, (u8 *) & mp);
+		svm_queue_unlock (q);
+
+		items_this_message = IP4_MFIB_COUNTER_BATCH_SIZE;
+		mp = vl_msg_api_alloc_as_if_client
+		  (sizeof (*mp) +
+		   items_this_message * sizeof (vl_api_ip4_mfib_counter_t));
+		mp->_vl_msg_id = ntohs (VL_API_VNET_IP4_MFIB_COUNTERS);
+		mp->count = 0;
+		mp->vrf_id = ntohl (mfib->mft_table_id);
+		ctrp = (vl_api_ip4_mfib_counter_t *) mp->c;
+	      }
+	  }
+      }
+
+      /* Flush any data from this mfib */
+      if (mp->count)
+	{
+	  mp->count = htonl (mp->count);
+	  vl_msg_api_send_shmem (q, (u8 *) & mp);
+	  mp = 0;
+	}
+    }
+
+  /* If e.g. the last FIB had no reportable routes, free the buffer */
+  if (mp)
+    vl_msg_api_free (mp);
+}
+
+static void
+do_ip6_mfib_counters (stats_main_t * sm)
+{
+  ip6_main_t *im6 = &ip6_main;
+  api_main_t *am = sm->api_main;
+  vl_shmem_hdr_t *shmem_hdr = am->shmem_hdr;
+  svm_queue_t *q = shmem_hdr->vl_input_queue;
+  mfib_prefix_t *pfx;
+  mfib_table_t *mfib;
+  do_ip46_fibs_t *do_fibs;
+  vl_api_vnet_ip6_mfib_counters_t *mp = 0;
+  u32 items_this_message;
+  vl_api_ip6_mfib_counter_t *ctrp = 0;
+  u32 start_at_mfib_index = 0;
+  int i, j, k;
+
+  do_fibs = &sm->do_ip46_fibs;
+
+  vec_reset_length (do_fibs->mfibs);
+  /* *INDENT-OFF* */
+  pool_foreach (mfib, im6->mfibs, ({vec_add1(do_fibs->mfibs, mfib);}));
+  /* *INDENT-ON* */
+
+  for (j = 0; j < vec_len (do_fibs->mfibs); j++)
+    {
+      mfib = do_fibs->mfibs[j];
+      /* We may have bailed out due to control-plane activity */
+      while ((mfib - im6->mfibs) < start_at_mfib_index)
+	continue;
+
+      if (mp == 0)
+	{
+	  items_this_message = IP6_MFIB_COUNTER_BATCH_SIZE;
+	  mp = vl_msg_api_alloc_as_if_client
+	    (sizeof (*mp) +
+	     items_this_message * sizeof (vl_api_ip6_mfib_counter_t));
+	  mp->_vl_msg_id = ntohs (VL_API_VNET_IP6_MFIB_COUNTERS);
+	  mp->count = 0;
+	  mp->vrf_id = ntohl (mfib->mft_table_id);
+	  ctrp = (vl_api_ip6_mfib_counter_t *) mp->c;
+	}
+      else
+	{
+	  /* happens if the last MFIB was empty... */
+	  ASSERT (mp->count == 0);
+	  mp->vrf_id = ntohl (mfib->mft_table_id);
+	}
+
+      vec_reset_length (do_fibs->mroutes);
+
+      /*
+       * walk the table with table updates blocked
+       */
+      dslock (sm, 0 /* release hint */ , 1 /* tag */ );
+
+      mfib_table_walk (mfib->mft_index,
+		       FIB_PROTOCOL_IP6, mfib_table_stats_walk_cb, sm);
+      dsunlock (sm);
+
+      vec_foreach (pfx, do_fibs->mroutes)
+      {
+	const dpo_id_t *dpo_id;
+	fib_node_index_t mfei;
+	vlib_counter_t c;
+	u32 index;
+
+	/*
+	 * re-lookup the entry, since we suspend during the collection
+	 */
+	mfei = mfib_table_lookup (mfib->mft_index, pfx);
+
+	if (FIB_NODE_INDEX_INVALID == mfei)
+	  continue;
+
+	dpo_id = mfib_entry_contribute_ip_forwarding (mfei);
+	index = (u32) dpo_id->dpoi_index;
+
+	vlib_get_combined_counter (&replicate_main.repm_counters,
+				   dpo_id->dpoi_index, &c);
+	/*
+	 * If it has seen at least one packet, send it.
+	 */
+	if (c.packets > 0)
+	  {
+	    /* already in net byte order */
+	    memcpy (ctrp->group, &pfx->fp_grp_addr.ip6, 16);
+	    memcpy (ctrp->source, &pfx->fp_src_addr.ip6, 16);
+	    ctrp->group_length = pfx->fp_len;
+	    ctrp->packets = clib_host_to_net_u64 (c.packets);
+	    ctrp->bytes = clib_host_to_net_u64 (c.bytes);
+	    mp->count++;
+	    ctrp++;
+
+	    if (mp->count == items_this_message)
+	      {
+		mp->count = htonl (items_this_message);
+		/*
+		 * If the main thread's input queue is stuffed,
+		 * drop the data structure lock (which the main thread
+		 * may want), and take a pause.
+		 */
+		svm_queue_lock (q);
+
+		while (svm_queue_is_full (q))
+		  {
+		    svm_queue_unlock (q);
+		    ip46_fib_stats_delay (sm, 0 /* sec */ ,
+					  STATS_RELEASE_DELAY_NS);
+		    svm_queue_lock (q);
+		  }
+		vl_msg_api_send_shmem_nolock (q, (u8 *) & mp);
+		svm_queue_unlock (q);
+
+		items_this_message = IP6_MFIB_COUNTER_BATCH_SIZE;
+		mp = vl_msg_api_alloc_as_if_client
+		  (sizeof (*mp) +
+		   items_this_message * sizeof (vl_api_ip6_mfib_counter_t));
+		mp->_vl_msg_id = ntohs (VL_API_VNET_IP6_MFIB_COUNTERS);
+		mp->count = 0;
+		mp->vrf_id = ntohl (mfib->mft_table_id);
+		ctrp = (vl_api_ip6_mfib_counter_t *) mp->c;
+	      }
+	  }
+      }
+
+      /* Flush any data from this mfib */
       if (mp->count)
 	{
 	  mp->count = htonl (mp->count);
@@ -1631,7 +1929,7 @@ do_ip6_fib_counters (stats_main_t * sm)
   ip6_main_t *im6 = &ip6_main;
   api_main_t *am = sm->api_main;
   vl_shmem_hdr_t *shmem_hdr = am->shmem_hdr;
-  unix_shared_memory_queue_t *q = shmem_hdr->vl_input_queue;
+  svm_queue_t *q = shmem_hdr->vl_input_queue;
   ip6_route_t *r;
   fib_table_t *fib;
   do_ip46_fibs_t *do_fibs;
@@ -1724,19 +2022,19 @@ again:
 		 * drop the data structure lock (which the main thread
 		 * may want), and take a pause.
 		 */
-		unix_shared_memory_queue_lock (q);
-		if (unix_shared_memory_queue_is_full (q))
+		svm_queue_lock (q);
+		if (svm_queue_is_full (q))
 		  {
 		    dsunlock (sm);
 		    vl_msg_api_send_shmem_nolock (q, (u8 *) & mp);
-		    unix_shared_memory_queue_unlock (q);
+		    svm_queue_unlock (q);
 		    mp = 0;
 		    ip46_fib_stats_delay (sm, 0 /* sec */ ,
 					  STATS_RELEASE_DELAY_NS);
 		    goto again;
 		  }
 		vl_msg_api_send_shmem_nolock (q, (u8 *) & mp);
-		unix_shared_memory_queue_unlock (q);
+		svm_queue_unlock (q);
 
 		items_this_message = IP6_FIB_COUNTER_BATCH_SIZE;
 		mp = vl_msg_api_alloc_as_if_client
@@ -1819,6 +2117,12 @@ stats_thread_fn (void *arg)
       if (pool_elts (sm->stats_registrations[IDX_IP6_FIB_COUNTERS]))
 	do_ip6_fib_counters (sm);
 
+      if (pool_elts (sm->stats_registrations[IDX_IP4_MFIB_COUNTERS]))
+	do_ip4_mfib_counters (sm);
+
+      if (pool_elts (sm->stats_registrations[IDX_IP6_MFIB_COUNTERS]))
+	do_ip6_mfib_counters (sm);
+
       if (pool_elts (sm->stats_registrations[IDX_IP4_NBR_COUNTERS]))
 	do_ip4_nbr_counters (sm);
 
@@ -1833,7 +2137,7 @@ static void
 {
   vpe_client_registration_t *clients, client;
   stats_main_t *sm = &stats_main;
-  unix_shared_memory_queue_t *q, *q_prev = NULL;
+  svm_queue_t *q, *q_prev = NULL;
   vl_api_vnet_interface_simple_counters_t *mp_copy = NULL;
   u32 mp_size;
   int i;
@@ -1882,15 +2186,11 @@ static void
     }
 }
 
-
-
-
-
 static void
 vl_api_vnet_ip4_fib_counters_t_handler (vl_api_vnet_ip4_fib_counters_t * mp)
 {
   stats_main_t *sm = &stats_main;
-  unix_shared_memory_queue_t *q, *q_prev = NULL;
+  svm_queue_t *q, *q_prev = NULL;
   vl_api_vnet_ip4_fib_counters_t *mp_copy = NULL;
   u32 mp_size;
   vpe_client_registration_t *clients, client;
@@ -1939,7 +2239,7 @@ static void
 vl_api_vnet_ip4_nbr_counters_t_handler (vl_api_vnet_ip4_nbr_counters_t * mp)
 {
   stats_main_t *sm = &stats_main;
-  unix_shared_memory_queue_t *q, *q_prev = NULL;
+  svm_queue_t *q, *q_prev = NULL;
   vl_api_vnet_ip4_nbr_counters_t *mp_copy = NULL;
   u32 mp_size;
   vpe_client_registration_t *clients, client;
@@ -1989,7 +2289,7 @@ static void
 vl_api_vnet_ip6_fib_counters_t_handler (vl_api_vnet_ip6_fib_counters_t * mp)
 {
   stats_main_t *sm = &stats_main;
-  unix_shared_memory_queue_t *q, *q_prev = NULL;
+  svm_queue_t *q, *q_prev = NULL;
   vl_api_vnet_ip6_fib_counters_t *mp_copy = NULL;
   u32 mp_size;
   vpe_client_registration_t *clients, client;
@@ -2038,7 +2338,7 @@ static void
 vl_api_vnet_ip6_nbr_counters_t_handler (vl_api_vnet_ip6_nbr_counters_t * mp)
 {
   stats_main_t *sm = &stats_main;
-  unix_shared_memory_queue_t *q, *q_prev = NULL;
+  svm_queue_t *q, *q_prev = NULL;
   vl_api_vnet_ip6_nbr_counters_t *mp_copy = NULL;
   u32 mp_size;
   vpe_client_registration_t *clients, client;
@@ -2092,7 +2392,7 @@ vl_api_want_stats_t_handler (vl_api_want_stats_t * mp)
   uword *p;
   i32 retval = 0;
   u32 item;
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
 
   item = ~0;			//"ALL THE THINGS IN THE THINGS
   rp.client_index = mp->client_index;
@@ -2140,7 +2440,7 @@ static void
   uword *p;
   i32 retval = 0;
   u32 swif;
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
 
   swif = ~0;			//Using same mechanism as _per_interface_
   rp.client_index = mp->client_index;
@@ -2177,7 +2477,7 @@ vl_api_want_ip4_fib_stats_t_handler (vl_api_want_ip4_fib_stats_t * mp)
   vl_api_want_ip4_fib_stats_reply_t *rmp;
   uword *p;
   i32 retval = 0;
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   u32 fib;
 
   fib = ~0;			//Using same mechanism as _per_interface_
@@ -2206,6 +2506,42 @@ reply:
 }
 
 static void
+vl_api_want_ip4_mfib_stats_t_handler (vl_api_want_ip4_mfib_stats_t * mp)
+{
+  stats_main_t *sm = &stats_main;
+  vpe_client_registration_t rp;
+  vl_api_want_ip4_mfib_stats_reply_t *rmp;
+  uword *p;
+  i32 retval = 0;
+  svm_queue_t *q;
+  u32 mfib;
+
+  mfib = ~0;			//Using same mechanism as _per_interface_
+  rp.client_index = mp->client_index;
+  rp.client_pid = mp->pid;
+
+  handle_client_registration (&rp, IDX_IP4_MFIB_COUNTERS, mfib,
+			      mp->enable_disable);
+
+reply:
+  q = vl_api_client_index_to_input_queue (mp->client_index);
+
+  if (!q)
+    {
+      sm->enable_poller = clear_client_for_stat (IDX_IP4_MFIB_COUNTERS,
+						 mfib, mp->client_index);
+      return;
+    }
+
+  rmp = vl_msg_api_alloc (sizeof (*rmp));
+  rmp->_vl_msg_id = ntohs (VL_API_WANT_IP4_MFIB_STATS_REPLY);
+  rmp->context = mp->context;
+  rmp->retval = retval;
+
+  vl_msg_api_send_shmem (q, (u8 *) & rmp);
+}
+
+static void
 vl_api_want_ip6_fib_stats_t_handler (vl_api_want_ip6_fib_stats_t * mp)
 {
   stats_main_t *sm = &stats_main;
@@ -2213,7 +2549,7 @@ vl_api_want_ip6_fib_stats_t_handler (vl_api_want_ip6_fib_stats_t * mp)
   vl_api_want_ip4_fib_stats_reply_t *rmp;
   uword *p;
   i32 retval = 0;
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   u32 fib;
 
   fib = ~0;			//Using same mechanism as _per_interface_
@@ -2235,6 +2571,42 @@ reply:
 
   rmp = vl_msg_api_alloc (sizeof (*rmp));
   rmp->_vl_msg_id = ntohs (VL_API_WANT_IP6_FIB_STATS_REPLY);
+  rmp->context = mp->context;
+  rmp->retval = retval;
+
+  vl_msg_api_send_shmem (q, (u8 *) & rmp);
+}
+
+static void
+vl_api_want_ip6_mfib_stats_t_handler (vl_api_want_ip6_mfib_stats_t * mp)
+{
+  stats_main_t *sm = &stats_main;
+  vpe_client_registration_t rp;
+  vl_api_want_ip4_mfib_stats_reply_t *rmp;
+  uword *p;
+  i32 retval = 0;
+  svm_queue_t *q;
+  u32 mfib;
+
+  mfib = ~0;			//Using same mechanism as _per_interface_
+  rp.client_index = mp->client_index;
+  rp.client_pid = mp->pid;
+
+  handle_client_registration (&rp, IDX_IP6_MFIB_COUNTERS, mfib,
+			      mp->enable_disable);
+
+reply:
+  q = vl_api_client_index_to_input_queue (mp->client_index);
+
+  if (!q)
+    {
+      sm->enable_poller = clear_client_for_stat (IDX_IP6_MFIB_COUNTERS,
+						 mfib, mp->client_index);
+      return;
+    }
+
+  rmp = vl_msg_api_alloc (sizeof (*rmp));
+  rmp->_vl_msg_id = ntohs (VL_API_WANT_IP6_MFIB_STATS_REPLY);
   rmp->context = mp->context;
   rmp->retval = retval;
 
@@ -2264,8 +2636,7 @@ vl_api_vnet_get_summary_stats_t_handler (vl_api_vnet_get_summary_stats_t * mp)
   u64 total_pkts[VLIB_N_RX_TX];
   u64 total_bytes[VLIB_N_RX_TX];
 
-  unix_shared_memory_queue_t *q =
-    vl_api_client_index_to_input_queue (mp->client_index);
+  svm_queue_t *q = vl_api_client_index_to_input_queue (mp->client_index);
 
   if (!q)
     {

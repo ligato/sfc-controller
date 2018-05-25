@@ -18,10 +18,12 @@
 
 #include <deque>
 #include <map>
+#include <queue>
 #include <sstream>
 #include <string>
 #include <thread>
 
+#include "vom/cmd.hpp"
 #include "vom/connection.hpp"
 #include "vom/types.hpp"
 
@@ -75,6 +77,11 @@ public:
       , item_rc(rc)
     {
     }
+
+    /**
+     * Destructor
+     */
+    ~item() = default;
 
     /**
      * Comparison operator
@@ -208,16 +215,6 @@ public:
     virtual void enqueue(std::queue<cmd*>& c);
 
     /**
-     * dequeue a command from the Q.
-     */
-    virtual void dequeue(cmd* c);
-
-    /**
-     * dequeue a command from the Q.
-     */
-    virtual void dequeue(std::shared_ptr<cmd> c);
-
-    /**
      * Write all the commands to HW
      */
     virtual rc_t write();
@@ -225,7 +222,7 @@ public:
     /**
      * Blocking Connect to VPP - call once at bootup
      */
-    void connect();
+    virtual void connect();
 
     /**
      * Disable the passing of commands to VPP. Whilst disabled all
@@ -303,16 +300,6 @@ public:
    * Enqueue A set of commands for execution
    */
   static void enqueue(std::queue<cmd*>& c);
-
-  /**
-   * dequeue A command for execution
-   */
-  static void dequeue(cmd* f);
-
-  /**
-   * dequeue A command for execution
-   */
-  static void dequeue(std::shared_ptr<cmd> c);
 
   /**
    * Write/Execute all commands hitherto enqueued.

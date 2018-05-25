@@ -116,16 +116,11 @@ session_manager_add_segment_i (segment_manager_t * sm, u32 segment_size,
       u64 approx_total_size;
 
       ca->segment_name = "process-private-segment";
-      ca->segment_size = ~0;
+      ca->segment_size = segment_size;
       ca->rx_fifo_size = props->rx_fifo_size;
       ca->tx_fifo_size = props->tx_fifo_size;
       ca->preallocated_fifo_pairs = props->preallocated_fifo_pairs;
       ca->private_segment_count = props->private_segment_count;
-      ca->private_segment_size = props->private_segment_size;
-
-      /* Default to a small private segment */
-      if (ca->private_segment_size == 0)
-	ca->private_segment_size = 128 << 20;
 
       /* Calculate space requirements */
       rx_rounded_data_size = (1 << (max_log2 (ca->rx_fifo_size)));
@@ -136,9 +131,8 @@ session_manager_add_segment_i (segment_manager_t * sm, u32 segment_size,
 
       approx_total_size = (u64) ca->preallocated_fifo_pairs
 	* (rx_fifo_size + tx_fifo_size);
-      approx_segment_count =
-	(approx_total_size +
-	 (ca->private_segment_size - 1)) / (u64) ca->private_segment_size;
+      approx_segment_count = (approx_total_size + (ca->segment_size - 1))
+	/ (u64) ca->segment_size;
 
       /* The user asked us to figure it out... */
       if (ca->private_segment_count == 0)
@@ -148,9 +142,8 @@ session_manager_add_segment_i (segment_manager_t * sm, u32 segment_size,
       /* Follow directions, but issue a warning */
       else if (approx_segment_count != ca->private_segment_count)
 	{
-	  clib_warning
-	    ("Honoring segment count %u, but calculated count was %u",
-	     ca->private_segment_count, approx_segment_count);
+	  clib_warning ("Honoring segment count %u, calculated count was %u",
+			ca->private_segment_count, approx_segment_count);
 	}
 
       if (svm_fifo_segment_create_process_private (ca))
@@ -537,12 +530,12 @@ segment_manager_dealloc_fifos (u32 svm_segment_index, svm_fifo_t * rx_fifo,
 /**
  * Allocates shm queue in the first segment
  */
-unix_shared_memory_queue_t *
+svm_queue_t *
 segment_manager_alloc_queue (segment_manager_t * sm, u32 queue_size)
 {
   ssvm_shared_header_t *sh;
   svm_fifo_segment_private_t *segment;
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   void *oldheap;
 
   ASSERT (sm->segment_indices != 0);
@@ -551,10 +544,9 @@ segment_manager_alloc_queue (segment_manager_t * sm, u32 queue_size)
   sh = segment->ssvm.sh;
 
   oldheap = ssvm_push_heap (sh);
-  q = unix_shared_memory_queue_init (queue_size,
-				     sizeof (session_fifo_event_t),
-				     0 /* consumer pid */ ,
-				     0 /* signal when queue non-empty */ );
+  q = svm_queue_init (queue_size,
+		      sizeof (session_fifo_event_t), 0 /* consumer pid */ ,
+		      0 /* signal when queue non-empty */ );
   ssvm_pop_heap (oldheap);
   return q;
 }
@@ -563,8 +555,7 @@ segment_manager_alloc_queue (segment_manager_t * sm, u32 queue_size)
  * Frees shm queue allocated in the first segment
  */
 void
-segment_manager_dealloc_queue (segment_manager_t * sm,
-			       unix_shared_memory_queue_t * q)
+segment_manager_dealloc_queue (segment_manager_t * sm, svm_queue_t * q)
 {
   ssvm_shared_header_t *sh;
   svm_fifo_segment_private_t *segment;
@@ -576,7 +567,7 @@ segment_manager_dealloc_queue (segment_manager_t * sm,
   sh = segment->ssvm.sh;
 
   oldheap = ssvm_push_heap (sh);
-  unix_shared_memory_queue_free (q);
+  svm_queue_free (q);
   ssvm_pop_heap (oldheap);
 }
 
@@ -624,7 +615,7 @@ segment_manager_show_fn (vlib_main_t * vm, unformat_input_t * input,
       segments = svm_fifo_segment_segments_pool ();
       vlib_cli_output (vm, "%d svm fifo segments allocated",
 		       pool_elts (segments));
-      vlib_cli_output (vm, "%-20s%=12s%=16s%=16s%=16s", "Name",
+      vlib_cli_output (vm, "%-25s%15s%16s%16s%16s", "Name",
 		       "HeapSize (M)", "ActiveFifos", "FreeFifos", "Address");
 
       /* *INDENT-OFF* */
@@ -647,7 +638,7 @@ segment_manager_show_fn (vlib_main_t * vm, unformat_input_t * input,
 	  }
 	active_fifos = svm_fifo_segment_num_fifos (seg);
         free_fifos = svm_fifo_segment_num_free_fifos (seg, ~0 /* size */);
-	vlib_cli_output (vm, "%-20v%=16llu%=16u%=16u%16llx",
+	vlib_cli_output (vm, "%-25v%15llu%16u%16u%16llx",
                          name, size >> 20ULL, active_fifos, free_fifos,
 			 address);
         if (verbose)

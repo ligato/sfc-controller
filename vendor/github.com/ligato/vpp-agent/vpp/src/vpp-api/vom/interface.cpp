@@ -24,7 +24,7 @@ namespace VOM {
 /**
  * A DB of all the interfaces, key on the name
  */
-singular_db<const std::string, interface> interface::m_db;
+singular_db<interface::key_t, interface> interface::m_db;
 
 /**
  * A DB of all the interfaces, key on VPP's handle
@@ -45,21 +45,6 @@ interface::interface(const std::string& name,
   , m_state(itf_state)
   , m_table_id(route::DEFAULT_TABLE)
   , m_l2_address(l2_address_t::ZERO, rc_t::UNSET)
-  , m_oper(oper_state_t::DOWN)
-{
-}
-
-interface::interface(const handle_t& handle,
-                     const l2_address_t& l2_address,
-                     const std::string& name,
-                     interface::type_t type,
-                     interface::admin_state_t state)
-  : m_hdl(handle)
-  , m_name(name)
-  , m_type(type)
-  , m_state(state)
-  , m_table_id(route::DEFAULT_TABLE)
-  , m_l2_address(l2_address)
   , m_oper(oper_state_t::DOWN)
 {
 }
@@ -89,6 +74,15 @@ interface::interface(const interface& o)
   , m_l2_address(o.m_l2_address)
   , m_oper(o.m_oper)
 {
+}
+
+bool
+interface::operator==(const interface& i) const
+{
+  return ((key() == i.key()) &&
+          (m_l2_address.data() == i.m_l2_address.data()) &&
+          (m_state == i.m_state) && (m_rd == i.m_rd) && (m_type == i.m_type) &&
+          (m_oper == i.m_oper));
 }
 
 interface::event_listener::event_listener()
@@ -163,11 +157,17 @@ interface::sweep()
       new interface_cmds::set_table_cmd(m_table_id, l3_proto_t::IPV6, m_hdl));
   }
 
+  if (m_stats) {
+    HW::enqueue(new interface_cmds::stats_disable_cmd(m_hdl.data()));
+    m_stats.reset();
+  }
+
   // If the interface is up, bring it down
   if (m_state && interface::admin_state_t::UP == m_state.data()) {
     m_state.data() = interface::admin_state_t::DOWN;
     HW::enqueue(new interface_cmds::state_change_cmd(m_state, m_hdl));
   }
+
   if (m_hdl) {
     std::queue<cmd*> cmds;
     HW::enqueue(mk_delete_cmd(cmds));
@@ -213,8 +213,8 @@ interface::to_string() const
 {
   std::ostringstream s;
   s << "interface:[" << m_name << " type:" << m_type.to_string()
-    << " hdl:" << m_hdl.to_string()
-    << " l2-address:" << m_l2_address.to_string();
+    << " hdl:" << m_hdl.to_string() << " l2-address:["
+    << m_l2_address.to_string() << "]";
 
   if (m_rd) {
     s << " rd:" << m_rd->to_string();
@@ -232,7 +232,7 @@ interface::name() const
   return (m_name);
 }
 
-const interface::key_type&
+const interface::key_t&
 interface::key() const
 {
   return (name());
@@ -250,6 +250,8 @@ interface::mk_create_cmd(std::queue<cmd*>& q)
     q.push(new interface_cmds::af_packet_create_cmd(m_hdl, m_name));
   } else if (type_t::TAP == m_type) {
     q.push(new interface_cmds::tap_create_cmd(m_hdl, m_name));
+  } else {
+    m_hdl.set(rc_t::OK);
   }
 
   return (q);
@@ -278,7 +280,17 @@ interface::update(const interface& desired)
   if (rc_t::OK != m_hdl.rc()) {
     std::queue<cmd*> cmds;
     HW::enqueue(mk_create_cmd(cmds));
+    /*
+     * interface create now, so we can barf early if it fails
+     */
+    HW::write();
   }
+
+  /*
+   * If the interface is not created do other commands should be issued
+   */
+  if (rc_t::OK != m_hdl.rc())
+    return;
 
   /*
    * change the interface state to that which is deisred
@@ -341,15 +353,37 @@ interface::set(const l2_address_t& addr)
 }
 
 void
+interface::set(const handle_t& hdl)
+{
+  m_hdl = hdl;
+}
+
+void
 interface::set(const oper_state_t& state)
 {
   m_oper = state;
 }
 
+void
+interface::enable_stats_i(interface::stat_listener& el)
+{
+  if (!m_stats) {
+    m_stats.reset(new interface_cmds::stats_enable_cmd(el, handle_i()));
+    HW::enqueue(m_stats);
+    HW::write();
+  }
+}
+
+void
+interface::enable_stats(interface::stat_listener& el)
+{
+  singular()->enable_stats_i(el);
+}
+
 std::shared_ptr<interface>
 interface::singular_i() const
 {
-  return (m_db.find_or_add(name(), *this));
+  return (m_db.find_or_add(key(), *this));
 }
 
 std::shared_ptr<interface>
@@ -359,9 +393,9 @@ interface::singular() const
 }
 
 std::shared_ptr<interface>
-interface::find(const std::string& name)
+interface::find(const key_t& k)
 {
-  return (m_db.find(name));
+  return (m_db.find(k));
 }
 
 std::shared_ptr<interface>
@@ -371,9 +405,9 @@ interface::find(const handle_t& handle)
 }
 
 void
-interface::add(const std::string& name, const HW::item<handle_t>& item)
+interface::add(const key_t& key, const HW::item<handle_t>& item)
 {
-  std::shared_ptr<interface> sp = find(name);
+  std::shared_ptr<interface> sp = find(key);
 
   if (sp && item) {
     m_hdl_db[item.data()] = sp;
@@ -396,29 +430,30 @@ void
 interface::event_handler::handle_populate(const client_db::key_t& key)
 {
   /*
- * dump VPP current states
- */
-  std::shared_ptr<interface_cmds::dump_cmd> cmd(new interface_cmds::dump_cmd());
+   * dump VPP current states
+   */
+  std::shared_ptr<interface_cmds::dump_cmd> cmd =
+    std::make_shared<interface_cmds::dump_cmd>();
 
   HW::enqueue(cmd);
   HW::write();
 
   for (auto& itf_record : *cmd) {
-    std::unique_ptr<interface> itf =
+    std::shared_ptr<interface> itf =
       interface_factory::new_interface(itf_record.get_payload());
 
     if (itf && interface::type_t::LOCAL != itf->type()) {
       VOM_LOG(log_level_t::DEBUG) << "dump: " << itf->to_string();
       /*
- * Write each of the discovered interfaces into the OM,
- * but disable the HW Command q whilst we do, so that no
- * commands are sent to VPP
- */
+       * Write each of the discovered interfaces into the OM,
+       * but disable the HW Command q whilst we do, so that no
+       * commands are sent to VPP
+       */
       OM::commit(key, *itf);
 
       /**
- * Get the address configured on the interface
- */
+       * Get the address configured on the interface
+       */
       std::shared_ptr<l3_binding_cmds::dump_v4_cmd> dcmd =
         std::make_shared<l3_binding_cmds::dump_v4_cmd>(
           l3_binding_cmds::dump_v4_cmd(itf->handle()));
@@ -463,7 +498,9 @@ interface::event_handler::show(std::ostream& os)
 {
   m_db.dump(os);
 }
-}
+
+} // namespace VOM
+
 /*
  * fd.io coding-style-patch-verification: ON
  *

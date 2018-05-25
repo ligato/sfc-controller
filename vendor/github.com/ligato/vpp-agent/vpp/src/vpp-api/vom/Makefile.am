@@ -15,7 +15,7 @@ AUTOMAKE_OPTIONS = foreign
 ACLOCAL_AMFLAGS = -I m4
 AM_LIBTOOLFLAGS = --quiet
 
-AM_CXXFLAGS = -Wall -std=gnu++11 -I${top_srcdir} -I${top_builddir}/vpp-api/vapi/ -I$(top_srcdir)/vpp-api/ -I${libdir}/../include
+AM_CXXFLAGS = -Wall -std=gnu++11 -I${top_srcdir} -I${top_builddir}/vpp-api/vapi/ -I$(top_srcdir)/vpp-api/ -I${libdir}/../include -O0
 AM_LDFLAGS = -shared -no-undefined
 
 bin_PROGRAMS =
@@ -72,6 +72,8 @@ libvom_la_SOURCES = 			\
 	ip_unnumbered.cpp		\
 	l2_binding_cmds.cpp		\
 	l2_binding.cpp			\
+	l2_emulation_cmds.cpp		\
+	l2_emulation.cpp		\
 	l3_binding_cmds.cpp		\
 	l3_binding.cpp			\
 	lldp_binding_cmds.cpp		\
@@ -130,6 +132,7 @@ vominclude_HEADERS =			\
 	interface_span.hpp		\
 	ip_unnumbered.hpp		\
 	l2_binding.hpp			\
+	l2_emulation.hpp		\
 	l3_binding.hpp			\
 	lldp_binding.hpp		\
 	lldp_global.hpp			\

@@ -419,12 +419,25 @@ _(layer2FrameDeltaCount, 430, u64)                                      \
 _(layer2FrameTotalCount, 431, u64)                                      \
 _(pseudoWireDestinationIPv4Address, 432, ip4_address_t)                 \
 _(ignoredLayer2FrameTotalCount, 433, u64)                               \
-_(natQuotaExceededEvent, 466, u32)
+_(natQuotaExceededEvent, 466, u32)                                      \
+_(maxSessionEntries, 471, u32)                                          \
+_(maxBIBEntries, 472, u32)                                              \
+_(maxEntriesPerUser, 473, u32)                                          \
+_(maxFragmentsPendingReassembly, 475, u32)
 
-typedef enum {
+typedef enum
+{
 #define _(n,v,t) n = v,
   foreach_ipfix_info_element_t
 #undef _
 } ipfix_info_element_id_t;
 
 #endif /* __included_ipfix_info_elements_h__ */
+
+/*
+ * fd.io coding-style-patch-verification: ON
+ *
+ * Local Variables:
+ * eval: (c-set-style "gnu")
+ * End:
+ */

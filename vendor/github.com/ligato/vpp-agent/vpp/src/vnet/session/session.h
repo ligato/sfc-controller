@@ -18,12 +18,13 @@
 #include <vnet/session/stream_session.h>
 #include <vnet/session/session_lookup.h>
 #include <vnet/session/transport_interface.h>
-#include <vlibmemory/unix_shared_memory_queue.h>
 #include <vnet/session/session_debug.h>
 #include <vnet/session/segment_manager.h>
+#include <svm/queue.h>
 
 #define HALF_OPEN_LOOKUP_INVALID_VALUE ((u64)~0)
 #define INVALID_INDEX ((u32)~0)
+#define SESSION_PROXY_LISTENER_INDEX ((u32)~0 - 1)
 
 /* TODO decide how much since we have pre-data as well */
 #define MAX_HDRS_LEN    100	/* Max number of bytes for headers */
@@ -79,17 +80,6 @@ typedef enum
     SESSION_N_ERROR,
 } session_error_t;
 
-/* Event queue input node static next indices */
-typedef enum
-{
-  SESSION_QUEUE_NEXT_DROP,
-  SESSION_QUEUE_NEXT_TCP_IP4_OUTPUT,
-  SESSION_QUEUE_NEXT_IP4_LOOKUP,
-  SESSION_QUEUE_NEXT_TCP_IP6_OUTPUT,
-  SESSION_QUEUE_NEXT_IP6_LOOKUP,
-  SESSION_QUEUE_N_NEXT,
-} session_queue_next_t;
-
 typedef struct
 {
   void *fp;
@@ -136,10 +126,10 @@ struct _session_manager_main
   clib_spinlock_t *peekers_write_locks;
 
   /** Pool of listen sessions. Same type as stream sessions to ease lookups */
-  stream_session_t *listen_sessions[SESSION_N_TYPES];
+  stream_session_t **listen_sessions;
 
   /** Per-proto, per-worker enqueue epoch counters */
-  u8 *current_enqueue_epoch[TRANSPORT_N_PROTO];
+  u32 *current_enqueue_epoch[TRANSPORT_N_PROTO];
 
   /** Per-proto, per-worker thread vector of sessions to enqueue */
   u32 **session_to_enqueue[TRANSPORT_N_PROTO];
@@ -157,10 +147,28 @@ struct _session_manager_main
   session_fifo_event_t **pending_disconnects;
 
   /** vpp fifo event queue */
-  unix_shared_memory_queue_t **vpp_event_queues;
+  svm_queue_t **vpp_event_queues;
+
+  /** Unique segment name counter */
+  u32 unique_segment_name_counter;
+
+  /** Per transport rx function that can either dequeue or peek */
+  session_fifo_rx_fn **session_tx_fns;
+
+  /** Per session type output nodes. Could optimize to group nodes by
+   * fib but lookup would then require session type parsing in session node.
+   * Trade memory for speed, for now */
+  u32 *session_type_to_next;
+
+  /** Session manager is enabled */
+  u8 is_enabled;
 
   /** vpp fifo event queue configured length */
   u32 configured_event_queue_length;
+
+  /*
+   * Config parameters
+   */
 
   /** session table size parameters */
   u32 configured_v4_session_table_buckets;
@@ -172,14 +180,9 @@ struct _session_manager_main
   u32 configured_v6_halfopen_table_buckets;
   u32 configured_v6_halfopen_table_memory;
 
-  /** Unique segment name counter */
-  u32 unique_segment_name_counter;
-
-  /** Per transport rx function that can either dequeue or peek */
-  session_fifo_rx_fn *session_tx_fns[SESSION_N_TYPES];
-
-  /** Session manager is enabled */
-  u8 is_enabled;
+  /** Transport table (preallocation) size parameters */
+  u32 local_endpoints_table_memory;
+  u32 local_endpoints_table_buckets;
 
   /** Preallocate session config parameter */
   u32 preallocated_sessions;
@@ -274,6 +277,18 @@ session_get_from_handle (u64 handle)
   return
     pool_elt_at_index (smm->sessions[session_thread_from_handle (handle)],
 		       session_index_from_handle (handle));
+}
+
+always_inline transport_proto_t
+session_get_transport_proto (stream_session_t * s)
+{
+  return (s->session_type >> 1);
+}
+
+always_inline session_type_t
+session_type_from_proto_and_ip (transport_proto_t proto, u8 is_ip4)
+{
+  return (proto << 1 | is_ip4);
 }
 
 /**
@@ -434,14 +449,13 @@ uword unformat_stream_session (unformat_input_t * input, va_list * args);
 uword unformat_transport_connection (unformat_input_t * input,
 				     va_list * args);
 
-int
-send_session_connected_callback (u32 app_index, u32 api_context,
-				 stream_session_t * s, u8 is_fail);
-
+void session_register_transport (transport_proto_t transport_proto,
+				 const transport_proto_vft_t * vft, u8 is_ip4,
+				 u32 output_node);
 
 clib_error_t *vnet_session_enable_disable (vlib_main_t * vm, u8 is_en);
 
-always_inline unix_shared_memory_queue_t *
+always_inline svm_queue_t *
 session_manager_get_vpp_event_queue (u32 thread_index)
 {
   return session_manager_main.vpp_event_queues[thread_index];
@@ -508,22 +522,24 @@ listen_session_get_local_session_endpoint (stream_session_t * listener,
 					   session_endpoint_t * sep);
 
 always_inline stream_session_t *
-session_manager_get_listener (u8 type, u32 index)
+session_manager_get_listener (u8 session_type, u32 index)
 {
-  return pool_elt_at_index (session_manager_main.listen_sessions[type],
-			    index);
+  return
+    pool_elt_at_index (session_manager_main.listen_sessions[session_type],
+		       index);
 }
 
+/**
+ * Set peek or dequeue function for given session type
+ *
+ * Reliable transport protocols will probably want to use a peek function
+ */
 always_inline void
-session_manager_set_transport_rx_fn (u8 type, u8 is_peek)
+session_manager_set_transport_rx_fn (session_type_t type, u8 is_peek)
 {
-  /* If an offset function is provided, then peek instead of dequeue */
   session_manager_main.session_tx_fns[type] = (is_peek) ?
     session_tx_fifo_peek_and_snd : session_tx_fifo_dequeue_and_snd;
 }
-
-session_type_t
-session_type_from_proto_and_ip (transport_proto_t proto, u8 is_ip4);
 
 always_inline u8
 session_manager_is_enabled ()
@@ -536,6 +552,8 @@ do {									\
     if (!session_manager_main.is_enabled)				\
       return clib_error_return(0, "session layer is not enabled");	\
 } while (0)
+
+void session_node_enable_disable (u8 is_en);
 
 #endif /* __included_session_h__ */
 

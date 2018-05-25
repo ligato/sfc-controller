@@ -19,12 +19,12 @@ import (
 	"testing"
 
 	"github.com/ligato/cn-infra/logging"
-	log "github.com/ligato/cn-infra/logging/logrus"
-
 	"github.com/ligato/sfc-controller/controller/extentitydriver/iosxecfg/model/iosxe"
+	"github.com/ligato/cn-infra/logging/logrus"
 )
 
 func TestInterfaces(t *testing.T) {
+	var log = logrus.DefaultLogger()
 	log.SetLevel(logging.DebugLevel)
 
 	s, err := NewSSHSession("10.195.94.48", 22, "cisco", "cisco")

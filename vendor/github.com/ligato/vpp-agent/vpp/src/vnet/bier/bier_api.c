@@ -83,7 +83,17 @@ vl_api_bier_table_add_del_t_handler (vl_api_bier_table_add_del_t * mp)
 
     if (mp->bt_is_add)
     {
-        bier_table_add_or_lock(&bti, ntohl(mp->bt_label));
+        mpls_label_t label = ntohl(mp->bt_label);
+
+        /*
+         * convert acceptable 'don't want a label' values from 
+         * the API to the correct internal INVLID value
+         */
+        if ((0 == label) || (~0 == label))
+        {
+            label = MPLS_LABEL_INVALID;
+        }
+        bier_table_add_or_lock(&bti, label);
     }
     else
     {
@@ -96,7 +106,7 @@ vl_api_bier_table_add_del_t_handler (vl_api_bier_table_add_del_t * mp)
 }
 
 static void
-send_bier_table_details (unix_shared_memory_queue_t * q,
+send_bier_table_details (svm_queue_t * q,
                          u32 context,
                          const bier_table_t *bt)
 {
@@ -120,7 +130,7 @@ send_bier_table_details (unix_shared_memory_queue_t * q,
 static void
 vl_api_bier_table_dump_t_handler (vl_api_bier_table_dump_t * mp)
 {
-    unix_shared_memory_queue_t *q;
+    svm_queue_t *q;
     bier_table_t *bt;
 
     q = vl_api_client_index_to_input_queue (mp->client_index);
@@ -152,10 +162,10 @@ vl_api_bier_route_add_del_t_handler (vl_api_bier_route_add_del_t * mp)
     vnm = vnet_get_main ();
     vnm->api_errno = 0;
 
-    bp = ntohs(mp->br_bp);
+    bp = ntohl(mp->br_bp);
     brpaths = NULL;
 
-    if (0 == bp || bp > 0xffff)
+    if (0 == bp || bp > BIER_BP_MAX)
     {
         rv = -1;
         goto done;
@@ -175,7 +185,7 @@ vl_api_bier_route_add_del_t_handler (vl_api_bier_route_add_del_t * mp)
     {
         brpath = &brpaths[ii];
         memset(brpath, 0, sizeof(*brpath));
-        brpath->frp_flags = FIB_ROUTE_PATH_BIER_FMASK;
+        brpath->frp_sw_if_index = ~0;
 
         vec_validate(brpath->frp_label_stack,
                      mp->br_paths[ii].n_labels - 1);
@@ -185,41 +195,52 @@ vl_api_bier_route_add_del_t_handler (vl_api_bier_route_add_del_t * mp)
                 ntohl(mp->br_paths[ii].label_stack[jj]);
         }
 
-        if (0 == mp->br_paths[ii].afi)
+        if (mp->br_paths[ii].is_udp_encap)
         {
-            clib_memcpy (&brpath->frp_addr.ip4,
-                         mp->br_paths[ii].next_hop,
-                         sizeof (brpath->frp_addr.ip4));
+            brpath->frp_flags |= FIB_ROUTE_PATH_UDP_ENCAP;
+            brpath->frp_udp_encap_id = ntohl(mp->br_paths[ii].next_hop_id);
         }
         else
         {
-            clib_memcpy (&brpath->frp_addr.ip6,
-                         mp->br_paths[ii].next_hop,
-                         sizeof (brpath->frp_addr.ip6));
-        }
-        if (ip46_address_is_zero(&brpath->frp_addr))
-        {
-            index_t bdti;
-
-            bdti = bier_disp_table_find(ntohl(mp->br_paths[ii].table_id));
-
-            if (INDEX_INVALID != bdti)
-                brpath->frp_fib_index = bdti;
+            if (0 == mp->br_paths[ii].afi)
+            {
+                clib_memcpy (&brpath->frp_addr.ip4,
+                             mp->br_paths[ii].next_hop,
+                             sizeof (brpath->frp_addr.ip4));
+            }
             else
             {
-                rv = VNET_API_ERROR_NO_SUCH_FIB;
-                goto done;
+                clib_memcpy (&brpath->frp_addr.ip6,
+                             mp->br_paths[ii].next_hop,
+                             sizeof (brpath->frp_addr.ip6));
+            }
+            if (ip46_address_is_zero(&brpath->frp_addr))
+            {
+                index_t bdti;
+
+                bdti = bier_disp_table_find(ntohl(mp->br_paths[ii].table_id));
+
+                if (INDEX_INVALID != bdti)
+                {
+                    brpath->frp_fib_index = bdti;
+                    brpath->frp_proto = DPO_PROTO_BIER;
+                }
+                else
+                {
+                    rv = VNET_API_ERROR_NO_SUCH_FIB;
+                    goto done;
+                }
             }
         }
     }
 
     if (mp->br_is_add)
     {
-        bier_table_route_add(&bti, ntohs(mp->br_bp), brpaths);
+        bier_table_route_add(&bti, bp, brpaths);
     }
     else
     {
-        bier_table_route_remove(&bti, ntohs(mp->br_bp), brpaths);
+        bier_table_route_remove(&bti, bp, brpaths);
     }
 
 done:
@@ -231,7 +252,7 @@ done:
 
 typedef struct bier_route_details_walk_t_
 {
-    unix_shared_memory_queue_t * q;
+    svm_queue_t * q;
     u32 context;
 } bier_route_details_walk_t;
 
@@ -281,7 +302,7 @@ send_bier_route_details (const bier_table_t *bt,
 static void
 vl_api_bier_route_dump_t_handler (vl_api_bier_route_dump_t * mp)
 {
-    unix_shared_memory_queue_t *q;
+    svm_queue_t *q;
 
     q = vl_api_client_index_to_input_queue (mp->client_index);
     if (q == 0)
@@ -329,7 +350,7 @@ vl_api_bier_imp_add_t_handler (vl_api_bier_imp_add_t * mp)
     /* *INDENT-OFF* */
     REPLY_MACRO2 (VL_API_BIER_IMP_ADD_REPLY,
     ({
-        rmp->bi_index = bii;
+        rmp->bi_index = ntohl (bii);
     }));
     /* *INDENT-OM* */
 }
@@ -350,7 +371,7 @@ vl_api_bier_imp_del_t_handler (vl_api_bier_imp_del_t * mp)
 }
 
 static void
-send_bier_imp_details (unix_shared_memory_queue_t * q,
+send_bier_imp_details (svm_queue_t * q,
                        u32 context,
                        const bier_imp_t *bi)
 {
@@ -385,7 +406,7 @@ send_bier_imp_details (unix_shared_memory_queue_t * q,
 static void
 vl_api_bier_imp_dump_t_handler (vl_api_bier_imp_dump_t * mp)
 {
-    unix_shared_memory_queue_t *q;
+    svm_queue_t *q;
     bier_imp_t *bi;
 
     q = vl_api_client_index_to_input_queue (mp->client_index);
@@ -425,7 +446,7 @@ vl_api_bier_disp_table_add_del_t_handler (vl_api_bier_disp_table_add_del_t * mp)
 }
 
 static void
-send_bier_disp_table_details (unix_shared_memory_queue_t * q,
+send_bier_disp_table_details (svm_queue_t * q,
                               u32 context,
                               const bier_disp_table_t *bdt)
 {
@@ -446,7 +467,7 @@ send_bier_disp_table_details (unix_shared_memory_queue_t * q,
 static void
 vl_api_bier_disp_table_dump_t_handler (vl_api_bier_disp_table_dump_t * mp)
 {
-    unix_shared_memory_queue_t *q;
+    svm_queue_t *q;
     bier_disp_table_t *bdt;
 
     q = vl_api_client_index_to_input_queue (mp->client_index);
@@ -475,7 +496,10 @@ vl_api_bier_disp_entry_add_del_t_handler (vl_api_bier_disp_entry_add_del_t * mp)
     table_id = ntohl(mp->bde_tbl_id);
     bp = ntohs(mp->bde_bp);
 
-    if (0 == bp || bp > 0xffff)
+    /*
+     * BP=0 is the default route
+     */
+    if (bp > 0xffff)
     {
         rv = -1;
         goto done;
@@ -579,7 +603,7 @@ done:
 
 typedef struct bier_disp_entry_details_walk_t_
 {
-    unix_shared_memory_queue_t * q;
+    svm_queue_t * q;
     u32 context;
 } bier_disp_entry_details_walk_t;
 
@@ -637,7 +661,7 @@ send_bier_disp_entry_details (const bier_disp_table_t *bdt,
 static void
 vl_api_bier_disp_entry_dump_t_handler (vl_api_bier_disp_entry_dump_t * mp)
 {
-    unix_shared_memory_queue_t *q;
+    svm_queue_t *q;
 
     q = vl_api_client_index_to_input_queue (mp->client_index);
     if (q == 0)

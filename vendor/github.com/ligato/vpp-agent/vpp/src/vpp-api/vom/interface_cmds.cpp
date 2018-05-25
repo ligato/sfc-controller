@@ -366,7 +366,7 @@ events_cmd::issue(connection& con)
 
   wait();
 
-  return (rc_t::INPROGRESS);
+  return (rc_t::OK);
 }
 
 void
@@ -401,74 +401,124 @@ events_cmd::to_string() const
 /**
  * Interface statistics
  */
-stats_cmd::stats_cmd(interface::stat_listener& el,
-                     const std::vector<handle_t>& interfaces)
+stats_enable_cmd::stats_enable_cmd(interface::stat_listener& el,
+                                   const handle_t& handle)
   : event_cmd(el.status())
   , m_listener(el)
-  , m_swifindex(interfaces)
+  , m_swifindex(handle)
 {
 }
 
 bool
-stats_cmd::operator==(const stats_cmd& other) const
+stats_enable_cmd::operator==(const stats_enable_cmd& other) const
 {
   return (true);
 }
 
 rc_t
-stats_cmd::issue(connection& con)
+stats_enable_cmd::issue(connection& con)
 {
   /*
- * First set the clal back to handle the interface stats
- */
+   * First set the call back to handle the interface stats
+   */
   m_reg.reset(new reg_t(con.ctx(), std::ref(*(static_cast<event_cmd*>(this)))));
-  // m_reg->execute();
 
   /*
- * then send the request to enable them
- */
-  msg_t req(con.ctx(), m_swifindex.size(),
-            std::ref(*(static_cast<rpc_cmd*>(this))));
+   * then send the request to enable them
+   */
+  msg_t req(con.ctx(), 1, std::ref(*(static_cast<rpc_cmd*>(this))));
 
   auto& payload = req.get_request().get_payload();
   payload.enable_disable = 1;
   payload.pid = getpid();
-  payload.num = m_swifindex.size();
+  payload.num = 1;
 
-  auto it = m_swifindex.cbegin();
-  uint32_t ii = 0;
-  while (it != m_swifindex.cend()) {
-    payload.sw_ifs[ii] = it->value();
-    ++it;
-    ++ii;
-  }
+  payload.sw_ifs[0] = m_swifindex.value();
 
   VAPI_CALL(req.execute());
 
   wait();
 
-  return (rc_t::INPROGRESS);
+  return (rc_t::OK);
 }
 
 void
-stats_cmd::retire(connection& con)
+stats_enable_cmd::retire(connection& con)
 {
+  /*
+   * disable interface stats.
+   */
+  msg_t req(con.ctx(), 1, std::ref(*(static_cast<rpc_cmd*>(this))));
+
+  auto& payload = req.get_request().get_payload();
+  payload.enable_disable = 0;
+  payload.pid = getpid();
+  payload.num = 1;
+  payload.sw_ifs[0] = m_swifindex.value();
+
+  VAPI_CALL(req.execute());
+
+  wait();
 }
 
 void
-stats_cmd::notify()
+stats_enable_cmd::notify()
 {
   m_listener.handle_interface_stat(this);
 }
 
 std::string
-stats_cmd::to_string() const
+stats_enable_cmd::to_string() const
 {
-  return ("itf-stats");
+  std::ostringstream s;
+  s << "itf-stats-enable itf:" << m_swifindex.to_string();
+  return (s.str());
 }
 
 dump_cmd::dump_cmd()
 {
+}
+
+stats_disable_cmd::stats_disable_cmd(const handle_t& handle)
+  : rpc_cmd(m_res)
+  , m_swifindex(handle)
+{
+}
+
+bool
+stats_disable_cmd::operator==(const stats_disable_cmd& other) const
+{
+  return (true);
+}
+
+rc_t
+stats_disable_cmd::issue(connection& con)
+{
+  /*
+   * then send the request to enable them
+   */
+  msg_t req(con.ctx(), 1, std::ref(*this));
+
+  auto& payload = req.get_request().get_payload();
+  payload.enable_disable = 0;
+  payload.pid = getpid();
+  payload.num = 1;
+
+  payload.sw_ifs[0] = m_swifindex.value();
+
+  VAPI_CALL(req.execute());
+
+  wait();
+
+  return (rc_t::OK);
+}
+
+std::string
+stats_disable_cmd::to_string() const
+{
+  std::ostringstream s;
+  s << "itf-stats-disable itf:" << m_swifindex.to_string();
+  return (s.str());
 }
 
 bool

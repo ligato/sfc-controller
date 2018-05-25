@@ -106,19 +106,6 @@ vxlan_tunnel::vxlan_tunnel(const boost::asio::ip::address& src,
 {
 }
 
-vxlan_tunnel::vxlan_tunnel(const handle_t& hdl,
-                           const boost::asio::ip::address& src,
-                           const boost::asio::ip::address& dst,
-                           uint32_t vni)
-  : interface(hdl,
-              l2_address_t::ZERO,
-              mk_name(src, dst, vni),
-              interface::type_t::VXLAN,
-              interface::admin_state_t::UP)
-  , m_tep(src, dst, vni)
-{
-}
-
 vxlan_tunnel::vxlan_tunnel(const vxlan_tunnel& o)
   : interface(o)
   , m_tep(o.m_tep)
@@ -217,10 +204,10 @@ void
 vxlan_tunnel::event_handler::handle_populate(const client_db::key_t& key)
 {
   /*
- * dump VPP current states
- */
-  std::shared_ptr<vxlan_tunnel_cmds::dump_cmd> cmd(
-    new vxlan_tunnel_cmds::dump_cmd());
+   * dump VPP current states
+   */
+  std::shared_ptr<vxlan_tunnel_cmds::dump_cmd> cmd =
+    std::make_shared<vxlan_tunnel_cmds::dump_cmd>();
 
   HW::enqueue(cmd);
   HW::write();
@@ -233,11 +220,13 @@ vxlan_tunnel::event_handler::handle_populate(const client_db::key_t& key)
     boost::asio::ip::address dst =
       from_bytes(payload.is_ipv6, payload.dst_address);
 
-    vxlan_tunnel vt(hdl, src, dst, payload.vni);
+    std::shared_ptr<vxlan_tunnel> vt =
+      vxlan_tunnel(src, dst, payload.vni).singular();
+    vt->set(hdl);
 
-    VOM_LOG(log_level_t::DEBUG) << "dump: " << vt.to_string();
+    VOM_LOG(log_level_t::DEBUG) << "dump: " << vt->to_string();
 
-    OM::commit(key, vt);
+    OM::commit(key, *vt);
   }
 }
 
@@ -262,9 +251,11 @@ vxlan_tunnel::event_handler::order() const
 void
 vxlan_tunnel::event_handler::show(std::ostream& os)
 {
-  m_db.dump(os);
+  // dumped by the interface handler
 }
-}
+
+}; // namespace VOM
+
 /*
  * fd.io coding-style-patch-verification: ON
  *

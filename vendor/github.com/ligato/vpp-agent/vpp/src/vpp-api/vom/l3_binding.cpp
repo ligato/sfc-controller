@@ -17,7 +17,7 @@
 #include "vom/l3_binding_cmds.hpp"
 
 namespace VOM {
-singular_db<l3_binding::key_type_t, l3_binding> l3_binding::m_db;
+singular_db<l3_binding::key_t, l3_binding> l3_binding::m_db;
 
 l3_binding::event_handler l3_binding::m_evh;
 
@@ -27,14 +27,14 @@ l3_binding::event_handler l3_binding::m_evh;
 l3_binding::l3_binding(const interface& itf, const route::prefix_t& pfx)
   : m_itf(itf.singular())
   , m_pfx(pfx)
-  , m_binding(true)
+  , m_binding(true, rc_t::NOOP)
 {
 }
 
 l3_binding::l3_binding(const l3_binding& o)
   : m_itf(o.m_itf)
   , m_pfx(o.m_pfx)
-  , m_binding(true)
+  , m_binding(o.m_binding)
 {
 }
 
@@ -43,7 +43,19 @@ l3_binding::~l3_binding()
   sweep();
 
   // not in the DB anymore.
-  m_db.release(make_pair(m_itf->key(), m_pfx), this);
+  m_db.release(key(), this);
+}
+
+bool
+l3_binding::operator==(const l3_binding& l) const
+{
+  return ((m_pfx == l.m_pfx) && (*m_itf == *l.m_itf));
+}
+
+const l3_binding::key_t
+l3_binding::key() const
+{
+  return (make_pair(m_itf->key(), m_pfx));
 }
 
 void
@@ -93,7 +105,7 @@ std::string
 l3_binding::to_string() const
 {
   std::ostringstream s;
-  s << "L3-config:[" << m_itf->to_string() << " prefix:" << m_pfx.to_string()
+  s << "L3-binding:[" << m_itf->to_string() << " prefix:" << m_pfx.to_string()
     << " " << m_binding.to_string() << "]";
 
   return (s.str());
@@ -116,7 +128,13 @@ l3_binding::update(const l3_binding& desired)
 std::shared_ptr<l3_binding>
 l3_binding::find_or_add(const l3_binding& temp)
 {
-  return (m_db.find_or_add(make_pair(temp.m_itf->key(), temp.m_pfx), temp));
+  return (m_db.find_or_add(temp.key(), temp));
+}
+
+std::shared_ptr<l3_binding>
+l3_binding::find(const key_t& k)
+{
+  return (m_db.find(k));
 }
 
 std::shared_ptr<l3_binding>
@@ -132,7 +150,7 @@ l3_binding::dump(std::ostream& os)
 }
 
 std::ostream&
-operator<<(std::ostream& os, const l3_binding::key_type_t& key)
+operator<<(std::ostream& os, const l3_binding::key_t& key)
 {
   os << "[" << key.first << ", " << key.second << "]";
 
@@ -153,9 +171,9 @@ l3_binding::find(const interface& i)
 
   while (it != m_db.cend()) {
     /*
- * The key in the DB is a pair of the interface's name and prefix.
- * If the keys match, save the L3-config
- */
+     * The key in the DB is a pair of the interface's name and prefix.
+     * If the keys match, save the L3-config
+     */
     auto key = it->first;
 
     if (i.key() == key.first) {
@@ -184,8 +202,8 @@ void
 l3_binding::event_handler::handle_populate(const client_db::key_t& key)
 {
   /**
- * This is done while populating the interfaces
- */
+   * This is done while populating the interfaces
+   */
 }
 
 dependency_t

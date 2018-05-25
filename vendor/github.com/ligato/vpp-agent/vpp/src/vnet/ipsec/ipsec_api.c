@@ -192,13 +192,6 @@ static void vl_api_ipsec_sad_add_del_entry_t_handler
 
   sa.id = ntohl (mp->sad_id);
   sa.spi = ntohl (mp->spi);
-  /* security protocol AH unsupported */
-  if (mp->protocol == IPSEC_PROTOCOL_AH)
-    {
-      clib_warning ("unsupported security protocol 'AH'");
-      rv = VNET_API_ERROR_UNIMPLEMENTED;
-      goto out;
-    }
   sa.protocol = mp->protocol;
   /* check for unsupported crypto-alg */
   if (mp->crypto_algorithm < IPSEC_CRYPTO_ALG_AES_CBC_128 ||
@@ -259,8 +252,7 @@ out:
 }
 
 static void
-send_ipsec_spd_details (ipsec_policy_t * p, unix_shared_memory_queue_t * q,
-			u32 context)
+send_ipsec_spd_details (ipsec_policy_t * p, svm_queue_t * q, u32 context)
 {
   vl_api_ipsec_spd_details_t *mp;
 
@@ -303,7 +295,7 @@ send_ipsec_spd_details (ipsec_policy_t * p, unix_shared_memory_queue_t * q,
 static void
 vl_api_ipsec_spd_dump_t_handler (vl_api_ipsec_spd_dump_t * mp)
 {
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   ipsec_main_t *im = &ipsec_main;
   ipsec_policy_t *policy;
   ipsec_spd_t *spd;
@@ -407,7 +399,7 @@ vl_api_ipsec_tunnel_if_add_del_t_handler (vl_api_ipsec_tunnel_if_add_del_t *
 }
 
 static void
-send_ipsec_sa_details (ipsec_sa_t * sa, unix_shared_memory_queue_t * q,
+send_ipsec_sa_details (ipsec_sa_t * sa, svm_queue_t * q,
 		       u32 context, u32 sw_if_index)
 {
   vl_api_ipsec_sa_details_t *mp;
@@ -470,7 +462,7 @@ send_ipsec_sa_details (ipsec_sa_t * sa, unix_shared_memory_queue_t * q,
 static void
 vl_api_ipsec_sa_dump_t_handler (vl_api_ipsec_sa_dump_t * mp)
 {
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   ipsec_main_t *im = &ipsec_main;
   vnet_main_t *vnm = im->vnet_main;
   ipsec_sa_t *sa;

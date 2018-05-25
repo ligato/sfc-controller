@@ -32,9 +32,6 @@
  * This makes it possible for servers to be co-located in the same data
  * center or be separated geographically as long as they are reachable
  * through the underlay L3 network.
- *
- * You can refer to this kind of L2 overlay bridge domain as a GENEVE
- * (Virtual eXtensible VLAN) segment.
  */
 
 
@@ -146,9 +143,7 @@ geneve_tunnel_restack_dpo (geneve_tunnel_t * t)
 static geneve_tunnel_t *
 geneve_tunnel_from_fib_node (fib_node_t * node)
 {
-#if (CLIB_DEBUG > 0)
   ASSERT (FIB_NODE_TYPE_GENEVE_TUNNEL == node->fn_type);
-#endif
   return ((geneve_tunnel_t *) (((char *) node) -
 			       STRUCT_OFFSET_OF (geneve_tunnel_t, node)));
 }
@@ -272,6 +267,9 @@ geneve_rewrite (geneve_tunnel_t * t, bool is_ip6)
   vnet_set_geneve_oamframe_bit (geneve, 0);
   vnet_set_geneve_critical_bit (geneve, 0);
   vnet_set_geneve_protocol (geneve, GENEVE_ETH_PROTOCOL);
+
+  vnet_geneve_hdr_1word_hton (geneve);
+
   vnet_set_geneve_vni (geneve, t->vni);
 
   t->rewrite = r.rw;
@@ -290,25 +288,6 @@ geneve_decap_next_is_valid (geneve_main_t * vxm, u32 is_ip6,
   return decap_next_index < r->n_next_nodes;
 }
 
-static void
-hash_set_key_copy (uword ** h, void *key, uword v)
-{
-  size_t ksz = hash_header (*h)->user;
-  void *copy = clib_mem_alloc (ksz);
-  clib_memcpy (copy, key, ksz);
-  hash_set_mem (*h, copy, v);
-}
-
-static void
-hash_unset_key_free (uword ** h, void *key)
-{
-  hash_pair_t *hp = hash_get_pair_mem (*h, key);
-  ASSERT (hp);
-  key = uword_to_pointer (hp->key, void *);
-  hash_unset_mem (*h, key);
-  clib_mem_free (key);
-}
-
 static uword
 vtep_addr_ref (ip46_address_t * ip)
 {
@@ -319,7 +298,7 @@ vtep_addr_ref (ip46_address_t * ip)
     return ++(*vtep);
   ip46_address_is_ip4 (ip) ?
     hash_set (geneve_main.vtep4, ip->ip4.as_u32, 1) :
-    hash_set_key_copy (&geneve_main.vtep6, &ip->ip6, 1);
+    hash_set_mem_alloc (&geneve_main.vtep6, &ip->ip6, 1);
   return 1;
 }
 
@@ -334,7 +313,7 @@ vtep_addr_unref (ip46_address_t * ip)
     return *vtep;
   ip46_address_is_ip4 (ip) ?
     hash_unset (geneve_main.vtep4, ip->ip4.as_u32) :
-    hash_unset_key_free (&geneve_main.vtep6, &ip->ip6);
+    hash_unset_mem_free (&geneve_main.vtep6, &ip->ip6);
   return 0;
 }
 
@@ -367,7 +346,7 @@ mcast_shared_add (ip46_address_t * remote,
     .mfib_entry_index = mfei,
   };
 
-  hash_set_key_copy (&geneve_main.mcast_shared, remote, new_ep.as_u64);
+  hash_set_mem_alloc (&geneve_main.mcast_shared, remote, new_ep.as_u64);
 }
 
 static inline void
@@ -378,7 +357,7 @@ mcast_shared_remove (ip46_address_t * remote)
   adj_unlock (ep.mcast_adj_index);
   mfib_table_entry_delete_index (ep.mfib_entry_index, MFIB_SOURCE_GENEVE);
 
-  hash_unset_key_free (&geneve_main.mcast_shared, remote);
+  hash_unset_mem_free (&geneve_main.mcast_shared, remote);
 }
 
 static inline fib_protocol_t
@@ -404,13 +383,15 @@ int vnet_geneve_add_del_tunnel
   if (!is_ip6)
     {
       key4.remote = a->remote.ip4.as_u32;
-      key4.vni = clib_host_to_net_u32 (a->vni << 8);
+      key4.vni =
+	clib_host_to_net_u32 ((a->vni << GENEVE_VNI_SHIFT) & GENEVE_VNI_MASK);
       p = hash_get (vxm->geneve4_tunnel_by_key, key4.as_u64);
     }
   else
     {
       key6.remote = a->remote.ip6;
-      key6.vni = clib_host_to_net_u32 (a->vni << 8);
+      key6.vni =
+	clib_host_to_net_u32 ((a->vni << GENEVE_VNI_SHIFT) & GENEVE_VNI_MASK);
       p = hash_get_mem (vxm->geneve6_tunnel_by_key, &key6);
     }
 
@@ -445,8 +426,8 @@ int vnet_geneve_add_del_tunnel
 
       /* copy the key */
       if (is_ip6)
-	hash_set_key_copy (&vxm->geneve6_tunnel_by_key, &key6,
-			   t - vxm->tunnels);
+	hash_set_mem_alloc (&vxm->geneve6_tunnel_by_key, &key6,
+			    t - vxm->tunnels);
       else
 	hash_set (vxm->geneve4_tunnel_by_key, key4.as_u64, t - vxm->tunnels);
 
@@ -624,7 +605,7 @@ int vnet_geneve_add_del_tunnel
       if (!is_ip6)
 	hash_unset (vxm->geneve4_tunnel_by_key, key4.as_u64);
       else
-	hash_unset_key_free (&vxm->geneve6_tunnel_by_key, &key6);
+	hash_unset_mem_free (&vxm->geneve6_tunnel_by_key, &key6);
 
       if (!ip46_address_is_multicast (&t->remote))
 	{

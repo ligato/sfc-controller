@@ -59,6 +59,10 @@ if ENABLE_IXGE_PLUGIN
 include ixge.am
 endif
 
+if ENABLE_KUBEPROXY_PLUGIN
+include kubeproxy.am
+endif
+
 if ENABLE_LB_PLUGIN
 include lb.am
 endif
@@ -81,6 +85,10 @@ endif
 
 if ENABLE_STN_PLUGIN
 include stn.am
+endif
+
+if ENABLE_L2E_PLUGIN
+include l2e.am
 endif
 
 include ../suffix-rules.mk

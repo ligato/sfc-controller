@@ -26,29 +26,6 @@ namespace VOM {
  */
 
 /**
- * An L3 protocol can be used to construct a prefix that is used
- * to match packets are part of a route.
- */
-class l3_proto_t : public enum_base<l3_proto_t>
-{
-public:
-  const static l3_proto_t IPV4;
-  const static l3_proto_t IPV6;
-  const static l3_proto_t MPLS;
-
-  bool is_ipv4();
-  bool is_ipv6();
-
-  static const l3_proto_t& from_address(const boost::asio::ip::address& addr);
-
-private:
-  /**
-   * Private constructor taking the value and the string name
-   */
-  l3_proto_t(int v, const std::string& s);
-};
-
-/**
  * A next-hop protocol describes the protocol of a peer to which packets
  * are sent after matching a route.
  */
@@ -68,6 +45,36 @@ private:
    */
   nh_proto_t(int v, const std::string& s);
 };
+
+/**
+ * An L3 protocol can be used to construct a prefix that is used
+ * to match packets are part of a route.
+ */
+class l3_proto_t : public enum_base<l3_proto_t>
+{
+public:
+  const static l3_proto_t IPV4;
+  const static l3_proto_t IPV6;
+  const static l3_proto_t MPLS;
+
+  bool is_ipv4();
+  bool is_ipv6();
+
+  static const l3_proto_t& from_address(const boost::asio::ip::address& addr);
+
+  const nh_proto_t& to_nh_proto() const;
+
+private:
+  /**
+   * Private constructor taking the value and the string name
+   */
+  l3_proto_t(int v, const std::string& s);
+};
+
+/**
+ * Ostream output for l3_proto_t
+ */
+std::ostream& operator<<(std::ostream& os, const l3_proto_t& l3p);
 
 namespace route {
 /**
@@ -170,17 +177,17 @@ public:
   /**
    * Return a address representation of the mask, e.g. 255.255.0.0
    */
-  boost::asio::ip::address_v4 mask() const;
+  boost::asio::ip::address mask() const;
 
   /**
    * get the lowest address in the prefix
    */
-  boost::asio::ip::address_v4 low() const;
+  prefix_t low() const;
 
   /**
    * Get the highest address in the prefix
    */
-  boost::asio::ip::address_v4 high() const;
+  prefix_t high() const;
 
   /**
    * Get the L3 protocol
@@ -207,6 +214,22 @@ boost::asio::ip::address_v4 operator&(const boost::asio::ip::address_v4& addr1,
                                       const boost::asio::ip::address_v4& addr2);
 
 boost::asio::ip::address_v4 operator~(const boost::asio::ip::address_v4& addr1);
+
+boost::asio::ip::address_v6 operator|(const boost::asio::ip::address_v6& addr1,
+                                      const boost::asio::ip::address_v6& addr2);
+
+boost::asio::ip::address_v6 operator&(const boost::asio::ip::address_v6& addr1,
+                                      const boost::asio::ip::address_v6& addr2);
+
+boost::asio::ip::address_v6 operator~(const boost::asio::ip::address_v6& addr1);
+
+boost::asio::ip::address operator|(const boost::asio::ip::address& addr1,
+                                   const boost::asio::ip::address& addr2);
+
+boost::asio::ip::address operator&(const boost::asio::ip::address& addr1,
+                                   const boost::asio::ip::address& addr2);
+
+boost::asio::ip::address operator~(const boost::asio::ip::address& addr1);
 
 /**
  * Ostream printer for prefix_t

@@ -100,7 +100,7 @@ send_test_chunk (tclient_main_t * tm, session_t * s)
 	  evt.fifo = txf;
 	  evt.event_type = FIFO_EVENT_APP_TX;
 
-	  if (unix_shared_memory_queue_add
+	  if (svm_queue_add
 	      (tm->vpp_event_queue[txf->master_thread_index], (u8 *) & evt,
 	       0 /* do wait for mutex */ ))
 	    clib_warning ("could not enqueue event");
@@ -112,13 +112,13 @@ static void
 receive_test_chunk (tclient_main_t * tm, session_t * s)
 {
   svm_fifo_t *rx_fifo = s->server_rx_fifo;
-  int n_read, test_bytes = 0;
   u32 my_thread_index = vlib_get_thread_index ();
+  int n_read, i;
 
   /* Allow enqueuing of new event */
   // svm_fifo_unset_event (rx_fifo);
 
-  if (test_bytes)
+  if (tm->test_bytes)
     {
       n_read = svm_fifo_dequeue_nowait (rx_fifo,
 					vec_len (tm->rx_buf[my_thread_index]),
@@ -149,9 +149,8 @@ receive_test_chunk (tclient_main_t * tm, session_t * s)
 	  ed->data[0] = n_read;
 	}
 
-      if (test_bytes)
+      if (tm->test_bytes)
 	{
-	  int i;
 	  for (i = 0; i < n_read; i++)
 	    {
 	      if (tm->rx_buf[my_thread_index][i]
@@ -161,6 +160,7 @@ receive_test_chunk (tclient_main_t * tm, session_t * s)
 				n_read, s->bytes_received + i,
 				tm->rx_buf[my_thread_index][i],
 				((s->bytes_received + i) & 0xff));
+		  tm->test_failed = 1;
 		}
 	    }
 	}
@@ -429,10 +429,10 @@ static clib_error_t *
 attach_builtin_test_clients_app (u8 * appns_id, u64 appns_flags,
 				 u64 appns_secret)
 {
+  u32 segment_name_length, prealloc_fifos, segment_size = 2 << 20;
   tclient_main_t *tm = &tclient_main;
   vnet_app_attach_args_t _a, *a = &_a;
   u8 segment_name[128];
-  u32 segment_name_length, prealloc_fifos;
   u64 options[16];
   clib_error_t *error = 0;
 
@@ -448,12 +448,14 @@ attach_builtin_test_clients_app (u8 * appns_id, u64 appns_flags,
 
   prealloc_fifos = tm->prealloc_fifos ? tm->expected_connections : 1;
 
-  options[SESSION_OPTIONS_ACCEPT_COOKIE] = 0x12345678;
-  options[SESSION_OPTIONS_SEGMENT_SIZE] = (2ULL << 32);
-  options[SESSION_OPTIONS_RX_FIFO_SIZE] = tm->fifo_size;
-  options[SESSION_OPTIONS_TX_FIFO_SIZE] = tm->fifo_size;
+  if (tm->private_segment_size)
+    segment_size = tm->private_segment_size;
+
+  options[APP_OPTIONS_ACCEPT_COOKIE] = 0x12345678;
+  options[APP_OPTIONS_SEGMENT_SIZE] = segment_size;
+  options[APP_OPTIONS_RX_FIFO_SIZE] = tm->fifo_size;
+  options[APP_OPTIONS_TX_FIFO_SIZE] = tm->fifo_size;
   options[APP_OPTIONS_PRIVATE_SEGMENT_COUNT] = tm->private_segment_count;
-  options[APP_OPTIONS_PRIVATE_SEGMENT_SIZE] = tm->private_segment_size;
   options[APP_OPTIONS_PREALLOC_FIFO_PAIRS] = prealloc_fifos;
 
   options[APP_OPTIONS_FLAGS] = APP_OPTIONS_FLAGS_IS_BUILTIN;
@@ -528,6 +530,10 @@ clients_connect (vlib_main_t * vm, u8 * uri, u32 n_clients)
   return 0;
 }
 
+#define CLI_OUTPUT(_fmt, _args...) 			\
+  if (!tm->no_output)  					\
+    vlib_cli_output(vm, _fmt, ##_args)
+
 static clib_error_t *
 test_tcp_clients_command_fn (vlib_main_t * vm,
 			     unformat_input_t * input,
@@ -536,7 +542,7 @@ test_tcp_clients_command_fn (vlib_main_t * vm,
   tclient_main_t *tm = &tclient_main;
   vlib_thread_main_t *thread_main = vlib_get_thread_main ();
   uword *event_data = 0, event_type;
-  u8 *default_connect_uri = (u8 *) "tcp://6.0.1.1/1234", *uri, *appns_id;
+  u8 *default_connect_uri = (u8 *) "tcp://6.0.1.1/1234", *uri, *appns_id = 0;
   u64 tmp, total_bytes, appns_flags = 0, appns_secret = 0;
   f64 test_timeout = 20.0, syn_timeout = 20.0, delta;
   f64 time_before_connects;
@@ -552,6 +558,9 @@ test_tcp_clients_command_fn (vlib_main_t * vm,
   tm->connections_per_batch = 1000;
   tm->private_segment_count = 0;
   tm->private_segment_size = 0;
+  tm->no_output = 0;
+  tm->test_bytes = 0;
+  tm->test_failed = 0;
   tm->vlib_main = vm;
   if (thread_main->n_vlib_mains > 1)
     clib_spinlock_init (&tm->sessions_lock);
@@ -606,6 +615,10 @@ test_tcp_clients_command_fn (vlib_main_t * vm,
 	appns_flags = APP_OPTIONS_FLAGS_USE_GLOBAL_SCOPE;
       else if (unformat (input, "secret %lu", &appns_secret))
 	;
+      else if (unformat (input, "no-output"))
+	tm->no_output = 1;
+      else if (unformat (input, "test-bytes"))
+	tm->test_bytes = 1;
       else
 	return clib_error_return (0, "unknown input `%U'",
 				  format_unformat_error, input);
@@ -676,26 +689,26 @@ test_tcp_clients_command_fn (vlib_main_t * vm,
   switch (event_type)
     {
     case ~0:
-      vlib_cli_output (vm, "Timeout with only %d sessions active...",
-		       tm->ready_connections);
+      CLI_OUTPUT ("Timeout with only %d sessions active...",
+		  tm->ready_connections);
+      error = clib_error_return (0, "failed: syn timeout with %d sessions",
+				 tm->ready_connections);
       goto cleanup;
 
     case 1:
       delta = vlib_time_now (vm) - time_before_connects;
-
       if (delta != 0.0)
-	{
-	  vlib_cli_output
-	    (vm, "%d three-way handshakes in %.2f seconds, %.2f/sec",
-	     n_clients, delta, ((f64) n_clients) / delta);
-	}
+	CLI_OUTPUT ("%d three-way handshakes in %.2f seconds %.2f/s",
+		    n_clients, delta, ((f64) n_clients) / delta);
 
       tm->test_start_time = vlib_time_now (tm->vlib_main);
-      vlib_cli_output (vm, "Test started at %.6f", tm->test_start_time);
+      CLI_OUTPUT ("Test started at %.6f", tm->test_start_time);
       break;
 
     default:
-      vlib_cli_output (vm, "unexpected event(1): %d", event_type);
+      CLI_OUTPUT ("unexpected event(1): %d", event_type);
+      error = clib_error_return (0, "failed: unexpected event(1): %d",
+				 event_type);
       goto cleanup;
     }
 
@@ -705,17 +718,21 @@ test_tcp_clients_command_fn (vlib_main_t * vm,
   switch (event_type)
     {
     case ~0:
-      vlib_cli_output (vm, "Timeout with %d sessions still active...",
-		       tm->ready_connections);
+      CLI_OUTPUT ("Timeout with %d sessions still active...",
+		  tm->ready_connections);
+      error = clib_error_return (0, "failed: timeout with %d sessions",
+				 tm->ready_connections);
       goto cleanup;
 
     case 2:
       tm->test_end_time = vlib_time_now (vm);
-      vlib_cli_output (vm, "Test finished at %.6f", tm->test_end_time);
+      CLI_OUTPUT ("Test finished at %.6f", tm->test_end_time);
       break;
 
     default:
-      vlib_cli_output (vm, "unexpected event(2): %d", event_type);
+      CLI_OUTPUT ("unexpected event(2): %d", event_type);
+      error = clib_error_return (0, "failed: unexpected event(2): %d",
+				 event_type);
       goto cleanup;
     }
 
@@ -725,18 +742,23 @@ test_tcp_clients_command_fn (vlib_main_t * vm,
     {
       total_bytes = (tm->no_return ? tm->tx_total : tm->rx_total);
       transfer_type = tm->no_return ? "half-duplex" : "full-duplex";
-      vlib_cli_output (vm,
-		       "%lld bytes (%lld mbytes, %lld gbytes) in %.2f seconds",
-		       total_bytes, total_bytes / (1ULL << 20),
-		       total_bytes / (1ULL << 30), delta);
-      vlib_cli_output (vm, "%.2f bytes/second %s",
-		       ((f64) total_bytes) / (delta), transfer_type);
-      vlib_cli_output (vm, "%.4f gbit/second %s",
-		       (((f64) total_bytes * 8.0) / delta / 1e9),
-		       transfer_type);
+      CLI_OUTPUT ("%lld bytes (%lld mbytes, %lld gbytes) in %.2f seconds",
+		  total_bytes, total_bytes / (1ULL << 20),
+		  total_bytes / (1ULL << 30), delta);
+      CLI_OUTPUT ("%.2f bytes/second %s", ((f64) total_bytes) / (delta),
+		  transfer_type);
+      CLI_OUTPUT ("%.4f gbit/second %s",
+		  (((f64) total_bytes * 8.0) / delta / 1e9), transfer_type);
     }
   else
-    vlib_cli_output (vm, "zero delta-t?");
+    {
+      CLI_OUTPUT ("zero delta-t?");
+      error = clib_error_return (0, "failed: zero delta-t");
+      goto cleanup;
+    }
+
+  if (tm->test_bytes && tm->test_failed)
+    error = clib_error_return (0, "failed: test bytes");
 
 cleanup:
   tm->run_test = 0;
@@ -755,14 +777,18 @@ cleanup:
       int rv;
 
       da->app_index = tm->app_index;
-
       rv = vnet_application_detach (da);
       if (rv)
-	vlib_cli_output (vm, "WARNING: app detach failed...");
+	{
+	  error = clib_error_return (0, "failed: app detach");
+	  CLI_OUTPUT ("WARNING: app detach failed...");
+	}
       tm->test_client_attached = 0;
       tm->app_index = ~0;
     }
-  return 0;
+  if (error)
+    CLI_OUTPUT ("test failed");
+  return error;
 }
 
 /* *INDENT-OFF* */
@@ -773,7 +799,7 @@ VLIB_CLI_COMMAND (test_clients_command, static) =
       "[test-timeout <time>][syn-timeout <time>][no-return][fifo-size <size>]"
       "[private-segment-count <count>][private-segment-size <bytes>[m|g]]"
       "[preallocate-fifos][preallocate-sessions][client-batch <batch-size>]"
-      "[uri <tcp://ip/port>]",
+      "[uri <tcp://ip/port>][test-bytes][no-output]",
   .function = test_tcp_clients_command_fn,
   .is_mp_safe = 1,
 };

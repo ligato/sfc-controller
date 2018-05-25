@@ -18,12 +18,11 @@ package l2driver
 
 import (
 	"fmt"
-	"github.com/ligato/cn-infra/utils/addrs"
 	l2driver "github.com/ligato/sfc-controller/controller/cnpdriver/l2driver/model"
 	"github.com/ligato/sfc-controller/controller/utils"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l3"
 	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/ifplugin/model/interfaces"
 )
 
@@ -369,8 +368,9 @@ func (cnpd *sfcCtlrL2CNPDriver) reconcileLinuxInterface(etcdPrefix string, ifnam
 
 func (cnpd *sfcCtlrL2CNPDriver) reconcileStaticRoute(etcdPrefix string, sr *l3.StaticRoutes_Route) {
 
-	destIPAddr, _, _ := addrs.ParseIPWithPrefix(sr.DstIpAddr)
-	key := utils.L3RouteKey(etcdPrefix, sr.VrfId, destIPAddr, sr.NextHopAddr)
+	//destIPAddr, _, _ := addrs.ParseIPWithPrefix(sr.DstIpAddr)
+	//key := utils.L3RouteKey(etcdPrefix, sr.VrfId, destIPAddr, sr.NextHopAddr)
+	key := utils.L3RouteKey(etcdPrefix, sr.VrfId, sr.DstIpAddr, sr.NextHopAddr)
 	cnpd.reconcileAfter.l3Routes[key] = *sr
 }
 

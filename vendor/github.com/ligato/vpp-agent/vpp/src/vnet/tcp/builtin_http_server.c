@@ -32,7 +32,7 @@ typedef struct
 typedef struct
 {
   u8 **rx_buf;
-  unix_shared_memory_queue_t **vpp_queue;
+  svm_queue_t **vpp_queue;
   u64 byte_index;
 
   uword *handler_by_get_request;
@@ -40,7 +40,7 @@ typedef struct
   u32 *free_http_cli_process_node_indices;
 
   /* Sever's event queue */
-  unix_shared_memory_queue_t *vl_input_queue;
+  svm_queue_t *vl_input_queue;
 
   /* API client handle */
   u32 my_client_index;
@@ -49,6 +49,10 @@ typedef struct
 
   /* process node index for evnt scheduling */
   u32 node_index;
+
+  u32 prealloc_fifos;
+  u32 private_segment_size;
+  u32 fifo_size;
   vlib_main_t *vlib_main;
 } http_server_main_t;
 
@@ -171,9 +175,8 @@ send_data (stream_session_t * s, u8 * data)
 	      evt.fifo = s->server_tx_fifo;
 	      evt.event_type = FIFO_EVENT_APP_TX;
 
-	      unix_shared_memory_queue_add (hsm->vpp_queue[s->thread_index],
-					    (u8 *) & evt,
-					    0 /* do wait for mutex */ );
+	      svm_queue_add (hsm->vpp_queue[s->thread_index],
+			     (u8 *) & evt, 0 /* do wait for mutex */ );
 	    }
 	  delay = 10e-3;
 	}
@@ -373,7 +376,7 @@ http_server_rx_callback (stream_session_t * s)
       evt.rpc_args.fp = alloc_http_process_callback;
       evt.rpc_args.arg = args;
       evt.event_type = FIFO_EVENT_RPC;
-      unix_shared_memory_queue_add
+      svm_queue_add
 	(session_manager_get_vpp_event_queue (0 /* main thread */ ),
 	 (u8 *) & evt, 0 /* do wait for mutex */ );
     }
@@ -507,20 +510,26 @@ server_attach ()
 {
   http_server_main_t *hsm = &http_server_main;
   u8 segment_name[128];
-  u64 options[SESSION_OPTIONS_N_OPTIONS];
+  u64 options[APP_OPTIONS_N_OPTIONS];
   vnet_app_attach_args_t _a, *a = &_a;
+  u32 segment_size = 128 << 20;
 
   memset (a, 0, sizeof (*a));
   memset (options, 0, sizeof (options));
 
+  if (hsm->private_segment_size)
+    segment_size = hsm->private_segment_size;
+
   a->api_client_index = hsm->my_client_index;
   a->session_cb_vft = &builtin_session_cb_vft;
   a->options = options;
-  a->options[SESSION_OPTIONS_SEGMENT_SIZE] = 128 << 20;
-  a->options[SESSION_OPTIONS_RX_FIFO_SIZE] = 8 << 10;
-  a->options[SESSION_OPTIONS_TX_FIFO_SIZE] = 32 << 10;
+  a->options[APP_OPTIONS_SEGMENT_SIZE] = segment_size;
+  a->options[APP_OPTIONS_RX_FIFO_SIZE] =
+    hsm->fifo_size ? hsm->fifo_size : 8 << 10;
+  a->options[APP_OPTIONS_TX_FIFO_SIZE] =
+    hsm->fifo_size ? hsm->fifo_size : 32 << 10;
   a->options[APP_OPTIONS_FLAGS] = APP_OPTIONS_FLAGS_IS_BUILTIN;
-  a->options[APP_OPTIONS_PREALLOC_FIFO_PAIRS] = 16;
+  a->options[APP_OPTIONS_PREALLOC_FIFO_PAIRS] = hsm->prealloc_fifos;
   a->segment_name = segment_name;
   a->segment_name_length = ARRAY_LEN (segment_name);
 
@@ -577,12 +586,31 @@ server_create_command_fn (vlib_main_t * vm,
 {
   http_server_main_t *hsm = &http_server_main;
   int rv, is_static = 0;
+  u64 seg_size;
   u8 *html;
 
+  hsm->prealloc_fifos = 0;
+  hsm->private_segment_size = 0;
+  hsm->fifo_size = 0;
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
       if (unformat (input, "static"))
 	is_static = 1;
+      else if (unformat (input, "prealloc-fifos %d", &hsm->prealloc_fifos))
+	;
+      else if (unformat (input, "private-segment-size %U",
+			 unformat_memory_size, &seg_size))
+	{
+	  if (seg_size >= 0x100000000ULL)
+	    {
+	      vlib_cli_output (vm, "private segment size %llu, too large",
+			       seg_size);
+	      return 0;
+	    }
+	  hsm->private_segment_size = seg_size;
+	}
+      else if (unformat (input, "fifo-size %d", &hsm->fifo_size))
+	hsm->fifo_size <<= 10;
       else
 	return clib_error_return (0, "unknown input `%U'",
 				  format_unformat_error, input);

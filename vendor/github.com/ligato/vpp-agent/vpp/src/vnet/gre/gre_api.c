@@ -54,18 +54,7 @@ static void vl_api_gre_add_del_tunnel_t_handler
   vl_api_gre_add_del_tunnel_reply_t *rmp;
   int rv = 0;
   vnet_gre_add_del_tunnel_args_t _a, *a = &_a;
-  u32 outer_fib_id;
-  u32 p;
   u32 sw_if_index = ~0;
-
-  p = fib_table_find (!mp->is_ipv6 ? FIB_PROTOCOL_IP4 : FIB_PROTOCOL_IP6,
-		      ntohl (mp->outer_fib_id));
-  if (p == ~0)
-    {
-      rv = VNET_API_ERROR_NO_SUCH_FIB;
-      goto out;
-    }
-  outer_fib_id = p;
 
   /* Check src & dst are different */
   if ((mp->is_ipv6 && memcmp (mp->src_address, mp->dst_address, 16) == 0) ||
@@ -92,7 +81,7 @@ static void vl_api_gre_add_del_tunnel_t_handler
       clib_memcpy (&(a->dst.ip6), mp->dst_address, 16);
     }
 
-  a->outer_fib_id = outer_fib_id;
+  a->outer_fib_id = ntohl (mp->outer_fib_id);
   rv = vnet_gre_add_del_tunnel (a, &sw_if_index);
 
 out:
@@ -105,7 +94,7 @@ out:
 }
 
 static void send_gre_tunnel_details
-  (gre_tunnel_t * t, unix_shared_memory_queue_t * q, u32 context)
+  (gre_tunnel_t * t, svm_queue_t * q, u32 context)
 {
   vl_api_gre_tunnel_details_t *rmp;
   u8 is_ipv6 = t->tunnel_dst.fp_proto == FIB_PROTOCOL_IP6 ? 1 : 0;
@@ -139,7 +128,7 @@ static void send_gre_tunnel_details
 static void
 vl_api_gre_tunnel_dump_t_handler (vl_api_gre_tunnel_dump_t * mp)
 {
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   gre_main_t *gm = &gre_main;
   gre_tunnel_t *t;
   u32 sw_if_index;

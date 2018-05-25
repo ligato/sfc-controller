@@ -207,14 +207,15 @@ VLIB_CLI_COMMAND (ip6_punt_policer_command, static) =
   .function = ip6_punt_police_cmd,
   .short_help = "ip6 punt policer [add|del] <index>",
 };
-/* *INDENT-ON* */
+
 
 ip_punt_redirect_t ip6_punt_redirect_cfg = {
   .any_rx_sw_if_index = {
-			 .tx_sw_if_index = ~0,
-			 }
-  ,
+    .tx_sw_if_index = ~0,
+    .adj_index = ADJ_INDEX_INVALID,
+  },
 };
+/* *INDENT-ON* */
 
 #define foreach_ip6_punt_redirect_error         \
 _(DROP, "ip6 punt redirect drop")
@@ -300,8 +301,8 @@ ip6_punt_redirect_cmd (vlib_main_t * vm,
 {
   unformat_input_t _line_input, *line_input = &_line_input;
   clib_error_t *error = 0;
-  u32 rx_sw_if_index;
-  u32 tx_sw_if_index;
+  u32 rx_sw_if_index = 0;
+  u32 tx_sw_if_index = 0;
   ip46_address_t nh;
   vnet_main_t *vnm;
   u8 is_add;
@@ -339,9 +340,19 @@ ip6_punt_redirect_cmd (vlib_main_t * vm,
     }
 
   if (is_add)
-    ip6_punt_redirect_add (rx_sw_if_index, tx_sw_if_index, &nh);
+    {
+      if (rx_sw_if_index && tx_sw_if_index)
+	{
+	  ip6_punt_redirect_add (rx_sw_if_index, tx_sw_if_index, &nh);
+	}
+    }
   else
-    ip6_punt_redirect_del (rx_sw_if_index);
+    {
+      if (rx_sw_if_index)
+	{
+	  ip6_punt_redirect_del (rx_sw_if_index);
+	}
+    }
 
 done:
   unformat_free (line_input);
@@ -382,7 +393,7 @@ VLIB_CLI_COMMAND (show_ip6_punt_redirect_command, static) =
 {
   .path = "show ip6 punt redirect",
   .function = ip6_punt_redirect_show_cmd,
-  .short_help = "show ip6 punt redirect [add|del] rx [<interface>|all] via [<nh>] <tx_interface>",
+  .short_help = "show ip6 punt redirect",
   .is_mp_safe = 1,
 };
 /* *INDENT-ON* */

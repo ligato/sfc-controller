@@ -41,6 +41,7 @@
 #define included_clib_file_h
 
 #include <vppinfra/socket.h>
+#include <vppinfra/pool.h>
 #include <termios.h>
 
 
@@ -122,6 +123,13 @@ clib_file_set_data_available_to_write (clib_file_main_t * um,
   return was_available != 0;
 }
 
+always_inline clib_file_t *
+clib_file_get (clib_file_main_t * fm, u32 file_index)
+{
+  if (pool_is_free_index (fm->file_pool, file_index))
+    return 0;
+  return pool_elt_at_index (fm->file_pool, file_index);
+}
 
 #endif /* included_clib_file_h */
 

@@ -43,16 +43,6 @@ tap_interface::tap_interface(const std::string& name,
 {
 }
 
-tap_interface::tap_interface(const handle_t& hdl,
-                             const std::string& name,
-                             admin_state_t state,
-                             route::prefix_t prefix)
-  : interface(hdl, l2_address_t::ZERO, name, type_t::TAP, state)
-  , m_prefix(prefix)
-  , m_l2_address(l2_address_t::ZERO)
-{
-}
-
 tap_interface::~tap_interface()
 {
   sweep();
@@ -99,10 +89,10 @@ void
 tap_interface::event_handler::handle_populate(const client_db::key_t& key)
 {
   /*
- * dump VPP current states
- */
-  std::shared_ptr<tap_interface_cmds::dump_cmd> cmd(
-    new tap_interface_cmds::dump_cmd());
+   * dump VPP current states
+   */
+  std::shared_ptr<tap_interface_cmds::dump_cmd> cmd =
+    std::make_shared<tap_interface_cmds::dump_cmd>();
 
   HW::enqueue(cmd);
   HW::write();
@@ -118,10 +108,10 @@ tap_interface::event_handler::handle_populate(const client_db::key_t& key)
     VOM_LOG(log_level_t::DEBUG) << "tap-dump: " << itf.to_string();
 
     /*
- * Write each of the discovered interfaces into the OM,
- * but disable the HW Command q whilst we do, so that no
- * commands are sent to VPP
- */
+     * Write each of the discovered interfaces into the OM,
+     * but disable the HW Command q whilst we do, so that no
+     * commands are sent to VPP
+     */
     OM::commit(key, itf);
   }
 }
@@ -147,9 +137,10 @@ tap_interface::event_handler::order() const
 void
 tap_interface::event_handler::show(std::ostream& os)
 {
-  m_db.dump(os);
+  // dumped by the interface handler
 }
-}
+
+}; // namespace VOM
 
 /*
  * fd.io coding-style-patch-verification: ON

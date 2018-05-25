@@ -35,20 +35,30 @@ def remove_folder(folder):
         removedirs(folder)
 
 
-reply_suffixes = ("reply", "details", "l2fibtableentry")
+_REPLY_SUFFIX = "reply"
+_DETAILS_SUFFIX = "details"
+_REPLY_SUFFIXES = (_REPLY_SUFFIX, _DETAILS_SUFFIX)
 
 
 def is_reply(name):
-    return name.lower().endswith(reply_suffixes)
+    return name.lower().endswith(_REPLY_SUFFIXES)
 
-details_suffix = "details"
+
+def is_request(msg_name_underscore, all_messages):
+    """
+    Checks if reply message is present in all_messages.
+
+    :param msg_name_underscore name of vpp API message
+    :param all_messages: sequence of vpp message names
+    :returns: True if reply for the msg_name_underscore message is defined.
+    """
+    reply_msg = msg_name_underscore + "_" + _REPLY_SUFFIX
+    return reply_msg in [m['name'] for m in all_messages]
+
 
 def is_details(name):
-    return name.lower().endswith(reply_suffixes[1]) or name.lower().endswith(reply_suffixes[2])
+    return name.lower().endswith(_DETAILS_SUFFIX)
 
-
-def is_retval_field(name):
-    return name == 'retval'
 
 dump_suffix = "dump"
 
@@ -57,14 +67,14 @@ def is_dump(name):
     return name.lower().endswith(dump_suffix)
 
 
+def is_retval_field(name):
+    return name == 'retval'
+
+
 def get_reply_suffix(name):
-    for reply_suffix in reply_suffixes:
+    for reply_suffix in _REPLY_SUFFIXES:
         if name.lower().endswith(reply_suffix):
-            if reply_suffix == reply_suffixes[2]:
-                # FIXME workaround for l2_fib_table_entry
-                return 'entry'
-            else:
-                return reply_suffix
+            return reply_suffix
 
 # Mapping according to:
 # http://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/types.html
@@ -94,7 +104,7 @@ jni_2_java_type_mapping = {'u8': 'byte',
 vpp_2_jni_type_mapping = {'u8': 'jbyte',
                           'u8[]': 'jbyteArray',
                           'i8': 'jbyte',
-                          'u8[]': 'jbyteArray',
+                          'i8[]': 'jbyteArray',
                           'u16': 'jshort',
                           'u16[]': 'jshortArray',
                           'i16': 'jshort',
@@ -154,34 +164,6 @@ jni_field_accessors =  {'u8': 'ByteField',
                         }
 
 
-# vpe.api calls that do not follow naming conventions and have to be handled exceptionally when finding reply -> request mapping
-# FIXME in vpe.api
-unconventional_naming_rep_req = {
-                                 }
-
-#
-# FIXME no convention in the naming of events (notifications) in vpe.api
-notifications_message_suffixes = ("event", "counters")
-
-# messages that must be ignored. These messages are INSUFFICIENTLY marked as disabled in vpe.api
-# FIXME
-ignored_messages = []
-
-
-def is_notification(name):
-    """ Returns true if the structure is a notification regardless of its no other use """
-    return is_just_notification(name)
-
-
-def is_just_notification(name):
-    """ Returns true if the structure is just a notification and has no other use """
-    return name.lower().endswith(notifications_message_suffixes)
-
-
-def is_ignored(param):
-    return param.lower() in ignored_messages
-
-
 def remove_reply_suffix(camel_case_name_with_suffix):
     return remove_suffix(camel_case_name_with_suffix, get_reply_suffix(camel_case_name_with_suffix))
 
@@ -194,7 +176,7 @@ def remove_suffix(camel_case_name_with_suffix, suffix):
 
 
 def is_control_ping(camel_case_name_with_suffix):
-    return camel_case_name_with_suffix.lower().startswith("controlping");
+    return camel_case_name_with_suffix.lower().startswith("controlping")
 
 
 def api_message_to_javadoc(api_message):
@@ -203,16 +185,5 @@ def api_message_to_javadoc(api_message):
     return " * " + str.replace("\n", "\n * ")
 
 
-notification_dto_suffix = "Notification"
-
-
-def add_notification_suffix(camel_case_dto_name):
-    camel_case_dto_name += notification_dto_suffix
-    return camel_case_dto_name
-
-
 def is_array(java_type_as_string):
     return java_type_as_string.endswith("[]")
-
-def is_want(name):
-    return name.startswith("want_")

@@ -31,7 +31,7 @@ namespace VOM {
  * Forward declaration of the stats and events command
  */
 namespace interface_cmds {
-class stats_cmd;
+class stats_enable_cmd;
 class events_cmd;
 };
 
@@ -44,7 +44,7 @@ public:
   /**
    * The key for interface's key
    */
-  typedef std::string key_type;
+  typedef std::string key_t;
 
   /**
    * The iterator type
@@ -207,7 +207,7 @@ public:
   /**
    * Return the interface type
    */
-  const key_type& key() const;
+  const key_t& key() const;
 
   /**
    * Return the L2 Address
@@ -223,6 +223,11 @@ public:
    * Set the operational state of the interface, as reported by VPP
    */
   void set(const oper_state_t& state);
+
+  /**
+   * Comparison operator - only used for UT
+   */
+  virtual bool operator==(const interface& i) const;
 
   /**
    * A base class for interface Create commands
@@ -385,7 +390,8 @@ public:
      * Virtual function called on the listener when the command has data
      * ready to process
      */
-    virtual void handle_interface_stat(interface_cmds::stats_cmd* cmd) = 0;
+    virtual void handle_interface_stat(
+      interface_cmds::stats_enable_cmd* cmd) = 0;
 
     /**
      * Return the HW::item representing the status
@@ -400,36 +406,31 @@ public:
   };
 
   /**
-   * The the singular instance of the interface in the object_base-Model
-   */
-  static std::shared_ptr<interface> find(const interface& temp);
-
-  /**
-   * The the singular instance of the interface in the object_base-Model
-   * by handle
+   * The the singular instance of the interface in the DB by handle
    */
   static std::shared_ptr<interface> find(const handle_t& h);
 
   /**
-   * The the singular instance of the interface in the object_base-Model
-   * by name
+   * The the singular instance of the interface in the DB by key
    */
-  static std::shared_ptr<interface> find(const std::string& s);
+  static std::shared_ptr<interface> find(const key_t& k);
 
   /**
    * Dump all interfaces into the stream provided
    */
   static void dump(std::ostream& os);
 
+  /**
+   * Enable stats for this interface
+   */
+  void enable_stats(stat_listener& el);
+
 protected:
   /**
-   * Construct an interface object with a handle and a HW address
+   * Set the handle of an interface object. Only called by the interface
+   * factory during the populate
    */
-  interface(const handle_t& handle,
-            const l2_address_t& l2_address,
-            const std::string& name,
-            type_t type,
-            admin_state_t state);
+  void set(const handle_t& handle);
   friend class interface_factory;
 
   /**
@@ -467,12 +468,12 @@ protected:
   /**
    * A map of all interfaces key against the interface's name
    */
-  static singular_db<const std::string, interface> m_db;
+  static singular_db<key_t, interface> m_db;
 
   /**
    * Add an interface to the DB keyed on handle
    */
-  static void add(const std::string& name, const HW::item<handle_t>& item);
+  static void add(const key_t& name, const HW::item<handle_t>& item);
 
   /**
    * remove an interface from the DB keyed on handle
@@ -513,6 +514,11 @@ private:
   static event_handler m_evh;
 
   /**
+   * enable the interface stats in the singular instance
+   */
+  void enable_stats_i(stat_listener& el);
+
+  /**
    * Commit the acculmulated changes into VPP. i.e. to a 'HW" write.
    */
   void update(const interface& obj);
@@ -530,7 +536,7 @@ private:
   /**
    * It's the singular_db class that calls replay()
    */
-  friend class singular_db<const std::string, interface>;
+  friend class singular_db<key_t, interface>;
 
   /**
    * The interfaces name
@@ -548,6 +554,11 @@ private:
    * NULL is not mapped  - i.e. in the default table
    */
   std::shared_ptr<route_domain> m_rd;
+
+  /**
+   * shared pointer to the stats object for this interface.
+   */
+  std::shared_ptr<interface_cmds::stats_enable_cmd> m_stats;
 
   /**
    * The state of the interface

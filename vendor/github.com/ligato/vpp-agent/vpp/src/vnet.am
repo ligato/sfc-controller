@@ -31,8 +31,10 @@ endif
 # Generic stuff
 ########################################
 libvnet_la_SOURCES +=				\
+  vnet/buffer.c					\
   vnet/config.c					\
   vnet/devices/devices.c			\
+  vnet/devices/netlink.c			\
   vnet/handoff.c				\
   vnet/interface.c				\
   vnet/interface_api.c				\
@@ -47,6 +49,7 @@ nobase_include_HEADERS +=			\
   vnet/buffer.h					\
   vnet/config.h					\
   vnet/devices/devices.h			\
+  vnet/devices/netlink.h			\
   vnet/global_funcs.h				\
   vnet/handoff.h				\
   vnet/interface.h				\
@@ -60,7 +63,8 @@ nobase_include_HEADERS +=			\
   vnet/vnet.h					\
   vnet/vnet_all_api_h.h				\
   vnet/vnet_msg_enum.h				\
-  vnet/util/radix.h
+  vnet/util/radix.h                 \
+  vnet/util/refcount.h
 
 API_FILES += vnet/interface.api
 
@@ -424,6 +428,8 @@ libvnet_la_SOURCES +=				\
  vnet/ipsec/esp_format.c			\
  vnet/ipsec/esp_encrypt.c			\
  vnet/ipsec/esp_decrypt.c			\
+ vnet/ipsec/ah_decrypt.c			\
+ vnet/ipsec/ah_encrypt.c			\
  vnet/ipsec/ikev2.c				\
  vnet/ipsec/ikev2_crypto.c			\
  vnet/ipsec/ikev2_cli.c				\
@@ -440,6 +446,7 @@ libvnet_la_SOURCES +=				\
 nobase_include_HEADERS +=			\
  vnet/ipsec/ipsec.h				\
  vnet/ipsec/esp.h				\
+ vnet/ipsec/ah.h				\
  vnet/ipsec/ikev2.h				\
  vnet/ipsec/ikev2_priv.h			\
  vnet/ipsec/ipsec.api.h
@@ -765,11 +772,15 @@ API_FILES += vnet/srv6/sr.api
 
 libvnet_la_SOURCES +=				\
  vnet/srmpls/sr_mpls_policy.c		\
- vnet/srmpls/sr_mpls_steering.c
+ vnet/srmpls/sr_mpls_steering.c   \
+ vnet/srmpls/sr_mpls_api.c
 
 
 nobase_include_HEADERS +=			\
- vnet/srmpls/sr.h
+ vnet/srmpls/sr_mpls.h      \
+ vnet/srmpls/sr_mpls.api.h
+
+API_FILES += vnet/srmpls/sr_mpls.api
 
 ########################################
 # IPFIX / netflow v10
@@ -863,15 +874,35 @@ API_FILES += vnet/pg/pg.api
 # virtio
 ########################################
 
-libvnet_la_SOURCES +=       \
-  vnet/devices/virtio/vhost-user.c	\
-  vnet/devices/virtio/vhost_user_api.c
+libvnet_la_SOURCES +=				\
+  vnet/devices/virtio/device.c			\
+  vnet/devices/virtio/node.c			\
+  vnet/devices/virtio/vhost-user.c		\
+  vnet/devices/virtio/vhost_user_api.c		\
+  vnet/devices/virtio/virtio.c
 
-nobase_include_HEADERS +=     \
-  vnet/devices/virtio/vhost-user.h	\
+
+nobase_include_HEADERS +=			\
+  vnet/devices/virtio/virtio.h			\
+  vnet/devices/virtio/vhost-user.h		\
   vnet/devices/virtio/vhost_user.api.h
 
 API_FILES += vnet/devices/virtio/vhost_user.api
+
+########################################
+# tap interface (with virtio backend)
+########################################
+
+libvnet_la_SOURCES += 				\
+  vnet/devices/tap/cli.c			\
+  vnet/devices/tap/tap.c			\
+  vnet/devices/tap/tapv2_api.c
+
+nobase_include_HEADERS += 			\
+  vnet/devices/tap/tap.h			\
+  vnet/devices/tap/tapv2.api.h
+
+API_FILES += vnet/devices/tap/tapv2.api
 
 ########################################
 # ssvm ethernet
@@ -1083,7 +1114,7 @@ libvnet_la_SOURCES +=				\
   vnet/dpo/mpls_disposition.c   		\
   vnet/dpo/mpls_label_dpo.c			\
   vnet/dpo/l3_proxy_dpo.c			\
-  vnet/dpo/l2_bridge_dpo.c
+  vnet/dpo/dvr_dpo.c
 
 nobase_include_HEADERS +=			\
   vnet/dpo/load_balance.h			\
@@ -1121,7 +1152,8 @@ nobase_include_HEADERS +=			\
 ########################################
 
 libvnet_la_SOURCES +=                    \
-  vnet/util/radix.c			 \
+  vnet/util/radix.c			     \
+  vnet/util/refcount.c			 \
   vnet/util/trajectory.c
 
 ########################################
@@ -1147,7 +1179,8 @@ libvnet_la_SOURCES +=                           \
   vnet/bier/bier_disp_entry.c			\
   vnet/bier/bier_disp_lookup_node.c		\
   vnet/bier/bier_disp_dispatch_node.c		\
-  vnet/bier/bier_disp_table.c
+  vnet/bier/bier_disp_table.c			\
+  vnet/bier/bier_bift_table.c
 
 nobase_include_HEADERS +=			\
   vnet/bier/bier_types.h                        \
@@ -1157,6 +1190,21 @@ nobase_include_HEADERS +=			\
   vnet/bier/bier_table.h
 
 API_FILES += vnet/bier/bier.api
+
+########################################
+# Test apps
+########################################
+
+noinst_PROGRAMS += tcp_echo udp_echo
+
+TEST_APPS_LDADD = libvlibmemoryclient.la libsvm.la libvppinfra.la
+TEST_APPS_LDADD += -lpthread -lm -lrt
+
+tcp_echo_SOURCES = tests/vnet/session/tcp_echo.c
+tcp_echo_LDADD = $(TEST_APPS_LDADD)
+
+udp_echo_SOURCES = tests/vnet/session/udp_echo.c
+udp_echo_LDADD = $(TEST_APPS_LDADD)
 
 ########################################
 # Plugin client library

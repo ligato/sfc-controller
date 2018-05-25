@@ -23,6 +23,7 @@
 
 /** per-worker built-in server copy buffers */
 u8 **copy_buffers;
+static int app_index = ~0;
 
 static int
 builtin_session_create_callback (stream_session_t * s)
@@ -38,6 +39,21 @@ builtin_session_disconnect_callback (stream_session_t * s)
   stream_session_disconnect (s);
 }
 
+static void
+builtin_session_reset_callback (stream_session_t * s)
+{
+  clib_warning ("Reset session %U", format_stream_session, s, 2);
+  stream_session_cleanup (s);
+}
+
+static int
+builtin_session_connected_callback (u32 app_index, u32 api_context,
+				    stream_session_t * s, u8 is_fail)
+{
+  clib_warning ("called...");
+  return -1;
+}
+
 static int
 builtin_server_rx_callback (stream_session_t * s)
 {
@@ -46,7 +62,7 @@ builtin_server_rx_callback (stream_session_t * s)
   int actual_transfer;
   u8 *my_copy_buffer;
   session_fifo_event_t evt;
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
 
   my_copy_buffer = copy_buffers[s->thread_index];
   rx_fifo = s->server_rx_fifo;
@@ -74,8 +90,7 @@ builtin_server_rx_callback (stream_session_t * s)
       evt.fifo = tx_fifo;
       evt.event_type = FIFO_EVENT_APP_TX;
       q = session_manager_get_vpp_event_queue (s->thread_index);
-      unix_shared_memory_queue_add (q, (u8 *) & evt,
-				    0 /* do wait for mutex */ );
+      svm_queue_add (q, (u8 *) & evt, 0 /* do wait for mutex */ );
     }
 
   return 0;
@@ -84,8 +99,10 @@ builtin_server_rx_callback (stream_session_t * s)
 /* *INDENT-OFF* */
 static session_cb_vft_t builtin_server = {
     .session_accept_callback = builtin_session_create_callback,
+    .session_connected_callback = builtin_session_connected_callback,
     .session_disconnect_callback = builtin_session_disconnect_callback,
-    .builtin_server_rx_callback = builtin_server_rx_callback
+    .builtin_server_rx_callback = builtin_server_rx_callback,
+    .session_reset_callback = builtin_session_reset_callback
 };
 /* *INDENT-ON* */
 
@@ -107,8 +124,8 @@ attach_builtin_uri_server ()
   a->segment_name_length = segment_name_length;
   a->session_cb_vft = &builtin_server;
 
-  options[SESSION_OPTIONS_ACCEPT_COOKIE] = 0x12345678;
-  options[SESSION_OPTIONS_SEGMENT_SIZE] = (2 << 30);	/*$$$$ config / arg */
+  options[APP_OPTIONS_ACCEPT_COOKIE] = 0x12345678;
+  options[APP_OPTIONS_SEGMENT_SIZE] = (2 << 30);	/*$$$$ config / arg */
   options[APP_OPTIONS_FLAGS] = APP_OPTIONS_FLAGS_IS_BUILTIN;
   options[APP_OPTIONS_PREALLOC_FIFO_PAIRS] = 1024;
 
@@ -116,6 +133,8 @@ attach_builtin_uri_server ()
 
   if (vnet_application_attach (a))
     return -1;
+
+  app_index = a->app_index;
   return 0;
 }
 
@@ -131,7 +150,7 @@ bind_builtin_uri_server (u8 * uri)
 
   memset (a, 0, sizeof (*a));
   a->uri = (char *) uri;
-  a->app_index = ~0;		/* built-in server */
+  a->app_index = app_index;
 
   rv = vnet_bind_uri (a);
 
@@ -143,7 +162,7 @@ unbind_builtin_uri_server (u8 * uri)
 {
   vnet_unbind_args_t _a, *a = &_a;
 
-  a->app_index = ~0;
+  a->app_index = app_index;
   a->uri = (char *) uri;
 
   return vnet_unbind_uri (a);
@@ -181,6 +200,8 @@ builtin_uri_bind_command_fn (vlib_main_t * vm,
 
   if (uri == 0)
     return clib_error_return (0, "uri to bind not specified...");
+
+  vnet_session_enable_disable (vm, 1 /* turn on UDP, etc. */ );
 
   rv = bind_builtin_uri_server (uri);
 

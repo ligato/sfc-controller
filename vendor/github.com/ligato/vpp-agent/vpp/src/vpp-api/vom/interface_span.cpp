@@ -20,7 +20,7 @@ namespace VOM {
 /**
  * A DB of all interface_span config
  */
-singular_db<interface_span::key_type_t, interface_span> interface_span::m_db;
+singular_db<interface_span::key_t, interface_span> interface_span::m_db;
 
 interface_span::event_handler interface_span::m_evh;
 
@@ -96,7 +96,7 @@ interface_span::update(const interface_span& desired)
 }
 
 std::ostream&
-operator<<(std::ostream& os, const interface_span::key_type_t& key)
+operator<<(std::ostream& os, const interface_span::key_t& key)
 {
   os << "[" << key.first << ", " << key.second << "]";
 
@@ -132,8 +132,8 @@ interface_span::event_handler::handle_replay()
 void
 interface_span::event_handler::handle_populate(const client_db::key_t& key)
 {
-  std::shared_ptr<interface_span_cmds::dump_cmd> cmd(
-    new interface_span_cmds::dump_cmd());
+  std::shared_ptr<interface_span_cmds::dump_cmd> cmd =
+    std::make_shared<interface_span_cmds::dump_cmd>();
 
   HW::enqueue(cmd);
   HW::write();

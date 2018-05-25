@@ -1,20 +1,20 @@
 /*
- *------------------------------------------------------------------
+ * ------------------------------------------------------------------
  * custom_dump.c - pretty-print API messages for replay
  *
- * Copyright (c) 2014-2016 Cisco and/or its affiliates.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at:
+ * Copyright (c) 2014-2016 Cisco and/or its affiliates. Licensed under the
+ * Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the
+ * License at:
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *------------------------------------------------------------------
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ * ------------------------------------------------------------------
  */
 
 #include <vnet/vnet.h>
@@ -25,6 +25,7 @@
 #include <vnet/l2tp/l2tp.h>
 #include <vnet/l2/l2_input.h>
 #include <vnet/srv6/sr.h>
+#include <vnet/srmpls/sr_mpls.h>
 #include <vnet/vxlan-gpe/vxlan_gpe.h>
 #include <vnet/geneve/geneve.h>
 #include <vnet/classify/policer_classify.h>
@@ -547,6 +548,61 @@ static void *vl_api_sw_interface_tap_dump_t_print
   FINISH;
 }
 
+static void *vl_api_tap_create_v2_t_print
+  (vl_api_tap_create_v2_t * mp, void *handle)
+{
+  u8 *s;
+  u8 null_mac[6];
+
+  memset (null_mac, 0, sizeof (null_mac));
+
+  s = format (0, "SCRIPT: tap_create_v2 ");
+  s = format (s, "id %s ", mp->id);
+  if (memcmp (mp->mac_address, null_mac, 6))
+    s = format (s, "mac-address %U ",
+		format_ethernet_address, mp->mac_address);
+  if (memcmp (mp->host_mac_addr, null_mac, 6))
+    s = format (s, "host-mac-addr %U ",
+		format_ethernet_address, mp->host_mac_addr);
+  if (mp->host_if_name_set)
+    s = format (s, "host-if-name %s ", mp->host_if_name);
+  if (mp->host_namespace_set)
+    s = format (s, "host-ns %s ", mp->host_namespace);
+  if (mp->host_bridge_set)
+    s = format (s, "host-bridge %s ", mp->host_bridge);
+  if (mp->host_ip4_addr_set)
+    s = format (s, "host-ip4-addr %U/%d ", format_ip4_address,
+		mp->host_ip4_addr, mp->host_ip4_prefix_len);
+  if (mp->host_ip6_addr_set)
+    s = format (s, "host-ip6-addr %U/%d ", format_ip6_address,
+		mp->host_ip6_addr, mp->host_ip6_prefix_len);
+  if (mp->tx_ring_sz)
+    s = format (s, "tx-ring-size %d ", mp->tx_ring_sz);
+  if (mp->rx_ring_sz)
+    s = format (s, "rx-ring-size %d ", mp->rx_ring_sz);
+  FINISH;
+}
+
+static void *vl_api_tap_delete_v2_t_print
+  (vl_api_tap_delete_v2_t * mp, void *handle)
+{
+  u8 *s;
+
+  s = format (0, "SCRIPT: tap_delete_v2 ");
+  s = format (s, "sw_if_index %d ", ntohl (mp->sw_if_index));
+
+  FINISH;
+}
+
+static void *vl_api_sw_interface_tap_v2_dump_t_print
+  (vl_api_sw_interface_tap_v2_dump_t * mp, void *handle)
+{
+  u8 *s;
+
+  s = format (0, "SCRIPT: sw_interface_tap_v2_dump ");
+
+  FINISH;
+}
 
 static void *vl_api_ip_add_del_route_t_print
   (vl_api_ip_add_del_route_t * mp, void *handle)
@@ -2009,7 +2065,6 @@ format_policer_action (u8 * s, va_list * va)
 	}
       s = format (s, "%s", t);
     }
-
   return s;
 }
 
@@ -2555,7 +2610,6 @@ static void *vl_api_lisp_add_del_remote_mapping_t_print
       s = format (s, "seid %U ", format_lisp_flat_eid,
 		  mp->eid_type, mp->seid, mp->seid_len);
     }
-
   rloc_num = clib_net_to_host_u32 (mp->rloc_num);
 
   if (0 == rloc_num)
@@ -2778,7 +2832,6 @@ static void *vl_api_lisp_eid_table_dump_t_print
 	  break;
 	}
     }
-
   FINISH;
 }
 
@@ -2891,7 +2944,6 @@ static void *vl_api_l2_interface_pbb_tag_rewrite_t_print
       s = format (s, "sid %d ", ntohl (mp->i_sid));
       s = format (s, "vlanid %d ", ntohs (mp->b_vlanid));
     }
-
   FINISH;
 }
 
@@ -3130,7 +3182,7 @@ static void *vl_api_sw_interface_set_lldp_t_print
   (vl_api_sw_interface_set_lldp_t * mp, void *handle)
 {
   u8 *s;
-  u8 null_data[128];
+  u8 null_data[256];
 
   memset (null_data, 0, sizeof (null_data));
 
@@ -3269,6 +3321,9 @@ _(TAP_CONNECT, tap_connect)                                             \
 _(TAP_MODIFY, tap_modify)                                               \
 _(TAP_DELETE, tap_delete)                                               \
 _(SW_INTERFACE_TAP_DUMP, sw_interface_tap_dump)                         \
+_(TAP_CREATE_V2, tap_create_v2)                                         \
+_(TAP_DELETE_V2, tap_delete_v2)                                         \
+_(SW_INTERFACE_TAP_V2_DUMP, sw_interface_tap_v2_dump)                   \
 _(IP_ADD_DEL_ROUTE, ip_add_del_route)                                   \
 _(PROXY_ARP_ADD_DEL, proxy_arp_add_del)                                 \
 _(PROXY_ARP_INTFC_ENABLE_DISABLE, proxy_arp_intfc_enable_disable)       \
@@ -3445,7 +3500,5 @@ vl_msg_api_custom_dump_configure (api_main_t * am)
 /*
  * fd.io coding-style-patch-verification: ON
  *
- * Local Variables:
- * eval: (c-set-style "gnu")
- * End:
+ * Local Variables: eval: (c-set-style "gnu") End:
  */

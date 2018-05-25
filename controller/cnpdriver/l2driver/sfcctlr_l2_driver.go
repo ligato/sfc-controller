@@ -32,7 +32,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ligato/cn-infra/db/keyval"
-	"github.com/ligato/cn-infra/logging/logroot"
+	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/ligato/cn-infra/servicelabel"
 	l2driver "github.com/ligato/sfc-controller/controller/cnpdriver/l2driver/model"
 	"github.com/ligato/sfc-controller/controller/extentitydriver"
@@ -40,9 +40,9 @@ import (
 	"github.com/ligato/sfc-controller/controller/utils/ipam"
 	"github.com/ligato/vpp-agent/clientv1/linux"
 	"github.com/ligato/vpp-agent/clientv1/linux/remoteclient"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l3"
 	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/ifplugin/model/interfaces"
 	"sort"
 	"strconv"
@@ -50,7 +50,7 @@ import (
 )
 
 var (
-	log = logroot.StandardLogger()
+	log = logrus.DefaultLogger()
 )
 
 type sfcCtlrL2CNPDriver struct {

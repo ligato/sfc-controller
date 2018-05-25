@@ -60,6 +60,16 @@ public:
   ~nat_static();
 
   /**
+   * Comparison operator - for UT
+   */
+  bool operator==(const nat_static& n) const;
+
+  /**
+   * Return the object's key
+   */
+  const key_t key() const;
+
+  /**
    * Return the matching 'singular instance'
    */
   std::shared_ptr<nat_static> singular() const;
@@ -67,7 +77,7 @@ public:
   /**
    * Find the instnace of the bridge_domain domain in the OM
    */
-  static std::shared_ptr<nat_static> find(const nat_static& temp);
+  static std::shared_ptr<nat_static> find(const key_t& key);
 
   /**
    * Dump all bridge_domain-doamin into the stream provided
@@ -158,12 +168,12 @@ private:
   /**
    * The 'inside' IP address, could be v4 or v6
    */
-  const boost::asio::ip::address& m_inside;
+  const boost::asio::ip::address m_inside;
 
   /**
    * The 'outside' IP address - always v4
    */
-  const boost::asio::ip::address_v4& m_outside;
+  const boost::asio::ip::address_v4 m_outside;
 
   /**
    * A map of all NAT statics

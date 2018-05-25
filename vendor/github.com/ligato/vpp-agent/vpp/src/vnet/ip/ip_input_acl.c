@@ -288,7 +288,7 @@ ip_inacl_inline (vlib_main_t * vm,
 		  if (e0->action == CLASSIFY_ACTION_SET_IP4_FIB_INDEX ||
 		      e0->action == CLASSIFY_ACTION_SET_IP6_FIB_INDEX)
 		    vnet_buffer (b0)->sw_if_index[VLIB_TX] = e0->metadata;
-		  else if (e0->action == CLASSIFY_ACTION_SET_SR_POLICY_INDEX)
+		  else if (e0->action == CLASSIFY_ACTION_SET_METADATA)
 		    vnet_buffer (b0)->ip.adj_index[VLIB_TX] = e0->metadata;
 		}
 	      else
@@ -402,7 +402,7 @@ VLIB_REGISTER_NODE (ip4_inacl_node) = {
 
   .n_next_nodes = ACL_NEXT_INDEX_N_NEXT,
   .next_nodes = {
-    [ACL_NEXT_INDEX_DENY] = "error-drop",
+    [ACL_NEXT_INDEX_DENY] = "ip4-drop",
   },
 };
 /* *INDENT-ON* */
@@ -427,7 +427,7 @@ VLIB_REGISTER_NODE (ip6_inacl_node) = {
 
   .n_next_nodes = ACL_NEXT_INDEX_N_NEXT,
   .next_nodes = {
-    [ACL_NEXT_INDEX_DENY] = "error-drop",
+    [ACL_NEXT_INDEX_DENY] = "ip6-drop",
   },
 };
 /* *INDENT-ON* */

@@ -19,11 +19,13 @@ import (
 	"testing"
 
 	"github.com/ligato/sfc-controller/controller/utils/vty/ssh"
-	log "github.com/ligato/cn-infra/logging/logrus"
+	"github.com/ligato/cn-infra/logging"
+	"github.com/ligato/cn-infra/logging/logrus"
 )
 
 func TestSSH(t *testing.T) {
-	log.SetLevel(log.DebugLevel)
+	var log = logrus.DefaultLogger()
+	log.SetLevel(logging.DebugLevel)
 
 	conn, err := ssh.Connect("10.10.10.10", 22, "cisco", "cisco")
 	if err != nil {

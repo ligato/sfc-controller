@@ -185,7 +185,7 @@ server_rx_callback (stream_session_t * s)
 	{
 	  evt.fifo = active_open_tx_fifo;
 	  evt.event_type = FIFO_EVENT_APP_TX;
-	  if (unix_shared_memory_queue_add
+	  if (svm_queue_add
 	      (bpm->active_open_event_queue[thread_index], (u8 *) & evt,
 	       0 /* do wait for mutex */ ))
 	    clib_warning ("failed to enqueue tx evt");
@@ -299,7 +299,7 @@ active_open_connected_callback (u32 app_index, u32 opaque,
     {
       evt.fifo = s->server_tx_fifo;
       evt.event_type = FIFO_EVENT_APP_TX;
-      if (unix_shared_memory_queue_add
+      if (svm_queue_add
 	  (bpm->active_open_event_queue[thread_index], (u8 *) & evt,
 	   0 /* do wait for mutex */ ))
 	clib_warning ("failed to enqueue tx evt");
@@ -343,7 +343,7 @@ active_open_rx_callback (stream_session_t * s)
     {
       evt.fifo = server_rx_fifo;
       evt.event_type = FIFO_EVENT_APP_TX;
-      if (unix_shared_memory_queue_add
+      if (svm_queue_add
 	  (bpm->server_event_queue[thread_index], (u8 *) & evt,
 	   0 /* do wait for mutex */ ))
 	clib_warning ("failed to enqueue server rx evt");
@@ -383,20 +383,22 @@ server_attach ()
 {
   builtin_proxy_main_t *bpm = &builtin_proxy_main;
   u8 segment_name[128];
-  u64 options[SESSION_OPTIONS_N_OPTIONS];
+  u64 options[APP_OPTIONS_N_OPTIONS];
   vnet_app_attach_args_t _a, *a = &_a;
+  u32 segment_size = 512 << 20;
 
   memset (a, 0, sizeof (*a));
   memset (options, 0, sizeof (options));
 
+  if (bpm->private_segment_size)
+    segment_size = bpm->private_segment_size;
   a->api_client_index = bpm->server_client_index;
   a->session_cb_vft = &builtin_session_cb_vft;
   a->options = options;
-  a->options[SESSION_OPTIONS_SEGMENT_SIZE] = 512 << 20;
-  a->options[SESSION_OPTIONS_RX_FIFO_SIZE] = bpm->fifo_size;
-  a->options[SESSION_OPTIONS_TX_FIFO_SIZE] = bpm->fifo_size;
+  a->options[APP_OPTIONS_SEGMENT_SIZE] = segment_size;
+  a->options[APP_OPTIONS_RX_FIFO_SIZE] = bpm->fifo_size;
+  a->options[APP_OPTIONS_TX_FIFO_SIZE] = bpm->fifo_size;
   a->options[APP_OPTIONS_PRIVATE_SEGMENT_COUNT] = bpm->private_segment_count;
-  a->options[APP_OPTIONS_PRIVATE_SEGMENT_SIZE] = bpm->private_segment_size;
   a->options[APP_OPTIONS_PREALLOC_FIFO_PAIRS] =
     bpm->prealloc_fifos ? bpm->prealloc_fifos : 1;
 
@@ -434,12 +436,11 @@ active_open_attach (void)
   a->segment_name_length = segment_name_length;
   a->session_cb_vft = &builtin_clients;
 
-  options[SESSION_OPTIONS_ACCEPT_COOKIE] = 0x12345678;
-  options[SESSION_OPTIONS_SEGMENT_SIZE] = 512 << 20;
-  options[SESSION_OPTIONS_RX_FIFO_SIZE] = bpm->fifo_size;
-  options[SESSION_OPTIONS_TX_FIFO_SIZE] = bpm->fifo_size;
+  options[APP_OPTIONS_ACCEPT_COOKIE] = 0x12345678;
+  options[APP_OPTIONS_SEGMENT_SIZE] = 512 << 20;
+  options[APP_OPTIONS_RX_FIFO_SIZE] = bpm->fifo_size;
+  options[APP_OPTIONS_TX_FIFO_SIZE] = bpm->fifo_size;
   options[APP_OPTIONS_PRIVATE_SEGMENT_COUNT] = bpm->private_segment_count;
-  options[APP_OPTIONS_PRIVATE_SEGMENT_SIZE] = bpm->private_segment_size;
   options[APP_OPTIONS_PREALLOC_FIFO_PAIRS] =
     bpm->prealloc_fifos ? bpm->prealloc_fifos : 1;
 

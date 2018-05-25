@@ -79,18 +79,24 @@
   _(DEV_TX_OFFLOAD_OUTER_IPV4_CKSUM, "outer-ipv4-cksum") \
   _(DEV_TX_OFFLOAD_QINQ_INSERT, "qinq-insert")
 
+#if RTE_VERSION < RTE_VERSION_NUM(17, 11, 0, 0)
+#define PKT_RX_VLAN PKT_RX_VLAN_PKT
+#endif
+
 #define foreach_dpdk_pkt_rx_offload_flag                                \
-  _ (PKT_RX_VLAN_PKT, "RX packet is a 802.1q VLAN packet")              \
+  _ (PKT_RX_VLAN, "RX packet is a 802.1q VLAN packet")                  \
   _ (PKT_RX_RSS_HASH, "RX packet with RSS hash result")                 \
   _ (PKT_RX_FDIR, "RX packet with FDIR infos")                          \
   _ (PKT_RX_L4_CKSUM_BAD, "L4 cksum of RX pkt. is not OK")              \
   _ (PKT_RX_IP_CKSUM_BAD, "IP cksum of RX pkt. is not OK")              \
+  _ (PKT_RX_EIP_CKSUM_BAD, "External IP header checksum error")         \
   _ (PKT_RX_VLAN_STRIPPED, "RX packet VLAN tag stripped")               \
   _ (PKT_RX_IP_CKSUM_GOOD, "IP cksum of RX pkt. is valid")              \
   _ (PKT_RX_L4_CKSUM_GOOD, "L4 cksum of RX pkt. is valid")              \
   _ (PKT_RX_IEEE1588_PTP, "RX IEEE1588 L2 Ethernet PT Packet")          \
   _ (PKT_RX_IEEE1588_TMST, "RX IEEE1588 L2/L4 timestamped packet")      \
-  _ (PKT_RX_QINQ_STRIPPED, "RX packet QinQ tags stripped")
+  _ (PKT_RX_QINQ_STRIPPED, "RX packet QinQ tags stripped") \
+  _ (PKT_RX_TIMESTAMP, "Timestamp field is valid")
 
 #define foreach_dpdk_pkt_type                                           \
   _ (L2, ETHER, "Ethernet packet")                                      \
@@ -324,6 +330,10 @@ format_dpdk_device_type (u8 * s, va_list * args)
 
     case VNET_DPDK_PMD_VHOST_ETHER:
       dev_type = "VhostEthernet";
+      break;
+
+    case VNET_DPDK_PMD_ENA:
+      dev_type = "AWS ENA VF";
       break;
 
     default:
@@ -585,7 +595,11 @@ format_dpdk_tx_dma_trace (u8 * s, va_list * va)
 
   s = format (s, "\n%Ubuffer 0x%x: %U",
 	      format_white_space, indent,
-	      t->buffer_index, format_vlib_buffer, &t->buffer);
+	      t->buffer_index, format_vnet_buffer, &t->buffer);
+
+  s = format (s, "\n%U%U",
+	      format_white_space, indent,
+	      format_dpdk_rte_mbuf, &t->mb, &t->data);
 
   s = format (s, "\n%U%U", format_white_space, indent,
 	      format_ethernet_header_with_length, t->buffer.pre_data,
@@ -612,7 +626,7 @@ format_dpdk_rx_dma_trace (u8 * s, va_list * va)
 
   s = format (s, "\n%Ubuffer 0x%x: %U",
 	      format_white_space, indent,
-	      t->buffer_index, format_vlib_buffer, &t->buffer);
+	      t->buffer_index, format_vnet_buffer, &t->buffer);
 
   s = format (s, "\n%U%U",
 	      format_white_space, indent,
@@ -712,18 +726,19 @@ format_dpdk_rte_mbuf (u8 * s, va_list * va)
   u32 indent = format_get_indent (s) + 2;
 
   s = format (s, "PKT MBUF: port %d, nb_segs %d, pkt_len %d"
-	      "\n%Ubuf_len %d, data_len %d, ol_flags 0x%x, data_off %d, phys_addr 0x%x"
-	      "\n%Upacket_type 0x%x",
+	      "\n%Ubuf_len %d, data_len %d, ol_flags 0x%lx, data_off %d, phys_addr 0x%x"
+	      "\n%Upacket_type 0x%x l2_len %u l3_len %u outer_l2_len %u outer_l3_len %u",
 	      mb->port, mb->nb_segs, mb->pkt_len,
 	      format_white_space, indent,
 	      mb->buf_len, mb->data_len, mb->ol_flags, mb->data_off,
-	      mb->buf_physaddr, format_white_space, indent, mb->packet_type);
+	      mb->buf_physaddr, format_white_space, indent, mb->packet_type,
+	      mb->l2_len, mb->l3_len, mb->outer_l2_len, mb->outer_l3_len);
 
   if (mb->ol_flags)
     s = format (s, "\n%U%U", format_white_space, indent,
 		format_dpdk_pkt_offload_flags, &mb->ol_flags);
 
-  if ((mb->ol_flags & PKT_RX_VLAN_PKT) &&
+  if ((mb->ol_flags & PKT_RX_VLAN) &&
       ((mb->ol_flags & (PKT_RX_VLAN_STRIPPED | PKT_RX_QINQ_STRIPPED)) == 0))
     {
       ethernet_vlan_header_tv_t *vlan_hdr =

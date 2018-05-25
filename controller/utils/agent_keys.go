@@ -15,11 +15,10 @@
 package utils
 
 import (
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/ifplugin/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l2plugin/model/l2"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/l3plugin/model/l3"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
+	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l3"
 	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/ifplugin/model/interfaces"
-	"net"
 	"strings"
 )
 
@@ -92,6 +91,6 @@ func L3RouteKeyPrefix(vppLabel string) string {
 }
 
 // L3RouteKey constructs L3 route db key
-func L3RouteKey(vppLabel string, vrf uint32, destNet *net.IPNet, nextHop string) string {
-	return agentPrefix + vppLabel + "/" + l3.RouteKey(vrf, destNet, nextHop)
+func L3RouteKey(vppLabel string, vrf uint32, destAddr string, nextHop string) string {
+	return agentPrefix + vppLabel + "/" + l3.RouteKey(vrf, destAddr, nextHop)
 }

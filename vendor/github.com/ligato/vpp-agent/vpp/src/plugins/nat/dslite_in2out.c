@@ -20,7 +20,7 @@ vlib_node_registration_t dslite_in2out_slowpath_node;
 typedef enum
 {
   DSLITE_IN2OUT_NEXT_IP4_LOOKUP,
-  DSLITE_IN2OUT_NEXT_IP6_LOOKUP,
+  DSLITE_IN2OUT_NEXT_IP6_ICMP,
   DSLITE_IN2OUT_NEXT_DROP,
   DSLITE_IN2OUT_NEXT_SLOWPATH,
   DSLITE_IN2OUT_N_NEXT,
@@ -108,13 +108,13 @@ slow_path (dslite_main_t * dm, dslite_session_key_t * in2out_key,
 
       if (snat_alloc_outside_address_and_port
 	  (dm->addr_pool, 0, thread_index, &out2in_key,
-	   &s->outside_address_index, 0, dm->port_per_thread, thread_index))
+	   &s->outside_address_index, dm->port_per_thread, thread_index))
 	ASSERT (0);
     }
   else
     {
       if (snat_alloc_outside_address_and_port
-	  (dm->addr_pool, 0, thread_index, &out2in_key, &address_index, 0,
+	  (dm->addr_pool, 0, thread_index, &out2in_key, &address_index,
 	   dm->port_per_thread, thread_index))
 	{
 	  *error = DSLITE_ERROR_OUT_OF_PORTS;
@@ -278,6 +278,11 @@ dslite_in2out_node_fn_inline (vlib_main_t * vm, vlib_node_runtime_t * node,
 
 	  if (PREDICT_FALSE (ip60->protocol != IP_PROTOCOL_IP_IN_IP))
 	    {
+	      if (ip60->protocol == IP_PROTOCOL_ICMP6)
+		{
+		  next0 = DSLITE_IN2OUT_NEXT_IP6_ICMP;
+		  goto trace0;
+		}
 	      error0 = DSLITE_ERROR_BAD_IP6_PROTOCOL;
 	      next0 = DSLITE_IN2OUT_NEXT_DROP;
 	      goto trace0;
@@ -443,7 +448,7 @@ VLIB_REGISTER_NODE (dslite_in2out_node) = {
   .next_nodes = {
     [DSLITE_IN2OUT_NEXT_DROP] = "error-drop",
     [DSLITE_IN2OUT_NEXT_IP4_LOOKUP] = "ip4-lookup",
-    [DSLITE_IN2OUT_NEXT_IP6_LOOKUP] = "ip6-lookup",
+    [DSLITE_IN2OUT_NEXT_IP6_ICMP] = "ip6-icmp-input",
     [DSLITE_IN2OUT_NEXT_SLOWPATH] = "dslite-in2out-slowpath",
   },
 };
@@ -472,7 +477,7 @@ VLIB_REGISTER_NODE (dslite_in2out_slowpath_node) = {
   .next_nodes = {
     [DSLITE_IN2OUT_NEXT_DROP] = "error-drop",
     [DSLITE_IN2OUT_NEXT_IP4_LOOKUP] = "ip4-lookup",
-    [DSLITE_IN2OUT_NEXT_IP6_LOOKUP] = "ip6-lookup",
+    [DSLITE_IN2OUT_NEXT_IP6_ICMP] = "ip6-lookup",
     [DSLITE_IN2OUT_NEXT_SLOWPATH] = "dslite-in2out-slowpath",
   },
 };

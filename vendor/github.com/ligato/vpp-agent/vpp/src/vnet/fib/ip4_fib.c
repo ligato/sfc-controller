@@ -106,11 +106,14 @@ ip4_create_fib_with_table_id (u32 table_id,
 {
     fib_table_t *fib_table;
     ip4_fib_t *v4_fib;
+    void *old_heap;
 
     pool_get_aligned(ip4_main.fibs, fib_table, CLIB_CACHE_LINE_BYTES);
     memset(fib_table, 0, sizeof(*fib_table));
 
+    old_heap = clib_mem_set_heap (ip4_main.mtrie_mheap);
     pool_get_aligned(ip4_main.v4_fibs, v4_fib, CLIB_CACHE_LINE_BYTES);
+    clib_mem_set_heap (old_heap);
 
     ASSERT((fib_table - ip4_main.fibs) ==
            (v4_fib - ip4_main.v4_fibs));
@@ -326,12 +329,17 @@ ip4_fib_table_entry_insert (ip4_fib_t *fib,
 	/*
 	 * adding a new entry
 	 */
+        uword *old_heap;
+        old_heap = clib_mem_set_heap (ip4_main.mtrie_mheap);
+
 	if (NULL == hash) {
 	    hash = hash_create (32 /* elts */, sizeof (uword));
 	    hash_set_flags (hash, HASH_FLAG_NO_AUTO_SHRINK);
+
 	}
 	hash = hash_set(hash, key, fib_entry_index);
 	fib->fib_entry_by_dst_address[len] = hash;
+        clib_mem_set_heap (old_heap);
     }
     else
     {
@@ -359,7 +367,11 @@ ip4_fib_table_entry_remove (ip4_fib_t *fib,
     }
     else 
     {
+        uword *old_heap;
+
+        old_heap = clib_mem_set_heap (ip4_main.mtrie_mheap);
 	hash_unset(hash, key);
+        clib_mem_set_heap (old_heap);
     }
 
     fib->fib_entry_by_dst_address[len] = hash;
@@ -481,6 +493,17 @@ ip4_fib_table_show_one (ip4_fib_t *fib,
                      FIB_ENTRY_FORMAT_DETAIL));
 }
 
+u8 *
+format_ip4_fib_table_memory (u8 * s, va_list * args)
+{
+    s = format(s, "%=30s %=6d %=8ld\n",
+               "IPv4 unicast",
+               pool_elts(ip4_main.fibs),
+               mheap_bytes(ip4_main.mtrie_mheap));
+
+    return (s);
+}
+
 static clib_error_t *
 ip4_show_fib (vlib_main_t * vm,
 	      unformat_input_t * input,
@@ -488,15 +511,17 @@ ip4_show_fib (vlib_main_t * vm,
 {
     ip4_main_t * im4 = &ip4_main;
     fib_table_t * fib_table;
-    int verbose, matching, mtrie;
+    u64 total_mtrie_memory, total_hash_memory;
+    int verbose, matching, mtrie, memory;
     ip4_address_t matching_address;
     u32 matching_mask = 32;
     int i, table_id = -1, fib_index = ~0;
     int detail = 0;
 
     verbose = 1;
-    matching = 0;
-    mtrie = 0;
+    matching = mtrie = memory = 0;
+    total_hash_memory = total_mtrie_memory = 0;
+
     while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
 	if (unformat (input, "brief") || unformat (input, "summary")
@@ -508,6 +533,10 @@ ip4_show_fib (vlib_main_t * vm,
 
 	else if (unformat (input, "mtrie"))
 	    mtrie = 1;
+
+        else if (unformat (input, "mem") ||
+                 unformat (input, "memory"))
+	    memory = 1;
 
 	else if (unformat (input, "%U/%d",
 			   unformat_ip4_address, &matching_address, &matching_mask))
@@ -535,6 +564,32 @@ ip4_show_fib (vlib_main_t * vm,
 	if (fib_index != ~0 && fib_index != (int)fib->index)
 	    continue;
 
+        if (memory)
+        {
+            uword mtrie_size, hash_size;
+
+            mtrie_size = ip4_fib_mtrie_memory_usage(&fib->mtrie);
+            hash_size = 0;
+
+	    for (i = 0; i < ARRAY_LEN (fib->fib_entry_by_dst_address); i++)
+	    {
+		uword * hash = fib->fib_entry_by_dst_address[i];
+                if (NULL != hash)
+                {
+                    hash_size += hash_bytes(hash);
+                }
+            }
+            if (verbose)
+                vlib_cli_output (vm, "%U mtrie:%d hash:%d",
+                                 format_fib_table_name, fib->index,
+                                 FIB_PROTOCOL_IP4,
+                                 mtrie_size,
+                                 hash_size);
+            total_mtrie_memory += mtrie_size;
+            total_hash_memory += hash_size;
+            continue;
+        }
+
 	s = format(s, "%U, fib_index:%d, flow hash:[%U] locks:[",
                    format_fib_table_name, fib->index,
                    FIB_PROTOCOL_IP4,
@@ -555,6 +610,11 @@ ip4_show_fib (vlib_main_t * vm,
         vec_free(s);
 
 	/* Show summary? */
+	if (mtrie)
+        {
+	    vlib_cli_output (vm, "%U", format_ip4_fib_mtrie, &fib->mtrie, verbose);
+            continue;
+        }
 	if (! verbose)
 	{
 	    vlib_cli_output (vm, "%=20s%=16s", "Prefix length", "Count");
@@ -567,11 +627,6 @@ ip4_show_fib (vlib_main_t * vm,
 	    }
 	    continue;
 	}
-	if (mtrie)
-        {
-	    vlib_cli_output (vm, "%U", format_ip4_fib_mtrie, &fib->mtrie);
-            continue;
-        }
 
 	if (!matching)
 	{
@@ -583,6 +638,12 @@ ip4_show_fib (vlib_main_t * vm,
                                    matching_mask, detail);
 	}
     }));
+
+    if (memory)
+        vlib_cli_output (vm, "totals: mtrie:%ld hash:%ld all:%ld",
+                         total_mtrie_memory,
+                         total_hash_memory,
+                         total_mtrie_memory + total_hash_memory);
 
     return 0;
 }

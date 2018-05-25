@@ -33,9 +33,18 @@ path::special_t::special_t(int v, const std::string& s)
 {
 }
 
+const path::flags_t path::flags_t::NONE(0, "none");
+const path::flags_t path::flags_t::DVR((1 << 0), "dvr");
+
+path::flags_t::flags_t(int v, const std::string& s)
+  : enum_base<path::flags_t>(v, s)
+{
+}
+
 path::path(special_t special)
   : m_type(special)
   , m_nh_proto(nh_proto_t::IPV4)
+  , m_flags(flags_t::NONE)
   , m_nh()
   , m_rd(nullptr)
   , m_interface(nullptr)
@@ -50,6 +59,7 @@ path::path(const boost::asio::ip::address& nh,
            uint8_t preference)
   : m_type(special_t::STANDARD)
   , m_nh_proto(nh_proto_t::from_address(nh))
+  , m_flags(flags_t::NONE)
   , m_nh(nh)
   , m_rd(nullptr)
   , m_interface(interface.singular())
@@ -64,6 +74,7 @@ path::path(const route_domain& rd,
            uint8_t preference)
   : m_type(special_t::STANDARD)
   , m_nh_proto(nh_proto_t::from_address(nh))
+  , m_flags(flags_t::NONE)
   , m_nh(nh)
   , m_rd(rd.singular())
   , m_interface(nullptr)
@@ -74,10 +85,12 @@ path::path(const route_domain& rd,
 
 path::path(const interface& interface,
            const nh_proto_t& proto,
+           const flags_t& flags,
            uint8_t weight,
            uint8_t preference)
   : m_type(special_t::STANDARD)
   , m_nh_proto(proto)
+  , m_flags(flags)
   , m_nh()
   , m_rd(nullptr)
   , m_interface(interface.singular())
@@ -89,6 +102,7 @@ path::path(const interface& interface,
 path::path(const path& p)
   : m_type(p.m_type)
   , m_nh_proto(p.m_nh_proto)
+  , m_flags(p.m_flags)
   , m_nh(p.m_nh)
   , m_rd(p.m_rd)
   , m_interface(p.m_interface)
@@ -100,16 +114,52 @@ path::path(const path& p)
 bool
 path::operator<(const path& p) const
 {
+  if (m_nh_proto < p.m_nh_proto)
+    return true;
+  if (m_flags < p.m_flags)
+    return true;
   if (m_type < p.m_type)
+    return true;
+  if (m_rd && !p.m_rd)
+    return false;
+  if (!m_rd && p.m_rd)
     return true;
   if (m_rd->table_id() < p.m_rd->table_id())
     return true;
   if (m_nh < p.m_nh)
     return true;
+  if (m_interface && !p.m_interface)
+    return false;
+  if (!m_interface && p.m_interface)
+    return true;
   if (m_interface->handle() < p.m_interface->handle())
     return true;
 
   return (false);
+}
+
+path::~path()
+{
+}
+
+bool
+path::operator==(const path& p) const
+{
+  bool result = true;
+  if (m_rd && !p.m_rd)
+    return false;
+  if (!m_rd && p.m_rd)
+    return false;
+  if (m_rd && p.m_rd)
+    result &= (*m_rd == *p.m_rd);
+  if (m_interface && !p.m_interface)
+    return false;
+  if (!m_interface && p.m_interface)
+    return false;
+  if (m_interface && p.m_interface)
+    result &= (*m_interface == *p.m_interface);
+  return (result && (m_type == p.m_type) && (m_nh == p.m_nh) &&
+          (m_nh_proto == p.m_nh_proto) && (m_flags == p.m_flags));
 }
 
 std::string
@@ -119,7 +169,7 @@ path::to_string() const
 
   s << "path:["
     << "type:" << m_type.to_string() << " proto:" << m_nh_proto.to_string()
-    << " neighbour:" << m_nh.to_string();
+    << " flags:" << m_flags.to_string() << " neighbour:" << m_nh.to_string();
   if (m_rd) {
     s << " " << m_rd->to_string();
   }
@@ -142,6 +192,12 @@ nh_proto_t
 path::nh_proto() const
 {
   return m_nh_proto;
+}
+
+path::flags_t
+path::flags() const
+{
+  return m_flags;
 }
 
 const boost::asio::ip::address&
@@ -174,6 +230,14 @@ path::preference() const
   return m_preference;
 }
 
+ip_route::ip_route(const prefix_t& prefix, const path& p)
+  : m_hw(false)
+  , m_rd(route_domain::get_default())
+  , m_prefix(prefix)
+  , m_paths({ p })
+{
+}
+
 ip_route::ip_route(const prefix_t& prefix)
   : m_hw(false)
   , m_rd(route_domain::get_default())
@@ -198,12 +262,35 @@ ip_route::ip_route(const route_domain& rd, const prefix_t& prefix)
 {
 }
 
+ip_route::ip_route(const route_domain& rd,
+                   const prefix_t& prefix,
+                   const path& p)
+  : m_hw(false)
+  , m_rd(rd.singular())
+  , m_prefix(prefix)
+  , m_paths({ p })
+{
+}
+
 ip_route::~ip_route()
 {
   sweep();
 
   // not in the DB anymore.
-  m_db.release(std::make_pair(m_rd->table_id(), m_prefix), this);
+  m_db.release(key(), this);
+  m_paths.clear();
+}
+
+const ip_route::key_t
+ip_route::key() const
+{
+  return (std::make_pair(m_rd->table_id(), m_prefix));
+}
+
+bool
+ip_route::operator==(const ip_route& i) const
+{
+  return ((key() == i.key()) && (m_paths == i.m_paths));
 }
 
 void
@@ -262,8 +349,13 @@ ip_route::update(const ip_route& r)
 std::shared_ptr<ip_route>
 ip_route::find_or_add(const ip_route& temp)
 {
-  return (m_db.find_or_add(std::make_pair(temp.m_rd->table_id(), temp.m_prefix),
-                           temp));
+  return (m_db.find_or_add(temp.key(), temp));
+}
+
+std::shared_ptr<ip_route>
+ip_route::find(const key_t& k)
+{
+  return (m_db.find(k));
 }
 
 std::shared_ptr<ip_route>
@@ -293,10 +385,10 @@ ip_route::event_handler::handle_replay()
 void
 ip_route::event_handler::handle_populate(const client_db::key_t& key)
 {
-  std::shared_ptr<ip_route_cmds::dump_v4_cmd> cmd_v4(
-    new ip_route_cmds::dump_v4_cmd());
-  std::shared_ptr<ip_route_cmds::dump_v6_cmd> cmd_v6(
-    new ip_route_cmds::dump_v6_cmd());
+  std::shared_ptr<ip_route_cmds::dump_v4_cmd> cmd_v4 =
+    std::make_shared<ip_route_cmds::dump_v4_cmd>();
+  std::shared_ptr<ip_route_cmds::dump_v6_cmd> cmd_v6 =
+    std::make_shared<ip_route_cmds::dump_v6_cmd>();
 
   HW::enqueue(cmd_v4);
   HW::enqueue(cmd_v6);
@@ -308,8 +400,8 @@ ip_route::event_handler::handle_populate(const client_db::key_t& key)
     prefix_t pfx(0, payload.address, payload.address_length);
 
     /**
-* populating the route domain here
-*/
+     * populating the route domain here
+     */
     route_domain rd_temp(payload.table_id);
     std::shared_ptr<route_domain> rd = route_domain::find(rd_temp);
     if (!rd) {
@@ -341,10 +433,10 @@ ip_route::event_handler::handle_populate(const client_db::key_t& key)
     VOM_LOG(log_level_t::DEBUG) << "ip-route-dump: " << ip_r.to_string();
 
     /*
-* Write each of the discovered interfaces into the OM,
-* but disable the HW Command q whilst we do, so that no
-* commands are sent to VPP
-*/
+     * Write each of the discovered interfaces into the OM,
+     * but disable the HW Command q whilst we do, so that no
+     * commands are sent to VPP
+     */
     OM::commit(key, ip_r);
   }
 
@@ -383,10 +475,10 @@ ip_route::event_handler::handle_populate(const client_db::key_t& key)
     VOM_LOG(log_level_t::DEBUG) << "ip-route-dump: " << ip_r.to_string();
 
     /*
-* Write each of the discovered interfaces into the OM,
-* but disable the HW Command q whilst we do, so that no
-* commands are sent to VPP
-*/
+     * Write each of the discovered interfaces into the OM,
+     * but disable the HW Command q whilst we do, so that no
+     * commands are sent to VPP
+     */
     OM::commit(key, ip_r);
   }
 }

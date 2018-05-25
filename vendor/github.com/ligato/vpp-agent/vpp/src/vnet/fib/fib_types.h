@@ -340,6 +340,14 @@ typedef enum fib_route_path_flags_t_
      * A path that resolves via a BIER impostion object
      */
     FIB_ROUTE_PATH_BIER_IMP = (1 << 12),
+    /**
+     * A path that resolves via another table
+     */
+    FIB_ROUTE_PATH_DEAG = (1 << 13),
+    /**
+     * A path that resolves via a DVR DPO
+     */
+    FIB_ROUTE_PATH_DVR = (1 << 14),
 } fib_route_path_flags_t;
 
 /**
@@ -443,6 +451,11 @@ typedef struct fib_route_path_t_ {
          * UDP encap ID
          */
         u32 frp_udp_encap_id;
+
+        /**
+         * Resolving via a BIER Fmask
+         */
+        index_t frp_bier_fmask;
     };
     /**
      * [un]equal cost path weight
@@ -459,6 +472,16 @@ typedef struct fib_route_path_t_ {
      */
     fib_route_path_flags_t frp_flags;
 } fib_route_path_t;
+
+/**
+ * Unformat a fib_route_path_t from CLI input
+ */
+extern uword unformat_fib_route_path(unformat_input_t * input, va_list * args);
+
+/**
+ * A help string to list the FIB path options
+ */
+#define FIB_ROUTE_PATH_HELP "[next-hop-address] [next-hop-interface] [next-hop-table <value>] [weight <value>] [preference <value>] [udp-encap-id <value>] [ip4-lookup-in-table <value>] [ip6-lookup-in-table <value>] [mpls-lookup-in-table <value>] [resolve-via-host] [resolve-via-connected] [rx-ip4 <interface>] [out-labels <value value value>]"
 
 /**
  * @brief 

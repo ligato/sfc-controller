@@ -6,7 +6,7 @@
 # You may obtain a copy of the License at:
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
-# l
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,13 +14,13 @@
 # limitations under the License.
 #
 
-import os, util
+import util
 from string import Template
 
 import jni_gen
 
 
-def is_manually_generated(f_name, plugin_name):
+def is_manually_generated(f_name):
     return f_name in {'control_ping_reply'}
 
 
@@ -67,7 +67,7 @@ def generate_class_cache(func_list, plugin_name):
         class_name = util.underscore_to_camelcase_upper(c_name)
         ref_name = util.underscore_to_camelcase(c_name)
 
-        if util.is_ignored(c_name) or util.is_control_ping(class_name):
+        if util.is_control_ping(class_name):
             continue
 
         class_references.append(class_reference_template.substitute(
@@ -139,15 +139,19 @@ JNIEXPORT jint JNICALL Java_io_fd_vpp_jvpp_${plugin_name}_JVpp${java_plugin_name
     return my_context_id;
 }""")
 
+
 def generate_jni_impl(func_list, plugin_name, inputfile):
     jni_impl = []
     for f in func_list:
         f_name = f['name']
         camel_case_function_name = util.underscore_to_camelcase(f_name)
-        if is_manually_generated(f_name, plugin_name) or util.is_reply(camel_case_function_name) \
-                or util.is_ignored(f_name) or util.is_just_notification(f_name):
+        if is_manually_generated(f_name):
+            # Skip control ping managed by jvpp registry.
+            continue
+        if not (util.is_dump(f_name) or util.is_request(f_name, func_list)):
             continue
 
+        # Generate jni bindings for sending dump and request messages.
         arguments = ''
         request_class = ''
         jni_identifiers = ''
@@ -254,12 +258,13 @@ def generate_msg_handlers(func_list, plugin_name, inputfile):
         dto_name = util.underscore_to_camelcase_upper(handler_name)
         ref_name = util.underscore_to_camelcase(handler_name)
 
-        if is_manually_generated(handler_name, plugin_name) or util.is_ignored(handler_name):
+        if is_manually_generated(handler_name):
+            # Skip control ping managed by jvpp registry.
+            continue
+        if util.is_dump(handler_name) or util.is_request(handler_name, func_list):
             continue
 
-        if not util.is_reply(dto_name) and not util.is_notification(handler_name):
-            continue
-
+        # Generate msg handlers for all messages except for dumps and requests (handled by vpp, not client).
         dto_setters = ''
         err_handler = ''
         # dto setters
@@ -306,12 +311,15 @@ def generate_handler_registration(func_list):
     handler_registration = ["#define foreach_api_reply_handler \\\n"]
     for f in func_list:
         name = f['name']
-        camelcase_name = util.underscore_to_camelcase(f['name'])
+        camelcase_name = util.underscore_to_camelcase(name)
 
-        if (not util.is_reply(camelcase_name) and not util.is_notification(name)) or util.is_ignored(name) \
-                or util.is_control_ping(camelcase_name):
+        if util.is_control_ping(camelcase_name):
+            # Skip control ping managed by registry.
+            continue
+        if util.is_dump(name) or util.is_request(name, func_list):
             continue
 
+        # Generate msg handler registration for all messages except for dumps and requests.
         handler_registration.append(handler_registration_template.substitute(
             name=name,
             crc=f['crc']))
@@ -327,9 +335,6 @@ def generate_api_verification(func_list):
     api_verification = ["#define foreach_supported_api_message \\\n"]
     for f in func_list:
         name = f['name']
-
-        if util.is_ignored(name):
-            continue
 
         api_verification.append(api_verification_template.substitute(
             name=name,
@@ -359,6 +364,7 @@ $msg_handlers
 // Registration of message handlers in vlib
 $handler_registration
 """)
+
 
 def generate_jvpp(func_list, plugin_name, inputfile, path):
     """ Generates jvpp C file """

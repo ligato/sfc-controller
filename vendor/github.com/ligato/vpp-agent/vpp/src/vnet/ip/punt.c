@@ -40,7 +40,8 @@
 #include <stdbool.h>
 
 #define foreach_punt_next			\
-  _ (PUNT, "error-punt")
+  _ (PUNT4, "ip4-punt")                         \
+  _ (PUNT6, "ip6-punt")
 
 typedef enum
 {
@@ -57,6 +58,8 @@ enum punt_socket_rx_next_e
   PUNT_SOCKET_RX_NEXT_IP6_LOOKUP,
   PUNT_SOCKET_RX_N_NEXT
 };
+
+#define punt_next_punt(is_ip4) (is_ip4 ? PUNT_NEXT_PUNT4 : PUNT_NEXT_PUNT6)
 
 vlib_node_registration_t udp4_punt_node;
 vlib_node_registration_t udp6_punt_node;
@@ -104,7 +107,8 @@ udp46_punt_inline (vlib_main_t * vm,
     {
       u32 n_left_to_next;
 
-      vlib_get_next_frame (vm, node, PUNT_NEXT_PUNT, to_next, n_left_to_next);
+      vlib_get_next_frame (vm, node, punt_next_punt (is_ip4), to_next,
+			   n_left_to_next);
 
       while (n_left_from > 0 && n_left_to_next > 0)
 	{
@@ -123,7 +127,7 @@ udp46_punt_inline (vlib_main_t * vm,
 	  b0->error = node->errors[PUNT_ERROR_UDP_PORT];
 	}
 
-      vlib_put_next_frame (vm, node, PUNT_NEXT_PUNT, n_left_to_next);
+      vlib_put_next_frame (vm, node, punt_next_punt (is_ip4), n_left_to_next);
     }
 
   return from_frame->n_vectors;
@@ -360,10 +364,7 @@ udp46_punt_socket_inline (vlib_main_t * vm,
       punt_client_t *c = NULL;
       if (PREDICT_FALSE (b->flags & VLIB_BUFFER_IS_TRACED))
 	{
-	  if (!c)
-	    {
-	      c = punt_client_get (is_ip4, port);
-	    }
+	  c = punt_client_get (is_ip4, port);
 	  udp_punt_trace_t *t;
 	  t = vlib_add_trace (vm, node, b, sizeof (t[0]));
 	  clib_memcpy (&t->client, c, sizeof (t->client));
@@ -393,6 +394,10 @@ udp46_punt_socket_inline (vlib_main_t * vm,
 	      b = vlib_get_buffer (vm, b->next_buffer);
 	      if (PREDICT_FALSE (b->flags & VLIB_BUFFER_IS_TRACED))
 		{
+		  if (PREDICT_FALSE (!c))
+		    {
+		      c = punt_client_get (is_ip4, port);
+		    }
 		  udp_punt_trace_t *t;
 		  t = vlib_add_trace (vm, node, b, sizeof (t[0]));
 		  clib_memcpy (&t->client, c, sizeof (t->client));
@@ -738,7 +743,7 @@ punt_cli (vlib_main_t * vm,
   u32 port;
   bool is_add = true;
   u32 protocol = ~0;
-  clib_error_t *error;
+  clib_error_t *error = NULL;
 
   while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT)
     {
@@ -749,22 +754,34 @@ punt_cli (vlib_main_t * vm,
 	  /* punt both IPv6 and IPv4 when used in CLI */
 	  error = vnet_punt_add_del (vm, ~0, protocol, ~0, is_add);
 	  if (error)
-	    clib_error_report (error);
+	    {
+	      clib_error_report (error);
+	      goto done;
+	    }
 	}
       else if (unformat (input, "%d", &port))
 	{
 	  /* punt both IPv6 and IPv4 when used in CLI */
 	  error = vnet_punt_add_del (vm, ~0, protocol, port, is_add);
 	  if (error)
-	    clib_error_report (error);
+	    {
+	      clib_error_report (error);
+	      goto done;
+	    }
 	}
       else if (unformat (input, "udp"))
 	protocol = IP_PROTOCOL_UDP;
       else if (unformat (input, "tcp"))
 	protocol = IP_PROTOCOL_TCP;
+      else
+	{
+	  error = clib_error_return (0, "parse error: '%U'",
+				     format_unformat_error, input);
+	  goto done;
+	}
     }
-
-  return 0;
+done:
+  return error;
 }
 
 /*?

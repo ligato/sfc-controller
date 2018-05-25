@@ -1077,6 +1077,10 @@ fib_entry_flags_update (const fib_entry_t *fib_entry,
 	{
 	    esrc->fes_entry_flags &= ~FIB_ENTRY_FLAG_ATTACHED;
 	}
+	if (rpath->frp_flags & FIB_ROUTE_PATH_DEAG)
+	{
+	    esrc->fes_entry_flags |= FIB_ENTRY_FLAG_LOOSE_URPF_EXEMPT;
+	}
     }
     if (fib_route_attached_cross_table(fib_entry, rpath))
     {
@@ -1321,6 +1325,7 @@ fib_entry_get_dpo_for_source (fib_node_index_t fib_entry_index,
 	    fib_path_list_contribute_forwarding(
 		esrc->fes_pl,
 		fib_entry_get_default_chain_type(fib_entry),
+                FIB_PATH_LIST_FWD_FLAG_NONE,
 		dpo);
 
 	    return (dpo_id_is_valid(dpo));

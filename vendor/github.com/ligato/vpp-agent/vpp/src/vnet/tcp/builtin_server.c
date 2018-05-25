@@ -23,8 +23,8 @@ typedef struct
   /*
    * Server app parameters
    */
-  unix_shared_memory_queue_t **vpp_queue;
-  unix_shared_memory_queue_t *vl_input_queue;	/**< Sever's event queue */
+  svm_queue_t **vpp_queue;
+  svm_queue_t *vl_input_queue;	/**< Sever's event queue */
 
   u32 app_index;		/**< Server app index */
   u32 my_client_index;		/**< API client handle */
@@ -186,14 +186,14 @@ builtin_server_rx_callback (stream_session_t * s)
       /* Program self-tap to retry */
       if (svm_fifo_set_event (rx_fifo))
 	{
-	  unix_shared_memory_queue_t *q;
+	  svm_queue_t *q;
 	  evt.fifo = rx_fifo;
 	  evt.event_type = FIFO_EVENT_BUILTIN_RX;
 
 	  q = bsm->vpp_queue[thread_index];
 	  if (PREDICT_FALSE (q->cursize == q->maxsize))
 	    clib_warning ("out of event queue space");
-	  else if (unix_shared_memory_queue_add (q, (u8 *) & evt, 0))
+	  else if (svm_queue_add (q, (u8 *) & evt, 0))
 	    clib_warning ("failed to enqueue self-tap");
 
 	  if (bsm->rx_retries[thread_index][s->session_index] == 500000)
@@ -231,9 +231,8 @@ builtin_server_rx_callback (stream_session_t * s)
       evt.fifo = tx_fifo;
       evt.event_type = FIFO_EVENT_APP_TX;
 
-      if (unix_shared_memory_queue_add (bsm->vpp_queue[s->thread_index],
-					(u8 *) & evt,
-					0 /* do wait for mutex */ ))
+      if (svm_queue_add (bsm->vpp_queue[s->thread_index],
+			 (u8 *) & evt, 0 /* do wait for mutex */ ))
 	clib_warning ("failed to enqueue tx evt");
     }
 
@@ -273,8 +272,9 @@ server_attach (u8 * appns_id, u64 appns_flags, u64 appns_secret)
 {
   builtin_server_main_t *bsm = &builtin_server_main;
   u8 segment_name[128];
-  u64 options[SESSION_OPTIONS_N_OPTIONS];
+  u64 options[APP_OPTIONS_N_OPTIONS];
   vnet_app_attach_args_t _a, *a = &_a;
+  u32 segment_size = 512 << 20;
 
   memset (a, 0, sizeof (*a));
   memset (options, 0, sizeof (options));
@@ -285,14 +285,17 @@ server_attach (u8 * appns_id, u64 appns_flags, u64 appns_secret)
   else
     builtin_session_cb_vft.builtin_server_rx_callback =
       builtin_server_rx_callback;
+
+  if (bsm->private_segment_size)
+    segment_size = bsm->private_segment_size;
+
   a->api_client_index = bsm->my_client_index;
   a->session_cb_vft = &builtin_session_cb_vft;
   a->options = options;
-  a->options[SESSION_OPTIONS_SEGMENT_SIZE] = 512 << 20;
-  a->options[SESSION_OPTIONS_RX_FIFO_SIZE] = bsm->fifo_size;
-  a->options[SESSION_OPTIONS_TX_FIFO_SIZE] = bsm->fifo_size;
+  a->options[APP_OPTIONS_SEGMENT_SIZE] = segment_size;
+  a->options[APP_OPTIONS_RX_FIFO_SIZE] = bsm->fifo_size;
+  a->options[APP_OPTIONS_TX_FIFO_SIZE] = bsm->fifo_size;
   a->options[APP_OPTIONS_PRIVATE_SEGMENT_COUNT] = bsm->private_segment_count;
-  a->options[APP_OPTIONS_PRIVATE_SEGMENT_SIZE] = bsm->private_segment_size;
   a->options[APP_OPTIONS_PREALLOC_FIFO_PAIRS] =
     bsm->prealloc_fifos ? bsm->prealloc_fifos : 1;
 

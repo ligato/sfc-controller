@@ -325,9 +325,7 @@ format_udp_encap (u8 * s, va_list * args)
 static udp_encap_t *
 udp_encap_from_fib_node (fib_node_t * node)
 {
-#if (CLIB_DEBUG > 0)
   ASSERT (FIB_NODE_TYPE_UDP_ENCAP == node->fn_type);
-#endif
   return ((udp_encap_t *) (((char *) node) -
 			   STRUCT_OFFSET_OF (udp_encap_t, ue_fib_node)));
 }
@@ -394,6 +392,11 @@ const static char *const udp4_encap_mpls_nodes[] = {
   NULL,
 };
 
+const static char *const udp4_encap_bier_nodes[] = {
+  "udp4-encap",
+  NULL,
+};
+
 const static char *const udp6_encap_ip4_nodes[] = {
   "udp6-encap",
   NULL,
@@ -409,16 +412,23 @@ const static char *const udp6_encap_mpls_nodes[] = {
   NULL,
 };
 
+const static char *const udp6_encap_bier_nodes[] = {
+  "udp6-encap",
+  NULL,
+};
+
 const static char *const *const udp4_encap_nodes[DPO_PROTO_NUM] = {
   [DPO_PROTO_IP4] = udp4_encap_ip4_nodes,
   [DPO_PROTO_IP6] = udp4_encap_ip6_nodes,
   [DPO_PROTO_MPLS] = udp4_encap_mpls_nodes,
+  [DPO_PROTO_BIER] = udp4_encap_bier_nodes,
 };
 
 const static char *const *const udp6_encap_nodes[DPO_PROTO_NUM] = {
   [DPO_PROTO_IP4] = udp6_encap_ip4_nodes,
   [DPO_PROTO_IP6] = udp6_encap_ip6_nodes,
   [DPO_PROTO_MPLS] = udp6_encap_mpls_nodes,
+  [DPO_PROTO_BIER] = udp6_encap_bier_nodes,
 };
 
 /*
@@ -435,7 +445,6 @@ const static dpo_vft_t udp_encap_dpo_vft = {
   .dv_lock = udp_encap_dpo_lock,
   .dv_unlock = udp_encap_dpo_unlock,
   .dv_format = format_udp_encap_dpo,
-  //.dv_mem_show = replicate_mem_show,
 };
 
 clib_error_t *
@@ -572,6 +581,9 @@ udp_encap_show (vlib_main_t * vm,
     {
       if (unformat (input, "%d", &ue_id))
 	;
+      else
+	return clib_error_return (0, "unknown input `%U'",
+				  format_unformat_error, input);
     }
 
   if (~0 == ue_id)

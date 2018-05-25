@@ -395,10 +395,6 @@ typedef struct _tcp_main
   u32 preallocated_connections;
   u32 preallocated_half_open_connections;
 
-  /** Transport table (preallocation) size parameters */
-  u32 local_endpoints_table_memory;
-  u32 local_endpoints_table_buckets;
-
   /** Vectors of src addresses. Optional unless one needs > 63K active-opens */
   ip4_address_t *ip4_src_addresses;
   u32 last_v4_address_rotor;
@@ -410,6 +406,9 @@ typedef struct _tcp_main
 
   u8 punt_unknown4;
   u8 punt_unknown6;
+
+  /** fault-injection */
+  f64 buffer_fail_fraction;
 } tcp_main_t;
 
 extern tcp_main_t tcp_main;
@@ -431,6 +430,15 @@ tcp_buffer_hdr (vlib_buffer_t * b)
   return (tcp_header_t *) (b->data + b->current_data
 			   + vnet_buffer (b)->tcp.hdr_offset);
 }
+
+#if (VLIB_BUFFER_TRACE_TRAJECTORY)
+#define tcp_trajectory_add_start(b, start)			\
+{								\
+    (*vlib_buffer_trace_trajectory_cb) (b, start);		\
+}
+#else
+#define tcp_trajectory_add_start(b, start)
+#endif
 
 clib_error_t *vnet_tcp_enable_disable (vlib_main_t * vm, u8 is_en);
 
@@ -655,15 +663,6 @@ tcp_set_time_now (u32 thread_index)
   tcp_main.time_now[thread_index] = clib_cpu_time_now ()
     * tcp_main.tstamp_ticks_per_clock;
   return tcp_main.time_now[thread_index];
-}
-
-always_inline void
-tcp_update_time (f64 now, u32 thread_index)
-{
-  tcp_set_time_now (thread_index);
-  tw_timer_expire_timers_16t_2w_512sl (&tcp_main.timer_wheels[thread_index],
-				       now);
-  tcp_flush_frames_to_output (thread_index);
 }
 
 u32 tcp_push_header (transport_connection_t * tconn, vlib_buffer_t * b);

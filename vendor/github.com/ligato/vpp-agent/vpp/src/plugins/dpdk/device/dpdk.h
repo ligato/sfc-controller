@@ -39,6 +39,9 @@
 #include <rte_eth_bond.h>
 #include <rte_sched.h>
 #include <rte_net.h>
+#if RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 0)
+#include <rte_bus_pci.h>
+#endif
 
 #include <vnet/unix/pcap.h>
 #include <vnet/devices/devices.h>
@@ -76,7 +79,8 @@ extern vlib_node_registration_t dpdk_input_node;
   _ ("net_mlx5", MLX5)            \
   _ ("net_dpaa2", DPAA2)          \
   _ ("net_virtio_user", VIRTIO_USER) \
-  _ ("net_vhost", VHOST_ETHER)
+  _ ("net_vhost", VHOST_ETHER)    \
+  _ ("net_ena", ENA)
 
 typedef enum
 {
@@ -115,6 +119,12 @@ typedef struct
   u64 tx_tail;
 } tx_ring_hdr_t;
 
+#if RTE_VERSION < RTE_VERSION_NUM(17, 11, 0, 0)
+typedef uint8_t dpdk_portid_t;
+#else
+typedef uint16_t dpdk_portid_t;
+#endif
+
 typedef struct
 {
   struct rte_ring *swq;
@@ -150,7 +160,7 @@ typedef struct
   volatile u32 **lockp;
 
   /* Instance ID */
-  u32 device_index;
+  dpdk_portid_t device_index;
 
   u32 hw_if_index;
   u32 vlib_sw_if_index;
@@ -203,11 +213,11 @@ typedef struct
   dpdk_device_hqos_per_hqos_thread_t *hqos_ht;
 
   /* af_packet or BondEthernet instance number */
-  u8 port_id;
+  dpdk_portid_t port_id;
 
   /* Bonded interface port# of a slave -
      only valid if DPDK_DEVICE_FLAG_BOND_SLAVE bit is set */
-  u8 bond_port;
+  dpdk_portid_t bond_port;
 
   struct rte_eth_link link;
   f64 time_last_link_update;
@@ -312,6 +322,7 @@ typedef struct
   u8 *uio_driver_name;
   u8 no_multi_seg;
   u8 enable_tcp_udp_checksum;
+  u8 no_tx_checksum_offload;
 
   /* Required config parameters */
   u8 coremask_set_manually;
@@ -354,9 +365,6 @@ typedef struct
   /* vlib buffer free list, must be same size as an rte_mbuf */
   u32 vlib_buffer_free_list_index;
 
-  /* Ethernet input node index */
-  u32 ethernet_input_node_index;
-
   /* pcap tracing [only works if (CLIB_DEBUG > 0)] */
   int tx_pcap_enable;
   pcap_main_t pcap_main;
@@ -369,8 +377,6 @@ typedef struct
    * (via post_sw_interface_set_flags) is in progress
    */
   u8 admin_up_down_in_progress;
-
-  u8 use_rss;
 
   /* which cpus are running I/O TX */
   int hqos_cpu_first_index;
@@ -405,6 +411,7 @@ typedef struct
   struct rte_mbuf mb;
   /* Copy of VLIB buffer; packet data stored in pre_data. */
   vlib_buffer_t buffer;
+  u8 data[256];			/* First 256 data bytes, used for hexdump */
 } dpdk_tx_dma_trace_t;
 
 typedef struct
@@ -421,14 +428,9 @@ void dpdk_device_setup (dpdk_device_t * xd);
 void dpdk_device_start (dpdk_device_t * xd);
 void dpdk_device_stop (dpdk_device_t * xd);
 
-#if DPDK_VOID_CALLBACK
-void dpdk_port_state_callback (uint8_t port_id,
-			       enum rte_eth_event_type type, void *param);
-#else
-int dpdk_port_state_callback (uint8_t port_id,
+int dpdk_port_state_callback (dpdk_portid_t port_id,
 			      enum rte_eth_event_type type,
 			      void *param, void *ret_param);
-#endif
 
 #define foreach_dpdk_error						\
   _(NONE, "no error")							\
@@ -464,6 +466,12 @@ clib_error_t *unformat_hqos (unformat_input_t * input,
 uword
 admin_up_down_process (vlib_main_t * vm,
 		       vlib_node_runtime_t * rt, vlib_frame_t * f);
+
+clib_error_t *dpdk_pool_create (vlib_main_t * vm, u8 * pool_name,
+				u32 elt_size, u32 num_elts,
+				u32 pool_priv_size, u16 cache_size, u8 numa,
+				struct rte_mempool **_mp,
+				vlib_physmem_region_index_t * pri);
 
 clib_error_t *dpdk_buffer_pool_create (vlib_main_t * vm, unsigned num_mbufs,
 				       unsigned socket_id);

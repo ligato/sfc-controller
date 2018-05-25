@@ -666,7 +666,7 @@ VNET_FEATURE_INIT (ip6_mc_lookup, static) = {
 VNET_FEATURE_ARC_INIT (ip6_output, static) =
 {
   .arc_name  = "ip6-output",
-  .start_nodes = VNET_FEATURES ("ip6-rewrite", "ip6-midchain"),
+  .start_nodes = VNET_FEATURES ("ip6-rewrite", "ip6-midchain", "ip6-dvr-dpo"),
   .arc_index_ptr = &ip6_main.lookup_main.output_feature_arc_index,
 };
 
@@ -1902,7 +1902,7 @@ VLIB_REGISTER_NODE (ip6_discover_neighbor_node) =
   .n_next_nodes = IP6_DISCOVER_NEIGHBOR_N_NEXT,
   .next_nodes =
   {
-    [IP6_DISCOVER_NEIGHBOR_NEXT_DROP] = "error-drop",
+    [IP6_DISCOVER_NEIGHBOR_NEXT_DROP] = "ip6-drop",
     [IP6_DISCOVER_NEIGHBOR_NEXT_REPLY_TX] = "interface-output",
   },
 };
@@ -1920,7 +1920,7 @@ VLIB_REGISTER_NODE (ip6_glean_node) =
   .n_next_nodes = IP6_DISCOVER_NEIGHBOR_N_NEXT,
   .next_nodes =
   {
-    [IP6_DISCOVER_NEIGHBOR_NEXT_DROP] = "error-drop",
+    [IP6_DISCOVER_NEIGHBOR_NEXT_DROP] = "ip6-drop",
     [IP6_DISCOVER_NEIGHBOR_NEXT_REPLY_TX] = "interface-output",
   },
 };
@@ -2432,7 +2432,7 @@ VLIB_REGISTER_NODE (ip6_rewrite_node) =
   .n_next_nodes = 2,
   .next_nodes =
   {
-    [IP6_REWRITE_NEXT_DROP] = "error-drop",
+    [IP6_REWRITE_NEXT_DROP] = "ip6-drop",
     [IP6_REWRITE_NEXT_ICMP_ERROR] = "ip6-icmp-error",
   },
 };
@@ -3494,14 +3494,9 @@ ip6_config (vlib_main_t * vm, unformat_input_t * input)
     {
       if (unformat (input, "hash-buckets %d", &tmp))
 	nbuckets = tmp;
-      else if (unformat (input, "heap-size %dm", &tmp))
-	heapsize = ((u64) tmp) << 20;
-      else if (unformat (input, "heap-size %dM", &tmp))
-	heapsize = ((u64) tmp) << 20;
-      else if (unformat (input, "heap-size %dg", &tmp))
-	heapsize = ((u64) tmp) << 30;
-      else if (unformat (input, "heap-size %dG", &tmp))
-	heapsize = ((u64) tmp) << 30;
+      else if (unformat (input, "heap-size %U",
+			 unformat_memory_size, &heapsize))
+	;
       else
 	return clib_error_return (0, "unknown input '%U'",
 				  format_unformat_error, input);

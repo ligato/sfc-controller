@@ -52,10 +52,22 @@ bridge_domain::bridge_domain(const bridge_domain& o)
 {
 }
 
+const bridge_domain::key_t&
+bridge_domain::key() const
+{
+  return (m_id.data());
+}
+
 uint32_t
 bridge_domain::id() const
 {
   return (m_id.data());
+}
+
+bool
+bridge_domain::operator==(const bridge_domain& b) const
+{
+  return ((m_learning_mode == b.m_learning_mode) && id() == b.id());
 }
 
 void
@@ -87,47 +99,24 @@ std::string
 bridge_domain::to_string() const
 {
   std::ostringstream s;
-  s << "bridge-domain:[" << m_id.to_string() << "]";
+  s << "bridge-domain:[" << m_id.to_string()
+    << " learning-mode:" << m_learning_mode.to_string() << "]";
 
   return (s.str());
 }
 
 std::shared_ptr<bridge_domain>
-bridge_domain::find(uint32_t id)
+bridge_domain::find(const key_t& key)
 {
-  /*
- * Loop throught the entire map looking for matching interface.
- * not the most efficient algorithm, but it will do for now. The
- * number of L3 configs is low and this is only called during bootup
- */
-  std::shared_ptr<bridge_domain> bd;
-
-  auto it = m_db.cbegin();
-
-  while (it != m_db.cend()) {
-    /*
- * The key in the DB is a pair of the interface's name and prefix.
- * If the keys match, save the L3-config
- */
-    auto key = it->first;
-
-    if (id == key) {
-      bd = it->second.lock();
-      break;
-    }
-
-    ++it;
-  }
-
-  return (bd);
+  return (m_db.find(key));
 }
 
 void
 bridge_domain::update(const bridge_domain& desired)
 {
   /*
- * the desired state is always that the interface should be created
- */
+   * the desired state is always that the interface should be created
+   */
   if (rc_t::OK != m_id.rc()) {
     HW::enqueue(new bridge_domain_cmds::create_cmd(m_id, m_learning_mode));
   }
@@ -155,10 +144,10 @@ void
 bridge_domain::event_handler::handle_populate(const client_db::key_t& key)
 {
   /*
- * dump VPP Bridge domains
- */
-  std::shared_ptr<bridge_domain_cmds::dump_cmd> cmd(
-    new bridge_domain_cmds::dump_cmd());
+   * dump VPP Bridge domains
+   */
+  std::shared_ptr<bridge_domain_cmds::dump_cmd> cmd =
+    std::make_shared<bridge_domain_cmds::dump_cmd>();
 
   HW::enqueue(cmd);
   HW::write();
@@ -171,15 +160,15 @@ bridge_domain::event_handler::handle_populate(const client_db::key_t& key)
     VOM_LOG(log_level_t::DEBUG) << "dump: " << bd.to_string();
 
     /*
- * Write each of the discovered interfaces into the OM,
- * but disable the HW Command q whilst we do, so that no
- * commands are sent to VPP
- */
+     * Write each of the discovered bridge-domains into the OM,
+     * but disable the HW Command q whilst we do, so that no
+     * commands are sent to VPP
+     */
     OM::commit(key, bd);
 
     /**
- * For each interface in the BD construct an l2_binding
- */
+     * For each interface in the BD construct an l2_binding
+     */
     for (unsigned int ii = 0; ii < payload.n_sw_ifs; ii++) {
       std::shared_ptr<interface> itf =
         interface::find(payload.sw_if_details[ii].sw_if_index);

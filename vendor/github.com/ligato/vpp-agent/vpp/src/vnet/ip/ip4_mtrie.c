@@ -176,9 +176,12 @@ ply_create (ip4_fib_mtrie_t * m,
 	    u32 leaf_prefix_len, u32 ply_base_len)
 {
   ip4_fib_mtrie_8_ply_t *p;
-
+  void *old_heap;
   /* Get cache aligned ply. */
+
+  old_heap = clib_mem_set_heap (ip4_main.mtrie_mheap);
   pool_get_aligned (ip4_ply_pool, p, CLIB_CACHE_LINE_BYTES);
+  clib_mem_set_heap (old_heap);
 
   ply_8_init (p, init_leaf, leaf_prefix_len, ply_base_len);
   return ip4_fib_mtrie_leaf_set_next_ply_index (p - ip4_ply_pool);
@@ -683,8 +686,8 @@ mtrie_ply_memory_usage (ip4_fib_mtrie_t * m, ip4_fib_mtrie_8_ply_t * p)
 }
 
 /* Returns number of bytes of memory used by mtrie. */
-static uword
-mtrie_memory_usage (ip4_fib_mtrie_t * m)
+uword
+ip4_fib_mtrie_memory_usage (ip4_fib_mtrie_t * m)
 {
   uword bytes, i;
 
@@ -764,40 +767,59 @@ u8 *
 format_ip4_fib_mtrie (u8 * s, va_list * va)
 {
   ip4_fib_mtrie_t *m = va_arg (*va, ip4_fib_mtrie_t *);
+  int verbose = va_arg (*va, int);
   ip4_fib_mtrie_16_ply_t *p;
   u32 base_address = 0;
   int i;
 
   s = format (s, "%d plies, memory usage %U\n",
 	      pool_elts (ip4_ply_pool),
-	      format_memory_size, mtrie_memory_usage (m));
+	      format_memory_size, ip4_fib_mtrie_memory_usage (m));
   s = format (s, "root-ply");
   p = &m->root_ply;
 
-  for (i = 0; i < ARRAY_LEN (p->leaves); i++)
+  if (verbose)
     {
-      u16 slot;
+      s = format (s, "root-ply");
+      p = &m->root_ply;
 
-      slot = clib_host_to_net_u16 (i);
-
-      if (p->dst_address_bits_of_leaves[slot] > 0)
+      for (i = 0; i < ARRAY_LEN (p->leaves); i++)
 	{
-	  FORMAT_PLY (s, p, slot, base_address, 16, 2);
+	  u16 slot;
+
+	  slot = clib_host_to_net_u16 (i);
+
+	  if (p->dst_address_bits_of_leaves[slot] > 0)
+	    {
+	      FORMAT_PLY (s, p, slot, base_address, 16, 2);
+	    }
 	}
     }
 
   return s;
 }
 
+/** Default heap size for the IPv4 mtries */
+#define IP4_FIB_DEFAULT_MTRIE_HEAP_SIZE (32<<20)
+
 static clib_error_t *
 ip4_mtrie_module_init (vlib_main_t * vm)
 {
-  /* Burn one ply so index 0 is taken */
   CLIB_UNUSED (ip4_fib_mtrie_8_ply_t * p);
+  ip4_main_t *im = &ip4_main;
+  clib_error_t *error = NULL;
+  uword *old_heap;
 
+  if (0 == im->mtrie_heap_size)
+    im->mtrie_heap_size = IP4_FIB_DEFAULT_MTRIE_HEAP_SIZE;
+  im->mtrie_mheap = mheap_alloc (0, im->mtrie_heap_size);
+
+  /* Burn one ply so index 0 is taken */
+  old_heap = clib_mem_set_heap (ip4_main.mtrie_mheap);
   pool_get (ip4_ply_pool, p);
+  clib_mem_set_heap (old_heap);
 
-  return (NULL);
+  return (error);
 }
 
 VLIB_INIT_FUNCTION (ip4_mtrie_module_init);

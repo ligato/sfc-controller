@@ -55,20 +55,32 @@ bridge_domain_entry::bridge_domain_entry(const bridge_domain_entry& bde)
 {
 }
 
+const bridge_domain_entry::key_t
+bridge_domain_entry::key() const
+{
+  return (std::make_pair(m_bd->key(), m_mac));
+}
+
+bool
+bridge_domain_entry::operator==(const bridge_domain_entry& bde) const
+{
+  return ((key() == bde.key()) && (m_tx_itf == bde.m_tx_itf));
+}
+
 bridge_domain_entry::~bridge_domain_entry()
 {
   sweep();
 
   // not in the DB anymore.
-  m_db.release(std::make_pair(m_bd->id(), m_mac), this);
+  m_db.release(key(), this);
 }
 
 void
 bridge_domain_entry::sweep()
 {
   if (m_hw) {
-    HW::enqueue(
-      new bridge_domain_entry_cmds::delete_cmd(m_hw, m_mac, m_bd->id()));
+    HW::enqueue(new bridge_domain_entry_cmds::delete_cmd(
+      m_hw, m_mac, m_bd->id(), interface::type_t::BVI == m_tx_itf->type()));
   }
   HW::write();
 }
@@ -78,7 +90,8 @@ bridge_domain_entry::replay()
 {
   if (m_hw) {
     HW::enqueue(new bridge_domain_entry_cmds::create_cmd(
-      m_hw, m_mac, m_bd->id(), m_tx_itf->handle()));
+      m_hw, m_mac, m_bd->id(), m_tx_itf->handle(),
+      interface::type_t::BVI == m_tx_itf->type()));
   }
 }
 std::string
@@ -99,14 +112,21 @@ bridge_domain_entry::update(const bridge_domain_entry& r)
    */
   if (rc_t::OK != m_hw.rc()) {
     HW::enqueue(new bridge_domain_entry_cmds::create_cmd(
-      m_hw, m_mac, m_bd->id(), m_tx_itf->handle()));
+      m_hw, m_mac, m_bd->id(), m_tx_itf->handle(),
+      interface::type_t::BVI == m_tx_itf->type()));
   }
 }
 
 std::shared_ptr<bridge_domain_entry>
 bridge_domain_entry::find_or_add(const bridge_domain_entry& temp)
 {
-  return (m_db.find_or_add(std::make_pair(temp.m_bd->id(), temp.m_mac), temp));
+  return (m_db.find_or_add(temp.key(), temp));
+}
+
+std::shared_ptr<bridge_domain_entry>
+bridge_domain_entry::find(const key_t& k)
+{
+  return (m_db.find(k));
 }
 
 std::shared_ptr<bridge_domain_entry>
@@ -137,8 +157,8 @@ bridge_domain_entry::event_handler::handle_replay()
 void
 bridge_domain_entry::event_handler::handle_populate(const client_db::key_t& key)
 {
-  std::shared_ptr<bridge_domain_entry_cmds::dump_cmd> cmd(
-    new bridge_domain_entry_cmds::dump_cmd());
+  std::shared_ptr<bridge_domain_entry_cmds::dump_cmd> cmd =
+    std::make_shared<bridge_domain_entry_cmds::dump_cmd>();
 
   HW::enqueue(cmd);
   HW::write();
@@ -148,11 +168,21 @@ bridge_domain_entry::event_handler::handle_populate(const client_db::key_t& key)
 
     std::shared_ptr<interface> itf = interface::find(payload.sw_if_index);
     std::shared_ptr<bridge_domain> bd = bridge_domain::find(payload.bd_id);
+
+    if (!bd || !itf) {
+      VOM_LOG(log_level_t::ERROR) << "bridge-domain-entry dump:"
+                                  << " itf:" << payload.sw_if_index
+                                  << " bd:" << payload.bd_id;
+      continue;
+    }
+
     mac_address_t mac(payload.mac);
     bridge_domain_entry bd_e(*bd, mac, *itf);
 
-    VOM_LOG(log_level_t::DEBUG) << "bd-entry-dump: " << bd->to_string()
-                                << mac.to_string() << itf->to_string();
+    VOM_LOG(log_level_t::DEBUG) << "bridge-domain-entry dump:"
+                                << " " << bd->to_string() << " "
+                                << itf->to_string() << " mac:["
+                                << mac.to_string() << "]";
 
     /*
      * Write each of the discovered interfaces into the OM,

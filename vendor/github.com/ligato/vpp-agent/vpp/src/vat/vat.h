@@ -119,7 +119,7 @@ typedef struct
 typedef struct
 {
   /* vpe input queue */
-  unix_shared_memory_queue_t *vl_input_queue;
+  svm_queue_t *vl_input_queue;
 
   /* interface name table */
   uword *sw_if_index_by_interface_name;
@@ -209,7 +209,7 @@ typedef struct
   ip4_nbr_counter_t **ip4_nbr_counters;
   ip6_nbr_counter_t **ip6_nbr_counters;
 
-  socket_client_main_t socket_client_main;
+  socket_client_main_t *socket_client_main;
   u8 *socket_name;
 
   /* Convenience */

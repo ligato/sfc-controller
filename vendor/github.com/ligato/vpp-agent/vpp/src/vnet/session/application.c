@@ -76,7 +76,7 @@ application_local_session_table (application_t * app)
 int
 application_api_queue_is_full (application_t * app)
 {
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
 
   /* builtin servers are always OK */
   if (app->api_client_index == ~0)
@@ -237,8 +237,8 @@ application_init (application_t * app, u32 api_client_index, u64 * options,
   u32 default_rx_fifo_size = 16 << 10, default_tx_fifo_size = 16 << 10;
   int rv;
 
-  app_evt_queue_size = options[APP_EVT_QUEUE_SIZE] > 0 ?
-    options[APP_EVT_QUEUE_SIZE] : default_app_evt_queue_size;
+  app_evt_queue_size = options[APP_OPTIONS_EVT_QUEUE_SIZE] > 0 ?
+    options[APP_OPTIONS_EVT_QUEUE_SIZE] : default_app_evt_queue_size;
 
   /*
    * Setup segment manager
@@ -247,11 +247,11 @@ application_init (application_t * app, u32 api_client_index, u64 * options,
   sm->app_index = app->index;
   props = segment_manager_properties_alloc ();
   app->sm_properties = segment_manager_properties_index (props);
-  props->add_segment_size = options[SESSION_OPTIONS_ADD_SEGMENT_SIZE];
-  props->rx_fifo_size = options[SESSION_OPTIONS_RX_FIFO_SIZE];
+  props->add_segment_size = options[APP_OPTIONS_ADD_SEGMENT_SIZE];
+  props->rx_fifo_size = options[APP_OPTIONS_RX_FIFO_SIZE];
   props->rx_fifo_size =
     props->rx_fifo_size ? props->rx_fifo_size : default_rx_fifo_size;
-  props->tx_fifo_size = options[SESSION_OPTIONS_TX_FIFO_SIZE];
+  props->tx_fifo_size = options[APP_OPTIONS_TX_FIFO_SIZE];
   props->tx_fifo_size =
     props->tx_fifo_size ? props->tx_fifo_size : default_tx_fifo_size;
   props->add_segment = props->add_segment_size != 0;
@@ -259,9 +259,8 @@ application_init (application_t * app, u32 api_client_index, u64 * options,
   props->use_private_segment = options[APP_OPTIONS_FLAGS]
     & APP_OPTIONS_FLAGS_IS_BUILTIN;
   props->private_segment_count = options[APP_OPTIONS_PRIVATE_SEGMENT_COUNT];
-  props->private_segment_size = options[APP_OPTIONS_PRIVATE_SEGMENT_SIZE];
 
-  first_seg_size = options[SESSION_OPTIONS_SEGMENT_SIZE];
+  first_seg_size = options[APP_OPTIONS_SEGMENT_SIZE];
   if ((rv = segment_manager_init (sm, app->sm_properties, first_seg_size)))
     return rv;
   sm->first_is_protected = 1;
@@ -523,7 +522,32 @@ application_first_listener (application_t * app, u8 fib_proto,
   /* *INDENT-OFF* */
    hash_foreach (handle, sm_index, app->listeners_table, ({
      listener = listen_session_get_from_handle (handle);
-     if (listener->session_type == sst)
+     if (listener->session_type == sst
+	 && listener->listener_index != SESSION_PROXY_LISTENER_INDEX)
+       return listener;
+   }));
+  /* *INDENT-ON* */
+
+  return 0;
+}
+
+stream_session_t *
+application_proxy_listener (application_t * app, u8 fib_proto,
+			    u8 transport_proto)
+{
+  stream_session_t *listener;
+  u64 handle;
+  u32 sm_index;
+  u8 sst;
+
+  sst = session_type_from_proto_and_ip (transport_proto,
+					fib_proto == FIB_PROTOCOL_IP4);
+
+  /* *INDENT-OFF* */
+   hash_foreach (handle, sm_index, app->listeners_table, ({
+     listener = listen_session_get_from_handle (handle);
+     if (listener->session_type == sst
+	 && listener->listener_index == SESSION_PROXY_LISTENER_INDEX)
        return listener;
    }));
   /* *INDENT-ON* */
@@ -544,17 +568,24 @@ application_start_stop_proxy_fib_proto (application_t * app, u8 fib_proto,
 
   if (is_start)
     {
-      sep.is_ip4 = is_ip4;
-      sep.fib_index = app_namespace_get_fib_index (app_ns, fib_proto);
-      sep.sw_if_index = app_ns->sw_if_index;
-      sep.transport_proto = transport_proto;
-      application_start_listen (app, &sep, &handle);
-      s = listen_session_get_from_handle (handle);
+      s = application_first_listener (app, fib_proto, transport_proto);
+      if (!s)
+	{
+	  sep.is_ip4 = is_ip4;
+	  sep.fib_index = app_namespace_get_fib_index (app_ns, fib_proto);
+	  sep.sw_if_index = app_ns->sw_if_index;
+	  sep.transport_proto = transport_proto;
+	  application_start_listen (app, &sep, &handle);
+	  s = listen_session_get_from_handle (handle);
+	  s->listener_index = SESSION_PROXY_LISTENER_INDEX;
+	}
     }
   else
     {
-      s = application_first_listener (app, fib_proto, transport_proto);
+      s = application_proxy_listener (app, fib_proto, transport_proto);
+      ASSERT (s);
     }
+
   tc = listen_session_get_transport (s);
 
   if (!ip_is_zero (&tc->lcl_ip, 1))
@@ -565,30 +596,48 @@ application_start_stop_proxy_fib_proto (application_t * app, u8 fib_proto,
       sep.transport_proto = transport_proto;
       sep.port = 0;
       sti = session_lookup_get_index_for_fib (fib_proto, sep.fib_index);
-      session_lookup_add_session_endpoint (sti, &sep, s->session_index);
+      if (is_start)
+	session_lookup_add_session_endpoint (sti, &sep, s->session_index);
+      else
+	session_lookup_del_session_endpoint (sti, &sep);
     }
+
   return 0;
 }
 
-void
-application_start_stop_proxy (application_t * app, u8 transport_proto,
-			      u8 is_start)
+static void
+application_start_stop_proxy_local_scope (application_t * app,
+					  u8 transport_proto, u8 is_start)
 {
-  if (application_has_local_scope (app))
+  session_endpoint_t sep = SESSION_ENDPOINT_NULL;
+  app_namespace_t *app_ns;
+  app_ns = app_namespace_get (app->ns_index);
+  sep.is_ip4 = 1;
+  sep.transport_proto = transport_proto;
+  sep.port = 0;
+
+  if (is_start)
     {
-      session_endpoint_t sep = SESSION_ENDPOINT_NULL;
-      app_namespace_t *app_ns;
-      app_ns = app_namespace_get (app->ns_index);
-      sep.is_ip4 = 1;
-      sep.transport_proto = transport_proto;
-      sep.port = 0;
       session_lookup_add_session_endpoint (app_ns->local_table_index, &sep,
 					   app->index);
-
       sep.is_ip4 = 0;
       session_lookup_add_session_endpoint (app_ns->local_table_index, &sep,
 					   app->index);
     }
+  else
+    {
+      session_lookup_del_session_endpoint (app_ns->local_table_index, &sep);
+      sep.is_ip4 = 0;
+      session_lookup_del_session_endpoint (app_ns->local_table_index, &sep);
+    }
+}
+
+void
+application_start_stop_proxy (application_t * app,
+			      transport_proto_t transport_proto, u8 is_start)
+{
+  if (application_has_local_scope (app))
+    application_start_stop_proxy_local_scope (app, transport_proto, is_start);
 
   if (application_has_global_scope (app))
     {
@@ -603,24 +652,34 @@ void
 application_setup_proxy (application_t * app)
 {
   u16 transports = app->proxied_transports;
+  transport_proto_t tp;
+
   ASSERT (application_is_proxy (app));
   if (application_is_builtin (app))
     return;
-  if (transports & (1 << TRANSPORT_PROTO_TCP))
-    application_start_stop_proxy (app, TRANSPORT_PROTO_TCP, 1);
-  if (transports & (1 << TRANSPORT_PROTO_UDP))
-    application_start_stop_proxy (app, TRANSPORT_PROTO_UDP, 1);
+
+  /* *INDENT-OFF* */
+  transport_proto_foreach (tp, ({
+    if (transports & (1 << tp))
+      application_start_stop_proxy (app, tp, 1);
+  }));
+  /* *INDENT-ON* */
 }
 
 void
 application_remove_proxy (application_t * app)
 {
   u16 transports = app->proxied_transports;
+  transport_proto_t tp;
+
   ASSERT (application_is_proxy (app));
-  if (transports & (1 << TRANSPORT_PROTO_TCP))
-    application_start_stop_proxy (app, TRANSPORT_PROTO_TCP, 0);
-  if (transports & (1 << TRANSPORT_PROTO_UDP))
-    application_start_stop_proxy (app, TRANSPORT_PROTO_UDP, 0);
+
+  /* *INDENT-OFF* */
+  transport_proto_foreach (tp, ({
+    if (transports & (1 << tp))
+      application_start_stop_proxy (app, tp, 0);
+  }));
+  /* *INDENT-ON* */
 }
 
 u8 *
@@ -737,12 +796,12 @@ format_application (u8 * s, va_list * args)
     {
       if (verbose)
 	s = format (s, "%-10s%-20s%-15s%-15s%-15s%-15s%-15s", "Index", "Name",
-		    "Namespace", "API Client", "Add seg size", "Rx fifo size",
+		    "API Client", "Namespace", "Add seg size", "Rx fifo size",
 		    "Tx fifo size");
       else
 	s =
-	  format (s, "%-10s%-20s%-15s%-20s", "Index", "Name", "Namespace",
-		  "API Client");
+	  format (s, "%-10s%-20s%-15s%-40s", "Index", "Name", "API Client",
+		  "Namespace");
       return s;
     }
 
@@ -751,13 +810,13 @@ format_application (u8 * s, va_list * args)
   props = segment_manager_properties_get (app->sm_properties);
   if (verbose)
     s =
-      format (s, "%-10d%-20s%-15s%-15d%-15d%-15d%-15d", app->index, app_name,
-	      app_ns_name, app->api_client_index,
+      format (s, "%-10d%-20s%-15d%-15d%-15d%-15d%-15d", app->index, app_name,
+	      app->api_client_index, app->ns_index,
 	      props->add_segment_size,
 	      props->rx_fifo_size, props->tx_fifo_size);
   else
-    s = format (s, "%-10d%-20s%-15s%-20d", app->index, app_name, app_ns_name,
-		app->api_client_index);
+    s = format (s, "%-10d%-20s%-15d%-40s", app->index, app_name,
+		app->api_client_index, app_ns_name);
   return s;
 }
 

@@ -132,16 +132,6 @@ class ARPTestCase(VppTestCase):
         self.assertEqual(ip.src, sip)
         self.assertEqual(ip.dst, dip)
 
-    def send_and_assert_no_replies(self, intf, pkts, remark):
-        intf.add_stream(pkts)
-        self.pg_enable_capture(self.pg_interfaces)
-        self.pg_start()
-        timeout = 1
-        for i in self.pg_interfaces:
-            i.get_capture(0, timeout=timeout)
-            i.assert_nothing_captured(remark=remark)
-            timeout = 0.1
-
     def test_arp(self):
         """ ARP """
 
@@ -641,7 +631,6 @@ class ARPTestCase(VppTestCase):
         #
         #  4 - don't respond to ARP requests that has mac source different
         #      from ARP request HW source
-        #      the router
         #
         p = (Ether(dst="ff:ff:ff:ff:ff:ff", src=self.pg0.remote_mac) /
              ARP(op="who-has",
@@ -650,6 +639,19 @@ class ARPTestCase(VppTestCase):
                  pdst=self.pg0.local_ip4))
         self.send_and_assert_no_replies(self.pg0, p,
                                         "ARP req for non-local source")
+
+        #
+        #  5 - don't respond to ARP requests for address within the
+        #      interface's sub-net but not the interface's address
+        #
+        self.pg0.generate_remote_hosts(2)
+        p = (Ether(dst="ff:ff:ff:ff:ff:ff", src=self.pg0.remote_mac) /
+             ARP(op="who-has",
+                 hwsrc=self.pg0.remote_mac,
+                 psrc=self.pg0.remote_hosts[0].ip4,
+                 pdst=self.pg0.remote_hosts[1].ip4))
+        self.send_and_assert_no_replies(self.pg0, p,
+                                        "ARP req for non-local destination")
 
         #
         # cleanup

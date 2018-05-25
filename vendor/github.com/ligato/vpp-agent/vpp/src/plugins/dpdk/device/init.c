@@ -103,26 +103,8 @@ dpdk_flag_change (vnet_main_t * vnm, vnet_hw_interface_t * hi, u32 flags)
     }
   else if (ETHERNET_INTERFACE_FLAG_CONFIG_MTU (flags))
     {
-      int rv;
-
       xd->port_conf.rxmode.max_rx_pkt_len = hi->max_packet_bytes;
-
-      if (xd->flags & DPDK_DEVICE_FLAG_ADMIN_UP)
-	dpdk_device_stop (xd);
-
-      rv = rte_eth_dev_configure
-	(xd->device_index, xd->rx_q_used, xd->tx_q_used, &xd->port_conf);
-
-      if (rv < 0)
-	vlib_cli_output (vlib_get_main (),
-			 "rte_eth_dev_configure[%d]: err %d",
-			 xd->device_index, rv);
-
-      rte_eth_dev_set_mtu (xd->device_index, hi->max_packet_bytes);
-
-      if (xd->flags & DPDK_DEVICE_FLAG_ADMIN_UP)
-	dpdk_device_start (xd);
-
+      dpdk_device_setup (xd);
     }
   return old;
 }
@@ -266,7 +248,6 @@ dpdk_lib_init (dpdk_main_t * dm)
 				      VLIB_BUFFER_DEFAULT_FREE_LIST_INDEX);
       vlib_buffer_init_for_free_list (bt, fl);
       bt->flags = dm->buffer_flags_template;
-      bt->current_data = -RTE_PKTMBUF_HEADROOM;
       vnet_buffer (bt)->sw_if_index[VLIB_TX] = (u32) ~ 0;
     }
 
@@ -332,6 +313,7 @@ dpdk_lib_init (dpdk_main_t * dm)
 
       clib_memcpy (&xd->tx_conf, &dev_info.default_txconf,
 		   sizeof (struct rte_eth_txconf));
+
       if (dm->conf->no_multi_seg)
 	{
 	  xd->tx_conf.txq_flags |= ETH_TXQ_FLAGS_NOMULTSEGS;
@@ -354,11 +336,6 @@ dpdk_lib_init (dpdk_main_t * dm)
       if (devconf->num_tx_queues > 0
 	  && devconf->num_tx_queues < xd->tx_q_used)
 	xd->tx_q_used = clib_min (xd->tx_q_used, devconf->num_tx_queues);
-
-      if (devconf->num_rx_queues > 1 && dm->use_rss == 0)
-	{
-	  dm->use_rss = 1;
-	}
 
       if (devconf->num_rx_queues > 1
 	  && dev_info.max_rx_queues >= devconf->num_rx_queues)
@@ -408,8 +385,14 @@ dpdk_lib_init (dpdk_main_t * dm)
 	    case VNET_DPDK_PMD_IXGBE:
 	    case VNET_DPDK_PMD_I40E:
 	      xd->port_type = port_type_from_speed_capa (&dev_info);
-	      xd->flags |= DPDK_DEVICE_FLAG_TX_OFFLOAD |
-		DPDK_DEVICE_FLAG_INTEL_PHDR_CKSUM;
+	      if (dm->conf->no_tx_checksum_offload == 0)
+		{
+		  xd->tx_conf.txq_flags &= ~ETH_TXQ_FLAGS_NOXSUMS;
+		  xd->flags |=
+		    DPDK_DEVICE_FLAG_TX_OFFLOAD |
+		    DPDK_DEVICE_FLAG_INTEL_PHDR_CKSUM;
+		}
+
 
 	      break;
 	    case VNET_DPDK_PMD_CXGBE:
@@ -429,6 +412,10 @@ dpdk_lib_init (dpdk_main_t * dm)
 	    case VNET_DPDK_PMD_THUNDERX:
 	      xd->port_type = VNET_DPDK_PORT_TYPE_ETH_VF;
 	      xd->port_conf.rxmode.hw_strip_crc = 1;
+	      break;
+
+	    case VNET_DPDK_PMD_ENA:
+	      xd->port_type = VNET_DPDK_PORT_TYPE_ETH_VF;
 	      break;
 
 	    case VNET_DPDK_PMD_DPAA2:
@@ -542,34 +529,26 @@ dpdk_lib_init (dpdk_main_t * dm)
       xd->per_interface_next_index = ~0;
 
       /* assign interface to input thread */
-      dpdk_device_and_queue_t *dq;
       int q;
 
       if (devconf->hqos_enabled)
 	{
 	  xd->flags |= DPDK_DEVICE_FLAG_HQOS;
 
+	  int cpu;
 	  if (devconf->hqos.hqos_thread_valid)
 	    {
-	      int cpu = dm->hqos_cpu_first_index + devconf->hqos.hqos_thread;
-
 	      if (devconf->hqos.hqos_thread >= dm->hqos_cpu_count)
 		return clib_error_return (0, "invalid HQoS thread index");
 
-	      vec_add2 (dm->devices_by_hqos_cpu[cpu], dq, 1);
-	      dq->device = xd->device_index;
-	      dq->queue_id = 0;
+	      cpu = dm->hqos_cpu_first_index + devconf->hqos.hqos_thread;
 	    }
 	  else
 	    {
-	      int cpu = dm->hqos_cpu_first_index + next_hqos_cpu;
-
 	      if (dm->hqos_cpu_count == 0)
 		return clib_error_return (0, "no HQoS threads available");
 
-	      vec_add2 (dm->devices_by_hqos_cpu[cpu], dq, 1);
-	      dq->device = xd->device_index;
-	      dq->queue_id = 0;
+	      cpu = dm->hqos_cpu_first_index + next_hqos_cpu;
 
 	      next_hqos_cpu++;
 	      if (next_hqos_cpu == dm->hqos_cpu_count)
@@ -578,6 +557,11 @@ dpdk_lib_init (dpdk_main_t * dm)
 	      devconf->hqos.hqos_thread_valid = 1;
 	      devconf->hqos.hqos_thread = cpu;
 	    }
+
+	  dpdk_device_and_queue_t *dq;
+	  vec_add2 (dm->devices_by_hqos_cpu[cpu], dq, 1);
+	  dq->device = xd->device_index;
+	  dq->queue_id = 0;
 	}
 
       vec_validate_aligned (xd->tx_vectors, tm->n_vlib_mains,
@@ -637,8 +621,9 @@ dpdk_lib_init (dpdk_main_t * dm)
 
       hi = vnet_get_hw_interface (dm->vnet_main, xd->hw_if_index);
 
-      if (xd->flags & DPDK_DEVICE_FLAG_TX_OFFLOAD)
-	hi->flags |= VNET_HW_INTERFACE_FLAG_SUPPORTS_TX_L4_CKSUM_OFFLOAD;
+      if (dm->conf->no_tx_checksum_offload == 0)
+	if (xd->flags & DPDK_DEVICE_FLAG_TX_OFFLOAD)
+	  hi->flags |= VNET_HW_INTERFACE_FLAG_SUPPORTS_TX_L4_CKSUM_OFFLOAD;
 
       dpdk_device_setup (xd);
 
@@ -699,24 +684,37 @@ dpdk_lib_init (dpdk_main_t * dm)
 static void
 dpdk_bind_devices_to_uio (dpdk_config_main_t * conf)
 {
-  vlib_pci_main_t *pm = &pci_main;
   clib_error_t *error;
-  vlib_pci_device_t *d;
   u8 *pci_addr = 0;
   int num_whitelisted = vec_len (conf->dev_confs);
+  vlib_pci_device_info_t *d = 0;
+  vlib_pci_addr_t *addr = 0, *addrs;
 
+  addrs = vlib_pci_get_all_dev_addrs ();
   /* *INDENT-OFF* */
-  pool_foreach (d, pm->pci_devs, ({
+  vec_foreach (addr, addrs)
+    {
     dpdk_device_config_t * devconf = 0;
     vec_reset_length (pci_addr);
-    pci_addr = format (pci_addr, "%U%c", format_vlib_pci_addr, &d->bus_address, 0);
+    pci_addr = format (pci_addr, "%U%c", format_vlib_pci_addr, addr, 0);
+    if (d)
+    {
+      vlib_pci_free_device_info (d);
+      d = 0;
+      }
+    d = vlib_pci_get_device_info (addr, &error);
+    if (error)
+    {
+      clib_error_report (error);
+      continue;
+    }
 
     if (d->device_class != PCI_CLASS_NETWORK_ETHERNET && d->device_class != PCI_CLASS_PROCESSOR_CO)
       continue;
 
     if (num_whitelisted)
       {
-	uword * p = hash_get (conf->device_config_index_by_pci_addr, d->bus_address.as_u32);
+	uword * p = hash_get (conf->device_config_index_by_pci_addr, addr->as_u32);
 
 	if (!p)
 	  continue;
@@ -725,7 +723,9 @@ dpdk_bind_devices_to_uio (dpdk_config_main_t * conf)
       }
 
     /* virtio */
-    if (d->vendor_id == 0x1af4 && d->device_id == 0x1000)
+    if (d->vendor_id == 0x1af4 &&
+            (d->device_id == VIRTIO_PCI_LEGACY_DEVICEID_NET ||
+             d->device_id == VIRTIO_PCI_MODERN_DEVICEID_NET))
       ;
     /* vmxnet3 */
     else if (d->vendor_id == 0x15ad && d->device_id == 0x07b0)
@@ -743,6 +743,9 @@ dpdk_bind_devices_to_uio (dpdk_config_main_t * conf)
     /* Chelsio T4/T5 */
     else if (d->vendor_id == 0x1425 && (d->device_id & 0xe000) == 0x4000)
       ;
+    /* Amazen Elastic Network Adapter */
+    else if (d->vendor_id == 0x1d0f && d->device_id >= 0xec20 && d->device_id <= 0xec21)
+      ;
     /* Mellanox  */
     else if (d->vendor_id == 0x15b3 && d->device_id >= 0x1013 && d->device_id <= 0x101a)
       {
@@ -756,23 +759,24 @@ dpdk_bind_devices_to_uio (dpdk_config_main_t * conf)
         continue;
       }
 
-    error = vlib_pci_bind_to_uio (d, (char *) conf->uio_driver_name);
+    error = vlib_pci_bind_to_uio (addr, (char *) conf->uio_driver_name);
 
     if (error)
       {
 	if (devconf == 0)
 	  {
 	    pool_get (conf->dev_confs, devconf);
-	    hash_set (conf->device_config_index_by_pci_addr, d->bus_address.as_u32,
+	    hash_set (conf->device_config_index_by_pci_addr, addr->as_u32,
 		      devconf - conf->dev_confs);
-	    devconf->pci_addr.as_u32 = d->bus_address.as_u32;
+	    devconf->pci_addr.as_u32 = addr->as_u32;
 	  }
 	devconf->is_blacklisted = 1;
 	clib_error_report (error);
       }
-  }));
+  }
   /* *INDENT-ON* */
   vec_free (pci_addr);
+  vlib_pci_free_device_info (d);
 }
 
 static clib_error_t *
@@ -916,6 +920,9 @@ dpdk_config (vlib_main_t * vm, unformat_input_t * input)
       else if (unformat (input, "enable-tcp-udp-checksum"))
 	conf->enable_tcp_udp_checksum = 1;
 
+      else if (unformat (input, "no-tx-checksum-offload"))
+	conf->no_tx_checksum_offload = 1;
+
       else if (unformat (input, "decimal-interface-names"))
 	conf->interface_name_format_decimal = 1;
 
@@ -1031,7 +1038,7 @@ dpdk_config (vlib_main_t * vm, unformat_input_t * input)
     }
 
   if (!conf->uio_driver_name)
-    conf->uio_driver_name = format (0, "uio_pci_generic%c", 0);
+    conf->uio_driver_name = format (0, "auto%c", 0);
 
   /*
    * Use 1G huge pages if available.
@@ -1441,7 +1448,7 @@ dpdk_process (vlib_main_t * vm, vlib_node_runtime_t * rt, vlib_frame_t * f)
 	    if (xd->pmd == VNET_DPDK_PMD_BOND)
 	      {
 		u8 addr[6];
-		u8 slink[16];
+		dpdk_portid_t slink[16];
 		int nlink = rte_eth_bond_slaves_get (i, slink, 16);
 		if (nlink > 0)
 		  {
@@ -1567,7 +1574,6 @@ static clib_error_t *
 dpdk_init (vlib_main_t * vm)
 {
   dpdk_main_t *dm = &dpdk_main;
-  vlib_node_t *ei;
   clib_error_t *error = 0;
   vlib_thread_main_t *tm = vlib_get_thread_main ();
 
@@ -1584,12 +1590,6 @@ dpdk_init (vlib_main_t * vm)
   dm->vnet_main = vnet_get_main ();
   dm->conf = &dpdk_config_main;
 
-  ei = vlib_get_node_by_name (vm, (u8 *) "ethernet-input");
-  if (ei == 0)
-    return clib_error_return (0, "ethernet-input node AWOL");
-
-  dm->ethernet_input_node_index = ei->index;
-
   dm->conf->nchannels = 4;
   dm->conf->num_mbufs = dm->conf->num_mbufs ? dm->conf->num_mbufs : NB_MBUF;
   vec_add1 (dm->conf->eal_init_args, (u8 *) "vnet");
@@ -1600,7 +1600,7 @@ dpdk_init (vlib_main_t * vm)
   dm->buffer_flags_template =
     (VLIB_BUFFER_TOTAL_LENGTH_VALID | VLIB_BUFFER_EXT_HDR_VALID
      | VNET_BUFFER_F_L4_CHECKSUM_COMPUTED |
-     VNET_BUFFER_F_L4_CHECKSUM_CORRECT);
+     VNET_BUFFER_F_L4_CHECKSUM_CORRECT | VNET_BUFFER_F_L2_HDR_OFFSET_VALID);
 
   dm->stat_poll_interval = DPDK_STATS_POLL_INTERVAL;
   dm->link_state_poll_interval = DPDK_LINK_POLL_INTERVAL;

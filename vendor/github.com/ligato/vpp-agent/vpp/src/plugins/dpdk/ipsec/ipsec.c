@@ -91,13 +91,8 @@ algos_init (u32 n_mains)
   a->key_len = 32;
   a->iv_len = 8;
 
-#if DPDK_NO_AEAD
-#define AES_GCM_TYPE RTE_CRYPTO_SYM_XFORM_CIPHER
-#define AES_GCM_ALG RTE_CRYPTO_CIPHER_AES_GCM
-#else
 #define AES_GCM_TYPE RTE_CRYPTO_SYM_XFORM_AEAD
 #define AES_GCM_ALG RTE_CRYPTO_AEAD_AES_GCM
-#endif
 
   a = &dcm->cipher_algs[IPSEC_CRYPTO_ALG_AES_GCM_128];
   a->type = AES_GCM_TYPE;
@@ -209,13 +204,11 @@ cipher_cap_to_alg (const struct rte_cryptodev_capabilities *cap, u8 key_len)
 	  (cap->sym.cipher.algo == alg->alg) &&
 	  (alg->key_len == key_len))
 	return alg;
-#if ! DPDK_NO_AEAD
       if ((cap->sym.xform_type == RTE_CRYPTO_SYM_XFORM_AEAD) &&
 	  (alg->type == RTE_CRYPTO_SYM_XFORM_AEAD) &&
 	  (cap->sym.aead.algo == alg->alg) &&
 	  (alg->key_len == key_len))
 	return alg;
-#endif
     }
   /* *INDENT-ON* */
 
@@ -244,7 +237,6 @@ auth_cap_to_alg (const struct rte_cryptodev_capabilities *cap, u8 trunc_size)
   return NULL;
 }
 
-#if ! DPDK_NO_AEAD
 static void
 crypto_set_aead_xform (struct rte_crypto_sym_xform *xform,
 		       ipsec_sa_t * sa, u8 is_outbound)
@@ -272,7 +264,6 @@ crypto_set_aead_xform (struct rte_crypto_sym_xform *xform,
   else
     xform->aead.op = RTE_CRYPTO_AEAD_OP_DECRYPT;
 }
-#endif
 
 static void
 crypto_set_cipher_xform (struct rte_crypto_sym_xform *xform,
@@ -289,11 +280,9 @@ crypto_set_cipher_xform (struct rte_crypto_sym_xform *xform,
   xform->cipher.algo = c->alg;
   xform->cipher.key.data = sa->crypto_key;
   xform->cipher.key.length = c->key_len;
-#if ! DPDK_NO_AEAD
   xform->cipher.iv.offset =
     crypto_op_get_priv_offset () + offsetof (dpdk_op_priv_t, cb);
   xform->cipher.iv.length = c->iv_len;
-#endif
   xform->next = NULL;
 
   if (is_outbound)
@@ -318,20 +307,6 @@ crypto_set_auth_xform (struct rte_crypto_sym_xform *xform,
   xform->auth.key.data = sa->integ_key;
   xform->auth.key.length = a->key_len;
   xform->auth.digest_length = a->trunc_size;
-#if DPDK_NO_AEAD
-  if (sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_128 ||
-      sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_192 ||
-      sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_256)
-    xform->auth.algo = RTE_CRYPTO_AUTH_AES_GCM;
-  xform->auth.add_auth_data_length = sa->use_esn ? 12 : 8;
-#else
-#if 0
-  xform->auth.iv.offset =
-    sizeof (struct rte_crypto_op) + sizeof (struct rte_crypto_sym_op) +
-    offsetof (dpdk_op_priv_t, cb);
-  xform->auth.iv.length = a->iv_len;
-#endif
-#endif
   xform->next = NULL;
 
   if (is_outbound)
@@ -353,14 +328,16 @@ create_sym_session (struct rte_cryptodev_sym_session **session,
   struct rte_crypto_sym_xform cipher_xform = { 0 };
   struct rte_crypto_sym_xform auth_xform = { 0 };
   struct rte_crypto_sym_xform *xfs;
+  struct rte_cryptodev_sym_session **s;
   crypto_session_key_t key = { 0 };
 
   key.drv_id = res->drv_id;
   key.sa_idx = sa_idx;
 
+  data = vec_elt_at_index (dcm->data, res->numa);
+
   sa = pool_elt_at_index (im->sad, sa_idx);
 
-#if ! DPDK_NO_AEAD
   if ((sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_128) |
       (sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_192) |
       (sa->crypto_alg == IPSEC_CRYPTO_ALG_AES_GCM_256))
@@ -369,7 +346,6 @@ create_sym_session (struct rte_cryptodev_sym_session **session,
       xfs = &cipher_xform;
     }
   else
-#endif /* ! DPDK_NO_AEAD */
     {
       crypto_set_cipher_xform (&cipher_xform, sa, is_outbound);
       crypto_set_auth_xform (&auth_xform, sa, is_outbound);
@@ -386,29 +362,14 @@ create_sym_session (struct rte_cryptodev_sym_session **session,
 	}
     }
 
-  data = vec_elt_at_index (dcm->data, res->numa);
-
-#if DPDK_NO_AEAD
-  /*
-   * DPDK_VER <= 1705:
-   *   Each worker/thread has its own session per device driver
-   */
-  session[0] = rte_cryptodev_sym_session_create (res->dev_id, xfs);
-  if (!session[0])
-    {
-      data->session_drv_failed[res->drv_id] += 1;
-      return clib_error_return (0, "failed to create session for dev %u",
-				res->dev_id);
-    }
-#else
   /*
    * DPDK_VER >= 1708:
    *   Multiple worker/threads share the session for an SA
    *   Single session per SA, initialized for each device driver
    */
-  session[0] = (void *) hash_get (data->session_by_sa_index, sa_idx);
+  s = (void *) hash_get (data->session_by_sa_index, sa_idx);
 
-  if (!session[0])
+  if (!s)
     {
       session[0] = rte_cryptodev_sym_session_create (data->session_h);
       if (!session[0])
@@ -418,6 +379,8 @@ create_sym_session (struct rte_cryptodev_sym_session **session,
 	}
       hash_set (data->session_by_sa_index, sa_idx, session[0]);
     }
+  else
+    session[0] = s[0];
 
   struct rte_mempool **mp;
   mp = vec_elt_at_index (data->session_drv, res->drv_id);
@@ -431,9 +394,8 @@ create_sym_session (struct rte_cryptodev_sym_session **session,
       return clib_error_return (0, "failed to init session for drv %u",
 				res->drv_id);
     }
-#endif /* DPDK_NO_AEAD */
 
-  hash_set (cwm->session_by_drv_id_and_sa_index, key.val, session[0]);
+  hash_set (data->session_by_drv_id_and_sa_index, key.val, session[0]);
 
   return 0;
 }
@@ -447,7 +409,6 @@ static void __attribute__ ((unused)) clear_and_free_obj (void *obj)
   rte_mempool_put (mp, obj);
 }
 
-#if ! DPDK_NO_AEAD
 /* This is from rte_cryptodev_pmd.h */
 static inline void *
 get_session_private_data (const struct rte_cryptodev_sym_session *sess,
@@ -463,21 +424,60 @@ set_session_private_data (struct rte_cryptodev_sym_session *sess,
 {
   sess->sess_private_data[driver_id] = private_data;
 }
-#endif
+
+static clib_error_t *
+dpdk_crypto_session_disposal (crypto_session_disposal_t * v, u64 ts)
+{
+  dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
+  crypto_session_disposal_t *s;
+  void *drv_session;
+  u32 drv_id;
+  i32 ret;
+
+  /* *INDENT-OFF* */
+  vec_foreach (s, v)
+    {
+      /* ordered vector by timestamp */
+      if (!(s->ts + dcm->session_timeout < ts))
+	break;
+
+      vec_foreach_index (drv_id, dcm->drv)
+	{
+	  drv_session = get_session_private_data (s->session, drv_id);
+	  if (!drv_session)
+	    continue;
+
+	  /*
+	   * Custom clear to avoid finding a dev_id for drv_id:
+	   *  ret = rte_cryptodev_sym_session_clear (dev_id, drv_session);
+	   *  ASSERT (!ret);
+	   */
+	  clear_and_free_obj (drv_session);
+
+	  set_session_private_data (s->session, drv_id, NULL);
+	}
+
+      ret = rte_cryptodev_sym_session_free (s->session);
+      ASSERT (!ret);
+    }
+  /* *INDENT-ON* */
+
+  if (s < vec_end (v))
+    vec_delete (v, s - v, 0);
+
+  return 0;
+}
 
 static clib_error_t *
 add_del_sa_session (u32 sa_index, u8 is_add)
 {
   ipsec_main_t *im = &ipsec_main;
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
-  crypto_worker_main_t *cwm;
+  crypto_data_t *data;
   struct rte_cryptodev_sym_session *s;
   crypto_session_key_t key = { 0 };
   uword *val;
   u32 drv_id;
-  i32 ret;
-
-  key.sa_idx = sa_index;
 
   if (is_add)
     {
@@ -499,33 +499,8 @@ add_del_sa_session (u32 sa_index, u8 is_add)
       return 0;
     }
 
-  /* XXX Wait N cycles to be sure session is not in use OR
-   * keep refcnt at SA level per worker/thread ? */
-  unix_sleep (0.2);
+  key.sa_idx = sa_index;
 
-  /* *INDENT-OFF* */
-  vec_foreach (cwm, dcm->workers_main)
-    {
-      for (drv_id = 0; drv_id < dcm->max_drv_id; drv_id++)
-	{
-	  key.drv_id = drv_id;
-	  val = hash_get (cwm->session_by_drv_id_and_sa_index, key.val);
-	  s = (struct rte_cryptodev_sym_session *) val;
-
-	  if (!s)
-	    continue;
-
-#if DPDK_NO_AEAD
-	  ret = (rte_cryptodev_sym_session_free (s->dev_id, s) == NULL);
-	  ASSERT (ret);
-#endif
-	  hash_unset (cwm->session_by_drv_id_and_sa_index, key.val);
-	}
-    }
-  /* *INDENT-ON* */
-
-#if ! DPDK_NO_AEAD
-  crypto_data_t *data;
   /* *INDENT-OFF* */
   vec_foreach (data, dcm->data)
     {
@@ -535,30 +510,30 @@ add_del_sa_session (u32 sa_index, u8 is_add)
       if (!s)
 	continue;
 
-      hash_unset (data->session_by_sa_index, sa_index);
-
-      void *drv_session;
       vec_foreach_index (drv_id, dcm->drv)
 	{
-	  drv_session = get_session_private_data (s, drv_id);
-	  if (!drv_session)
+	  key.drv_id = drv_id;
+	  val = hash_get (data->session_by_drv_id_and_sa_index, key.val);
+	  s = (struct rte_cryptodev_sym_session *) val;
+
+	  if (!s)
 	    continue;
 
-	  /*
-	   * Custom clear to avoid finding a dev_id for drv_id:
-	   *  ret = rte_cryptodev_sym_session_clear (dev_id, drv_session);
-	   *  ASSERT (!ret);
-	   */
-	  clear_and_free_obj (drv_session);
-
-	  set_session_private_data (s, drv_id, NULL);
+	  hash_unset (data->session_by_drv_id_and_sa_index, key.val);
 	}
 
-      ret = rte_cryptodev_sym_session_free(s);
-      ASSERT (!ret);
+      hash_unset (data->session_by_sa_index, sa_index);
+
+      u64 ts = unix_time_now_nsec ();
+      dpdk_crypto_session_disposal (data->session_disposal, ts);
+
+      crypto_session_disposal_t sd;
+      sd.ts = ts;
+      sd.session = s;
+
+      vec_add1 (data->session_disposal, sd);
     }
   /* *INDENT-ON* */
-#endif
 
   return 0;
 }
@@ -609,9 +584,7 @@ crypto_parse_capabilities (crypto_dev_t * dev,
       /* A single capability maps to multiple cipher/auth algorithms */
       switch (cap->sym.xform_type)
 	{
-#if ! DPDK_NO_AEAD
 	case RTE_CRYPTO_SYM_XFORM_AEAD:
-#endif
 	case RTE_CRYPTO_SYM_XFORM_CIPHER:
 	  inc = cap->sym.cipher.key_size.increment;
 	  inc = inc ? inc : 1;
@@ -662,10 +635,6 @@ crypto_dev_conf (u8 dev, u16 n_qp, u8 numa)
 
   dev_conf.socket_id = numa;
   dev_conf.nb_queue_pairs = n_qp;
-#if DPDK_NO_AEAD
-  dev_conf.session_mp.nb_objs = DPDK_CRYPTO_NB_SESS_OBJS;
-  dev_conf.session_mp.cache_size = 512;
-#endif
 
   error_str = "failed to configure crypto device %u";
   ret = rte_cryptodev_configure (dev, &dev_conf);
@@ -676,11 +645,7 @@ crypto_dev_conf (u8 dev, u16 n_qp, u8 numa)
   qp_conf.nb_descriptors = DPDK_CRYPTO_N_QUEUE_DESC;
   for (qp = 0; qp < n_qp; qp++)
     {
-#if DPDK_NO_AEAD
-      ret = rte_cryptodev_queue_pair_setup (dev, qp, &qp_conf, numa);
-#else
       ret = rte_cryptodev_queue_pair_setup (dev, qp, &qp_conf, numa, NULL);
-#endif
       if (ret < 0)
 	return clib_error_return (0, error_str, dev, qp);
     }
@@ -716,11 +681,7 @@ crypto_scan_devs (u32 n_mains)
       dev->numa = rte_cryptodev_socket_id (i);
       dev->features = info.feature_flags;
       dev->max_qp = info.max_nb_queue_pairs;
-#if DPDK_NO_AEAD
-      drv_id = cryptodev->dev_type;
-#else
       drv_id = info.driver_id;
-#endif
       if (drv_id >= vec_len (dcm->drv))
 	vec_validate_init_empty (dcm->drv, drv_id,
 				 (crypto_drv_t) EMPTY_STRUCT);
@@ -842,20 +803,19 @@ crypto_op_init (struct rte_mempool *mempool,
 {
   struct rte_crypto_op *op = _obj;
 
-#if DPDK_NO_AEAD
-  op->sym = (struct rte_crypto_sym_op *) (op + 1);
-  op->sym->sess_type = RTE_CRYPTO_SYM_OP_WITH_SESSION;
-#else
   op->sess_type = RTE_CRYPTO_OP_WITH_SESSION;
-#endif
   op->type = RTE_CRYPTO_OP_TYPE_SYMMETRIC;
   op->status = RTE_CRYPTO_OP_STATUS_NOT_PROCESSED;
-  op->phys_addr = rte_mem_virt2phy (_obj);
+#if RTE_VERSION < RTE_VERSION_NUM(17, 11, 0, 0)
+  op->phys_addr = rte_mempool_virt2phy (NULL, _obj);
+#else
+  op->phys_addr = rte_mempool_virt2iova (_obj);
+#endif
   op->mempool = mempool;
 }
 
 static clib_error_t *
-crypto_create_crypto_op_pool (u8 numa)
+crypto_create_crypto_op_pool (vlib_main_t * vm, u8 numa)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   dpdk_config_main_t *conf = &dpdk_config_main;
@@ -863,48 +823,50 @@ crypto_create_crypto_op_pool (u8 numa)
   u8 *pool_name;
   u32 pool_priv_size = sizeof (struct rte_crypto_op_pool_private);
   struct rte_crypto_op_pool_private *priv;
+  struct rte_mempool *mp;
   clib_error_t *error = NULL;
+  vlib_physmem_region_index_t pri;
 
   data = vec_elt_at_index (dcm->data, numa);
 
+  /* Already allocated */
   if (data->crypto_op)
     return NULL;
 
   pool_name = format (0, "crypto_pool_numa%u%c", numa, 0);
 
-  data->crypto_op =
-    rte_mempool_create ((i8 *) pool_name, conf->num_mbufs, crypto_op_len (),
-			512, pool_priv_size, NULL, NULL, crypto_op_init, NULL,
-			numa, 0);
+  error =
+    dpdk_pool_create (vm, pool_name, crypto_op_len (), conf->num_mbufs,
+		      pool_priv_size, 512, numa, &mp, &pri);
 
-  if (!data->crypto_op)
-    {
-      error = clib_error_return (0, "failed to allocate %s", pool_name);
-      goto done;
-    }
+  vec_free (pool_name);
 
-  priv = rte_mempool_get_priv (data->crypto_op);
+  if (error)
+    return error;
 
+  /* Initialize mempool private data */
+  priv = rte_mempool_get_priv (mp);
   priv->priv_size = pool_priv_size;
   priv->type = RTE_CRYPTO_OP_TYPE_SYMMETRIC;
 
-done:
-  vec_free (pool_name);
+  /* call the object initializers */
+  rte_mempool_obj_iter (mp, crypto_op_init, 0);
 
-  return error;
+  data->crypto_op = mp;
+
+  return NULL;
 }
 
 static clib_error_t *
-crypto_create_session_h_pool (u8 numa)
+crypto_create_session_h_pool (vlib_main_t * vm, u8 numa)
 {
-#if DPDK_NO_AEAD
-  return NULL;
-#else
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   crypto_data_t *data;
   u8 *pool_name;
-  u32 elt_size;
+  struct rte_mempool *mp;
   clib_error_t *error = NULL;
+  vlib_physmem_region_index_t pri;
+  u32 elt_size;
 
   data = vec_elt_at_index (dcm->data, numa);
 
@@ -912,32 +874,33 @@ crypto_create_session_h_pool (u8 numa)
     return NULL;
 
   pool_name = format (0, "session_h_pool_numa%u%c", numa, 0);
+
   elt_size = rte_cryptodev_get_header_session_size ();
 
-  data->session_h =
-    rte_mempool_create ((i8 *) pool_name, DPDK_CRYPTO_NB_SESS_OBJS, elt_size,
-			512, 0, NULL, NULL, NULL, NULL, numa, 0);
-
-  if (!data->session_h)
-    error = clib_error_return (0, "failed to allocate %s", pool_name);
+  error =
+    dpdk_pool_create (vm, pool_name, elt_size, DPDK_CRYPTO_NB_SESS_OBJS,
+		      0, 512, numa, &mp, &pri);
 
   vec_free (pool_name);
 
-  return error;
-#endif
+  if (error)
+    return error;
+
+  data->session_h = mp;
+
+  return NULL;
 }
 
 static clib_error_t *
-crypto_create_session_drv_pool (crypto_dev_t * dev)
+crypto_create_session_drv_pool (vlib_main_t * vm, crypto_dev_t * dev)
 {
-#if DPDK_NO_AEAD
-  return NULL;
-#else
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   crypto_data_t *data;
   u8 *pool_name;
-  u32 elt_size;
+  struct rte_mempool *mp;
   clib_error_t *error = NULL;
+  vlib_physmem_region_index_t pri;
+  u32 elt_size;
   u8 numa = dev->numa;
 
   data = vec_elt_at_index (dcm->data, numa);
@@ -951,21 +914,22 @@ crypto_create_session_drv_pool (crypto_dev_t * dev)
   pool_name = format (0, "session_drv%u_pool_numa%u%c", dev->drv_id, numa, 0);
   elt_size = rte_cryptodev_get_private_session_size (dev->id);
 
-  data->session_drv[dev->drv_id] =
-    rte_mempool_create ((i8 *) pool_name, DPDK_CRYPTO_NB_SESS_OBJS, elt_size,
-			512, 0, NULL, NULL, NULL, NULL, numa, 0);
-
-  if (!data->session_drv[dev->drv_id])
-    error = clib_error_return (0, "failed to allocate %s", pool_name);
+  error =
+    dpdk_pool_create (vm, pool_name, elt_size, DPDK_CRYPTO_NB_SESS_OBJS,
+		      0, 512, numa, &mp, &pri);
 
   vec_free (pool_name);
 
-  return error;
-#endif
+  if (error)
+    return error;
+
+  data->session_drv[dev->drv_id] = mp;
+
+  return NULL;
 }
 
 static clib_error_t *
-crypto_create_pools (void)
+crypto_create_pools (vlib_main_t * vm)
 {
   dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
   clib_error_t *error = NULL;
@@ -976,15 +940,15 @@ crypto_create_pools (void)
     {
       vec_validate_aligned (dcm->data, dev->numa, CLIB_CACHE_LINE_BYTES);
 
-      error = crypto_create_crypto_op_pool (dev->numa);
+      error = crypto_create_crypto_op_pool (vm, dev->numa);
       if (error)
 	return error;
 
-      error = crypto_create_session_h_pool (dev->numa);
+      error = crypto_create_session_h_pool (vm, dev->numa);
       if (error)
 	return error;
 
-      error = crypto_create_session_drv_pool (dev);
+      error = crypto_create_session_drv_pool (vm, dev);
       if (error)
 	return error;
     }
@@ -1049,6 +1013,8 @@ dpdk_ipsec_process (vlib_main_t * vm, vlib_node_runtime_t * rt,
       return 0;
     }
 
+  dcm->session_timeout = 10e9;
+
   vec_validate_init_empty_aligned (dcm->workers_main, n_mains - 1,
 				   (crypto_worker_main_t) EMPTY_STRUCT,
 				   CLIB_CACHE_LINE_BYTES);
@@ -1067,7 +1033,7 @@ dpdk_ipsec_process (vlib_main_t * vm, vlib_node_runtime_t * rt,
 
   crypto_auto_placement ();
 
-  error = crypto_create_pools ();
+  error = crypto_create_pools (vm);
   if (error)
     {
       clib_error_report (error);

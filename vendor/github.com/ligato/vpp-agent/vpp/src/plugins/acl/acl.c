@@ -138,7 +138,7 @@ vl_api_acl_plugin_get_version_t_handler (vl_api_acl_plugin_get_version_t * mp)
   acl_main_t *am = &acl_main;
   vl_api_acl_plugin_get_version_reply_t *rmp;
   int msg_size = sizeof (*rmp);
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
 
   q = vl_api_client_index_to_input_queue (mp->client_index);
   if (q == 0)
@@ -337,8 +337,6 @@ acl_del_list (u32 acl_list_index)
 /* Some aids in ASCII graphing the content */
 #define XX "\377"
 #define __ "\000"
-#define DOT1AD "\210\250"
-#define DOT1Q "\201\00"
 #define _(x)
 #define v
 /* *INDENT-OFF* */
@@ -393,15 +391,15 @@ u8 ip4_5tuple_mask[] =
 
  u8 dot1q_5tuple_mask[] =
    _("             dmac               smac          dot1q         etype ")
-   _(ether) __ __ __ __ __ __ v __ __ __ __ __ __ v DOT1Q __ __ v XX XX v
+   _(ether) __ __ __ __ __ __ v __ __ __ __ __ __ v XX XX __ __ v XX XX v
    _(padpad) __ __ __ __
    _(padpad) __ __ __ __
    _(padpad) __ __ __ __
    _(padeth) __ __;
 
  u8 dot1ad_5tuple_mask[] =
-   _("             dmac               smac          dot1ad                     etype ")
-   _(ether) __ __ __ __ __ __ v __ __ __ __ __ __ v DOT1AD __ __ DOT1Q __ __ v XX XX v
+   _("             dmac               smac          dot1ad      dot1q         etype ")
+   _(ether) __ __ __ __ __ __ v __ __ __ __ __ __ v XX XX __ __ XX XX __ __ v XX XX v
    _(padpad) __ __ __ __
    _(padpad) __ __ __ __
    _(padeth) __ __;
@@ -409,8 +407,6 @@ u8 ip4_5tuple_mask[] =
 /* *INDENT-ON* */
 #undef XX
 #undef __
-#undef DOT1AD
-#undef DOT1Q
 #undef _
 #undef v
 
@@ -639,6 +635,21 @@ acl_add_vlan_session (acl_main_t * am, u32 table_index, u8 is_output,
     }
   match = (is_dot1ad) ? dot1ad_5tuple_mask : dot1q_5tuple_mask;
   idx = (is_dot1ad) ? 20 : 16;
+  if (is_dot1ad)
+    {
+      /* 802.1ad ethertype */
+      match[12] = 0x88;
+      match[13] = 0xa8;
+      /* 802.1q ethertype */
+      match[16] = 0x81;
+      match[17] = 0x00;
+    }
+  else
+    {
+      /* 802.1q ethertype */
+      match[12] = 0x81;
+      match[13] = 0x00;
+    }
 
   /* add sessions to vlan tables per ethernet_type */
   if (is_ip6)
@@ -655,7 +666,16 @@ acl_add_vlan_session (acl_main_t * am, u32 table_index, u8 is_output,
     }
   vnet_classify_add_del_session (cm, table_index, match, next_acl,
 				 session_idx, 0, 0, 0, 1);
-  memset (&match[idx], 0x00, 2);
+  /* reset the mask back to being a mask */
+  match[idx] = 0xff;
+  match[idx + 1] = 0xff;
+  match[12] = 0xff;
+  match[13] = 0xff;
+  if (is_dot1ad)
+    {
+      match[16] = 0xff;
+      match[17] = 0xff;
+    }
 }
 
 static int
@@ -1483,6 +1503,27 @@ macip_destroy_classify_tables (acl_main_t * am, u32 macip_acl_index)
 }
 
 static int
+macip_maybe_apply_unapply_classifier_tables (acl_main_t * am, u32 acl_index,
+					     int is_apply)
+{
+  int rv = 0;
+  int rv0 = 0;
+  int i;
+  macip_acl_list_t *a = pool_elt_at_index (am->macip_acls, acl_index);
+
+  for (i = 0; i < vec_len (am->macip_acl_by_sw_if_index); i++)
+    if (vec_elt (am->macip_acl_by_sw_if_index, i) == acl_index)
+      {
+	rv0 = vnet_set_input_acl_intfc (am->vlib_main, i, a->ip4_table_index,
+					a->ip6_table_index, a->l2_table_index,
+					is_apply);
+	/* return the first unhappy outcome but make try to plough through. */
+	rv = rv || rv0;
+      }
+  return rv;
+}
+
+static int
 macip_acl_add_list (u32 count, vl_api_macip_acl_rule_t rules[],
 		    u32 * acl_list_index, u8 * tag)
 {
@@ -1491,6 +1532,7 @@ macip_acl_add_list (u32 count, vl_api_macip_acl_rule_t rules[],
   macip_acl_rule_t *r;
   macip_acl_rule_t *acl_new_rules = 0;
   int i;
+  int rv = 0;
 
   if (*acl_list_index != ~0)
     {
@@ -1511,6 +1553,9 @@ macip_acl_add_list (u32 count, vl_api_macip_acl_rule_t rules[],
 	("acl-plugin-warning: Trying to create empty MACIP ACL (tag %s)",
 	 tag);
     }
+  /* if replacing the ACL, unapply the classifier tables first - they will be gone.. */
+  if (~0 != *acl_list_index)
+    rv = macip_maybe_apply_unapply_classifier_tables (am, *acl_list_index, 0);
   void *oldheap = acl_set_heap (am);
   /* Create and populate the rules */
   if (count > 0)
@@ -1555,7 +1600,10 @@ macip_acl_add_list (u32 count, vl_api_macip_acl_rule_t rules[],
   /* Create and populate the classifer tables */
   macip_create_classify_tables (am, *acl_list_index);
   clib_mem_set_heap (oldheap);
-  return 0;
+  /* If the ACL was already applied somewhere, reapply the newly created tables */
+  rv = rv
+    || macip_maybe_apply_unapply_classifier_tables (am, *acl_list_index, 1);
+  return rv;
 }
 
 
@@ -1823,7 +1871,7 @@ copy_acl_rule_to_api_rule (vl_api_acl_rule_t * api_rule, acl_rule_t * r)
 }
 
 static void
-send_acl_details (acl_main_t * am, unix_shared_memory_queue_t * q,
+send_acl_details (acl_main_t * am, svm_queue_t * q,
 		  acl_list_t * acl, u32 context)
 {
   vl_api_acl_details_t *mp;
@@ -1861,7 +1909,7 @@ vl_api_acl_dump_t_handler (vl_api_acl_dump_t * mp)
   acl_list_t *acl;
 
   int rv = -1;
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
 
   q = vl_api_client_index_to_input_queue (mp->client_index);
   if (q == 0)
@@ -1898,7 +1946,7 @@ vl_api_acl_dump_t_handler (vl_api_acl_dump_t * mp)
 
 static void
 send_acl_interface_list_details (acl_main_t * am,
-				 unix_shared_memory_queue_t * q,
+				 svm_queue_t * q,
 				 u32 sw_if_index, u32 context)
 {
   vl_api_acl_interface_list_details_t *mp;
@@ -1951,7 +1999,7 @@ vl_api_acl_interface_list_dump_t_handler (vl_api_acl_interface_list_dump_t *
   vnet_interface_main_t *im = &am->vnet_main->interface_main;
 
   u32 sw_if_index;
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
 
   q = vl_api_client_index_to_input_queue (mp->client_index);
   if (q == 0)
@@ -2065,7 +2113,7 @@ static void
 }
 
 static void
-send_macip_acl_details (acl_main_t * am, unix_shared_memory_queue_t * q,
+send_macip_acl_details (acl_main_t * am, svm_queue_t * q,
 			macip_acl_list_t * acl, u32 context)
 {
   vl_api_macip_acl_details_t *mp;
@@ -2120,7 +2168,7 @@ vl_api_macip_acl_dump_t_handler (vl_api_macip_acl_dump_t * mp)
   acl_main_t *am = &acl_main;
   macip_acl_list_t *acl;
 
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
 
   q = vl_api_client_index_to_input_queue (mp->client_index);
   if (q == 0)
@@ -2158,7 +2206,7 @@ vl_api_macip_acl_interface_get_t_handler (vl_api_macip_acl_interface_get_t *
   vl_api_macip_acl_interface_get_reply_t *rmp;
   u32 count = vec_len (am->macip_acl_by_sw_if_index);
   int msg_size = sizeof (*rmp) + sizeof (rmp->acls[0]) * count;
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   int i;
 
   q = vl_api_client_index_to_input_queue (mp->client_index);
@@ -2183,7 +2231,7 @@ vl_api_macip_acl_interface_get_t_handler (vl_api_macip_acl_interface_get_t *
 
 static void
 send_macip_acl_interface_list_details (acl_main_t * am,
-				       unix_shared_memory_queue_t * q,
+				       svm_queue_t * q,
 				       u32 sw_if_index,
 				       u32 acl_index, u32 context)
 {
@@ -2209,7 +2257,7 @@ static void
   vl_api_macip_acl_interface_list_dump_t_handler
   (vl_api_macip_acl_interface_list_dump_t * mp)
 {
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   acl_main_t *am = &acl_main;
   u32 sw_if_index = ntohl (mp->sw_if_index);
 
@@ -2717,7 +2765,7 @@ acl_show_aclplugin_acl_fn (vlib_main_t * vm,
   acl_main_t *am = &acl_main;
 
   u32 acl_index = ~0;
-  unformat (input, "index %u", &acl_index);
+  (void) unformat (input, "index %u", &acl_index);
 
   acl_plugin_show_acl (am, acl_index);
   return error;
@@ -2773,6 +2821,26 @@ acl_plugin_show_interface (acl_main_t * am, u32 sw_if_index, int show_acl)
 
 }
 
+
+static clib_error_t *
+acl_show_aclplugin_decode_5tuple_fn (vlib_main_t * vm,
+				     unformat_input_t * input,
+				     vlib_cli_command_t * cmd)
+{
+  clib_error_t *error = 0;
+  u64 five_tuple[6] = { 0, 0, 0, 0, 0, 0 };
+
+  if (unformat
+      (input, "%llx %llx %llx %llx %llx %llx", &five_tuple[0], &five_tuple[1],
+       &five_tuple[2], &five_tuple[3], &five_tuple[4], &five_tuple[5]))
+    vlib_cli_output (vm, "5-tuple structure decode: %U\n\n",
+		     format_acl_plugin_5tuple, five_tuple);
+  else
+    error = clib_error_return (0, "expecting 6 hex integers");
+  return error;
+}
+
+
 static clib_error_t *
 acl_show_aclplugin_interface_fn (vlib_main_t * vm,
 				 unformat_input_t * input,
@@ -2782,7 +2850,7 @@ acl_show_aclplugin_interface_fn (vlib_main_t * vm,
   acl_main_t *am = &acl_main;
 
   u32 sw_if_index = ~0;
-  unformat (input, "sw_if_index %u", &sw_if_index);
+  (void) unformat (input, "sw_if_index %u", &sw_if_index);
   int show_acl = unformat (input, "acl");
 
   acl_plugin_show_interface (am, sw_if_index, show_acl);
@@ -2964,9 +3032,9 @@ acl_show_aclplugin_sessions_fn (vlib_main_t * vm,
   u32 show_bihash_verbose = 0;
   u32 show_session_thread_id = ~0;
   u32 show_session_session_index = ~0;
-  unformat (input, "thread %u index %u", &show_session_thread_id,
-	    &show_session_session_index);
-  unformat (input, "verbose %u", &show_bihash_verbose);
+  (void) unformat (input, "thread %u index %u", &show_session_thread_id,
+		   &show_session_session_index);
+  (void) unformat (input, "verbose %u", &show_bihash_verbose);
 
   acl_plugin_show_sessions (am, show_session_thread_id,
 			    show_session_session_index);
@@ -3191,6 +3259,12 @@ VLIB_CLI_COMMAND (aclplugin_show_acl_command, static) = {
     .path = "show acl-plugin acl",
     .short_help = "show acl-plugin acl [index N]",
     .function = acl_show_aclplugin_acl_fn,
+};
+
+VLIB_CLI_COMMAND (aclplugin_show_decode_5tuple_command, static) = {
+    .path = "show acl-plugin decode 5tuple",
+    .short_help = "show acl-plugin decode 5tuple XXXX XXXX XXXX XXXX XXXX XXXX",
+    .function = acl_show_aclplugin_decode_5tuple_fn,
 };
 
 VLIB_CLI_COMMAND (aclplugin_show_interface_command, static) = {

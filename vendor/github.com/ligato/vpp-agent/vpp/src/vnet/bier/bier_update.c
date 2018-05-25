@@ -32,6 +32,8 @@ vnet_bier_table_cmd (vlib_main_t * vm,
     };
     u32 is_add = 0;
 
+    local_label = MPLS_LABEL_INVALID;
+
     while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT) {
         if (unformat (input, "del")) {
             is_add = 0;
@@ -66,7 +68,7 @@ done:
 
 VLIB_CLI_COMMAND (bier_table_command) = {
   .path = "bier table",
-  .short_help = "Add/delete BIER Tables",
+  .short_help = "bier table [add|del] sd <sub-domain> set <SET> bsl <bit-string-length> [mpls <label>]",
   .function = vnet_bier_table_cmd,
 };
 
@@ -79,25 +81,27 @@ vnet_bier_route_cmd (vlib_main_t * vm,
     fib_route_path_t *brps = NULL, brp = {
         .frp_flags = FIB_ROUTE_PATH_BIER_FMASK,
     };
+    u32 hdr_len, payload_proto;
     bier_table_id_t bti = {
+        .bti_ecmp = BIER_ECMP_TABLE_ID_MAIN,
     };
-    mpls_label_t out_label;
     bier_bp_t bp;
-    u32 hdr_len;
     u32 add = 1;
+
+    payload_proto = DPO_PROTO_BIER;
 
     while (unformat_check_input (input) != UNFORMAT_END_OF_INPUT) {
         if (unformat (input, "del")) {
             add = 0;
+        } else if (unformat (input, "add")) {
+            add = 1;
         } else if (unformat (input, "sd %d", &bti.bti_sub_domain)) {
         } else if (unformat (input, "set %d", &bti.bti_set)) {
         } else if (unformat (input, "bsl %d", &hdr_len)) {
         } else if (unformat (input, "bp %d", &bp)) {
-        } else if (unformat (input, "v4-nh %U",
-                             unformat_ip46_address,
-                             &brp.frp_addr, 0)) {
-        } else if (unformat (input, "mpls %d", &out_label)) {
-            vec_add1(brp.frp_label_stack, out_label);
+        } else if (unformat (input, "via %U",
+                             unformat_fib_route_path,
+                             &brp, &payload_proto)) {
         } else {
             error = unformat_parse_error (input);
             goto done;
@@ -111,11 +115,11 @@ vnet_bier_route_cmd (vlib_main_t * vm,
 
     if (add)
     {
-        bier_table_route_add(&bti, bp, &brp);
+        bier_table_route_add(&bti, bp, brps);
     }
     else
     {
-        bier_table_route_remove(&bti, bp, &brp);
+        bier_table_route_remove(&bti, bp, brps);
     }
 
 done:
@@ -125,7 +129,7 @@ done:
 
 VLIB_CLI_COMMAND (bier_route_command) = {
   .path = "bier route",
-  .short_help = "Add/delete BIER Routes",
+  .short_help = "bier route [add|del] sd <sud-domain> set <set> bsl <bit-string-length> bp <bit-position> via [next-hop-address] [next-hop-interface] [next-hop-table <value>] [weight <value>] [preference <value>] [udp-encap-id <value>] [ip4-lookup-in-table <value>] [ip6-lookup-in-table <value>] [mpls-lookup-in-table <value>] [resolve-via-host] [resolve-via-connected] [rx-ip4 <interface>] [out-labels <value value value>]",
   .function = vnet_bier_route_cmd,
 };
 

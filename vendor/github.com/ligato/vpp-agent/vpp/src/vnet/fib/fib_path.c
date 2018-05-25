@@ -23,7 +23,7 @@
 #include <vnet/dpo/lookup_dpo.h>
 #include <vnet/dpo/interface_rx_dpo.h>
 #include <vnet/dpo/mpls_disposition.h>
-#include <vnet/dpo/l2_bridge_dpo.h>
+#include <vnet/dpo/dvr_dpo.h>
 #include <vnet/dpo/drop_dpo.h>
 
 #include <vnet/adj/adj.h>
@@ -41,6 +41,7 @@
 #include <vnet/bier/bier_fmask.h>
 #include <vnet/bier/bier_table.h>
 #include <vnet/bier/bier_imp.h>
+#include <vnet/bier/bier_disp_table.h>
 
 /**
  * Enurmeration of path types
@@ -99,6 +100,10 @@ typedef enum fib_path_type_t_ {
      */
     FIB_PATH_TYPE_BIER_FMASK,
     /**
+     * via a DVR.
+     */
+    FIB_PATH_TYPE_DVR,
+    /**
      * Marker. Add new types before this one, then update it.
      */
     FIB_PATH_TYPE_LAST = FIB_PATH_TYPE_BIER_FMASK,
@@ -122,6 +127,7 @@ typedef enum fib_path_type_t_ {
     [FIB_PATH_TYPE_BIER_IMP]          = "bier-imp",	        \
     [FIB_PATH_TYPE_BIER_TABLE]        = "bier-table",	        \
     [FIB_PATH_TYPE_BIER_FMASK]        = "bier-fmask",	        \
+    [FIB_PATH_TYPE_DVR]               = "dvr",   	        \
 }
 
 #define FOR_EACH_FIB_PATH_TYPE(_item)           \
@@ -286,13 +292,9 @@ typedef struct fib_path_t_ {
 	} recursive;
 	struct {
             /**
-             * The next-hop
+             * BIER FMask ID
              */
-            ip46_address_t fp_nh;
-            /**
-             * The BIER FIB the fmask is in
-             */
-            index_t fp_bier_fib;
+            index_t fp_bier_fmask;
 	} bier_fmask;
 	struct {
             /**
@@ -348,6 +350,12 @@ typedef struct fib_path_t_ {
 	     */
 	    u32 fp_udp_encap_id;
 	} udp_encap;
+	struct {
+	    /**
+	     * The interface
+	     */
+	    u32 fp_interface;
+	} dvr;
     };
     STRUCT_MARK(path_hash_end);
 
@@ -369,13 +377,13 @@ typedef struct fib_path_t_ {
          */
         fib_node_index_t fp_via_fib;
         /**
-         * the resolving bier-fmask
-         */
-        index_t fp_via_bier_fmask;
-        /**
          * the resolving bier-table
          */
         index_t fp_via_bier_tbl;
+        /**
+         * the resolving bier-fmask
+         */
+        index_t fp_via_bier_fmask;
     };
 
     /**
@@ -409,8 +417,8 @@ static fib_path_t *fib_path_pool;
 {       		          				\
     u8 *_tmp = NULL;						\
     _tmp = fib_path_format(fib_path_get_index(_p), _tmp);	\
-    clib_warning("path:[%d:%s]:" _fmt,				\
-		 fib_path_get_index(_p), _tmp,			\
+    clib_warning("path:[%d:%U]:" _fmt,				\
+		 fib_path_get_index(_p), format_fib_path, _p, 0,\
 		 ##_args);					\
     vec_free(_tmp);						\
 }
@@ -439,21 +447,24 @@ fib_path_get_node (fib_node_index_t index)
 static fib_path_t*
 fib_path_from_fib_node (fib_node_t *node)
 {
-#if CLIB_DEBUG > 0
     ASSERT(FIB_NODE_TYPE_PATH == node->fn_type);
-#endif
     return ((fib_path_t*)node);
 }
 
 u8 *
 format_fib_path (u8 * s, va_list * args)
 {
-    fib_path_t *path = va_arg (*args, fib_path_t *);
+    fib_node_index_t path_index = va_arg (*args, fib_node_index_t);
+    u32 indent = va_arg (*args, u32);
     vnet_main_t * vnm = vnet_get_main();
     fib_path_oper_attribute_t oattr;
     fib_path_cfg_attribute_t cattr;
+    fib_path_t *path;
 
-    s = format (s, "      index:%d ", fib_path_get_index(path));
+    path = fib_path_get(path_index);
+
+    s = format (s, "%Upath:[%d] ", format_white_space, indent,
+                fib_path_get_index(path));
     s = format (s, "pl-index:%d ", path->fp_pl_index);
     s = format (s, "%U ", format_dpo_proto, path->fp_nh_proto);
     s = format (s, "weight=%d ", path->fp_weight);
@@ -475,7 +486,7 @@ format_fib_path (u8 * s, va_list * args)
 	    }
 	}
     }
-    s = format(s, "\n       ");
+    s = format(s, "\n%U", format_white_space, indent+2);
 
     switch (path->fp_type)
     {
@@ -503,19 +514,20 @@ format_fib_path (u8 * s, va_list * args)
 	}
 	if (!dpo_id_is_valid(&path->fp_dpo))
 	{
-	    s = format(s, "\n          unresolved");
+	    s = format(s, "\n%Uunresolved", format_white_space, indent+2);
 	}
 	else
 	{
-	    s = format(s, "\n          %U",
-		       format_dpo_id,
+	    s = format(s, "\n%U%U",
+		       format_white_space, indent,
+                       format_dpo_id,
 		       &path->fp_dpo, 13);
 	}
 	break;
     case FIB_PATH_TYPE_ATTACHED:
 	if (path->fp_oper_flags & FIB_PATH_OPER_FLAG_DROP)
 	{
-	    s = format (s, " if_index:%d", path->attached_next_hop.fp_interface);
+	    s = format (s, "if_index:%d", path->attached_next_hop.fp_interface);
 	}
 	else
 	{
@@ -553,7 +565,7 @@ format_fib_path (u8 * s, va_list * args)
 
 	break;
     case FIB_PATH_TYPE_UDP_ENCAP:
-        s = format (s, " UDP-encap ID:%d", path->udp_encap.fp_udp_encap_id);
+        s = format (s, "UDP-encap ID:%d", path->udp_encap.fp_udp_encap_id);
         break;
     case FIB_PATH_TYPE_BIER_TABLE:
         s = format (s, "via bier-table:[%U}",
@@ -564,14 +576,7 @@ format_fib_path (u8 * s, va_list * args)
                     path->fp_dpo.dpoi_index);
         break;
     case FIB_PATH_TYPE_BIER_FMASK:
-        s = format (s, "via %U",
-                    format_ip46_address,
-                    &path->bier_fmask.fp_nh,
-                    IP46_TYPE_ANY);
-	s = format (s, " in BIER-fib:%d",
-		    path->bier_fmask.fp_bier_fib,
-		    path->fp_via_fib); 
-	s = format (s, " via-fmask:%d", path->fp_via_bier_fmask); 
+	s = format (s, "via-fmask:%d", path->bier_fmask.fp_bier_fmask); 
 	s = format (s, " via-dpo:[%U:%d]",
 		    format_dpo_type, path->fp_dpo.dpoi_type, 
 		    path->fp_dpo.dpoi_index);
@@ -579,6 +584,14 @@ format_fib_path (u8 * s, va_list * args)
     case FIB_PATH_TYPE_BIER_IMP:
         s = format (s, "via %U", format_bier_imp,
                     path->bier_imp.fp_bier_imp, 0, BIER_SHOW_BRIEF);
+        break;
+    case FIB_PATH_TYPE_DVR:
+        s = format (s, " %U",
+                    format_vnet_sw_interface_name,
+                    vnm,
+                    vnet_get_sw_interface(
+                        vnm,
+                        path->dvr.fp_interface));
         break;
     case FIB_PATH_TYPE_RECEIVE:
     case FIB_PATH_TYPE_INTF_RX:
@@ -588,7 +601,7 @@ format_fib_path (u8 * s, va_list * args)
 	if (dpo_id_is_valid(&path->fp_dpo))
 	{
 	    s = format(s, "%U", format_dpo_id,
-		       &path->fp_dpo, 2);
+		       &path->fp_dpo, indent+2);
 	}
 	break;
     }
@@ -604,29 +617,6 @@ fib_path_format (fib_node_index_t pi, u8 *s)
     ASSERT(NULL != path);
 
     return (format (s, "%U", format_fib_path, path));
-}
-
-u8 *
-fib_path_adj_format (fib_node_index_t pi,
-		     u32 indent,
-		     u8 *s)
-{
-    fib_path_t *path;
-
-    path = fib_path_get(pi);
-    ASSERT(NULL != path);
-
-    if (!dpo_id_is_valid(&path->fp_dpo))
-    {
-	s = format(s, " unresolved");
-    }
-    else
-    {
-	s = format(s, "%U", format_dpo_id,
-		   &path->fp_dpo, 2);
-    }
-
-    return (s);
 }
 
 /*
@@ -834,7 +824,7 @@ static void
 fib_path_bier_fmask_update (fib_path_t *path,
                             dpo_id_t *dpo)
 {
-    bier_fmask_contribute_forwarding(path->fp_via_bier_fmask, dpo);
+    bier_fmask_contribute_forwarding(path->bier_fmask.fp_bier_fmask, dpo);
 
     /*
      * if we are stakcing on the drop, then the path is not resolved
@@ -895,12 +885,8 @@ fib_path_unresolve (fib_path_t *path)
 	}
 	break;
     case FIB_PATH_TYPE_BIER_FMASK:
-	if (FIB_NODE_INDEX_INVALID != path->fp_via_bier_fmask)
-	{
-	    bier_fmask_child_remove(path->fp_via_bier_fmask,
-                                    path->fp_sibling);
-	    path->fp_via_bier_fmask = FIB_NODE_INDEX_INVALID;
-	}
+        bier_fmask_child_remove(path->fp_via_bier_fmask,
+                                path->fp_sibling);
 	break;
     case FIB_PATH_TYPE_BIER_IMP:
         bier_imp_unlock(path->fp_dpo.dpoi_index);
@@ -914,12 +900,9 @@ fib_path_unresolve (fib_path_t *path)
         adj_unlock(path->fp_dpo.dpoi_index);
         break;
     case FIB_PATH_TYPE_ATTACHED:
-        if (DPO_PROTO_ETHERNET != path->fp_nh_proto)
-        {
-            adj_child_remove(path->fp_dpo.dpoi_index,
-                             path->fp_sibling);
-            adj_unlock(path->fp_dpo.dpoi_index);
-        }
+        adj_child_remove(path->fp_dpo.dpoi_index,
+                         path->fp_sibling);
+        adj_unlock(path->fp_dpo.dpoi_index);
         break;
     case FIB_PATH_TYPE_UDP_ENCAP:
 	udp_encap_unlock_w_index(path->fp_dpo.dpoi_index);
@@ -931,6 +914,7 @@ fib_path_unresolve (fib_path_t *path)
     case FIB_PATH_TYPE_RECEIVE:
     case FIB_PATH_TYPE_INTF_RX:
     case FIB_PATH_TYPE_DEAG:
+    case FIB_PATH_TYPE_DVR:
         /*
          * these hold only the path's DPO, which is reset below.
          */
@@ -1134,6 +1118,7 @@ FIXME comment
         }
 	break;
     case FIB_PATH_TYPE_ATTACHED:
+    case FIB_PATH_TYPE_DVR:
 	/*
 	 * FIXME; this could schedule a lower priority walk, since attached
 	 * routes are not usually in ECMP configurations so the backwalk to
@@ -1315,8 +1300,7 @@ fib_path_create (fib_node_index_t pl_index,
     else if (rpath->frp_flags & FIB_ROUTE_PATH_BIER_FMASK)
     {
         path->fp_type = FIB_PATH_TYPE_BIER_FMASK;
-        path->bier_fmask.fp_nh = rpath->frp_addr;
-        path->bier_fmask.fp_bier_fib = rpath->frp_bier_fib_index;
+        path->bier_fmask.fp_bier_fmask = rpath->frp_bier_fmask;
     }
     else if (rpath->frp_flags & FIB_ROUTE_PATH_BIER_IMP)
     {
@@ -1327,6 +1311,16 @@ fib_path_create (fib_node_index_t pl_index,
     {
         path->fp_type = FIB_PATH_TYPE_BIER_TABLE;
         path->bier_table.fp_bier_tbl = rpath->frp_bier_tbl;
+    }
+    else if (rpath->frp_flags & FIB_ROUTE_PATH_DEAG)
+    {
+	path->fp_type = FIB_PATH_TYPE_DEAG;
+	path->deag.fp_tbl_id = rpath->frp_fib_index;
+    }
+    else if (rpath->frp_flags & FIB_ROUTE_PATH_DVR)
+    {
+	path->fp_type = FIB_PATH_TYPE_DVR;
+	path->dvr.fp_interface = rpath->frp_sw_if_index;
     }
     else if (~0 != rpath->frp_sw_if_index)
     {
@@ -1551,14 +1545,8 @@ fib_path_cmp_i (const fib_path_t *path1,
 	    }
 	    break;
 	case FIB_PATH_TYPE_BIER_FMASK:
-	    res = ip46_address_cmp(&path1->bier_fmask.fp_nh,
-				   &path2->bier_fmask.fp_nh);
- 
-	    if (0 == res)
-	    {
-		res = (path1->bier_fmask.fp_bier_fib -
-                       path2->bier_fmask.fp_bier_fib);
-	    }
+            res = (path1->bier_fmask.fp_bier_fmask -
+                   path2->bier_fmask.fp_bier_fmask);
 	    break;
 	case FIB_PATH_TYPE_BIER_IMP:
             res = (path1->bier_imp.fp_bier_imp -
@@ -1580,6 +1568,9 @@ fib_path_cmp_i (const fib_path_t *path1,
 	    break;
 	case FIB_PATH_TYPE_UDP_ENCAP:
 	    res = (path1->udp_encap.fp_udp_encap_id - path2->udp_encap.fp_udp_encap_id);
+	    break;
+	case FIB_PATH_TYPE_DVR:
+	    res = (path1->dvr.fp_interface - path2->dvr.fp_interface);
 	    break;
 	case FIB_PATH_TYPE_SPECIAL:
 	case FIB_PATH_TYPE_RECEIVE:
@@ -1693,13 +1684,7 @@ fib_path_cmp_w_route_path (fib_node_index_t path_index,
             }
 	    break;
 	case FIB_PATH_TYPE_BIER_FMASK:
-            res = ip46_address_cmp(&path->bier_fmask.fp_nh,
-                                   &rpath->frp_addr);
-
-            if (0 == res)
-            {
-                res = (path->bier_fmask.fp_bier_fib - rpath->frp_bier_fib_index);
-            }
+            res = (path->bier_fmask.fp_bier_fmask - rpath->frp_bier_fmask);
 	    break;
 	case FIB_PATH_TYPE_BIER_IMP:
             res = (path->bier_imp.fp_bier_imp - rpath->frp_bier_imp);
@@ -1721,6 +1706,9 @@ fib_path_cmp_w_route_path (fib_node_index_t path_index,
                 res = (path->deag.fp_rpf_id - rpath->frp_rpf_id);
             }
             break;
+	case FIB_PATH_TYPE_DVR:
+	    res = (path->dvr.fp_interface - rpath->frp_sw_if_index);
+	    break;
 	case FIB_PATH_TYPE_SPECIAL:
 	case FIB_PATH_TYPE_RECEIVE:
 	case FIB_PATH_TYPE_EXCLUSIVE:
@@ -1817,6 +1805,7 @@ fib_path_recursive_loop_detect (fib_node_index_t path_index,
     case FIB_PATH_TYPE_ATTACHED:
     case FIB_PATH_TYPE_SPECIAL:
     case FIB_PATH_TYPE_DEAG:
+    case FIB_PATH_TYPE_DVR:
     case FIB_PATH_TYPE_RECEIVE:
     case FIB_PATH_TYPE_INTF_RX:
     case FIB_PATH_TYPE_UDP_ENCAP:
@@ -1862,35 +1851,27 @@ fib_path_resolve (fib_node_index_t path_index)
 	fib_path_attached_next_hop_set(path);
 	break;
     case FIB_PATH_TYPE_ATTACHED:
-        if (DPO_PROTO_ETHERNET == path->fp_nh_proto)
+        /*
+         * path->attached.fp_interface
+         */
+        if (!vnet_sw_interface_is_admin_up(vnet_get_main(),
+                                           path->attached.fp_interface))
         {
-            l2_bridge_dpo_add_or_lock(path->attached.fp_interface,
-                                      &path->fp_dpo);
+            path->fp_oper_flags &= ~FIB_PATH_OPER_FLAG_RESOLVED;
         }
-        else
-        {
-            /*
-             * path->attached.fp_interface
-             */
-            if (!vnet_sw_interface_is_admin_up(vnet_get_main(),
-                                               path->attached.fp_interface))
-            {
-                path->fp_oper_flags &= ~FIB_PATH_OPER_FLAG_RESOLVED;
-            }
-            dpo_set(&path->fp_dpo,
-                    DPO_ADJACENCY,
-                    path->fp_nh_proto,
-                    fib_path_attached_get_adj(path,
-                                              dpo_proto_to_link(path->fp_nh_proto)));
+        dpo_set(&path->fp_dpo,
+                DPO_ADJACENCY,
+                path->fp_nh_proto,
+                fib_path_attached_get_adj(path,
+                                          dpo_proto_to_link(path->fp_nh_proto)));
 
-            /*
-             * become a child of the adjacency so we receive updates
-             * when the interface state changes
-             */
-            path->fp_sibling = adj_child_add(path->fp_dpo.dpoi_index,
-                                             FIB_NODE_TYPE_PATH,
-                                             fib_path_get_index(path));
-        }
+        /*
+         * become a child of the adjacency so we receive updates
+         * when the interface state changes
+         */
+        path->fp_sibling = adj_child_add(path->fp_dpo.dpoi_index,
+                                         FIB_NODE_TYPE_PATH,
+                                         fib_path_get_index(path));
 	break;
     case FIB_PATH_TYPE_RECURSIVE:
     {
@@ -1946,26 +1927,14 @@ fib_path_resolve (fib_node_index_t path_index)
     case FIB_PATH_TYPE_BIER_FMASK:
     {
         /*
-         * Find the BIER f-mask to link to
-         */
-        bier_fmask_id_t fmid = {
-            .bfmi_nh = path->bier_fmask.fp_nh,
-            .bfmi_hdr_type = BIER_HDR_O_MPLS,
-        };
-
-        ASSERT(FIB_NODE_INDEX_INVALID == path->fp_via_bier_fmask);
-
-        path->fp_via_bier_fmask = bier_fmask_db_find(path->bier_fmask.fp_bier_fib,
-                                                &fmid);
-
-        /*
          * become a dependent child of the entry so the path is
          * informed when the forwarding for the entry changes.
          */
-        path->fp_sibling = bier_fmask_child_add(path->fp_via_bier_fmask,
+        path->fp_sibling = bier_fmask_child_add(path->bier_fmask.fp_bier_fmask,
                                                 FIB_NODE_TYPE_PATH,
                                                 fib_path_get_index(path));
 
+        path->fp_via_bier_fmask = path->bier_fmask.fp_bier_fmask;
         fib_path_bier_fmask_update(path, &path->fp_dpo);
 
         break;
@@ -1998,28 +1967,41 @@ fib_path_resolve (fib_node_index_t path_index)
 	break;
     case FIB_PATH_TYPE_DEAG:
     {
-	/*
-	 * Resolve via a lookup DPO.
-         * FIXME. control plane should add routes with a table ID
-	 */
-        lookup_input_t input;
-        lookup_cast_t cast;
+        if (DPO_PROTO_BIER == path->fp_nh_proto)
+        {
+            bier_disp_table_contribute_forwarding(path->deag.fp_tbl_id,
+                                                  &path->fp_dpo);
+        }
+        else
+        {
+            /*
+             * Resolve via a lookup DPO.
+             * FIXME. control plane should add routes with a table ID
+             */
+            lookup_input_t input;
+            lookup_cast_t cast;
 
-        cast = (path->fp_cfg_flags & FIB_PATH_CFG_FLAG_RPF_ID ?
-                LOOKUP_MULTICAST :
-                LOOKUP_UNICAST);
-        input = (path->fp_cfg_flags & FIB_PATH_CFG_FLAG_DEAG_SRC ?
-                LOOKUP_INPUT_SRC_ADDR :
-                LOOKUP_INPUT_DST_ADDR);
+            cast = (path->fp_cfg_flags & FIB_PATH_CFG_FLAG_RPF_ID ?
+                    LOOKUP_MULTICAST :
+                    LOOKUP_UNICAST);
+            input = (path->fp_cfg_flags & FIB_PATH_CFG_FLAG_DEAG_SRC ?
+                     LOOKUP_INPUT_SRC_ADDR :
+                     LOOKUP_INPUT_DST_ADDR);
 
-        lookup_dpo_add_or_lock_w_fib_index(path->deag.fp_tbl_id,
-                                           path->fp_nh_proto,
-                                           cast,
-                                           input,
-                                           LOOKUP_TABLE_FROM_CONFIG,
-                                           &path->fp_dpo);
-	break;
+            lookup_dpo_add_or_lock_w_fib_index(path->deag.fp_tbl_id,
+                                               path->fp_nh_proto,
+                                               cast,
+                                               input,
+                                               LOOKUP_TABLE_FROM_CONFIG,
+                                               &path->fp_dpo);
+        }
+        break;
     }
+    case FIB_PATH_TYPE_DVR:
+        dvr_dpo_add_or_lock(path->attached.fp_interface,
+                            path->fp_nh_proto,
+                            &path->fp_dpo);
+        break;
     case FIB_PATH_TYPE_RECEIVE:
 	/*
 	 * Resolve via a receive DPO.
@@ -2076,6 +2058,8 @@ fib_path_get_resolving_interface (fib_node_index_t path_index)
             return (fib_entry_get_resolving_interface(path->fp_via_fib));
         }
         break;
+    case FIB_PATH_TYPE_DVR:
+	return (path->dvr.fp_interface);
     case FIB_PATH_TYPE_INTF_RX:
     case FIB_PATH_TYPE_UDP_ENCAP:
     case FIB_PATH_TYPE_SPECIAL:
@@ -2104,6 +2088,7 @@ fib_path_get_resolving_index (fib_node_index_t path_index)
     case FIB_PATH_TYPE_INTF_RX:
     case FIB_PATH_TYPE_SPECIAL:
     case FIB_PATH_TYPE_DEAG:
+    case FIB_PATH_TYPE_DVR:
     case FIB_PATH_TYPE_EXCLUSIVE:
         break;
     case FIB_PATH_TYPE_UDP_ENCAP:
@@ -2111,7 +2096,7 @@ fib_path_get_resolving_index (fib_node_index_t path_index)
     case FIB_PATH_TYPE_RECURSIVE:
 	return (path->fp_via_fib);
     case FIB_PATH_TYPE_BIER_FMASK:
- 	return (path->fp_via_bier_fmask);
+ 	return (path->bier_fmask.fp_bier_fmask);
    case FIB_PATH_TYPE_BIER_TABLE:
        return (path->fp_via_bier_tbl);
    case FIB_PATH_TYPE_BIER_IMP:
@@ -2232,6 +2217,9 @@ fib_path_contribute_urpf (fib_node_index_t path_index,
 	}
 	break;
     }
+    case FIB_PATH_TYPE_DVR:
+	fib_urpf_list_append(urpf, path->dvr.fp_interface);
+	break;
     case FIB_PATH_TYPE_DEAG:
     case FIB_PATH_TYPE_RECEIVE:
     case FIB_PATH_TYPE_INTF_RX:
@@ -2295,6 +2283,7 @@ fib_path_stack_mpls_disp (fib_node_index_t path_index,
     case FIB_PATH_TYPE_BIER_FMASK:
     case FIB_PATH_TYPE_BIER_TABLE:
     case FIB_PATH_TYPE_BIER_IMP:
+    case FIB_PATH_TYPE_DVR:
         break;
     }
 }
@@ -2445,11 +2434,6 @@ fib_path_contribute_forwarding (fib_node_index_t path_index,
 	    dpo_copy(dpo, &path->exclusive.fp_ex_dpo);
 	    break;
         case FIB_PATH_TYPE_ATTACHED:
-            if (DPO_PROTO_ETHERNET == path->fp_nh_proto)
-            {
-                dpo_copy(dpo, &path->fp_dpo);
-                break;
-            }
 	    switch (fct)
 	    {
 	    case FIB_FORW_CHAIN_TYPE_MPLS_NON_EOS:
@@ -2507,6 +2491,7 @@ fib_path_contribute_forwarding (fib_node_index_t path_index,
             break;
         case FIB_PATH_TYPE_RECEIVE:
         case FIB_PATH_TYPE_SPECIAL:
+        case FIB_PATH_TYPE_DVR:
             dpo_copy(dpo, &path->fp_dpo);
             break;
 	}
@@ -2625,8 +2610,7 @@ fib_path_encode (fib_node_index_t path_list_index,
         api_rpath->rpath.frp_addr = path->attached_next_hop.fp_nh;
         break;
       case FIB_PATH_TYPE_BIER_FMASK:
-        api_rpath->rpath.frp_fib_index = path->bier_fmask.fp_bier_fib;
-        api_rpath->rpath.frp_addr = path->bier_fmask.fp_nh;
+        api_rpath->rpath.frp_bier_fmask = path->bier_fmask.fp_bier_fmask;
         break;
       case FIB_PATH_TYPE_SPECIAL:
         break;
@@ -2675,7 +2659,7 @@ show_fib_path_command (vlib_main_t * vm,
 	if (!pool_is_free_index(fib_path_pool, pi))
 	{
 	    path = fib_path_get(pi);
-	    u8 *s = fib_path_format(pi, NULL);
+	    u8 *s = format(NULL, "%U", format_fib_path, pi, 1);
 	    s = format(s, "children:");
 	    s = fib_node_children_format(path->fp_node.fn_children, s);
 	    vlib_cli_output (vm, "%s", s);
@@ -2689,9 +2673,9 @@ show_fib_path_command (vlib_main_t * vm,
     else
     {
 	vlib_cli_output (vm, "FIB Paths");
-	pool_foreach(path, fib_path_pool,
+	pool_foreach_index (pi, fib_path_pool,
 	({
-	    vlib_cli_output (vm, "%U", format_fib_path, path);
+	    vlib_cli_output (vm, "%U", format_fib_path, pi, 0);
 	}));
     }
 

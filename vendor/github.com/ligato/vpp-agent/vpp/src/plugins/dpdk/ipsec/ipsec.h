@@ -56,16 +56,15 @@ typedef struct
 
 typedef struct
 {
-  dpdk_gcm_cnt_blk cb;
-  u8 aad[12];
   u32 next;
+  dpdk_gcm_cnt_blk cb __attribute__ ((aligned (16)));
+  u8 aad[16];
   u8 icv[32];
-} dpdk_op_priv_t __attribute__ ((aligned (16)));
+} dpdk_op_priv_t;
 
 typedef struct
 {
   u16 *resource_idx;
-  uword *session_by_drv_id_and_sa_index;
   struct rte_crypto_op **ops;
   u16 cipher_resource_idx[IPSEC_CRYPTO_N_ALG];
   u16 auth_resource_idx[IPSEC_INTEG_N_ALG];
@@ -121,10 +120,18 @@ typedef struct
 
 typedef struct
 {
+  u64 ts;
+  struct rte_cryptodev_sym_session *session;
+} crypto_session_disposal_t;
+
+typedef struct
+{
   struct rte_mempool *crypto_op;
   struct rte_mempool *session_h;
   struct rte_mempool **session_drv;
+  crypto_session_disposal_t *session_disposal;
   uword *session_by_sa_index;
+  uword *session_by_drv_id_and_sa_index;
   u64 crypto_op_get_failed;
   u64 session_h_failed;
   u64 *session_drv_failed;
@@ -140,7 +147,7 @@ typedef struct
   crypto_alg_t *auth_algs;
   crypto_data_t *data;
   crypto_drv_t *drv;
-  u8 max_drv_id;
+  u64 session_timeout;		/* nsec */
   u8 enabled;
 } dpdk_crypto_main_t;
 
@@ -158,7 +165,7 @@ clib_error_t *create_sym_session (struct rte_cryptodev_sym_session **session,
 static_always_inline u32
 crypto_op_len (void)
 {
-  const u32 align = 16;
+  const u32 align = 4;
   u32 op_size =
     sizeof (struct rte_crypto_op) + sizeof (struct rte_crypto_sym_op);
 
@@ -200,12 +207,16 @@ crypto_get_session (struct rte_cryptodev_sym_session **session,
 		    crypto_resource_t * res,
 		    crypto_worker_main_t * cwm, u8 is_outbound)
 {
+  dpdk_crypto_main_t *dcm = &dpdk_crypto_main;
+  crypto_data_t *data;
+  uword *val;
   crypto_session_key_t key = { 0 };
 
   key.drv_id = res->drv_id;
   key.sa_idx = sa_idx;
 
-  uword *val = hash_get (cwm->session_by_drv_id_and_sa_index, key.val);
+  data = vec_elt_at_index (dcm->data, res->numa);
+  val = hash_get (data->session_by_drv_id_and_sa_index, key.val);
 
   if (PREDICT_FALSE (!val))
     return create_sym_session (session, sa_idx, res, cwm, is_outbound);
@@ -249,7 +260,9 @@ crypto_alloc_ops (u8 numa, struct rte_crypto_op ** ops, u32 n)
 
   ret = rte_mempool_get_bulk (data->crypto_op, (void **) ops, n);
 
+  /* *INDENT-OFF* */
   data->crypto_op_get_failed += ! !ret;
+  /* *INDENT-ON* */
 
   return ret;
 }
@@ -306,20 +319,14 @@ crypto_set_icb (dpdk_gcm_cnt_blk * icb, u32 salt, u32 seq, u32 seq_hi)
   icb->salt = salt;
   icb->iv[0] = seq;
   icb->iv[1] = seq_hi;
-#if DPDK_NO_AEAD
-  icb->cnt = clib_host_to_net_u32 (1);
-#endif
 }
 
-#define __unused __attribute__((unused))
 static_always_inline void
 crypto_op_setup (u8 is_aead, struct rte_mbuf *mb0,
 		 struct rte_crypto_op *op, void *session,
 		 u32 cipher_off, u32 cipher_len,
-		 u8 * icb __unused, u32 iv_size __unused,
 		 u32 auth_off, u32 auth_len,
-		 u8 * aad __unused, u32 aad_size __unused,
-		 u8 * digest, u64 digest_paddr, u32 digest_size __unused)
+		 u8 * aad, u8 * digest, u64 digest_paddr)
 {
   struct rte_crypto_sym_op *sym_op;
 
@@ -328,32 +335,6 @@ crypto_op_setup (u8 is_aead, struct rte_mbuf *mb0,
   sym_op->m_src = mb0;
   sym_op->session = session;
 
-#if DPDK_NO_AEAD
-  sym_op->cipher.data.offset = cipher_off;
-  sym_op->cipher.data.length = cipher_len;
-
-  sym_op->cipher.iv.data = icb;
-  sym_op->cipher.iv.phys_addr =
-    op->phys_addr + (uintptr_t) icb - (uintptr_t) op;
-  sym_op->cipher.iv.length = iv_size;
-
-  if (is_aead)
-    {
-      sym_op->auth.aad.data = aad;
-      sym_op->auth.aad.phys_addr =
-	op->phys_addr + (uintptr_t) aad - (uintptr_t) op;
-      sym_op->auth.aad.length = aad_size;
-    }
-  else
-    {
-      sym_op->auth.data.offset = auth_off;
-      sym_op->auth.data.length = auth_len;
-    }
-
-  sym_op->auth.digest.data = digest;
-  sym_op->auth.digest.phys_addr = digest_paddr;
-  sym_op->auth.digest.length = digest_size;
-#else /* ! DPDK_NO_AEAD */
   if (is_aead)
     {
       sym_op->aead.data.offset = cipher_off;
@@ -377,10 +358,7 @@ crypto_op_setup (u8 is_aead, struct rte_mbuf *mb0,
       sym_op->auth.digest.data = digest;
       sym_op->auth.digest.phys_addr = digest_paddr;
     }
-#endif /* DPDK_NO_AEAD */
 }
-
-#undef __unused
 
 #endif /* __DPDK_IPSEC_H__ */
 

@@ -24,7 +24,7 @@ import (
 	"github.com/ligato/cn-infra/db/keyval/etcdv3"
 	"github.com/ligato/cn-infra/flavors/local"
 	"github.com/ligato/cn-infra/logging"
-	"github.com/ligato/cn-infra/logging/logroot"
+	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/ligato/cn-infra/rpc/rest"
 	"github.com/ligato/cn-infra/utils/safeclose"
 	"github.com/ligato/sfc-controller/controller/cnpdriver"
@@ -43,7 +43,7 @@ var (
 	cnpDriverName     string // cli flag - see RegisterFlags
 	sfcConfigFile     string // cli flag - see RegisterFlags
 	cleanSfcDatastore bool   // cli flag - see RegisterFlags
-	log               = logroot.StandardLogger()
+	log               = logrus.DefaultLogger()
 )
 
 // RegisterFlags add command line flags.

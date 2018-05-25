@@ -628,18 +628,27 @@ format_mfib_table_name (u8* s, va_list *ap)
     return (s);
 }
 
+u8 *
+format_mfib_table_memory (u8 *s, va_list *args)
+{
+    s = format(s, "%U", format_ip4_mfib_table_memory);
+    s = format(s, "%U", format_ip6_mfib_table_memory);
+
+    return (s);
+}
+
 static clib_error_t *
 mfib_module_init (vlib_main_t * vm)
 {
     clib_error_t * error;
 
+    mfib_entry_module_init();
+    mfib_signal_module_init();
+
     if ((error = vlib_call_init_function (vm, fib_module_init)))
         return (error);
     if ((error = vlib_call_init_function (vm, rn_module_init)))
         return (error);
-
-    mfib_entry_module_init();
-    mfib_signal_module_init();
 
     return (error);
 }

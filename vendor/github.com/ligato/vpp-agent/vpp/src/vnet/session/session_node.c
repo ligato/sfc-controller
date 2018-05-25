@@ -16,11 +16,11 @@
 #include <math.h>
 #include <vlib/vlib.h>
 #include <vnet/vnet.h>
-#include <vnet/tcp/tcp.h>
 #include <vppinfra/elog.h>
+#include <vnet/session/transport.h>
 #include <vnet/session/application.h>
 #include <vnet/session/session_debug.h>
-#include <vlibmemory/unix_shared_memory_queue.h>
+#include <svm/queue.h>
 
 vlib_node_registration_t session_queue_node;
 
@@ -62,13 +62,6 @@ static char *session_queue_error_strings[] = {
 #define _(sym,string) string,
   foreach_session_queue_error
 #undef _
-};
-
-static u32 session_type_to_next[] = {
-  SESSION_QUEUE_NEXT_TCP_IP4_OUTPUT,
-  SESSION_QUEUE_NEXT_IP4_LOOKUP,
-  SESSION_QUEUE_NEXT_TCP_IP6_OUTPUT,
-  SESSION_QUEUE_NEXT_IP6_LOOKUP,
 };
 
 always_inline void
@@ -143,6 +136,7 @@ session_tx_fifo_read_and_snd_i (vlib_main_t * vm, vlib_node_runtime_t * node,
   u32 n_bufs_per_evt, n_frames_per_evt, n_bufs_per_frame;
   transport_connection_t *tc0;
   transport_proto_vft_t *transport_vft;
+  transport_proto_t tp;
   u32 next_index, next0, *to_next, n_left_to_next, bi0;
   vlib_buffer_t *b0;
   u32 tx_offset = 0, max_dequeue0, n_bytes_per_seg, left_for_seg;
@@ -152,9 +146,10 @@ session_tx_fifo_read_and_snd_i (vlib_main_t * vm, vlib_node_runtime_t * node,
   u32 n_bytes_per_buf, deq_per_buf, deq_per_first_buf;
   u32 buffers_allocated, buffers_allocated_this_call;
 
-  next_index = next0 = session_type_to_next[s0->session_type];
+  next_index = next0 = smm->session_type_to_next[s0->session_type];
 
-  transport_vft = transport_protocol_get_vft (s0->session_type);
+  tp = session_get_transport_proto (s0);
+  transport_vft = transport_protocol_get_vft (tp);
   tc0 = transport_vft->get_connection (s0->connection_index, thread_index);
 
   /* Make sure we have space to send and there's something to dequeue */
@@ -167,6 +162,9 @@ session_tx_fifo_read_and_snd_i (vlib_main_t * vm, vlib_node_runtime_t * node,
       vec_add1 (smm->pending_event_vector[thread_index], *e0);
       return 0;
     }
+
+  /* Allow enqueuing of a new event */
+  svm_fifo_unset_event (s0->server_tx_fifo);
 
   /* Check how much we can pull. */
   max_dequeue0 = svm_fifo_max_dequeue (s0->server_tx_fifo);
@@ -183,10 +181,7 @@ session_tx_fifo_read_and_snd_i (vlib_main_t * vm, vlib_node_runtime_t * node,
 
   /* Nothing to read return */
   if (max_dequeue0 == 0)
-    {
-      svm_fifo_unset_event (s0->server_tx_fifo);
-      return 0;
-    }
+    return 0;
 
   /* Ensure we're not writing more than transport window allows */
   if (max_dequeue0 < snd_space0)
@@ -249,8 +244,6 @@ session_tx_fifo_read_and_snd_i (vlib_main_t * vm, vlib_node_runtime_t * node,
 	    }
 	  ASSERT (n_bufs >= n_bufs_per_frame);
 	}
-      /* Allow enqueuing of a new event */
-      svm_fifo_unset_event (s0->server_tx_fifo);
 
       vlib_get_next_frame (vm, node, next_index, to_next, n_left_to_next);
       while (left_to_snd0 && n_left_to_next)
@@ -327,8 +320,6 @@ session_tx_fifo_read_and_snd_i (vlib_main_t * vm, vlib_node_runtime_t * node,
 	  /* *INDENT-ON* */
 
 	  VLIB_BUFFER_TRACE_TRAJECTORY_INIT (b0);
-	  if (VLIB_BUFFER_TRACE_TRAJECTORY)
-	    b0->pre_data[1] = 3;
 
 	  if (PREDICT_FALSE (n_trace > 0))
 	    {
@@ -415,7 +406,7 @@ dump_thread_0_event_queue (void)
   int i, index;
   i8 *headp;
 
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   q = smm->vpp_event_queues[my_thread_index];
 
   index = q->head;
@@ -495,7 +486,7 @@ u8
 session_node_lookup_fifo_event (svm_fifo_t * f, session_fifo_event_t * e)
 {
   session_manager_main_t *smm = vnet_get_session_manager_main ();
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   session_fifo_event_t *pending_event_vector, *evt;
   int i, index, found = 0;
   i8 *headp;
@@ -542,7 +533,7 @@ session_queue_node_fn (vlib_main_t * vm, vlib_node_runtime_t * node,
   session_fifo_event_t *my_pending_event_vector, *pending_disconnects, *e;
   session_fifo_event_t *my_fifo_events;
   u32 n_to_dequeue, n_events;
-  unix_shared_memory_queue_t *q;
+  svm_queue_t *q;
   application_t *app;
   int n_tx_packets = 0;
   u32 my_thread_index = vm->thread_index;
@@ -553,9 +544,9 @@ session_queue_node_fn (vlib_main_t * vm, vlib_node_runtime_t * node,
   SESSION_EVT_DBG (SESSION_EVT_POLL_GAP_TRACK, smm, my_thread_index);
 
   /*
-   *  Update TCP time
+   *  Update transport time
    */
-  tcp_update_time (now, my_thread_index);
+  transport_update_time (now, my_thread_index);
 
   /*
    * Get vpp queue events
@@ -595,7 +586,7 @@ session_queue_node_fn (vlib_main_t * vm, vlib_node_runtime_t * node,
   for (i = 0; i < n_to_dequeue; i++)
     {
       vec_add2 (my_fifo_events, e, 1);
-      unix_shared_memory_queue_sub_raw (q, (u8 *) e);
+      svm_queue_sub_raw (q, (u8 *) e);
     }
 
   /* The other side of the connection is not polling */
@@ -632,7 +623,10 @@ skip_dequeue:
 	  /* Can retransmit for closed sessions but can't do anything if
 	   * session is not ready or closed */
 	  if (PREDICT_FALSE (s0->session_state < SESSION_STATE_READY))
-	    continue;
+	    {
+	      vec_add1 (smm->pending_event_vector[my_thread_index], *e0);
+	      continue;
+	    }
 	  /* Spray packets in per session type frames, since they go to
 	   * different nodes */
 	  rv = (smm->session_tx_fns[s0->session_type]) (vm, node, smm, e0, s0,
@@ -695,18 +689,28 @@ VLIB_REGISTER_NODE (session_queue_node) =
   .type = VLIB_NODE_TYPE_INPUT,
   .n_errors = ARRAY_LEN (session_queue_error_strings),
   .error_strings = session_queue_error_strings,
-  .n_next_nodes = SESSION_QUEUE_N_NEXT,
   .state = VLIB_NODE_STATE_DISABLED,
-  .next_nodes =
-  {
-      [SESSION_QUEUE_NEXT_DROP] = "error-drop",
-      [SESSION_QUEUE_NEXT_IP4_LOOKUP] = "ip4-lookup",
-      [SESSION_QUEUE_NEXT_IP6_LOOKUP] = "ip6-lookup",
-      [SESSION_QUEUE_NEXT_TCP_IP4_OUTPUT] = "tcp4-output",
-      [SESSION_QUEUE_NEXT_TCP_IP6_OUTPUT] = "tcp6-output",
-  },
 };
 /* *INDENT-ON* */
+
+static clib_error_t *
+session_queue_exit (vlib_main_t * vm)
+{
+  if (vec_len (vlib_mains) < 2)
+    return 0;
+
+  /*
+   * Shut off (especially) worker-thread session nodes.
+   * Otherwise, vpp can crash as the main thread unmaps the
+   * API segment.
+   */
+  vlib_worker_thread_barrier_sync (vm);
+  session_node_enable_disable (0 /* is_enable */ );
+  vlib_worker_thread_barrier_release (vm);
+  return 0;
+}
+
+VLIB_MAIN_LOOP_EXIT_FUNCTION (session_queue_exit);
 
 /*
  * fd.io coding-style-patch-verification: ON

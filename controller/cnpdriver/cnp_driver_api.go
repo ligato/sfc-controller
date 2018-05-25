@@ -26,7 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ligato/cn-infra/db/keyval"
-	"github.com/ligato/cn-infra/logging/logroot"
+	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/ligato/sfc-controller/controller/model/controller"
 	"github.com/ligato/sfc-controller/controller/cnpdriver/l2driver"
 )
@@ -34,7 +34,7 @@ import (
 var (
 	cnpDriverRegistered = false
 	cnpDriverName       string
-	log = logroot.StandardLogger()
+	log = logrus.DefaultLogger()
 )
 
 // SfcControllerCNPDriverAPI is interface that is implemented by each Container Networking Policy (CNP) Driver.  As n/b api's

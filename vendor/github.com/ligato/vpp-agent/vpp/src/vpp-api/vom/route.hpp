@@ -72,6 +72,29 @@ public:
   };
 
   /**
+   * Path flags
+   */
+  class flags_t : public enum_base<flags_t>
+  {
+  public:
+    /**
+     * No flags
+     */
+    const static flags_t NONE;
+
+    /**
+     * A path that resolves via a DVR next-hop
+     */
+    const static flags_t DVR;
+
+  private:
+    /**
+     * Private constructor taking the value and the string name
+     */
+    flags_t(int v, const std::string& s);
+  };
+
+  /**
    * constructor for special paths
    */
   path(special_t special);
@@ -97,6 +120,7 @@ public:
    */
   path(const interface& interface,
        const nh_proto_t& proto,
+       const flags_t& flags = flags_t::NONE,
        uint8_t weight = 1,
        uint8_t preference = 0);
 
@@ -106,9 +130,14 @@ public:
   path(const path& p);
 
   /**
-   * Convert the path into the VPP API representation
+   * Destructor
    */
-  void to_vpp(vapi_payload_ip_add_del_route& payload) const;
+  ~path();
+
+  /**
+   * comparison operator
+   */
+  bool operator==(const path& p) const;
 
   /**
    * Less than operator for set insertion
@@ -125,6 +154,7 @@ public:
    */
   special_t type() const;
   nh_proto_t nh_proto() const;
+  flags_t flags() const;
   const boost::asio::ip::address& nh() const;
   std::shared_ptr<route_domain> rd() const;
   std::shared_ptr<interface> itf() const;
@@ -141,6 +171,11 @@ private:
    * The next-hop protocol
    */
   nh_proto_t m_nh_proto;
+
+  /**
+   * Flags for the path
+   */
+  flags_t m_flags;
 
   /**
    * The next-hop
@@ -196,6 +231,11 @@ public:
   ip_route(const prefix_t& prefix);
 
   /**
+   * Construct a route with a path
+   */
+  ip_route(const prefix_t& prefix, const path& p);
+
+  /**
    * Copy Construct
    */
   ip_route(const ip_route& r);
@@ -206,9 +246,24 @@ public:
   ip_route(const route_domain& rd, const prefix_t& prefix);
 
   /**
+   * Construct a route in the given route domain with a path
+   */
+  ip_route(const route_domain& rd, const prefix_t& prefix, const path& p);
+
+  /**
    * Destructor
    */
   ~ip_route();
+
+  /**
+   * Get the route's key
+   */
+  const key_t key() const;
+
+  /**
+   * Comparison operator
+   */
+  bool operator==(const ip_route& i) const;
 
   /**
    * Return the matching 'singular instance'
@@ -244,6 +299,11 @@ public:
    * Convert to string for debugging
    */
   std::string to_string() const;
+
+  /**
+   * Return the matching 'singular instance'
+   */
+  static std::shared_ptr<ip_route> find(const key_t& k);
 
 private:
   /**

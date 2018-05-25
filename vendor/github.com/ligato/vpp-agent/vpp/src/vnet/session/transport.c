@@ -58,6 +58,22 @@ format_transport_proto (u8 * s, va_list * args)
   return s;
 }
 
+u8 *
+format_transport_proto_short (u8 * s, va_list * args)
+{
+  u32 transport_proto = va_arg (*args, u32);
+  switch (transport_proto)
+    {
+    case TRANSPORT_PROTO_TCP:
+      s = format (s, "T");
+      break;
+    case TRANSPORT_PROTO_UDP:
+      s = format (s, "U");
+      break;
+    }
+  return s;
+}
+
 uword
 unformat_transport_proto (unformat_input_t * input, va_list * args)
 {
@@ -123,22 +139,23 @@ transport_endpoint_table_del (transport_endpoint_table_t * ht, u8 proto,
 /**
  * Register transport virtual function table.
  *
- * @param type - session type (not protocol type)
- * @param vft - virtual function table
+ * @param transport_proto - transport protocol type (i.e., TCP, UDP ..)
+ * @param vft - virtual function table for transport proto
+ * @param fib_proto - network layer protocol
+ * @param output_node - output node index that session layer will hand off
+ * 			buffers to, for requested fib proto
  */
 void
-transport_register_protocol (transport_proto_t transport_proto, u8 is_ip4,
-			     const transport_proto_vft_t * vft)
+transport_register_protocol (transport_proto_t transport_proto,
+			     const transport_proto_vft_t * vft,
+			     fib_protocol_t fib_proto, u32 output_node)
 {
-  u8 session_type;
-  session_type = session_type_from_proto_and_ip (transport_proto, is_ip4);
+  u8 is_ip4 = fib_proto == FIB_PROTOCOL_IP4;
 
-  vec_validate (tp_vfts, session_type);
-  tp_vfts[session_type] = *vft;
+  vec_validate (tp_vfts, transport_proto);
+  tp_vfts[transport_proto] = *vft;
 
-  /* If an offset function is provided, then peek instead of dequeue */
-  session_manager_set_transport_rx_fn (session_type,
-				       vft->tx_fifo_offset != 0);
+  session_register_transport (transport_proto, vft, is_ip4, output_node);
 }
 
 /**
@@ -147,11 +164,11 @@ transport_register_protocol (transport_proto_t transport_proto, u8 is_ip4,
  * @param type - session type (not protocol type)
  */
 transport_proto_vft_t *
-transport_protocol_get_vft (u8 session_type)
+transport_protocol_get_vft (transport_proto_t transport_proto)
 {
-  if (session_type >= vec_len (tp_vfts))
+  if (transport_proto >= vec_len (tp_vfts))
     return 0;
-  return &tp_vfts[session_type];
+  return &tp_vfts[transport_proto];
 }
 
 #define PORT_MASK ((1 << 16)- 1)
@@ -311,19 +328,45 @@ transport_alloc_local_endpoint (u8 proto, transport_endpoint_t * rmt,
 }
 
 void
+transport_update_time (f64 time_now, u8 thread_index)
+{
+  transport_proto_vft_t *vft;
+  vec_foreach (vft, tp_vfts)
+  {
+    if (vft->update_time)
+      (vft->update_time) (time_now, thread_index);
+  }
+}
+
+void
+transport_enable_disable (vlib_main_t * vm, u8 is_en)
+{
+  transport_proto_vft_t *vft;
+  vec_foreach (vft, tp_vfts)
+  {
+    if (vft->enable)
+      (vft->enable) (vm, is_en);
+  }
+}
+
+void
 transport_init (void)
 {
   vlib_thread_main_t *vtm = vlib_get_thread_main ();
-  u32 local_endpoints_table_buckets = 250000;
-  u32 local_endpoints_table_memory = 512 << 20;
+  session_manager_main_t *smm = vnet_get_session_manager_main ();
   u32 num_threads;
+
+  if (smm->local_endpoints_table_buckets == 0)
+    smm->local_endpoints_table_buckets = 250000;
+  if (smm->local_endpoints_table_memory == 0)
+    smm->local_endpoints_table_memory = 512 << 20;
 
   /* Initialize [port-allocator] random number seed */
   port_allocator_seed = (u32) clib_cpu_time_now ();
 
   clib_bihash_init_24_8 (&local_endpoints_table, "local endpoints table",
-			 local_endpoints_table_buckets,
-			 local_endpoints_table_memory);
+			 smm->local_endpoints_table_buckets,
+			 smm->local_endpoints_table_memory);
   num_threads = 1 /* main thread */  + vtm->n_threads;
   if (num_threads > 1)
     clib_spinlock_init (&local_endpoints_lock);
