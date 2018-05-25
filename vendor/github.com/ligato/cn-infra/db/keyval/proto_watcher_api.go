@@ -19,8 +19,7 @@ import (
 
 	"github.com/ligato/cn-infra/core"
 	"github.com/ligato/cn-infra/datasync"
-	"github.com/ligato/cn-infra/logging"
-	"github.com/ligato/cn-infra/logging/logrus"
+	"github.com/ligato/cn-infra/logging/logroot"
 )
 
 // ProtoWatcher defines API for monitoring changes in datastore.
@@ -46,7 +45,7 @@ type ProtoWatchResp interface {
 func ToChanProto(ch chan ProtoWatchResp, opts ...interface{}) func(dto ProtoWatchResp) {
 
 	timeout := datasync.DefaultNotifTimeout
-	var logger logging.Logger = logrus.DefaultLogger()
+	logger := logroot.StandardLogger()
 
 	for _, opt := range opts {
 		switch opt.(type) {

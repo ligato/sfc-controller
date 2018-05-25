@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/ligato/cn-infra/logging"
-	"github.com/ligato/cn-infra/logging/logrus"
+	"github.com/ligato/cn-infra/logging/logroot"
 	"github.com/ligato/cn-infra/utils/safeclose"
 	"github.com/namsral/flag"
 )
@@ -29,7 +29,6 @@ import (
 var (
 	BuildVersion string
 	BuildDate    string
-	CommitHash   string
 )
 
 // Agent implements startup & shutdown procedures.
@@ -72,9 +71,9 @@ const (
 
 // init result flags
 const (
-	done      = "done"
-	errStatus = "error"
-	timeout   = "timeout"
+	done    = "done"
+	errStatus   = "error"
+	timeout = "timeout"
 )
 
 // NewAgent returns a new instance of the Agent with plugins. Use options if needed:
@@ -132,10 +131,10 @@ func NewAgent(flavor Flavor, opts ...Option) *Agent {
 		if logReg != nil {
 			agentCoreLogger = logReg.NewLogger("agentcore")
 		} else {
-			agentCoreLogger = logrus.DefaultLogger()
+			agentCoreLogger = logroot.StandardLogger()
 		}
 	} else {
-		agentCoreLogger = logrus.DefaultLogger()
+		agentCoreLogger = logroot.StandardLogger()
 	}
 
 	a := Agent{
@@ -192,8 +191,7 @@ type logRegistryGetter interface {
 // The startup/initialization must take no longer than maxStartup time limit,
 // otherwise ErrPluginsInitTimeout error is returned.
 func (agent *Agent) Start() error {
-	agent.WithFields(logging.Fields{"CommitHash": CommitHash, "BuildDate": BuildDate}).
-		Infof("Starting agent %v", BuildVersion)
+	agent.WithFields(logging.Fields{"BuildVersion": BuildVersion, "BuildDate": BuildDate}).Info("Starting the agent...")
 
 	doneChannel := make(chan struct{}, 0)
 	errChannel := make(chan error, 0)

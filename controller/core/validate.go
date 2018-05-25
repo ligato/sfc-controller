@@ -60,30 +60,7 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) validateSystemParameters(sp *co
 		log.Info("validateSystemParameters: sys starting vlan_id = 0, defaulting to 5000")
 		sp.StartingVlanId = 5000 // if not provided, default it to 5000
 	}
-	if sp.DefaultStaticRouteWeight == 0 {
-		log.Info("validateSystemParameters: sys default static route weight = 0, defaulting to 5")
-		sp.DefaultStaticRouteWeight = 5 // if not provided, default it to 5
-	}
-	if sp.DynamicBridgeParms == nil {
-		sp.DynamicBridgeParms = &controller.BDParms{
-			Learn: true,
-			UnknownUnicastFlood: true,
-			Flood: true,
-			Forward: true,
-			ArpTermination: false,
-			MacAge: 0,
-		}
-	}
-	if sp.StaticBridgeParms == nil {
-		sp.StaticBridgeParms = &controller.BDParms{
-			Learn: false,
-			UnknownUnicastFlood: false,
-			Flood: false,
-			Forward: true,
-			ArpTermination: false,
-			MacAge: 0,
-		}
-	}
+
 	log.Info("validateSystemParameters: final SP's", sp)
 
 	return nil

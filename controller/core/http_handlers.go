@@ -337,7 +337,6 @@ func processSfcChainPost(formatter *render.Render, w http.ResponseWriter, req *h
 			formatter.JSON(w, http.StatusOK, "OK")
 			return
 		}
-		// re-POSTing, need to handle the changes ...
 	}
 
 	sfcplg.ramConfigCache.SFCs[vars[entityName]] = sfc

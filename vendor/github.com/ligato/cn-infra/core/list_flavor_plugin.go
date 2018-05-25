@@ -16,20 +16,11 @@ package core
 
 import (
 	"errors"
-	"os"
 	"reflect"
 
 	"github.com/ligato/cn-infra/logging"
-	"github.com/ligato/cn-infra/logging/logrus"
+	"github.com/ligato/cn-infra/logging/logroot"
 )
-
-var flavorLogger = logrus.NewLogger("flavors")
-
-func init() {
-	if os.Getenv("DEBUG_FLAVORS") != "" {
-		flavorLogger.SetLevel(logging.DebugLevel)
-	}
-}
 
 // Flavor is a structure that contains a particular combination of plugins
 // (fields of plugins).
@@ -62,7 +53,7 @@ func ListPluginsInFlavor(flavor Flavor) (plugins []*NamedPlugin) {
 	uniqueness := map[Plugin] /*nil*/ interface{}{}
 	l, err := listPluginsInFlavor(reflect.ValueOf(flavor), uniqueness)
 	if err != nil {
-		flavorLogger.Error("Invalid argument - it does not satisfy the Flavor interface")
+		logroot.StandardLogger().Error("Invalid argument - it does not satisfy the Flavor interface")
 	}
 	return l
 }
@@ -78,7 +69,7 @@ func ListPluginsInFlavor(flavor Flavor) (plugins []*NamedPlugin) {
 // must satisfy either the Plugin or the Flavor interface. If they do not,
 // an error is logged, but the function does not return an error.
 func listPluginsInFlavor(flavorValue reflect.Value, uniqueness map[Plugin] /*nil*/ interface{}) ([]*NamedPlugin, error) {
-	flavorLogger.Debug("inspect flavor structure ", flavorValue.Type())
+	logroot.StandardLogger().Debug("inspect flavor structure ", flavorValue.Type())
 
 	var res []*NamedPlugin
 
@@ -121,16 +112,16 @@ func listPluginsInFlavor(flavorValue reflect.Value, uniqueness map[Plugin] /*nil
 						uniqueness[plug] = nil
 						res = append(res, &NamedPlugin{PluginName: PluginName(field.Name), Plugin: plug})
 
-						flavorLogger.
+						logroot.StandardLogger().
 							WithField("fieldName", field.Name).
 							Debug("Found plugin in flavor ", field.Type)
 					} else {
-						flavorLogger.
+						logroot.StandardLogger().
 							WithField("fieldName", field.Name).
 							Debug("Found plugin in flavor with non unique name")
 					}
 				} else {
-					flavorLogger.
+					logroot.StandardLogger().
 						WithField("fieldName", field.Name).
 						Debug("Found nil plugin in flavor")
 				}
@@ -138,7 +129,7 @@ func listPluginsInFlavor(flavorValue reflect.Value, uniqueness map[Plugin] /*nil
 				// try to inspect flavor structure recursively
 				l, err := listPluginsInFlavor(fieldVal, uniqueness)
 				if err != nil {
-					flavorLogger.
+					logroot.StandardLogger().
 						WithField("fieldName", field.Name).
 						Error("Bad field: must satisfy either Plugin or Flavor interface")
 				} else {
@@ -170,8 +161,7 @@ func fieldPlugin(field reflect.StructField, fieldVal reflect.Value, pluginType r
 	case reflect.Ptr, reflect.Interface:
 		if plug, ok := fieldVal.Interface().(Plugin); ok {
 			if fieldVal.IsNil() {
-				flavorLogger.WithField("fieldName", field.Name).
-					Debug("Field is nil ", pluginType)
+				logroot.StandardLogger().WithField("fieldName", field.Name).Debug("Field is nil ", pluginType)
 				return nil, true
 			}
 			return plug, true
@@ -200,7 +190,7 @@ type flavorAggregator struct {
 
 // Plugins returns list of plugins af all flavorAggregator
 func (flavors flavorAggregator) Plugins() []*NamedPlugin {
-	var ret []*NamedPlugin
+	ret := []*NamedPlugin{}
 	for _, f := range flavors.fs {
 		ret = appendDiff(ret, f.Plugins()...)
 	}
@@ -231,7 +221,7 @@ func appendDiff(existing []*NamedPlugin, new ...*NamedPlugin) []*NamedPlugin {
 		exists := false
 		for _, existingPlugin := range existing {
 			if newPlugin.PluginName == existingPlugin.PluginName {
-				flavorLogger.Debugf("duplicate of plugin skipped %v", newPlugin.PluginName)
+				logroot.StandardLogger().Debugf("duplicate of plugin skipped %v", newPlugin.PluginName)
 				exists = true
 				break
 			}

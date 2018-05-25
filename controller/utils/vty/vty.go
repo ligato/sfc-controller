@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ligato/cn-infra/logging/logrus"
+	"github.com/ligato/cn-infra/logging/logroot"
 )
 
 const (
@@ -50,7 +50,7 @@ type Session struct {
 	errChan   chan error
 }
 
-var log = logrus.DefaultLogger()
+var log = logroot.StandardLogger()
 
 // NewSession returns a new VTY session opened on provided connector.
 // The session is supposed to be closed via Close().

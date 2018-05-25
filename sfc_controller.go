@@ -23,8 +23,8 @@ import (
 	"github.com/ligato/cn-infra/flavors/local"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/logging/logmanager"
-	"github.com/ligato/cn-infra/logging/logrus"
 
+	"github.com/ligato/cn-infra/logging/logroot"
 	"github.com/ligato/cn-infra/rpc/rest"
 	"github.com/namsral/flag"
 
@@ -33,7 +33,7 @@ import (
 	"github.com/ligato/sfc-controller/plugins/vnfdriver"
 )
 
-var log = logrus.DefaultLogger()
+var log = logroot.StandardLogger()
 
 // Init is the Go init() function for the plugin. It should
 // contain the boiler plate initialization code that is executed

@@ -17,7 +17,7 @@ package servicelabel
 import (
 	"fmt"
 
-	"github.com/ligato/cn-infra/logging/logrus"
+	"github.com/ligato/cn-infra/logging/logroot"
 	"github.com/namsral/flag"
 )
 
@@ -46,7 +46,7 @@ func (p *Plugin) Init() error {
 	if p.MicroserviceLabel == "" {
 		p.MicroserviceLabel = microserviceLabelFlag
 	}
-	logrus.DefaultLogger().Debugf("Microservice label is set to %v", p.MicroserviceLabel)
+	logroot.StandardLogger().Debugf("Microservice label is set to %v", p.MicroserviceLabel)
 	return nil
 }
 

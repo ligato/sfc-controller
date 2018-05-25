@@ -9,13 +9,10 @@ It is generated from these files:
 	controller.proto
 
 It has these top-level messages:
-	BDParms
 	SystemParameters
 	ExternalEntity
 	HostEntity
 	CustomInfoType
-	L3VRFRoute
-	L3ArpEntry
 	SfcEntity
 */
 package controller
@@ -68,6 +65,29 @@ func (x ExtEntDriverType) String() string {
 	return proto.EnumName(ExtEntDriverType_name, int32(x))
 }
 
+type EWBridgeType int32
+
+const (
+	EWBridgeType_EW_SYSTEM_DEFAULT_BRIDGE EWBridgeType = 0
+	EWBridgeType_EW_L2FIB_BRIDGE          EWBridgeType = 1
+	EWBridgeType_EW_DYNAMIC_BRIDGE        EWBridgeType = 2
+)
+
+var EWBridgeType_name = map[int32]string{
+	0: "EW_SYSTEM_DEFAULT_BRIDGE",
+	1: "EW_L2FIB_BRIDGE",
+	2: "EW_DYNAMIC_BRIDGE",
+}
+var EWBridgeType_value = map[string]int32{
+	"EW_SYSTEM_DEFAULT_BRIDGE": 0,
+	"EW_L2FIB_BRIDGE":          1,
+	"EW_DYNAMIC_BRIDGE":        2,
+}
+
+func (x EWBridgeType) String() string {
+	return proto.EnumName(EWBridgeType_name, int32(x))
+}
+
 type SfcType int32
 
 const (
@@ -75,38 +95,32 @@ const (
 	SfcType_SFC_NS_VXLAN       SfcType = 1
 	SfcType_SFC_NS_NIC_BD      SfcType = 3
 	SfcType_SFC_NS_NIC_L2XCONN SfcType = 4
-	SfcType_SFC_NS_NIC_VRF     SfcType = 9
 	SfcType_SFC_EW_BD          SfcType = 2
 	SfcType_SFC_EW_L2XCONN     SfcType = 5
 	SfcType_SFC_EW_BD_L2FIB    SfcType = 8
-	SfcType_SFC_EW_VRF_FIB     SfcType = 10
 	SfcType_SFC_EW_MEMIF       SfcType = 6
 	SfcType_SFC_EW_VETH        SfcType = 7
 )
 
 var SfcType_name = map[int32]string{
-	0:  "SFC_UNKNOWN_TYPE",
-	1:  "SFC_NS_VXLAN",
-	3:  "SFC_NS_NIC_BD",
-	4:  "SFC_NS_NIC_L2XCONN",
-	9:  "SFC_NS_NIC_VRF",
-	2:  "SFC_EW_BD",
-	5:  "SFC_EW_L2XCONN",
-	8:  "SFC_EW_BD_L2FIB",
-	10: "SFC_EW_VRF_FIB",
-	6:  "SFC_EW_MEMIF",
-	7:  "SFC_EW_VETH",
+	0: "SFC_UNKNOWN_TYPE",
+	1: "SFC_NS_VXLAN",
+	3: "SFC_NS_NIC_BD",
+	4: "SFC_NS_NIC_L2XCONN",
+	2: "SFC_EW_BD",
+	5: "SFC_EW_L2XCONN",
+	8: "SFC_EW_BD_L2FIB",
+	6: "SFC_EW_MEMIF",
+	7: "SFC_EW_VETH",
 }
 var SfcType_value = map[string]int32{
 	"SFC_UNKNOWN_TYPE":   0,
 	"SFC_NS_VXLAN":       1,
 	"SFC_NS_NIC_BD":      3,
 	"SFC_NS_NIC_L2XCONN": 4,
-	"SFC_NS_NIC_VRF":     9,
 	"SFC_EW_BD":          2,
 	"SFC_EW_L2XCONN":     5,
 	"SFC_EW_BD_L2FIB":    8,
-	"SFC_EW_VRF_FIB":     10,
 	"SFC_EW_MEMIF":       6,
 	"SFC_EW_VETH":        7,
 }
@@ -150,45 +164,14 @@ func (x SfcElementType) String() string {
 	return proto.EnumName(SfcElementType_name, int32(x))
 }
 
-type BDParms struct {
-	Flood               bool   `protobuf:"varint,1,opt,name=flood,proto3" json:"flood,omitempty"`
-	UnknownUnicastFlood bool   `protobuf:"varint,2,opt,name=unknown_unicast_flood,proto3" json:"unknown_unicast_flood,omitempty"`
-	Forward             bool   `protobuf:"varint,3,opt,name=forward,proto3" json:"forward,omitempty"`
-	Learn               bool   `protobuf:"varint,4,opt,name=learn,proto3" json:"learn,omitempty"`
-	ArpTermination      bool   `protobuf:"varint,5,opt,name=arp_termination,proto3" json:"arp_termination,omitempty"`
-	MacAge              uint32 `protobuf:"varint,6,opt,name=mac_age,proto3" json:"mac_age,omitempty"`
-}
-
-func (m *BDParms) Reset()         { *m = BDParms{} }
-func (m *BDParms) String() string { return proto.CompactTextString(m) }
-func (*BDParms) ProtoMessage()    {}
-
 type SystemParameters struct {
-	Mtu                          uint32   `protobuf:"varint,1,opt,name=mtu,proto3" json:"mtu,omitempty"`
-	StartingVlanId               uint32   `protobuf:"varint,2,opt,name=starting_vlan_id,proto3" json:"starting_vlan_id,omitempty"`
-	DefaultStaticRouteWeight     uint32   `protobuf:"varint,3,opt,name=default_static_route_weight,proto3" json:"default_static_route_weight,omitempty"`
-	DefaultStaticRoutePreference uint32   `protobuf:"varint,4,opt,name=default_static_route_preference,proto3" json:"default_static_route_preference,omitempty"`
-	DynamicBridgeParms           *BDParms `protobuf:"bytes,5,opt,name=dynamic_bridge_parms" json:"dynamic_bridge_parms,omitempty"`
-	StaticBridgeParms            *BDParms `protobuf:"bytes,6,opt,name=static_bridge_parms" json:"static_bridge_parms,omitempty"`
+	Mtu            uint32 `protobuf:"varint,1,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	StartingVlanId uint32 `protobuf:"varint,2,opt,name=starting_vlan_id,proto3" json:"starting_vlan_id,omitempty"`
 }
 
 func (m *SystemParameters) Reset()         { *m = SystemParameters{} }
 func (m *SystemParameters) String() string { return proto.CompactTextString(m) }
 func (*SystemParameters) ProtoMessage()    {}
-
-func (m *SystemParameters) GetDynamicBridgeParms() *BDParms {
-	if m != nil {
-		return m.DynamicBridgeParms
-	}
-	return nil
-}
-
-func (m *SystemParameters) GetStaticBridgeParms() *BDParms {
-	if m != nil {
-		return m.StaticBridgeParms
-	}
-	return nil
-}
 
 type ExternalEntity struct {
 	Name            string                        `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -256,17 +239,13 @@ func (m *ExternalEntity_HostBD) String() string { return proto.CompactTextString
 func (*ExternalEntity_HostBD) ProtoMessage()    {}
 
 type HostEntity struct {
-	Name                   string     `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	EthIfName              string     `protobuf:"bytes,2,opt,name=eth_if_name,proto3" json:"eth_if_name,omitempty"`
-	EthIpv4                string     `protobuf:"bytes,3,opt,name=eth_ipv4,proto3" json:"eth_ipv4,omitempty"`
-	EthIpv6                string     `protobuf:"bytes,4,opt,name=eth_ipv6,proto3" json:"eth_ipv6,omitempty"`
-	LoopbackMacAddr        string     `protobuf:"bytes,5,opt,name=loopback_mac_addr,proto3" json:"loopback_mac_addr,omitempty"`
-	LoopbackIpv4           string     `protobuf:"bytes,6,opt,name=loopback_ipv4,proto3" json:"loopback_ipv4,omitempty"`
-	LoopbackIpv6           string     `protobuf:"bytes,7,opt,name=loopback_ipv6,proto3" json:"loopback_ipv6,omitempty"`
-	VxlanTunnelIpv4        string     `protobuf:"bytes,8,opt,name=vxlan_tunnel_ipv4,proto3" json:"vxlan_tunnel_ipv4,omitempty"`
-	CreateVxlanStaticRoute bool       `protobuf:"varint,9,opt,name=create_vxlan_static_route,proto3" json:"create_vxlan_static_route,omitempty"`
-	Mtu                    uint32     `protobuf:"varint,10,opt,name=mtu,proto3" json:"mtu,omitempty"`
-	RxMode                 RxModeType `protobuf:"varint,11,opt,name=rx_mode,proto3,enum=controller.RxModeType" json:"rx_mode,omitempty"`
+	Name            string     `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	EthIfName       string     `protobuf:"bytes,2,opt,name=eth_if_name,proto3" json:"eth_if_name,omitempty"`
+	EthIpv4         string     `protobuf:"bytes,3,opt,name=eth_ipv4,proto3" json:"eth_ipv4,omitempty"`
+	LoopbackMacAddr string     `protobuf:"bytes,4,opt,name=loopback_mac_addr,proto3" json:"loopback_mac_addr,omitempty"`
+	LoopbackIpv4    string     `protobuf:"bytes,5,opt,name=loopback_ipv4,proto3" json:"loopback_ipv4,omitempty"`
+	Mtu             uint32     `protobuf:"varint,6,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	RxMode          RxModeType `protobuf:"varint,7,opt,name=rx_mode,proto3,enum=controller.RxModeType" json:"rx_mode,omitempty"`
 }
 
 func (m *HostEntity) Reset()         { *m = HostEntity{} }
@@ -281,49 +260,19 @@ func (m *CustomInfoType) Reset()         { *m = CustomInfoType{} }
 func (m *CustomInfoType) String() string { return proto.CompactTextString(m) }
 func (*CustomInfoType) ProtoMessage()    {}
 
-type L3VRFRoute struct {
-	VrfId             uint32 `protobuf:"varint,1,opt,name=vrf_id,proto3" json:"vrf_id,omitempty"`
-	Description       string `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	DstIpAddr         string `protobuf:"bytes,3,opt,name=dst_ip_addr,proto3" json:"dst_ip_addr,omitempty"`
-	NextHopAddr       string `protobuf:"bytes,4,opt,name=next_hop_addr,proto3" json:"next_hop_addr,omitempty"`
-	OutgoingInterface string `protobuf:"bytes,5,opt,name=outgoing_interface,proto3" json:"outgoing_interface,omitempty"`
-	Weight            uint32 `protobuf:"varint,6,opt,name=weight,proto3" json:"weight,omitempty"`
-	Preference        uint32 `protobuf:"varint,7,opt,name=preference,proto3" json:"preference,omitempty"`
-}
-
-func (m *L3VRFRoute) Reset()         { *m = L3VRFRoute{} }
-func (m *L3VRFRoute) String() string { return proto.CompactTextString(m) }
-func (*L3VRFRoute) ProtoMessage()    {}
-
-type L3ArpEntry struct {
-	IpAddress   string `protobuf:"bytes,2,opt,name=ip_address,proto3" json:"ip_address,omitempty"`
-	PhysAddress string `protobuf:"bytes,3,opt,name=phys_address,proto3" json:"phys_address,omitempty"`
-}
-
-func (m *L3ArpEntry) Reset()         { *m = L3ArpEntry{} }
-func (m *L3ArpEntry) String() string { return proto.CompactTextString(m) }
-func (*L3ArpEntry) ProtoMessage()    {}
-
 type SfcEntity struct {
 	Name           string                  `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Description    string                  `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
 	Type           SfcType                 `protobuf:"varint,3,opt,name=type,proto3,enum=controller.SfcType" json:"type,omitempty"`
 	SfcIpv4Prefix  string                  `protobuf:"bytes,4,opt,name=sfc_ipv4_prefix,proto3" json:"sfc_ipv4_prefix,omitempty"`
 	VnfRepeatCount uint32                  `protobuf:"varint,5,opt,name=vnf_repeat_count,proto3" json:"vnf_repeat_count,omitempty"`
-	BdParms        *BDParms                `protobuf:"bytes,6,opt,name=bd_parms" json:"bd_parms,omitempty"`
+	EwBridgeType   EWBridgeType            `protobuf:"varint,6,opt,name=ew_bridge_type,proto3,enum=controller.EWBridgeType" json:"ew_bridge_type,omitempty"`
 	Elements       []*SfcEntity_SfcElement `protobuf:"bytes,7,rep,name=elements" json:"elements,omitempty"`
 }
 
 func (m *SfcEntity) Reset()         { *m = SfcEntity{} }
 func (m *SfcEntity) String() string { return proto.CompactTextString(m) }
 func (*SfcEntity) ProtoMessage()    {}
-
-func (m *SfcEntity) GetBdParms() *BDParms {
-	if m != nil {
-		return m.BdParms
-	}
-	return nil
-}
 
 func (m *SfcEntity) GetElements() []*SfcEntity_SfcElement {
 	if m != nil {
@@ -336,39 +285,24 @@ type SfcEntity_SfcElement struct {
 	Container        string         `protobuf:"bytes,1,opt,name=container,proto3" json:"container,omitempty"`
 	PortLabel        string         `protobuf:"bytes,2,opt,name=port_label,proto3" json:"port_label,omitempty"`
 	EtcdVppSwitchKey string         `protobuf:"bytes,3,opt,name=etcd_vpp_switch_key,proto3" json:"etcd_vpp_switch_key,omitempty"`
-	Ipv4Addr         string         `protobuf:"bytes,4,opt,name=ipv4_addr,proto3" json:"ipv4_addr,omitempty"`
+	IpAddresses      []string       `protobuf:"bytes,4,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
 	MacAddr          string         `protobuf:"bytes,5,opt,name=mac_addr,proto3" json:"mac_addr,omitempty"`
 	Type             SfcElementType `protobuf:"varint,6,opt,name=type,proto3,enum=controller.SfcElementType" json:"type,omitempty"`
 	VlanId           uint32         `protobuf:"varint,7,opt,name=vlan_id,proto3" json:"vlan_id,omitempty"`
 	Mtu              uint32         `protobuf:"varint,8,opt,name=mtu,proto3" json:"mtu,omitempty"`
 	RxMode           RxModeType     `protobuf:"varint,9,opt,name=rx_mode,proto3,enum=controller.RxModeType" json:"rx_mode,omitempty"`
 	L2FibMacs        []string       `protobuf:"bytes,10,rep,name=l2fib_macs" json:"l2fib_macs,omitempty"`
-	Ipv6Addr         string         `protobuf:"bytes,11,opt,name=ipv6_addr,proto3" json:"ipv6_addr,omitempty"`
-	L3VrfRoutes      []*L3VRFRoute  `protobuf:"bytes,12,rep,name=l3vrf_routes" json:"l3vrf_routes,omitempty"`
-	L3ArpEntries     []*L3ArpEntry  `protobuf:"bytes,13,rep,name=l3arp_entries" json:"l3arp_entries,omitempty"`
+	HostPortLabel    string         `protobuf:"bytes,11,opt,name=host_port_label,proto3" json:"host_port_label,omitempty"`
 }
 
 func (m *SfcEntity_SfcElement) Reset()         { *m = SfcEntity_SfcElement{} }
 func (m *SfcEntity_SfcElement) String() string { return proto.CompactTextString(m) }
 func (*SfcEntity_SfcElement) ProtoMessage()    {}
 
-func (m *SfcEntity_SfcElement) GetL3VrfRoutes() []*L3VRFRoute {
-	if m != nil {
-		return m.L3VrfRoutes
-	}
-	return nil
-}
-
-func (m *SfcEntity_SfcElement) GetL3ArpEntries() []*L3ArpEntry {
-	if m != nil {
-		return m.L3ArpEntries
-	}
-	return nil
-}
-
 func init() {
 	proto.RegisterEnum("controller.RxModeType", RxModeType_name, RxModeType_value)
 	proto.RegisterEnum("controller.ExtEntDriverType", ExtEntDriverType_name, ExtEntDriverType_value)
+	proto.RegisterEnum("controller.EWBridgeType", EWBridgeType_name, EWBridgeType_value)
 	proto.RegisterEnum("controller.SfcType", SfcType_name, SfcType_value)
 	proto.RegisterEnum("controller.SfcElementType", SfcElementType_name, SfcElementType_value)
 }

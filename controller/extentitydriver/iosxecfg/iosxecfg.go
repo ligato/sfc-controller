@@ -21,7 +21,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/ligato/cn-infra/logging/logrus"
+	"github.com/ligato/cn-infra/logging/logroot"
 	"github.com/ligato/sfc-controller/controller/utils/vty"
 	"github.com/ligato/sfc-controller/controller/utils/vty/ssh"
 )
@@ -33,7 +33,7 @@ type Session struct {
 	inConfigMode bool
 }
 
-var log = logrus.DefaultLogger()
+var log = logroot.StandardLogger()
 
 // NewSession creates a new configuration session with an IOS XE Router from an existing (open) VTY session.
 // The session should be closed with the Close() method.

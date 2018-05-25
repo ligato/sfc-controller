@@ -19,7 +19,7 @@ import (
 	"io"
 	"net"
 
-	"github.com/ligato/cn-infra/logging/logrus"
+	"github.com/ligato/cn-infra/logging/logroot"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -29,7 +29,7 @@ type Connection struct {
 	session *ssh.Session
 }
 
-var log = logrus.DefaultLogger()
+var log = logroot.StandardLogger()
 
 // Connect connects top a host via SSH using password authentication.
 func Connect(host string, port uint32, userName string, password string) (*Connection, error) {

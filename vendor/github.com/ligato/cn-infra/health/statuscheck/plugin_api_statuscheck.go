@@ -15,7 +15,6 @@
 package statuscheck
 
 import (
-	"github.com/gogo/protobuf/proto"
 	"github.com/ligato/cn-infra/core"
 	"github.com/ligato/cn-infra/health/statuscheck/model/status"
 )
@@ -44,11 +43,6 @@ type PluginStatusWriter interface {
 	// to detect an actual status change and propagate only updates to remote
 	// clients.
 	ReportStateChange(pluginName core.PluginName, state PluginState, lastError error)
-
-	// ReportStateChangeWithMeta can be used to report a change in the status
-	// of a previously registered plugin with added metadata value stored in
-	// global agent status. Metadata type is specified in statuscheck model.
-	ReportStateChangeWithMeta(pluginName core.PluginName, state PluginState, lastError error, meta proto.Message)
 }
 
 // AgentStatusReader allows to lookup agent status by other plugins.
@@ -57,14 +51,8 @@ type AgentStatusReader interface {
 	GetAgentStatus() status.AgentStatus
 }
 
-// InterfaceStatusReader looks up the interface state and returns updated state data
-type InterfaceStatusReader interface {
-	GetInterfaceStats() status.InterfaceStats
-}
-
 // StatusReader allows to lookup agent status and retrieve a map containing status of all plugins.
 type StatusReader interface {
 	AgentStatusReader
-	InterfaceStatusReader
 	GetAllPluginStatus() map[string]*status.PluginStatus
 }

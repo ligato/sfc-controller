@@ -8,7 +8,7 @@ import (
 	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/cn-infra/db/keyval/etcdv3"
 	"github.com/ligato/cn-infra/logging"
-	"github.com/ligato/cn-infra/logging/logrus"
+	"github.com/ligato/cn-infra/logging/logroot"
 	"github.com/ligato/cn-infra/rpc/rest"
 	"github.com/namsral/flag"
 )
@@ -18,7 +18,7 @@ const PluginID core.PluginName = "vnf-driver"
 
 var (
 	vnfConfigFile string // CLI flag - see RegisterFlags
-	log           = logrus.DefaultLogger()
+	log           = logroot.StandardLogger()
 )
 
 // Plugin is the main VNF driver plugin handler structure.

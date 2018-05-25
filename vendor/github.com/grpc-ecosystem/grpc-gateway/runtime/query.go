@@ -48,11 +48,8 @@ func populateFieldValueFromPath(msg proto.Message, fieldPath []string, values []
 			return fmt.Errorf("non-aggregate type in the mid of path: %s", strings.Join(fieldPath, "."))
 		}
 		var f reflect.Value
-		var err error
-		f, props, err = fieldByProtoName(m, fieldName)
-		if err != nil {
-			return err
-		} else if !f.IsValid() {
+		f, props = fieldByProtoName(m, fieldName)
+		if !f.IsValid() {
 			grpclog.Printf("field not found in %T: %s", msg, strings.Join(fieldPath, "."))
 			return nil
 		}
@@ -95,26 +92,14 @@ func populateFieldValueFromPath(msg proto.Message, fieldPath []string, values []
 
 // fieldByProtoName looks up a field whose corresponding protobuf field name is "name".
 // "m" must be a struct value. It returns zero reflect.Value if no such field found.
-func fieldByProtoName(m reflect.Value, name string) (reflect.Value, *proto.Properties, error) {
+func fieldByProtoName(m reflect.Value, name string) (reflect.Value, *proto.Properties) {
 	props := proto.GetProperties(m.Type())
-
-	// look up field name in oneof map
-	if op, ok := props.OneofTypes[name]; ok {
-		v := reflect.New(op.Type.Elem())
-		field := m.Field(op.Field)
-		if !field.IsNil() {
-			return reflect.Value{}, nil, fmt.Errorf("field already set for %s oneof", props.Prop[op.Field].OrigName)
-		}
-		field.Set(v)
-		return v.Elem().Field(0), op.Prop, nil
-	}
-
 	for _, p := range props.Prop {
 		if p.OrigName == name {
-			return m.FieldByName(p.Name), p, nil
+			return m.FieldByName(p.Name), p
 		}
 	}
-	return reflect.Value{}, nil, nil
+	return reflect.Value{}, nil
 }
 
 func populateRepeatedField(f reflect.Value, values []string, props *proto.Properties) error {
