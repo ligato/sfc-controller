@@ -57,10 +57,10 @@
     "config",
     "core",
     "datasync",
+    "datasync/resync",
     "db/keyval",
     "db/keyval/etcdv3",
     "db/keyval/kvproto",
-    "db/keyval/plugin",
     "flavors/local",
     "health/probe",
     "health/statuscheck",
@@ -74,8 +74,8 @@
     "utils/addrs",
     "utils/safeclose"
   ]
-  revision = "e3b8c2a73fdfb66fe7654d1c3377ed5c1762a3b2"
-  version = "v1.2.0"
+  revision = "08a0f1c21c3b06b0a797fbbfe58b6acb7595c666"
+  version = "v1.3.0"
 
 [[projects]]
   name = "github.com/ligato/vpp-agent"
@@ -85,8 +85,8 @@
     "plugins/defaultplugins/common/model/l3",
     "plugins/linuxplugin/common/model/interfaces"
   ]
-  revision = "1a961e0b76e53fb206348dfb8a18a12f3325d661"
-  version = "v1.3"
+  revision = "2fbd74815c43e20f67a9b1029324c1d9022e69cb"
+  version = "v1.4.0"
 
 [[projects]]
   name = "github.com/matttproud/golang_protobuf_extensions"
@@ -231,6 +231,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1790684301ae25194790e96885a5b0aba8466a8cbeb0f254ef305778caa80700"
+  inputs-digest = "a24d1ac1b99b82ca50b42693346949935134202b67078a867c56fea61cd671a2"
   solver-name = "gps-cdcl"
   solver-version = 1

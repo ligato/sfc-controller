@@ -30,7 +30,11 @@ var beforeMap map[int]map[string]*vppagent.KVType
 var afterMap map[int]map[string]*vppagent.KVType
 var txnLevel int
 
-var configMutex sync.Mutex
+var configMutex *sync.Mutex = nil
+
+func ConfigMutexSet(_configMutex *sync.Mutex) {
+	configMutex = _configMutex
+}
 
 func RenderTxnGetAfterMap(key string) (*vppagent.KVType, bool) {
 	vppKey, exists := afterMap[0][key]

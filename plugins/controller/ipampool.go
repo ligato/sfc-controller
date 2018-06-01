@@ -161,7 +161,7 @@ func (mgr *IPAMPoolMgr) SetAddress(poolName string, nodeName string, vsName stri
 		return "", fmt.Errorf("Cannot allocate address from ipam pool %s", poolName)
 	}
 
-	log.Errorf("AllocateAddress: allocatorPool: %v", allocatorPool)
+	log.Infof("AllocateAddress: allocatorPool: %v", allocatorPool)
 
 	ipamPool.Status.Addresses[allocatorPool.Name] = allocatorPool.GetAllocatedAddressesStatus()
 

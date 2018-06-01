@@ -35,6 +35,7 @@ import (
 	"github.com/namsral/flag"
 	"github.com/unrolled/render"
 	"net/http"
+	"sync"
 )
 
 // PluginID is plugin identifier (must be unique throughout the system)
@@ -106,6 +107,7 @@ type Plugin struct {
 	BypassModelTypeHttpHandlers bool   // cli flag - see RegisterFlags
 	CleanDatastore              bool   // cli flag - see RegisterFlags
 	ContivKSREnabled            bool   // cli flag - see RegisterFlags
+	ConfigMutex                 sync.Mutex
 }
 
 // Init the controller, read the DB, reconcile/resync, render config to etcd
@@ -126,6 +128,8 @@ func (s *Plugin) Init() error {
 	// Register providing status reports (push mode)
 	s.StatusCheck.Register(PluginID, nil)
 	s.StatusCheck.ReportStateChange(PluginID, statuscheck.Init, nil)
+
+	ConfigMutexSet(&s.ConfigMutex)
 
 	s.DB = s.Etcd.NewBroker(keyval.Root)
 	database.InitDatabase(s.DB)

@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package plugin contains a keyval plugin skeleton used in various
-// key-value data store clients (e.g. etcdv3/plugin_impl_etcdv3.go,
-// redis/plugin_impl_redis.go).
-package plugin
+// Package resync implements the mechanism to notify previously registered
+// plugins that the resync procedure needs to start.
+package resync
