@@ -44,6 +44,8 @@ const (
 	NetworkPodTypeVPPContainer    = "vppcontainer"
 	NetworkPodTypeNonVPPContainer = "nonvppcontainer"
 
+	MemifDirectoryName = "/tmp"
+
 	RxModeInterrupt = "interrupt"
 	RxModePolling   = "polling"
 	RxModeAdaptive  = "adaptive"

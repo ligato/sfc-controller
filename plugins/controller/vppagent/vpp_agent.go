@@ -248,6 +248,7 @@ func ConstructMemInterface(vppAgent string,
 	memifID uint32,
 	isMaster bool,
 	memifParms *controller.Interface_MemIFParms,
+	defaultMemifDirectory string,
 	masterVppAgent string) *KVType {
 
 	iface := &interfaces.Interfaces_Interface{
@@ -260,7 +261,6 @@ func ConstructMemInterface(vppAgent string,
 		Memif: &interfaces.Interfaces_Interface_Memif{
 			Id:             memifID,
 			Master:         isMaster,
-			SocketFilename: "/tmp/memif_" + masterVppAgent + ".sock",
 		},
 	}
 
@@ -268,7 +268,12 @@ func ConstructMemInterface(vppAgent string,
 		if memifParms.Mode != "" {
 			iface.Memif.Mode = memifMode(memifParms.Mode)
 		}
+		if memifParms.MemifDirectory != "" {
+			defaultMemifDirectory = memifParms.MemifDirectory
+		}
 	}
+
+	iface.Memif.SocketFilename = defaultMemifDirectory + "/memif_" + masterVppAgent + ".sock"
 
 	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
 

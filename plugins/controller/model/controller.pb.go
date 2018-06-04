@@ -170,6 +170,7 @@ func (m *IPAMPool) GetStatus() *IPAMPoolStatus {
 
 type SystemParameters struct {
 	Mtu                          uint32     `protobuf:"varint,1,opt,name=mtu,proto3" json:"mtu,omitempty"`
+	MemifDirectory               string     `protobuf:"bytes,2,opt,name=memif_directory,proto3" json:"memif_directory,omitempty"`
 	DefaultStaticRouteWeight     uint32     `protobuf:"varint,3,opt,name=default_static_route_weight,proto3" json:"default_static_route_weight,omitempty"`
 	DefaultStaticRoutePreference uint32     `protobuf:"varint,4,opt,name=default_static_route_preference,proto3" json:"default_static_route_preference,omitempty"`
 	L2BdTemplates                []*BDParms `protobuf:"bytes,5,rep,name=l2bd_templates" json:"l2bd_templates,omitempty"`
@@ -263,8 +264,9 @@ func (m *Interface) GetMemifParms() *Interface_MemIFParms {
 }
 
 type Interface_MemIFParms struct {
-	Mode         string `protobuf:"bytes,1,opt,name=mode,proto3" json:"mode,omitempty"`
-	InterPodConn string `protobuf:"bytes,2,opt,name=inter_pod_conn,proto3" json:"inter_pod_conn,omitempty"`
+	Mode           string `protobuf:"bytes,1,opt,name=mode,proto3" json:"mode,omitempty"`
+	InterPodConn   string `protobuf:"bytes,2,opt,name=inter_pod_conn,proto3" json:"inter_pod_conn,omitempty"`
+	MemifDirectory string `protobuf:"bytes,3,opt,name=memif_directory,proto3" json:"memif_directory,omitempty"`
 }
 
 func (m *Interface_MemIFParms) Reset()         { *m = Interface_MemIFParms{} }

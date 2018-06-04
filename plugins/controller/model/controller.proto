@@ -76,6 +76,7 @@ message IPAMPool {
 
 message SystemParameters {
     uint32 mtu = 1; // optional, overrrides default 1500
+    string memif_directory = 2; // optional: defaults to /tmp
     uint32 default_static_route_weight = 3; // optional, overrrides default 5
     uint32 default_static_route_preference = 4; // optional, overrrides default 0
     repeated BDParms l2bd_templates =  5; // L2BDs can referene these
@@ -125,6 +126,7 @@ message Interface {
     message MemIFParms {
         string mode = 1; //ethernet|ip|puntinject optional/default: ethernet
         string inter_pod_conn = 2; //direct|vswitch optional/default: direct
+        string memif_directory = 3; // optional: use system parameter if empty
     }
     MemIFParms memif_parms = 11;
     repeated string labels = 12;

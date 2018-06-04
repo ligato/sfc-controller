@@ -79,6 +79,7 @@ func (ns *NetworkService) RenderConnMemifPair(
 		ifStatus.MemifID,
 		false,
 		networkPodInterface.MemifParms,
+		ctlrPlugin.SysParametersMgr.sysParmCache.MemifDirectory,
 		vppAgent)
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
@@ -99,6 +100,7 @@ func (ns *NetworkService) RenderConnMemifPair(
 		ifStatus.MemifID,
 		true,
 		networkPodInterface.MemifParms,
+		ctlrPlugin.SysParametersMgr.sysParmCache.MemifDirectory,
 		vppAgent)
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
@@ -142,6 +144,7 @@ func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
 		if0Status.MemifID,
 		false,
 		networkPodInterfaces[0].MemifParms,
+		ctlrPlugin.SysParametersMgr.sysParmCache.MemifDirectory,
 		connPodName1)
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
@@ -171,6 +174,7 @@ func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
 		if1Status.MemifID,
 		true,
 		networkPodInterfaces[1].MemifParms,
+		ctlrPlugin.SysParametersMgr.sysParmCache.MemifDirectory,
 		connPodName1)
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
