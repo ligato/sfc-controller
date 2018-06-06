@@ -15,11 +15,12 @@
 package k8scrd
 
 import (
-
+	"os"
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/sfc-controller/plugins/controller"
-	"os"
+	crd "github.com/ligato/sfc-controller/plugins/k8scrd/pkg/apis/sfccontroller/v1alpha1"
+	model "github.com/ligato/sfc-controller/plugins/controller/model"
 )
 
 type CRDNetworkNodeMgr struct {
@@ -47,12 +48,49 @@ func (mgr *CRDNetworkNodeMgr) DumpCache() {
 	}
 }
 
+func (mgr *CRDNetworkNodeMgr) CrdToSfcNetworkNode(crdNN crd.NetworkNode) (sfcNN controller.NetworkNode, err error) {
+	sfcNN = controller.NetworkNode{}
+	sfcNN.Metadata = &model.MetaDataType{}
+	sfcNN.Metadata.Name = crdNN.Name
+	//sfcNN.Metadata.Labels = crdNN.Labels TODO: labels should be a map
+	sfcNN.NetworkNode.Spec = &crdNN.NetworkNodeSpec
+	sfcNN.NetworkNode.Status = &crdNN.NetworkNodeStatus
+	return sfcNN, nil
+}
+
+// HandleCRDSync syncs the SFC Controller with the incoming CRD
+func (mgr *CRDNetworkNodeMgr) HandleCRDSync(crdNN crd.NetworkNode) {
+	log.Info("CRDNetworkNodeMgr HandleCRDSync: enter ...")
+	defer log.Info("CRDNetworkNodeMgr HandleCRDSync: exit ...")
+
+	nn, err := mgr.CrdToSfcNetworkNode(crdNN)
+	if err != nil {
+		log.Errorf("%s", err.Error())
+		return
+	}
+
+	opStr := "created"
+	if existing, exists := ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationR(crdNN.Name); exists {
+		opStr = "updated"
+		if existing.ConfigEqual(&nn) {
+			log.Infof("crdNN %s has not changed.", crdNN.Name)
+			return
+		}
+	}
+
+	if err := ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationCU(&nn, false); err != nil {
+		log.Errorf("%s", err.Error())
+		return
+	}
+
+	log.Infof("NetworkNode %s", opStr)
+}
+
 // InitAndRunWatcher enables etcd updates to be monitored
 func (mgr *CRDNetworkNodeMgr) InitAndRunWatcher() {
 
 	log.Info("CRD NetworkNodeWatcher: enter ...")
 	defer log.Info("CRD NetworkNodeWatcher: exit ...")
-
 
 	respChan := make(chan keyval.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(ctlrPlugin.NetworkNodeMgr.KeyPrefix())

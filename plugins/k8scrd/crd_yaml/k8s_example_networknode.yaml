@@ -1,23 +1,15 @@
-apiVersion: sfccontroller.ligato.github.com/v2
+apiVersion: sfccontroller.ligato.github.com/v1alpha1
 kind: NetworkNode
 metadata:
-  name: vswitch1
-  labels:
-    - nicenode
+  name: vswitch2
 spec:
-  node_type: host
+  node_type: host 
   interfaces:
-    - metadata:
-        name: GigabitEthernet2/0/1
-        labels:
-          - vxlan
-      spec:
-        if_type: ethernet
-        ip_addresses:
-          - "192.168.16.1/24"
-    - metadata:
-        name: vxlan_endpoint
-      spec:
-        if_type: vxlan_tunnel
-        ip_addresses:
-          - "200.200.200.1/24"
+    - name: GigabitEthernet2/0/1
+      if_type: ethernet
+      ip_addresses:
+        - "192.168.16.1/24"
+    - name: vxlan_endpoint
+      if_type: vxlan_tunnel
+      ip_addresses:
+        - "200.200.200.1/24"
