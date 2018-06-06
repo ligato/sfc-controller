@@ -1103,6 +1103,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 	var macAddress string
 	var ipv4Address string
 
+	ipAddresses := []string{}
+
 	// the sfc controller can generate addresses if not provided
 	if len(vnfChainElement.IpAddresses) == 0 {
 		if generateAddresses {
@@ -1120,6 +1122,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 					ipID = sfcID.IpId
 				}
 			}
+			ipAddresses = append(ipAddresses, ipv4Address)
 		}
 	} else if len(vnfChainElement.IpAddresses) == 1 {
 		strs := strings.Split(vnfChainElement.IpAddresses[0], "/")
@@ -1131,14 +1134,19 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 		if sfc.SfcIpv4Prefix != "" {
 			ipam.SetIpAddrIfInsideSubnet(sfc.SfcIpv4Prefix, strs[0])
 		}
-	}
-	if sfc.SfcIpv4Prefix != "" {
-		log.Info("createMemIfPair: ", ipam.DumpSubnet(sfc.SfcIpv4Prefix), ipv4Address)
+		ipAddresses = append(ipAddresses, ipv4Address)
+	} else {
+		ipAddresses = vnfChainElement.IpAddresses
+		strs := strings.Split(ipAddresses[0], "/")
+		if len(strs) == 2 {
+			ipv4Address = ipAddresses[0]
+		} else {
+			ipv4Address = ipAddresses[0] + "/24"
+		}
 	}
 
-	ipAddresses := vnfChainElement.IpAddresses
-	if ipv4Address != "" {
-		ipAddresses = append(vnfChainElement.IpAddresses, ipv4Address)
+	if sfc.SfcIpv4Prefix != "" {
+		log.Info("createMemIfPair: ", ipam.DumpSubnet(sfc.SfcIpv4Prefix), ipv4Address)
 	}
 
 	if vnfChainElement.MacAddr == "" {
@@ -1232,6 +1240,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 		vethID = sfcID.VethId
 	}
 
+	ipAddresses := []string{}
+
 	if len(vnfChainElement.IpAddresses) == 0 {
 		if sfc.SfcIpv4Prefix != "" {
 			if sfcID == nil || sfcID.IpId == 0 {
@@ -1246,6 +1256,7 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 				}
 				ipID = sfcID.IpId
 			}
+			ipAddresses = append(ipAddresses, ipv4Address)
 		}
 	} else if len(vnfChainElement.IpAddresses) == 1 { // hack for old ipv4 without /xx
 		strs := strings.Split(vnfChainElement.IpAddresses[0], "/")
@@ -1257,14 +1268,19 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 		if sfc.SfcIpv4Prefix != "" {
 			ipam.SetIpAddrIfInsideSubnet(sfc.SfcIpv4Prefix, strs[0])
 		}
-	}
-	if sfc.SfcIpv4Prefix != "" {
-		log.Info("createAFPacketVEthPair: ", ipam.DumpSubnet(sfc.SfcIpv4Prefix), ipv4Address)
+		ipAddresses = append(ipAddresses, ipv4Address)
+	} else {
+		ipAddresses = vnfChainElement.IpAddresses
+		strs := strings.Split(ipAddresses[0], "/")
+		if len(strs) == 2 {
+			ipv4Address = ipAddresses[0]
+		} else {
+			ipv4Address = ipAddresses[0] + "/24"
+		}
 	}
 
-	ipAddresses := vnfChainElement.IpAddresses
-	if ipv4Address != "" {
-		ipAddresses = append(vnfChainElement.IpAddresses, ipv4Address)
+	if sfc.SfcIpv4Prefix != "" {
+		log.Info("createAFPacketVEthPair: ", ipam.DumpSubnet(sfc.SfcIpv4Prefix), ipv4Address)
 	}
 
 	if vnfChainElement.MacAddr == "" {
