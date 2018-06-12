@@ -16,6 +16,14 @@
 
 package v1alpha1
 
+// IpamPoolListerExpansion allows custom methods to be added to
+// IpamPoolLister.
+type IpamPoolListerExpansion interface{}
+
+// IpamPoolNamespaceListerExpansion allows custom methods to be added to
+// IpamPoolNamespaceLister.
+type IpamPoolNamespaceListerExpansion interface{}
+
 // NetworkNodeListerExpansion allows custom methods to be added to
 // NetworkNodeLister.
 type NetworkNodeListerExpansion interface{}
@@ -23,3 +31,19 @@ type NetworkNodeListerExpansion interface{}
 // NetworkNodeNamespaceListerExpansion allows custom methods to be added to
 // NetworkNodeNamespaceLister.
 type NetworkNodeNamespaceListerExpansion interface{}
+
+// NetworkNodeOverlayListerExpansion allows custom methods to be added to
+// NetworkNodeOverlayLister.
+type NetworkNodeOverlayListerExpansion interface{}
+
+// NetworkNodeOverlayNamespaceListerExpansion allows custom methods to be added to
+// NetworkNodeOverlayNamespaceLister.
+type NetworkNodeOverlayNamespaceListerExpansion interface{}
+
+// NetworkServiceListerExpansion allows custom methods to be added to
+// NetworkServiceLister.
+type NetworkServiceListerExpansion interface{}
+
+// NetworkServiceNamespaceListerExpansion allows custom methods to be added to
+// NetworkServiceNamespaceLister.
+type NetworkServiceNamespaceListerExpansion interface{}

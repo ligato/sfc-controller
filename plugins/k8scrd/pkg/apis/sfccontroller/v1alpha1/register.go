@@ -45,6 +45,12 @@ var (
 // Adds the list of known types to Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&IpamPool{},
+		&IpamPoolList{},
+		&NetworkService{},
+		&NetworkServiceList{},
+		&NetworkNodeOverlay{},
+		&NetworkNodeOverlayList{},
 		&NetworkNode{},
 		&NetworkNodeList{},
 	)

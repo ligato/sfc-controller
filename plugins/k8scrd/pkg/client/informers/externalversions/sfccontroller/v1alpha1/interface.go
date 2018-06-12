@@ -22,8 +22,14 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// IpamPools returns a IpamPoolInformer.
+	IpamPools() IpamPoolInformer
 	// NetworkNodes returns a NetworkNodeInformer.
 	NetworkNodes() NetworkNodeInformer
+	// NetworkNodeOverlays returns a NetworkNodeOverlayInformer.
+	NetworkNodeOverlays() NetworkNodeOverlayInformer
+	// NetworkServices returns a NetworkServiceInformer.
+	NetworkServices() NetworkServiceInformer
 }
 
 type version struct {
@@ -37,7 +43,22 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
+// IpamPools returns a IpamPoolInformer.
+func (v *version) IpamPools() IpamPoolInformer {
+	return &ipamPoolInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // NetworkNodes returns a NetworkNodeInformer.
 func (v *version) NetworkNodes() NetworkNodeInformer {
 	return &networkNodeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// NetworkNodeOverlays returns a NetworkNodeOverlayInformer.
+func (v *version) NetworkNodeOverlays() NetworkNodeOverlayInformer {
+	return &networkNodeOverlayInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// NetworkServices returns a NetworkServiceInformer.
+func (v *version) NetworkServices() NetworkServiceInformer {
+	return &networkServiceInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

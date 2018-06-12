@@ -110,7 +110,7 @@ func (mgr *CRDNetworkNodeMgr) InitAndRunWatcher() {
 				dbEntry := &controller.NetworkNode{}
 				if err := resp.GetValue(dbEntry); err == nil {
 					// config and status might have changed ...
-					log.Infof("CRD NetworkNodeWatcher: PUT detected: network node: %s",
+					log.Infof("CRD NetworkNodeWatcher: PUT detected: NetworkNode: %s",
 						dbEntry)
 				}
 

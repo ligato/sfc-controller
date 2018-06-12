@@ -16,4 +16,10 @@
 
 package v1alpha1
 
+type IpamPoolExpansion interface{}
+
 type NetworkNodeExpansion interface{}
+
+type NetworkNodeOverlayExpansion interface{}
+
+type NetworkServiceExpansion interface{}

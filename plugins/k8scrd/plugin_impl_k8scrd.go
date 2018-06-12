@@ -79,7 +79,10 @@ type Plugin struct {
 	*local.FlavorLocal
 	Controller     *controller.Plugin
 	ramConfigCache CacheType
+	IpamPoolMgr CRDIpamPoolMgr
 	NetworkNodeMgr CRDNetworkNodeMgr
+	NetworkNodeOverlayMgr CRDNetworkNodeOverlayMgr
+	NetworkServiceMgr CRDNetworkServiceMgr
 }
 
 // Init the controller, read the db, reconcile/resync, render config to etcd
