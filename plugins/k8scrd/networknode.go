@@ -52,7 +52,7 @@ func (mgr *CRDNetworkNodeMgr) CrdToSfcNetworkNode(crdNN crd.NetworkNode) (sfcNN 
 	sfcNN = controller.NetworkNode{}
 	sfcNN.Metadata = &model.MetaDataType{}
 	sfcNN.Metadata.Name = crdNN.Name
-	//sfcNN.Metadata.Labels = crdNN.Labels TODO: labels should be a map
+	sfcNN.Metadata.Labels = crdNN.Labels
 	sfcNN.NetworkNode.Spec = &crdNN.NetworkNodeSpec
 	sfcNN.NetworkNode.Status = &crdNN.NetworkNodeStatus
 	return sfcNN, nil

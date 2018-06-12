@@ -2,6 +2,8 @@ apiVersion: sfccontroller.ligato.github.com/v1alpha1
 kind: NetworkNode
 metadata:
   name: vswitch2
+  labels:
+    foo: bar
 spec:
   node_type: host 
   interfaces:
