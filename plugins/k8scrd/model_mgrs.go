@@ -46,9 +46,9 @@ type registeredManagersInterface interface {
 
 func (s *Plugin) RegisterModelTypeManagers() {
 	//RegisterModelType(controller.ModelTypeSysParameters, &s.sysParametersMgr)
-	//RegisterModelType(controller.ModelTypeIPAMPool, &s.ipamPoolMgr)
+	RegisterModelType(controller.ModelTypeIPAMPool, &s.IpamPoolMgr)
 	//RegisterModelType(controller.ModelTypeNetworkPodNodeMap, &s.networkPodNodeMapMgr)
-	//RegisterModelType(controller.ModelTypeNetworkNodeOverlay, &s.networkNodeOverlayMgr)
+	RegisterModelType(controller.ModelTypeNetworkNodeOverlay, &s.NetworkNodeOverlayMgr)
 	RegisterModelType(controller.ModelTypeNetworkNode, &s.NetworkNodeMgr)
-	//RegisterModelType(controller.ModelTypeNetworkService, &s.networkServiceMgr)
+	RegisterModelType(controller.ModelTypeNetworkService, &s.NetworkServiceMgr)
 }

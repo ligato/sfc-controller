@@ -25,7 +25,10 @@ import (
 
 type SfccontrollerV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	IpamPoolsGetter
 	NetworkNodesGetter
+	NetworkNodeOverlaysGetter
+	NetworkServicesGetter
 }
 
 // SfccontrollerV1alpha1Client is used to interact with features provided by the sfccontroller.ligato.github.com group.
@@ -33,8 +36,20 @@ type SfccontrollerV1alpha1Client struct {
 	restClient rest.Interface
 }
 
+func (c *SfccontrollerV1alpha1Client) IpamPools(namespace string) IpamPoolInterface {
+	return newIpamPools(c, namespace)
+}
+
 func (c *SfccontrollerV1alpha1Client) NetworkNodes(namespace string) NetworkNodeInterface {
 	return newNetworkNodes(c, namespace)
+}
+
+func (c *SfccontrollerV1alpha1Client) NetworkNodeOverlays(namespace string) NetworkNodeOverlayInterface {
+	return newNetworkNodeOverlays(c, namespace)
+}
+
+func (c *SfccontrollerV1alpha1Client) NetworkServices(namespace string) NetworkServiceInterface {
+	return newNetworkServices(c, namespace)
 }
 
 // NewForConfig creates a new SfccontrollerV1alpha1Client for the given config.

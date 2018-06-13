@@ -51,8 +51,14 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=sfccontroller.ligato.github.com, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("ipampools"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Sfccontroller().V1alpha1().IpamPools().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("networknodes"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Sfccontroller().V1alpha1().NetworkNodes().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("networknodeoverlays"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Sfccontroller().V1alpha1().NetworkNodeOverlays().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("networkservices"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Sfccontroller().V1alpha1().NetworkServices().Informer()}, nil
 
 	}
 

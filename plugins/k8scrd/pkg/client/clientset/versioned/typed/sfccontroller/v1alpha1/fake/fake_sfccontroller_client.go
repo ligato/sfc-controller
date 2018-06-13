@@ -26,8 +26,20 @@ type FakeSfccontrollerV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeSfccontrollerV1alpha1) IpamPools(namespace string) v1alpha1.IpamPoolInterface {
+	return &FakeIpamPools{c, namespace}
+}
+
 func (c *FakeSfccontrollerV1alpha1) NetworkNodes(namespace string) v1alpha1.NetworkNodeInterface {
 	return &FakeNetworkNodes{c, namespace}
+}
+
+func (c *FakeSfccontrollerV1alpha1) NetworkNodeOverlays(namespace string) v1alpha1.NetworkNodeOverlayInterface {
+	return &FakeNetworkNodeOverlays{c, namespace}
+}
+
+func (c *FakeSfccontrollerV1alpha1) NetworkServices(namespace string) v1alpha1.NetworkServiceInterface {
+	return &FakeNetworkServices{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
