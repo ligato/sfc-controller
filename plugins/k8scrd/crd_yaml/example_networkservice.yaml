@@ -1,0 +1,17 @@
+apiVersion: sfccontroller.ligato.github.com/v1alpha1
+kind: NetworkService
+metadata:
+  name: mob-bia-group-1
+  labels:
+    foo: bar
+spec:
+  network_pods:
+    - metadata:
+        name: MOB
+      spec:
+        pod_type: nonvppcontainer
+        interfaces:
+          - name: mob
+            if_type: memif
+            ipam_pool_names:
+              - network_service_pool

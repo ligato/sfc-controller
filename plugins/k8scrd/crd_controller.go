@@ -47,22 +47,31 @@ const (
 	MessageResourceSynced = "NetworkNode synced successfully"
 )
 
-// Controller is the controller implementation for NetworkNode resources
+// Controller is the controller implementation for our custom resources
 type Controller struct {
 	// kubeclientset is a standard kubernetes clientset
 	kubeclientset kubernetes.Interface
 	// sfcclientset is a clientset for our own API group
 	sfcclientset clientset.Interface
 
-	networkNodesLister        listers.NetworkNodeLister
-	networkNodesSynced        cache.InformerSynced
+	ipamPoolsLister listers.IpamPoolLister
+	ipamPoolsSynced cache.InformerSynced
+	networkNodesLister listers.NetworkNodeLister
+	networkNodesSynced cache.InformerSynced
+	networkNodeOverlaysLister listers.NetworkNodeOverlayLister
+	networkNodeOverlaysSynced cache.InformerSynced
+	networkServicesLister listers.NetworkServiceLister
+	networkServicesSynced cache.InformerSynced
 
 	// workqueue is a rate limited work queue. This is used to queue work to be
 	// processed instead of performing it as soon as a change happens. This
 	// means we can ensure we only process a fixed amount of resources at a
 	// time, and makes it easy to ensure we are never processing the same item
 	// simultaneously in two different workers.
-	workqueue workqueue.RateLimitingInterface
+	ipamPoolsWorkqueue workqueue.RateLimitingInterface
+	networkNodesWorkqueue workqueue.RateLimitingInterface
+	networkNodeOverlaysWorkqueue workqueue.RateLimitingInterface
+	networkServicesWorkqueue workqueue.RateLimitingInterface
 	// recorder is an event recorder for recording Event resources to the
 	// Kubernetes API.
 	recorder record.EventRecorder
@@ -76,7 +85,10 @@ func NewController(
 	sfcInformerFactory informers.SharedInformerFactory) *Controller {
 
 	// obtain references to shared index informers for the SFC Controller types.
+	ipamPoolInformer := sfcInformerFactory.Sfccontroller().V1alpha1().IpamPools()
 	networkNodeInformer := sfcInformerFactory.Sfccontroller().V1alpha1().NetworkNodes()
+	networkNodeOverlayInformer := sfcInformerFactory.Sfccontroller().V1alpha1().NetworkNodeOverlays()
+	networkServiceInformer := sfcInformerFactory.Sfccontroller().V1alpha1().NetworkServices()
 
 	// Create event broadcaster
 	// Add sfc-controller types to the default Kubernetes Scheme so Events can be
@@ -91,18 +103,46 @@ func NewController(
 	controller := &Controller{
 		kubeclientset:     kubeclientset,
 		sfcclientset:   sfcclientset,
+		ipamPoolsLister: ipamPoolInformer.Lister(),
+		ipamPoolsSynced: ipamPoolInformer.Informer().HasSynced,
+		ipamPoolsWorkqueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "IpamPools"),
 		networkNodesLister:       networkNodeInformer.Lister(),
 		networkNodesSynced:       networkNodeInformer.Informer().HasSynced,
-		workqueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "NetworkNodes"),
+		networkNodesWorkqueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "NetworkNodes"),
+		networkNodeOverlaysLister:       networkNodeOverlayInformer.Lister(),
+		networkNodeOverlaysSynced:       networkNodeOverlayInformer.Informer().HasSynced,
+		networkNodeOverlaysWorkqueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "NetworkNodeOverlays"),
+		networkServicesLister:       networkServiceInformer.Lister(),
+		networkServicesSynced:       networkServiceInformer.Informer().HasSynced,
+		networkServicesWorkqueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "NetworkServices"),
 		recorder:          recorder,
 	}
 
 	log.Info("Setting up event handlers")
-	// Set up an event handler for when NetworkNode resources change
+	// Set up an event handler for when resources change
+
+	ipamPoolInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.enqueueIpamPool,
+		UpdateFunc: func(old, new interface{}) {
+			controller.enqueueIpamPool(new)
+		},
+	})
 	networkNodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueNetworkNode,
 		UpdateFunc: func(old, new interface{}) {
 			controller.enqueueNetworkNode(new)
+		},
+	})
+	networkNodeOverlayInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.enqueueNetworkNodeOverlay,
+		UpdateFunc: func(old, new interface{}) {
+			controller.enqueueNetworkNodeOverlay(new)
+		},
+	})
+	networkServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: controller.enqueueNetworkService,
+		UpdateFunc: func(old, new interface{}) {
+			controller.enqueueNetworkService(new)
 		},
 	})
 
@@ -115,22 +155,28 @@ func NewController(
 // workers to finish processing their current work items.
 func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
-	defer c.workqueue.ShutDown()
+	defer c.ipamPoolsWorkqueue.ShutDown()
+	defer c.networkNodesWorkqueue.ShutDown()
+	defer c.networkNodeOverlaysWorkqueue.ShutDown()
+	defer c.networkServicesWorkqueue.ShutDown()
 
 	// Start the informer factories to begin populating the informer caches
-	log.Info("Starting NetworkNode controller")
+	log.Info("Starting CRD controller")
 
 	// Wait for the caches to be synced before starting workers
 	log.Info("Waiting for informer caches to sync")
-	if ok := cache.WaitForCacheSync(stopCh, c.networkNodesSynced); !ok {
+	if ok := cache.WaitForCacheSync(stopCh, c.ipamPoolsSynced, c.networkNodesSynced, c.networkNodeOverlaysSynced, c.networkServicesSynced); !ok {
 		log.Fatalf("Error running controller: %s", "failed to wait for caches to sync")
 		return
 	}
 
 	log.Info("Starting workers")
-	// Launch two workers to process NetworkNode resources
+	// Launch two workers to process each type of resource
 	for i := 0; i < threadiness; i++ {
-		go wait.Until(c.runWorker, time.Second, stopCh)
+		go wait.Until(c.runIpamPoolsWorker, time.Second, stopCh)
+		go wait.Until(c.runNetworkNodesWorker, time.Second, stopCh)
+		go wait.Until(c.runNetworkNodeOverlaysWorker, time.Second, stopCh)
+		go wait.Until(c.runNetworkServicesWorker, time.Second, stopCh)
 	}
 
 	log.Info("Started workers")
@@ -141,15 +187,27 @@ func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) {
 // runWorker is a long-running function that will continually call the
 // processNextWorkItem function in order to read and process a message on the
 // workqueue.
-func (c *Controller) runWorker() {
-	for c.processNextWorkItem() {
+func (c *Controller) runIpamPoolsWorker() {
+	for c.processNextWorkItem(c.ipamPoolsWorkqueue, c.syncHandlerIpamPool) {
+	}
+}
+func (c *Controller) runNetworkNodesWorker() {
+	for c.processNextWorkItem(c.networkNodesWorkqueue, c.syncHandlerNetworkNode) {
+	}
+}
+func (c *Controller) runNetworkNodeOverlaysWorker() {
+	for c.processNextWorkItem(c.networkNodeOverlaysWorkqueue, c.syncHandlerNetworkNodeOverlay) {
+	}
+}
+func (c *Controller) runNetworkServicesWorker() {
+	for c.processNextWorkItem(c.networkServicesWorkqueue, c.syncHandlerNetworkService) {
 	}
 }
 
 // processNextWorkItem will read a single work item off the workqueue and
 // attempt to process it, by calling the syncHandler.
-func (c *Controller) processNextWorkItem() bool {
-	obj, shutdown := c.workqueue.Get()
+func (c *Controller) processNextWorkItem(queue workqueue.RateLimitingInterface, syncFunc func(string) error) bool {
+	obj, shutdown := queue.Get()
 
 	if shutdown {
 		return false
@@ -163,7 +221,7 @@ func (c *Controller) processNextWorkItem() bool {
 		// not call Forget if a transient error occurs, instead the item is
 		// put back on the workqueue and attempted again after a back-off
 		// period.
-		defer c.workqueue.Done(obj)
+		defer queue.Done(obj)
 		var key string
 		var ok bool
 		// We expect strings to come off the workqueue. These are of the
@@ -175,18 +233,18 @@ func (c *Controller) processNextWorkItem() bool {
 			// As the item in the workqueue is actually invalid, we call
 			// Forget here else we'd go into a loop of attempting to
 			// process a work item that is invalid.
-			c.workqueue.Forget(obj)
+			queue.Forget(obj)
 			runtime.HandleError(fmt.Errorf("expected string in workqueue but got %#v", obj))
 			return nil
 		}
 		// Run the syncHandler, passing it the namespace/name string of the
-		// NetworkNode resource to be synced.
-		if err := c.syncHandler(key); err != nil {
+		// resource to be synced.
+		if err := syncFunc(key); err != nil {
 			return fmt.Errorf("error syncing '%s': %s", key, err.Error())
 		}
 		// Finally, if no error occurs we Forget this item so it does not
 		// get queued again until another change happens.
-		c.workqueue.Forget(obj)
+		queue.Forget(obj)
 		log.Infof("Successfully synced '%s'", key)
 		return nil
 	}(obj)
@@ -200,9 +258,46 @@ func (c *Controller) processNextWorkItem() bool {
 }
 
 // syncHandler compares the actual state with the desired, and attempts to
+// converge the two. It then updates the Status block of the IpamPool resource
+// with the current status of the resource.
+func (c *Controller) syncHandlerIpamPool(key string) error {
+	// Convert the namespace/name string into a distinct namespace and name
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("invalid resource key: %s", key))
+		return nil
+	}
+
+	// Get the IpamPool resource with this namespace/name
+	ipamPool, err := c.ipamPoolsLister.IpamPools(namespace).Get(name)
+	if err != nil {
+		// The IpamPool resource may no longer exist, in which case we stop
+		// processing.
+		if errors.IsNotFound(err) {
+			runtime.HandleError(fmt.Errorf("ipamPool '%s' in work queue no longer exists", key))
+			return nil
+		}
+
+		return err
+	}
+
+	// Handle CRD Sync with SFC Controller data
+	k8scrdPlugin.IpamPoolMgr.HandleCRDSync(*ipamPool)
+
+	// Update status block of IpamPool - TODO: should be some pending status, final status is after rendering
+	//err = c.updateIpamPoolStatus(ipamPool, deployment)
+	//if err != nil {
+	//	return err
+	//}
+
+	c.recorder.Event(ipamPool, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
+	return nil
+}
+
+// syncHandler compares the actual state with the desired, and attempts to
 // converge the two. It then updates the Status block of the NetworkNode resource
 // with the current status of the resource.
-func (c *Controller) syncHandler(key string) error {
+func (c *Controller) syncHandlerNetworkNode(key string) error {
 	// Convert the namespace/name string into a distinct namespace and name
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
@@ -223,7 +318,7 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 
-    // Handle CRD Sync with SFC Controller data
+	// Handle CRD Sync with SFC Controller data
 	k8scrdPlugin.NetworkNodeMgr.HandleCRDSync(*networkNode)
 
 	// Update status block of NetworkNode - TODO: should be some pending status, final status is after rendering
@@ -233,6 +328,80 @@ func (c *Controller) syncHandler(key string) error {
 	//}
 
 	c.recorder.Event(networkNode, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
+	return nil
+}
+
+// syncHandler compares the actual state with the desired, and attempts to
+// converge the two. It then updates the Status block of the NetworkNodeOverlay resource
+// with the current status of the resource.
+func (c *Controller) syncHandlerNetworkNodeOverlay(key string) error {
+	// Convert the namespace/name string into a distinct namespace and name
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("invalid resource key: %s", key))
+		return nil
+	}
+
+	// Get the NetworkNodeOverlay resource with this namespace/name
+	networkNodeOverlay, err := c.networkNodeOverlaysLister.NetworkNodeOverlays(namespace).Get(name)
+	if err != nil {
+		// The NetworkNodeOverlay resource may no longer exist, in which case we stop
+		// processing.
+		if errors.IsNotFound(err) {
+			runtime.HandleError(fmt.Errorf("networkNodeOverlay '%s' in work queue no longer exists", key))
+			return nil
+		}
+
+		return err
+	}
+
+	// Handle CRD Sync with SFC Controller data
+	k8scrdPlugin.NetworkNodeOverlayMgr.HandleCRDSync(*networkNodeOverlay)
+
+	// Update status block of NetworkNodeOverlay - TODO: should be some pending status, final status is after rendering
+	//err = c.updateNetworkNodeOverlayStatus(networkNodeOverlay, deployment)
+	//if err != nil {
+	//	return err
+	//}
+
+	c.recorder.Event(networkNodeOverlay, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
+	return nil
+}
+
+// syncHandler compares the actual state with the desired, and attempts to
+// converge the two. It then updates the Status block of the NetworkService resource
+// with the current status of the resource.
+func (c *Controller) syncHandlerNetworkService(key string) error {
+	// Convert the namespace/name string into a distinct namespace and name
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("invalid resource key: %s", key))
+		return nil
+	}
+
+	// Get the NetworkService resource with this namespace/name
+	networkService, err := c.networkServicesLister.NetworkServices(namespace).Get(name)
+	if err != nil {
+		// The NetworkService resource may no longer exist, in which case we stop
+		// processing.
+		if errors.IsNotFound(err) {
+			runtime.HandleError(fmt.Errorf("networkService '%s' in work queue no longer exists", key))
+			return nil
+		}
+
+		return err
+	}
+
+    // Handle CRD Sync with SFC Controller data
+	k8scrdPlugin.NetworkServiceMgr.HandleCRDSync(*networkService)
+
+	// Update status block of NetworkService - TODO: should be some pending status, final status is after rendering
+	//err = c.updateNetworkServiceStatus(networkService, deployment)
+	//if err != nil {
+	//	return err
+	//}
+
+	c.recorder.Event(networkService, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
 	return nil
 }
 
@@ -253,6 +422,16 @@ func (c *Controller) syncHandler(key string) error {
 // enqueueNetworkNode takes a NetworkNode resource and converts it into a namespace/name
 // string which is then put onto the work queue. This method should *not* be
 // passed resources of any type other than NetworkNode.
+func (c *Controller) enqueueIpamPool(obj interface{}) {
+	var key string
+	var err error
+	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+		runtime.HandleError(err)
+		return
+	}
+	c.ipamPoolsWorkqueue.AddRateLimited(key)
+}
+
 func (c *Controller) enqueueNetworkNode(obj interface{}) {
 	var key string
 	var err error
@@ -260,5 +439,25 @@ func (c *Controller) enqueueNetworkNode(obj interface{}) {
 		runtime.HandleError(err)
 		return
 	}
-	c.workqueue.AddRateLimited(key)
+	c.networkNodesWorkqueue.AddRateLimited(key)
+}
+
+func (c *Controller) enqueueNetworkNodeOverlay(obj interface{}) {
+	var key string
+	var err error
+	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+		runtime.HandleError(err)
+		return
+	}
+	c.networkNodeOverlaysWorkqueue.AddRateLimited(key)
+}
+
+func (c *Controller) enqueueNetworkService(obj interface{}) {
+	var key string
+	var err error
+	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+		runtime.HandleError(err)
+		return
+	}
+	c.networkServicesWorkqueue.AddRateLimited(key)
 }
