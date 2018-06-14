@@ -162,5 +162,10 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) renderServiceFunctionEntity(sfc
 		return err
 	}
 
+	if err := sfcCtrlPlugin.DatastoreSfcEntityCreate(sfc); err != nil {
+		return err
+	}
+
+	log.Infof("renderServiceFunctionEntity: WireSfcEntities: sfc after wiring: %v", sfc)
 	return nil
 }

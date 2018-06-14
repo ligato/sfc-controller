@@ -138,7 +138,7 @@ func (cnpd *sfcCtlrL2CNPDriver) initL2CNPCache() {
 
 	cnpd.l2CNPEntityCache.EEs = make(map[string]controller.ExternalEntity)
 	cnpd.l2CNPEntityCache.HEs = make(map[string]controller.HostEntity)
-	cnpd.l2CNPEntityCache.SFCs = make(map[string]controller.SfcEntity)
+	//cnpd.l2CNPEntityCache.SFCs = make(map[string]controller.SfcEntity)
 }
 
 // Perform plugin specific initializations
@@ -395,14 +395,14 @@ func (cnpd *sfcCtlrL2CNPDriver) WireSfcEntity(sfc *controller.SfcEntity) error {
 
 	case controller.SfcType_SFC_NS_VXLAN:
 		// north/south VXLAN type, memIfs/cntrs connect to vrouters/RASs bridge
-		cnpd.l2CNPEntityCache.SFCs[sfc.Name] = *sfc
+		//cnpd.l2CNPEntityCache.SFCs[sfc.Name] = *sfc
 		err = cnpd.wireSfcNorthSouthVXLANElements(sfc)
 
 	case controller.SfcType_SFC_NS_NIC_BD:
 		fallthrough
 	case controller.SfcType_SFC_NS_NIC_L2XCONN:
 		// north/south NIC type, memIfs/cntrs connect to physical NIC
-		cnpd.l2CNPEntityCache.SFCs[sfc.Name] = *sfc
+		//cnpd.l2CNPEntityCache.SFCs[sfc.Name] = *sfc
 		err = cnpd.wireSfcNorthSouthNICElements(sfc)
 
 	case controller.SfcType_SFC_EW_MEMIF:
@@ -413,7 +413,7 @@ func (cnpd *sfcCtlrL2CNPDriver) WireSfcEntity(sfc *controller.SfcEntity) error {
 		fallthrough
 	case controller.SfcType_SFC_EW_L2XCONN:
 		// east/west type, memIfs/cntrs connect to the hosts easet/west bridge
-		cnpd.l2CNPEntityCache.SFCs[sfc.Name] = *sfc
+		//cnpd.l2CNPEntityCache.SFCs[sfc.Name] = *sfc
 		err = cnpd.wireSfcEastWestElements(sfc)
 
 	default:
@@ -1145,6 +1145,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 		}
 	}
 
+	vnfChainElement.IpAddresses = ipAddresses
+
 	if sfc.SfcIpv4Prefix != "" {
 		log.Info("createMemIfPair: ", ipam.DumpSubnet(sfc.SfcIpv4Prefix), ipv4Address)
 	}
@@ -1163,6 +1165,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createMemIfPair(sfc *controller.SfcEntity, hostN
 	} else {
 		macAddress = vnfChainElement.MacAddr
 	}
+
+	vnfChainElement.MacAddr = macAddress
 
 	mtu := cnpd.getMtu(vnfChainElement.Mtu)
 	rxMode := vnfChainElement.RxMode
@@ -1279,6 +1283,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 		}
 	}
 
+	vnfChainElement.IpAddresses = ipAddresses
+
 	if sfc.SfcIpv4Prefix != "" {
 		log.Info("createAFPacketVEthPair: ", ipam.DumpSubnet(sfc.SfcIpv4Prefix), ipv4Address)
 	}
@@ -1295,6 +1301,8 @@ func (cnpd *sfcCtlrL2CNPDriver) createAFPacketVEthPair(sfc *controller.SfcEntity
 	} else {
 		macAddress = vnfChainElement.MacAddr
 	}
+
+	vnfChainElement.MacAddr = macAddress
 
 	mtu := cnpd.getMtu(vnfChainElement.Mtu)
 	rxMode := vnfChainElement.RxMode
