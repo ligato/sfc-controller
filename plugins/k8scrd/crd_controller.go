@@ -30,11 +30,15 @@ typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 "k8s.io/client-go/tools/cache"
 "k8s.io/client-go/tools/record"
 "k8s.io/client-go/util/workqueue"
+apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+"k8s.io/apimachinery/pkg/apis/meta/v1"
 
 clientset "github.com/ligato/sfc-controller/plugins/k8scrd/pkg/client/clientset/versioned"
 sfcscheme "github.com/ligato/sfc-controller/plugins/k8scrd/pkg/client/clientset/versioned/scheme"
 informers "github.com/ligato/sfc-controller/plugins/k8scrd/pkg/client/informers/externalversions"
 listers "github.com/ligato/sfc-controller/plugins/k8scrd/pkg/client/listers/sfccontroller/v1alpha1"
+crdtypes "github.com/ligato/sfc-controller/plugins/k8scrd/pkg/apis/sfccontroller/v1alpha1"
 )
 
 const controllerAgentName = "sfc-controller"
@@ -51,6 +55,8 @@ const (
 type Controller struct {
 	// kubeclientset is a standard kubernetes clientset
 	kubeclientset kubernetes.Interface
+	// apiext clientset is the kubernetes api extension that lets us create CRDs
+	apiextclientset apiextensionsclientset.Interface
 	// sfcclientset is a clientset for our own API group
 	sfcclientset clientset.Interface
 
@@ -80,9 +86,16 @@ type Controller struct {
 // NewController returns a new sfc crd controller
 func NewController(
 	kubeclientset kubernetes.Interface,
+	apiextclientset apiextensionsclientset.Interface,
 	sfcclientset clientset.Interface,
 	kubeInformerFactory kubeinformers.SharedInformerFactory,
 	sfcInformerFactory informers.SharedInformerFactory) *Controller {
+
+	// create CRDs if they have not already been created
+	createCRD(apiextclientset, crdtypes.CRDKindIpamPool, crdtypes.CRDPluralIpamPool)
+	createCRD(apiextclientset, crdtypes.CRDKindNetworkNode, crdtypes.CRDPluralNetworkNode)
+	createCRD(apiextclientset, crdtypes.CRDKindNetworkNodeOverlay, crdtypes.CRDPluralNetworkNodeOverlay)
+	createCRD(apiextclientset, crdtypes.CRDKindNetworkService, crdtypes.CRDPlurlaNetworkService)
 
 	// obtain references to shared index informers for the SFC Controller types.
 	ipamPoolInformer := sfcInformerFactory.Sfccontroller().V1alpha1().IpamPools()
@@ -102,6 +115,7 @@ func NewController(
 
 	controller := &Controller{
 		kubeclientset:     kubeclientset,
+		apiextclientset: apiextclientset,
 		sfcclientset:   sfcclientset,
 		ipamPoolsLister: ipamPoolInformer.Lister(),
 		ipamPoolsSynced: ipamPoolInformer.Informer().HasSynced,
@@ -460,4 +474,29 @@ func (c *Controller) enqueueNetworkService(obj interface{}) {
 		return
 	}
 	c.networkServicesWorkqueue.AddRateLimited(key)
+}
+
+func createCRD(apiextclientset apiextensionsclientset.Interface,
+		kind string, plural string){
+	crd := &v1beta1.CustomResourceDefinition{
+		ObjectMeta: v1.ObjectMeta{
+			Name: plural + "." + crdtypes.CRDGroupName,
+		},
+		Spec: v1beta1.CustomResourceDefinitionSpec{
+			Group: crdtypes.CRDGroupName,
+			Version: crdtypes.SchemeGroupVersion.Version,
+			Scope: v1beta1.NamespaceScoped,
+			Names: v1beta1.CustomResourceDefinitionNames{
+				Kind: kind,
+				Plural: plural,
+			},
+		},
+	}
+
+	_, err := apiextclientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	if err != nil {
+		runtime.HandleError(err)
+		return
+	}
+
 }

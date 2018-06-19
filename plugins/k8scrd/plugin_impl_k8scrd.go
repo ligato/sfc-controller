@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"time"
 	kubeinformers "k8s.io/client-go/informers"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	clientset "github.com/ligato/sfc-controller/plugins/k8scrd/pkg/client/clientset/versioned"
 	informers "github.com/ligato/sfc-controller/plugins/k8scrd/pkg/client/informers/externalversions"
 	"github.com/ligato/sfc-controller/plugins/k8scrd/pkg/signals"
@@ -159,6 +160,11 @@ func initK8sCRDProcessing(k8sCRDConfigFile string) {
 		log.Fatalf("Error building kubernetes clientset: %s", err.Error())
 	}
 
+	apiextClient, err := apiextensionsclientset.NewForConfig(cfg)
+	if err != nil {
+		log.Fatalf("Error building api extensions clientset: %s", err.Error())
+	}
+
 	sfcKubeClient, err := clientset.NewForConfig(cfg)
 	if err != nil {
 		log.Fatalf("Error building sfcKube clientset: %s", err.Error())
@@ -167,7 +173,7 @@ func initK8sCRDProcessing(k8sCRDConfigFile string) {
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
 	sfcKubeInformerFactory := informers.NewSharedInformerFactory(sfcKubeClient, time.Second*30)
 
-	crdController := NewController(kubeClient, sfcKubeClient, kubeInformerFactory, sfcKubeInformerFactory)
+	crdController := NewController(kubeClient, apiextClient, sfcKubeClient, kubeInformerFactory, sfcKubeInformerFactory)
 
 	go kubeInformerFactory.Start(stopCh)
 	go sfcKubeInformerFactory.Start(stopCh)

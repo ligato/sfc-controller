@@ -21,6 +21,22 @@ import (
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 )
 
+const (
+	CRDGroupName = "sfccontroller.ligato.github.com"
+
+	CRDKindIpamPool = "IpamPool"
+	CRDPluralIpamPool = "ipampools"
+
+	CRDKindNetworkNode = "NetworkNode"
+	CRDPluralNetworkNode = "networknodes"
+
+	CRDKindNetworkNodeOverlay = "NetworkNodeOverlay"
+	CRDPluralNetworkNodeOverlay = "networknodeoverlays"
+
+	CRDKindNetworkService = "NetworkService"
+	CRDPlurlaNetworkService = "networkservices"
+)
+
 // IpamPool is a specification for a IpamPool resource
 // +genclient
 // +genclient:noStatus
