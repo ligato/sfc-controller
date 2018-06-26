@@ -21,6 +21,9 @@ import (
 	"github.com/ligato/sfc-controller/plugins/controller"
 	crd "github.com/ligato/sfc-controller/plugins/k8scrd/pkg/apis/sfccontroller/v1alpha1"
 	model "github.com/ligato/sfc-controller/plugins/controller/model"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"fmt"
+	"k8s.io/client-go/tools/cache"
 )
 
 type CRDNetworkNodeMgr struct {
@@ -109,9 +112,10 @@ func (mgr *CRDNetworkNodeMgr) InitAndRunWatcher() {
 			case datasync.Put:
 				dbEntry := &controller.NetworkNode{}
 				if err := resp.GetValue(dbEntry); err == nil {
-					// config and status might have changed ...
+					// status might have changed ...
 					log.Infof("CRD NetworkNodeWatcher: PUT detected: NetworkNode: %s",
 						dbEntry)
+					mgr.updateStatus(*dbEntry)
 				}
 
 			case datasync.Delete:
@@ -120,4 +124,34 @@ func (mgr *CRDNetworkNodeMgr) InitAndRunWatcher() {
 			}
 		}
 	}
+}
+
+// updates the CRD status in Kubernetes with the current status from the sfc-controller
+func (mgr *CRDNetworkNodeMgr) updateStatus(sfcNetworkNode controller.NetworkNode) error {
+	// Fetch crdNetworkNode from K8s cache
+	// The name in sfc is the namespace/name, which is the "namespace key". Split it out.
+	key := sfcNetworkNode.Metadata.Name
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("invalid resource key: %s", key))
+		return nil
+	}
+	crdNetworkNode, errGet := k8scrdPlugin.CrdController.networkNodesLister.NetworkNodes(namespace).Get(name)
+	if errGet != nil {
+		return errGet
+	}
+	// NEVER modify objects from the store. It's a read-only, local cache.
+	// You can use DeepCopy() to make a deep copy of original object and modify this copy
+	// Or create a copy manually for better performance
+	crdNetworkNodeCopy := crdNetworkNode.DeepCopy()
+
+	// set status from sfc controller
+	crdNetworkNodeCopy.NetworkNodeStatus = *sfcNetworkNode.Status
+
+	// Until #38113 is merged, we must use Update instead of UpdateStatus to
+	// update the Status block of the NetworkNode resource. UpdateStatus will not
+	// allow changes to the Spec of the resource, which is ideal for ensuring
+	// nothing other than resource status has been updated.
+	_, errUpdate := k8scrdPlugin.CrdController.sfcclientset.SfccontrollerV1alpha1().NetworkNodes(crdNetworkNodeCopy.Namespace).Update(crdNetworkNodeCopy)
+	return errUpdate
 }

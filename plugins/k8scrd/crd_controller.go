@@ -298,19 +298,12 @@ func (c *Controller) syncHandlerIpamPool(key string) error {
 	// Handle CRD Sync with SFC Controller data
 	k8scrdPlugin.IpamPoolMgr.HandleCRDSync(*ipamPool)
 
-	// Update status block of IpamPool - TODO: should be some pending status, final status is after rendering
-	//err = c.updateIpamPoolStatus(ipamPool, deployment)
-	//if err != nil {
-	//	return err
-	//}
-
 	c.recorder.Event(ipamPool, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
 	return nil
 }
 
 // syncHandler compares the actual state with the desired, and attempts to
-// converge the two. It then updates the Status block of the NetworkNode resource
-// with the current status of the resource.
+// converge the two.
 func (c *Controller) syncHandlerNetworkNode(key string) error {
 	// Convert the namespace/name string into a distinct namespace and name
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -334,12 +327,6 @@ func (c *Controller) syncHandlerNetworkNode(key string) error {
 
 	// Handle CRD Sync with SFC Controller data
 	k8scrdPlugin.NetworkNodeMgr.HandleCRDSync(*networkNode)
-
-	// Update status block of NetworkNode - TODO: should be some pending status, final status is after rendering
-	//err = c.updateNetworkNodeStatus(networkNode, deployment)
-	//if err != nil {
-	//	return err
-	//}
 
 	c.recorder.Event(networkNode, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
 	return nil
@@ -372,12 +359,6 @@ func (c *Controller) syncHandlerNetworkNodeOverlay(key string) error {
 	// Handle CRD Sync with SFC Controller data
 	k8scrdPlugin.NetworkNodeOverlayMgr.HandleCRDSync(*networkNodeOverlay)
 
-	// Update status block of NetworkNodeOverlay - TODO: should be some pending status, final status is after rendering
-	//err = c.updateNetworkNodeOverlayStatus(networkNodeOverlay, deployment)
-	//if err != nil {
-	//	return err
-	//}
-
 	c.recorder.Event(networkNodeOverlay, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
 	return nil
 }
@@ -409,29 +390,9 @@ func (c *Controller) syncHandlerNetworkService(key string) error {
     // Handle CRD Sync with SFC Controller data
 	k8scrdPlugin.NetworkServiceMgr.HandleCRDSync(*networkService)
 
-	// Update status block of NetworkService - TODO: should be some pending status, final status is after rendering
-	//err = c.updateNetworkServiceStatus(networkService, deployment)
-	//if err != nil {
-	//	return err
-	//}
-
 	c.recorder.Event(networkService, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
 	return nil
 }
-
-//func (c *Controller) updateNetworkNodeStatus(networkNode *sfcv1alpha1.NetworkNode, deployment *appsv1.Deployment) error {
-//	// NEVER modify objects from the store. It's a read-only, local cache.
-//	// You can use DeepCopy() to make a deep copy of original object and modify this copy
-//	// Or create a copy manually for better performance
-//	networkNodeCopy := networkNode.DeepCopy()
-//	networkNodeCopy.Status.AvailableReplicas = deployment.Status.AvailableReplicas
-//	// Until #38113 is merged, we must use Update instead of UpdateStatus to
-//	// update the Status block of the NetworkNode resource. UpdateStatus will not
-//	// allow changes to the Spec of the resource, which is ideal for ensuring
-//	// nothing other than resource status has been updated.
-//	_, err := c.sfcclientset.SfccontrollerV1alpha1().NetworkNodes(networkNode.Namespace).Update(networkNodeCopy)
-//	return err
-//}
 
 // enqueueNetworkNode takes a NetworkNode resource and converts it into a namespace/name
 // string which is then put onto the work queue. This method should *not* be

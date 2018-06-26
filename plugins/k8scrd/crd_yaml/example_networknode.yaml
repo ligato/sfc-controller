@@ -3,7 +3,7 @@ kind: NetworkNode
 metadata:
   name: vswitch2
   labels:
-    foo: bar
+    bar: foo
 spec:
   node_type: host 
   interfaces:

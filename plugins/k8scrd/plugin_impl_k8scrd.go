@@ -80,6 +80,7 @@ type Plugin struct {
 	*local.FlavorLocal
 	Controller     *controller.Plugin
 	ramConfigCache CacheType
+	CrdController *Controller
 	IpamPoolMgr CRDIpamPoolMgr
 	NetworkNodeMgr CRDNetworkNodeMgr
 	NetworkNodeOverlayMgr CRDNetworkNodeOverlayMgr
@@ -107,7 +108,7 @@ func (s *Plugin) Init() error {
 	s.initMgrs()
 
 	if kubeconfig != "" {
-		initK8sCRDProcessing(kubeconfig)
+		s.initK8sCRDProcessing(kubeconfig)
 	}
 
 	return nil
@@ -145,7 +146,7 @@ func (s *Plugin) Close() error {
 	return nil
 }
 
-func initK8sCRDProcessing(k8sCRDConfigFile string) {
+func (s *Plugin) initK8sCRDProcessing(k8sCRDConfigFile string) {
 
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
@@ -173,10 +174,10 @@ func initK8sCRDProcessing(k8sCRDConfigFile string) {
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
 	sfcKubeInformerFactory := informers.NewSharedInformerFactory(sfcKubeClient, time.Second*30)
 
-	crdController := NewController(kubeClient, apiextClient, sfcKubeClient, kubeInformerFactory, sfcKubeInformerFactory)
+	s.CrdController = NewController(kubeClient, apiextClient, sfcKubeClient, kubeInformerFactory, sfcKubeInformerFactory)
 
 	go kubeInformerFactory.Start(stopCh)
 	go sfcKubeInformerFactory.Start(stopCh)
 
-	go crdController.Run(2, stopCh)
+	go s.CrdController.Run(2, stopCh)
 }
