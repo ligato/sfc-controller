@@ -144,19 +144,22 @@ func (mgr *CRDNetworkNodeOverlayMgr) updateStatus(sfcNetworkNodeOverlay controll
 		log.Errorf("Could not get '%s' with namespace '%s", name, namespace)
 		return errGet
 	}
-	// NEVER modify objects from the store. It's a read-only, local cache.
-	// You can use DeepCopy() to make a deep copy of original object and modify this copy
-	// Or create a copy manually for better performance
-	crdNetworkNodeOverlayCopy := crdNetworkNodeOverlay.DeepCopy()
-
 	// set status from sfc controller
-	crdNetworkNodeOverlayCopy.NetworkNodeOverlayStatus = *sfcNetworkNodeOverlay.Status
-	log.Infof("NetworkNodeOverlay Status Msg: %s", crdNetworkNodeOverlayCopy.NetworkNodeOverlayStatus.Msg)
+	if sfcNetworkNodeOverlay.Status != nil {
+		// NEVER modify objects from the store. It's a read-only, local cache.
+		// You can use DeepCopy() to make a deep copy of original object and modify this copy
+		// Or create a copy manually for better performance
+		crdNetworkNodeOverlayCopy := crdNetworkNodeOverlay.DeepCopy()
 
-	// Until #38113 is merged, we must use Update instead of UpdateStatus to
-	// update the Status block of the NetworkNodeOverlay resource. UpdateStatus will not
-	// allow changes to the Spec of the resource, which is ideal for ensuring
-	// nothing other than resource status has been updated.
-	_, errUpdate := k8scrdPlugin.CrdController.sfcclientset.SfccontrollerV1alpha1().NetworkNodeOverlays(crdNetworkNodeOverlayCopy.Namespace).Update(crdNetworkNodeOverlayCopy)
-	return errUpdate
+		crdNetworkNodeOverlayCopy.NetworkNodeOverlayStatus = *sfcNetworkNodeOverlay.Status
+		log.Infof("NetworkNodeOverlay Status Msg: %s", crdNetworkNodeOverlayCopy.NetworkNodeOverlayStatus.Msg)
+
+		// Until #38113 is merged, we must use Update instead of UpdateStatus to
+		// update the Status block of the NetworkNodeOverlay resource. UpdateStatus will not
+		// allow changes to the Spec of the resource, which is ideal for ensuring
+		// nothing other than resource status has been updated.
+		_, errUpdate := k8scrdPlugin.CrdController.sfcclientset.SfccontrollerV1alpha1().NetworkNodeOverlays(crdNetworkNodeOverlayCopy.Namespace).Update(crdNetworkNodeOverlayCopy)
+		return errUpdate
+	}
+	return nil
 }

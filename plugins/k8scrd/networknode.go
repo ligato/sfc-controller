@@ -146,19 +146,22 @@ func (mgr *CRDNetworkNodeMgr) updateStatus(sfcNetworkNode controller.NetworkNode
 		return errGet
 	}
 
-	// NEVER modify objects from the store. It's a read-only, local cache.
-	// You can use DeepCopy() to make a deep copy of original object and modify this copy
-	// Or create a copy manually for better performance
-	crdNetworkNodeCopy := crdNetworkNode.DeepCopy()
-
 	// set status from sfc controller
-	crdNetworkNodeCopy.NetworkNodeStatus = *sfcNetworkNode.Status
-	log.Infof("NetworkNode Status Msg: %s", crdNetworkNodeCopy.NetworkNodeStatus.Msg)
+	if sfcNetworkNode.Status != nil {
+		// NEVER modify objects from the store. It's a read-only, local cache.
+		// You can use DeepCopy() to make a deep copy of original object and modify this copy
+		// Or create a copy manually for better performance
+		crdNetworkNodeCopy := crdNetworkNode.DeepCopy()
 
-	// Until #38113 is merged, we must use Update instead of UpdateStatus to
-	// update the Status block of the NetworkNode resource. UpdateStatus will not
-	// allow changes to the Spec of the resource, which is ideal for ensuring
-	// nothing other than resource status has been updated.
-	_, errUpdate := k8scrdPlugin.CrdController.sfcclientset.SfccontrollerV1alpha1().NetworkNodes(crdNetworkNodeCopy.Namespace).Update(crdNetworkNodeCopy)
-	return errUpdate
+		crdNetworkNodeCopy.NetworkNodeStatus = *sfcNetworkNode.Status
+		log.Infof("NetworkNode Status Msg: %s", crdNetworkNodeCopy.NetworkNodeStatus.Msg)
+
+		// Until #38113 is merged, we must use Update instead of UpdateStatus to
+		// update the Status block of the NetworkNode resource. UpdateStatus will not
+		// allow changes to the Spec of the resource, which is ideal for ensuring
+		// nothing other than resource status has been updated.
+		_, errUpdate := k8scrdPlugin.CrdController.sfcclientset.SfccontrollerV1alpha1().NetworkNodes(crdNetworkNodeCopy.Namespace).Update(crdNetworkNodeCopy)
+		return errUpdate
+	}
+	return nil
 }
