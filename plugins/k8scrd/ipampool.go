@@ -136,22 +136,30 @@ func (mgr *CRDIpamPoolMgr) updateStatus(sfcIpamPool controller.IPAMPool) error {
 		runtime.HandleError(fmt.Errorf("invalid resource key: %s", key))
 		return nil
 	}
+	if namespace == "" {
+		namespace = "default"
+	}
 	crdIpamPool, errGet := k8scrdPlugin.CrdController.ipamPoolsLister.IpamPools(namespace).Get(name)
 	if errGet != nil {
+		log.Errorf("Could not get '%s' with namespace '%s", name, namespace)
 		return errGet
 	}
-	// NEVER modify objects from the store. It's a read-only, local cache.
-	// You can use DeepCopy() to make a deep copy of original object and modify this copy
-	// Or create a copy manually for better performance
-	crdIpamPoolCopy := crdIpamPool.DeepCopy()
-
 	// set status from sfc controller
-	crdIpamPoolCopy.IPAMPoolStatus = *sfcIpamPool.Status
+	if sfcIpamPool.Status != nil {
+		// NEVER modify objects from the store. It's a read-only, local cache.
+		// You can use DeepCopy() to make a deep copy of original object and modify this copy
+		// Or create a copy manually for better performance
+		crdIpamPoolCopy := crdIpamPool.DeepCopy()
 
-	// Until #38113 is merged, we must use Update instead of UpdateStatus to
-	// update the Status block of the IpamPool resource. UpdateStatus will not
-	// allow changes to the Spec of the resource, which is ideal for ensuring
-	// nothing other than resource status has been updated.
-	_, errUpdate := k8scrdPlugin.CrdController.sfcclientset.SfccontrollerV1alpha1().IpamPools(crdIpamPoolCopy.Namespace).Update(crdIpamPoolCopy)
-	return errUpdate
+		crdIpamPoolCopy.IPAMPoolStatus = *sfcIpamPool.Status
+		log.Infof("IpamPool Addresses: %s", crdIpamPoolCopy.IPAMPoolStatus.Addresses)
+
+		// Until #38113 is merged, we must use Update instead of UpdateStatus to
+		// update the Status block of the IpamPool resource. UpdateStatus will not
+		// allow changes to the Spec of the resource, which is ideal for ensuring
+		// nothing other than resource status has been updated.
+		_, errUpdate := k8scrdPlugin.CrdController.sfcclientset.SfccontrollerV1alpha1().IpamPools(crdIpamPoolCopy.Namespace).Update(crdIpamPoolCopy)
+		return errUpdate
+	}
+	return nil
 }

@@ -136,22 +136,30 @@ func (mgr *CRDNetworkServiceMgr) updateStatus(sfcNetworkService controller.Netwo
 		runtime.HandleError(fmt.Errorf("invalid resource key: %s", key))
 		return nil
 	}
+	if namespace == "" {
+		namespace = "default"
+	}
 	crdNetworkService, errGet := k8scrdPlugin.CrdController.networkServicesLister.NetworkServices(namespace).Get(name)
 	if errGet != nil {
+		log.Errorf("Could not get '%s' with namespace '%s", name, namespace)
 		return errGet
 	}
-	// NEVER modify objects from the store. It's a read-only, local cache.
-	// You can use DeepCopy() to make a deep copy of original object and modify this copy
-	// Or create a copy manually for better performance
-	crdNetworkServiceCopy := crdNetworkService.DeepCopy()
-
 	// set status from sfc controller
-	crdNetworkServiceCopy.NetworkServiceStatus = *sfcNetworkService.Status
+	if sfcNetworkService.Status != nil {
+		// NEVER modify objects from the store. It's a read-only, local cache.
+		// You can use DeepCopy() to make a deep copy of original object and modify this copy
+		// Or create a copy manually for better performance
+		crdNetworkServiceCopy := crdNetworkService.DeepCopy()
 
-	// Until #38113 is merged, we must use Update instead of UpdateStatus to
-	// update the Status block of the NetworkService resource. UpdateStatus will not
-	// allow changes to the Spec of the resource, which is ideal for ensuring
-	// nothing other than resource status has been updated.
-	_, errUpdate := k8scrdPlugin.CrdController.sfcclientset.SfccontrollerV1alpha1().NetworkServices(crdNetworkServiceCopy.Namespace).Update(crdNetworkServiceCopy)
-	return errUpdate
+		crdNetworkServiceCopy.NetworkServiceStatus = *sfcNetworkService.Status
+		log.Infof("NetworkNode Status Msg: %s", crdNetworkServiceCopy.NetworkServiceStatus.Msg)
+
+		// Until #38113 is merged, we must use Update instead of UpdateStatus to
+		// update the Status block of the NetworkService resource. UpdateStatus will not
+		// allow changes to the Spec of the resource, which is ideal for ensuring
+		// nothing other than resource status has been updated.
+		_, errUpdate := k8scrdPlugin.CrdController.sfcclientset.SfccontrollerV1alpha1().NetworkServices(crdNetworkServiceCopy.Namespace).Update(crdNetworkServiceCopy)
+		return errUpdate
+	}
+	return nil
 }
