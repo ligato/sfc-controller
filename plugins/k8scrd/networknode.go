@@ -131,15 +131,21 @@ func (mgr *CRDNetworkNodeMgr) updateStatus(sfcNetworkNode controller.NetworkNode
 	// Fetch crdNetworkNode from K8s cache
 	// The name in sfc is the namespace/name, which is the "namespace key". Split it out.
 	key := sfcNetworkNode.Metadata.Name
+	log.Infof("NetworkNode key: %s", key)
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("invalid resource key: %s", key))
 		return nil
 	}
+	if namespace == "" {
+		namespace = "default"
+	}
 	crdNetworkNode, errGet := k8scrdPlugin.CrdController.networkNodesLister.NetworkNodes(namespace).Get(name)
 	if errGet != nil {
+		log.Errorf("Could not get '%s' with namespace '%s", name, namespace)
 		return errGet
 	}
+
 	// NEVER modify objects from the store. It's a read-only, local cache.
 	// You can use DeepCopy() to make a deep copy of original object and modify this copy
 	// Or create a copy manually for better performance
@@ -147,6 +153,7 @@ func (mgr *CRDNetworkNodeMgr) updateStatus(sfcNetworkNode controller.NetworkNode
 
 	// set status from sfc controller
 	crdNetworkNodeCopy.NetworkNodeStatus = *sfcNetworkNode.Status
+	log.Infof("NetworkNode Status Msg: %s", crdNetworkNodeCopy.NetworkNodeStatus.Msg)
 
 	// Until #38113 is merged, we must use Update instead of UpdateStatus to
 	// update the Status block of the NetworkNode resource. UpdateStatus will not

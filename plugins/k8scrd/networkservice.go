@@ -136,8 +136,12 @@ func (mgr *CRDNetworkServiceMgr) updateStatus(sfcNetworkService controller.Netwo
 		runtime.HandleError(fmt.Errorf("invalid resource key: %s", key))
 		return nil
 	}
+	if namespace == "" {
+		namespace = "default"
+	}
 	crdNetworkService, errGet := k8scrdPlugin.CrdController.networkServicesLister.NetworkServices(namespace).Get(name)
 	if errGet != nil {
+		log.Errorf("Could not get '%s' with namespace '%s", name, namespace)
 		return errGet
 	}
 	// NEVER modify objects from the store. It's a read-only, local cache.
@@ -147,6 +151,7 @@ func (mgr *CRDNetworkServiceMgr) updateStatus(sfcNetworkService controller.Netwo
 
 	// set status from sfc controller
 	crdNetworkServiceCopy.NetworkServiceStatus = *sfcNetworkService.Status
+	log.Infof("NetworkNode Status Msg: %s", crdNetworkServiceCopy.NetworkServiceStatus.Msg)
 
 	// Until #38113 is merged, we must use Update instead of UpdateStatus to
 	// update the Status block of the NetworkService resource. UpdateStatus will not

@@ -136,8 +136,12 @@ func (mgr *CRDNetworkNodeOverlayMgr) updateStatus(sfcNetworkNodeOverlay controll
 		runtime.HandleError(fmt.Errorf("invalid resource key: %s", key))
 		return nil
 	}
+	if namespace == "" {
+		namespace = "default"
+	}
 	crdNetworkNodeOverlay, errGet := k8scrdPlugin.CrdController.networkNodeOverlaysLister.NetworkNodeOverlays(namespace).Get(name)
 	if errGet != nil {
+		log.Errorf("Could not get '%s' with namespace '%s", name, namespace)
 		return errGet
 	}
 	// NEVER modify objects from the store. It's a read-only, local cache.
@@ -147,6 +151,7 @@ func (mgr *CRDNetworkNodeOverlayMgr) updateStatus(sfcNetworkNodeOverlay controll
 
 	// set status from sfc controller
 	crdNetworkNodeOverlayCopy.NetworkNodeOverlayStatus = *sfcNetworkNodeOverlay.Status
+	log.Infof("NetworkNodeOverlay Status Msg: %s", crdNetworkNodeOverlayCopy.NetworkNodeOverlayStatus.Msg)
 
 	// Until #38113 is merged, we must use Update instead of UpdateStatus to
 	// update the Status block of the NetworkNodeOverlay resource. UpdateStatus will not
