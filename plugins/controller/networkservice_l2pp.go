@@ -86,7 +86,7 @@ func (ns *NetworkService) RenderConnL2PP(
 			return fmt.Errorf(msg)
 		}
 
-		connNodeName, connInterfaceName := NodePodInterfaceNames(nodeInterface)
+		connNodeName, connInterfaceName := NodeInterfaceNames(nodeInterface)
 
 		nodeInterface, nodeIfType := ctlrPlugin.NetworkNodeMgr.FindInterfaceInNode(connNodeName, connInterfaceName)
 		netPodInterfaces[ifIndex] = nodeInterface

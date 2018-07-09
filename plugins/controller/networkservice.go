@@ -402,10 +402,9 @@ func (ns *NetworkService) validate() error {
 
 	log.Debugf("Validating NetworkService: %v", ns)
 
-	//if ns.Spec.NetworkPods == nil || len(ns.Spec.NetworkPods) == 0 {
-	//	return fmt.Errorf("network-service: %s network pods's are missing from this service",
-	//		ns.Metadata.Name)
-	//}
+	if ns.Metadata == nil || ns.Metadata.Name == "" {
+		return fmt.Errorf("network-service: missing metadata or name")
+	}
 
 	if err := ns.validateNetworkPods(); err != nil {
 		return err
@@ -436,7 +435,7 @@ func (ns *NetworkService) validateConnections() error {
 			}
 		case controller.ConnTypeL2MP:
 			if len(conn.PodInterfaces) + len(conn.NodeInterfaces) == 0 {
-				return fmt.Errorf("network-service: %s conn: p2pm must have at least one interface",
+				return fmt.Errorf("network-service: %s conn: p2mp must have at least one interface",
 					ns.Metadata.Name)
 			}
 			if conn.UseNodeL2Bd != "" && conn.L2Bd != nil {
@@ -487,6 +486,7 @@ func (ns *NetworkService) validateNetworkPods() error {
 	// list of NetworkPod's
 
 	for _, networkPod := range ns.Spec.NetworkPods {
+
 		if err := ns.validateNetworkPod(networkPod); err != nil {
 			return err
 		}
@@ -511,6 +511,14 @@ func (ns *NetworkService) findNetworkPodAndInterfaceInList(networkPodName string
 
 func (ns *NetworkService) validateNetworkPod(networkPod *controller.NetworkPod) error {
 
+	if networkPod.Metadata == nil || networkPod.Metadata.Name == "" {
+		return fmt.Errorf("ValidatePod: network-service: %s, network-pod is missing metadata or name",
+			ns.Metadata.Name)
+	}
+	if networkPod.Spec == nil {
+		return fmt.Errorf("ValidatePod: network-service: %s, network-pod: %s is missing spec",
+			ns.Metadata.Name, networkPod.Metadata.Name)
+	}
 	switch networkPod.Spec.PodType {
 	case controller.NetworkPodTypeExternal:
 	case controller.NetworkPodTypeVPPContainer:

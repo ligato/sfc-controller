@@ -40,7 +40,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 	// has the per spoke vnf interfaces in it.
 
 	hubNodeName := nno.Spec.VxlanHubAndSpokeParms.HubNodeName
-	if _, exists := ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationR(hubNodeName); !exists {
+	if _, exists := ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationR(hubNodeName); !exists {
 		msg := fmt.Sprintf("network-service: %s, conn: %d, network node overlay: %s, hub_node: %s not found",
 			ns.Metadata.Name,
 			connIndex+1,

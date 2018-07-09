@@ -46,7 +46,7 @@ func ConnPodInterfaceNames(connPodInterfaceString string) (string, string) {
 	return connPodInterfaceString[0:n], connPodInterfaceString[n+1:]
 }
 
-func NodePodInterfaceNames(nodePodInterfaceString string) (string, string) {
+func NodeInterfaceNames(nodePodInterfaceString string) (string, string) {
 	return ConnPodInterfaceNames(nodePodInterfaceString)
 }
 

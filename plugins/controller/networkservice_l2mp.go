@@ -79,7 +79,7 @@ func (ns *NetworkService) RenderConnL2MP(
 
 	for _, nodeInterface := range conn.NodeInterfaces {
 
-		connNodeName, connInterfaceName := NodePodInterfaceNames(nodeInterface)
+		connNodeName, connInterfaceName := NodeInterfaceNames(nodeInterface)
 
 		nodeInterface, nodeIfType := ctlrPlugin.NetworkNodeMgr.FindInterfaceInNode(connNodeName, connInterfaceName)
 		nodeInterface.Parent = connNodeName

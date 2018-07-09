@@ -96,7 +96,7 @@ message RenderedVppAgentEntry {
 }
 
 //
-// Interface ... channel?
+// Interface
 //
 message InterfaceStatus {
     string name = 1; // format: pod/ifname
@@ -114,7 +114,7 @@ message InterfaceStatus {
 message Interface {
     string name = 1;
     bool bypass_renderer = 2; // optional: if set to true, then DONT create/render
-    string if_type = 3;     // ethernet|loopback|vxlan|memif|tap
+    string if_type = 3;     // ethernet|loopback|vxlan_tunnel|memif|tap
     string mac_address = 4; // format mm:aa:cc:aa:dd:rr, if omitted, sys generates one using
                             // 02:00:00:00:00:00 as base, last octet increments
     uint32 mtu = 5;         // optional: if omitted, use system parameter default
@@ -145,11 +145,11 @@ message NetworkPod {
 }
 
 message Connection {
-    string conn_type = 1; // l2pp|l2mp|ip4pp|ip6pp|ip4mp|ip6mp
+    string conn_type = 1; // l2pp|l2mp|   future: ip4pp|ip6pp|ip4mp|ip6mp
     string network_node_overlay_name = 2; // needed if require inter-node vnf's
     repeated string pod_interfaces = 3; // format: pod/ifname
-    repeated string node_interfaces = 4; // format: pod/ifname
-    repeated string node_interface_labels = 5; // format: node/ifname
+    repeated string node_interfaces = 4; // format: node/ifname
+    repeated string node_interface_labels = 5; // format: label
     string use_node_l2bd = 6; // optional: use an existing node level l2bd
                               // only for l2mp connections
     L2BD l2bd = 7; // optional: if omitted and use_node_l2bd is not set then
@@ -159,7 +159,6 @@ message Connection {
 message NetworkServiceStatus {
     string oper_status = 2; // unknown|up|down
     repeated string msg = 3;
-    //repeated RenderedVppAgentEntry rendered_vpp_agent_entries = 4;
     map<string,RenderedVppAgentEntry> rendered_vpp_agent_entries = 4; // key: modeltype/name
     map<string,InterfaceStatus> interfaces = 5;
 }
@@ -176,7 +175,6 @@ message NetworkService {
 message NetworkNodeOverlayStatus {
     string status = 1; // unknown|up|down
     repeated string msg = 2;
-    //repeated RenderedVppAgentEntry rendered_vpp_agent_entries = 3;
     map<string,RenderedVppAgentEntry> rendered_vpp_agent_entries = 3; // key: modeltype/name
 }
 message NetworkNodeOverlaySpec {
@@ -223,7 +221,6 @@ message NetworkNodeSpec {
 message NetworkNodeStatus {
     string status = 1;
     repeated string msg = 2;
-    //repeated RenderedVppAgentEntry rendered_vpp_agent_entries = 3;
     map<string,RenderedVppAgentEntry> rendered_vpp_agent_entries = 3; // key: modeltype/name
     map<string,InterfaceStatus> interfaces = 5;
 }
