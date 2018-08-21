@@ -19,11 +19,13 @@ package controller
 import (
 	"os"
 
-	"github.com/ligato/cn-infra/core"
+	"net/http"
+	"sync"
+
 	"github.com/ligato/cn-infra/db/keyval"
-	"github.com/ligato/cn-infra/db/keyval/etcdv3"
-	"github.com/ligato/cn-infra/flavors/local"
+	"github.com/ligato/cn-infra/db/keyval/etcd"
 	"github.com/ligato/cn-infra/health/statuscheck"
+	"github.com/ligato/cn-infra/infra"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/ligato/cn-infra/rpc/rest"
@@ -34,12 +36,10 @@ import (
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 	"github.com/namsral/flag"
 	"github.com/unrolled/render"
-	"net/http"
-	"sync"
 )
 
 // PluginID is plugin identifier (must be unique throughout the system)
-const PluginID core.PluginName = "SfcController"
+const PluginID infra.PluginName = "SfcController"
 
 var (
 	sfcConfigFile               string // cli flag - see RegisterFlags
@@ -82,20 +82,19 @@ func init() {
 // CacheType is ram cache of controller entities
 type CacheType struct {
 	// state
-	InterfaceStates       map[string]*controller.InterfaceStatus // key[entity/ifname]
+	InterfaceStates       map[string]*controller.InterfaceStatus                  // key[entity/ifname]
 	RenderedEntitesStates map[string]map[string]*controller.RenderedVppAgentEntry // key[modelType/name][vppkey]
-	VppEntries            map[string]*vppagent.KVType // key[vppkey]
+	VppEntries            map[string]*vppagent.KVType                             // key[vppkey]
 	MacAddrAllocator      *idapi.MacAddrAllocatorType
 	MemifIDAllocator      *idapi.MemifAllocatorType
 	IPAMPoolAllocators    map[string]*ipam.PoolAllocatorType // key[modelType/ipamPoolName]
-	NetworkPodToNodeMap   map[string]*NetworkPodToNodeMap // key[pod]
+	NetworkPodToNodeMap   map[string]*NetworkPodToNodeMap    // key[pod]
 }
 
 // Plugin contains the controllers information
 type Plugin struct {
-	Etcd                        *etcdv3.Plugin
-	HTTPmux                     *rest.Plugin
-	*local.FlavorLocal
+	Deps
+
 	NetworkNodeMgr              NetworkNodeMgr
 	IpamPoolMgr                 IPAMPoolMgr
 	SysParametersMgr            SystemParametersMgr
@@ -103,11 +102,19 @@ type Plugin struct {
 	NetworkNodeOverlayMgr       NetworkNodeOverlayMgr
 	NetworkPodNodeMapMgr        NetworkPodToNodeMapMgr
 	ramCache                    CacheType
-	DB                          keyval.ProtoBroker
-	BypassModelTypeHttpHandlers bool   // cli flag - see RegisterFlags
-	CleanDatastore              bool   // cli flag - see RegisterFlags
-	ContivKSREnabled            bool   // cli flag - see RegisterFlags
+	BypassModelTypeHttpHandlers bool // cli flag - see RegisterFlags
+	CleanDatastore              bool // cli flag - see RegisterFlags
+	ContivKSREnabled            bool // cli flag - see RegisterFlags
 	ConfigMutex                 sync.Mutex
+	DB                          keyval.ProtoBroker
+}
+
+// Deps groups the dependencies of the Plugin.
+type Deps struct {
+	infra.PluginDeps
+	Etcd         *etcd.Plugin
+	HTTPHandlers rest.HTTPHandlers
+	StatusCheck  statuscheck.Plugin
 }
 
 // Init the controller, read the DB, reconcile/resync, render config to etcd
@@ -265,7 +272,7 @@ func (s *Plugin) InitSystemHTTPHandler() {
 	log.Infof("InitHTTPHandlers: registering ...")
 
 	log.Infof("InitHTTPHandlers: registering GET %s", controller.SfcControllerPrefix())
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(controller.SfcControllerPrefix(), httpSystemGetAllYamlHandler, "GET")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(controller.SfcControllerPrefix(), httpSystemGetAllYamlHandler, "GET")
 }
 
 // curl -X GET http://localhost:9191/sfc_controller
@@ -315,7 +322,7 @@ func (s *Plugin) PostProcessLoadedDatastore() error {
 
 			log.Debugf("PostProcessLoadedDatastore: processing node state: %s", nn.Metadata.Name)
 			if err := s.LoadVppAgentEntriesFromRenderedVppAgentEntries(
-				ModelTypeNetworkNode + "/" + nn.Metadata.Name,
+				ModelTypeNetworkNode+"/"+nn.Metadata.Name,
 				nn.Status.RenderedVppAgentEntries); err != nil {
 				return err
 			}
@@ -350,7 +357,7 @@ func (s *Plugin) PostProcessLoadedDatastore() error {
 
 			log.Debugf("PostProcessLoadedDatastore: processing network service state: %s", ns.Metadata.Name)
 			if err := s.LoadVppAgentEntriesFromRenderedVppAgentEntries(
-				ModelTypeNetworkService + "/" + ns.Metadata.Name,
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
 				ns.Status.RenderedVppAgentEntries); err != nil {
 				return err
 			}
@@ -399,7 +406,7 @@ func (s *Plugin) LoadVppAgentEntriesFromRenderedVppAgentEntries(
 
 			// add ref to the rendering entity
 			if renderedEntities, exists := s.ramCache.RenderedEntitesStates[entityName]; !exists {
-				renderedEntities = make(map[string]*controller.RenderedVppAgentEntry,0)
+				renderedEntities = make(map[string]*controller.RenderedVppAgentEntry, 0)
 				s.ramCache.RenderedEntitesStates[entityName] = renderedEntities
 
 			}

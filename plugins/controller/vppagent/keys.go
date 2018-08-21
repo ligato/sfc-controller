@@ -15,12 +15,13 @@
 package vppagent
 
 import (
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l3"
-	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/common/model/interfaces"
 	"net"
 	"strings"
+
+	linux "github.com/ligato/vpp-agent/plugins/linux/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/vpp/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vpp/model/l3"
 )
 
 // this must match what utils the vpp-agent uses
@@ -47,7 +48,7 @@ func InterfaceStateKey(vppLabel string, ifaceLabel string) string {
 
 // InterfaceStatePrefixKey constructs interface state prefix db key
 func InterfaceStatePrefixKey(vppLabel string) string {
-	return agentPrefix + vppLabel + "/" + interfaces.InterfaceStateKeyPrefix()
+	return agentPrefix + vppLabel + "/" + interfaces.Prefix
 }
 
 // InterfaceKey constructs interface db key
@@ -57,17 +58,17 @@ func InterfaceKey(vppLabel string, ifaceLabel string) string {
 
 // InterfacePrefixKey constructs interface prefix db key
 func InterfacePrefixKey(vppLabel string) string {
-	return agentPrefix + vppLabel + "/" + interfaces.InterfaceKeyPrefix()
+	return agentPrefix + vppLabel + "/" + interfaces.Prefix
 }
 
 // LinuxInterfaceKey constructs Linux interface db key
 func LinuxInterfaceKey(vppLabel string, ifaceLabel string) string {
-	return agentPrefix + vppLabel + "/" + linuxIntf.InterfaceKey(ifaceLabel)
+	return agentPrefix + vppLabel + "/" + linux.InterfaceKey(ifaceLabel)
 }
 
 // LinuxInterfacePrefixKey constructs Linux interface prefix db key
 func LinuxInterfacePrefixKey(vppLabel string) string {
-	return agentPrefix + vppLabel + "/" + linuxIntf.InterfaceKeyPrefix()
+	return agentPrefix + vppLabel + "/" + linux.InterfaceKeyPrefix()
 }
 
 // L2BridgeDomainKey constructs L2 bridge domain db key
@@ -77,7 +78,7 @@ func L2BridgeDomainKey(vppLabel string, bdName string) string {
 
 // L2BridgeDomainKeyPrefix constructs L2 bridge domain db key prefix
 func L2BridgeDomainKeyPrefix(vppLabel string) string {
-	return agentPrefix + vppLabel + "/" + l2.BridgeDomainKeyPrefix()
+	return agentPrefix + vppLabel + "/" + l2.BdPrefix
 }
 
 // L2XConnectKey constructs L2 XConnect db key
@@ -88,7 +89,7 @@ func L2XConnectKey(vppLabel string, rxIf string) string {
 // L3RouteKeyPrefix constructs L3 route db key prefix
 func L3RouteKeyPrefix(vppLabel string) string {
 	//return agentPrefix + vppLabel + "/" + l3.RouteKeyPrefix()
-	return agentPrefix + vppLabel + "/" + l3.VrfKeyPrefix()
+	return agentPrefix + vppLabel + "/" + l3.VrfPrefix
 }
 
 // L3RouteKey constructs L3 route db key

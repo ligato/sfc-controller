@@ -17,6 +17,11 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"os"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
@@ -24,12 +29,8 @@ import (
 	"github.com/ligato/sfc-controller/plugins/controller/database"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
 	"github.com/unrolled/render"
-	"io/ioutil"
-	"net"
-	"net/http"
-	"os"
 )
 
 type NetworkNodeMgr struct {
@@ -269,9 +270,9 @@ func (mgr *NetworkNodeMgr) InitHTTPHandlers() {
 
 	log.Infof("InitHTTPHandlers: registering GET/POST %s", mgr.KeyPrefix())
 	url := fmt.Sprintf(mgr.KeyPrefix()+"{%s}", networkNodeName)
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(url, httpNetworkNodeHandler, "GET", "POST", "DELETE")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, httpNetworkNodeHandler, "GET", "POST", "DELETE")
 	log.Infof("InitHTTPHandlers: registering GET %s", mgr.GetAllURL())
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(mgr.GetAllURL(), httpNetworkNodeGetAllHandler, "GET")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(mgr.GetAllURL(), httpNetworkNodeGetAllHandler, "GET")
 }
 
 // curl -X GET http://localhost:9191/sfc_controller/v2/config/network-node/<networkNodeName>
@@ -398,8 +399,8 @@ func (nn *NetworkNode) renderConfig() error {
 	log.Debugf("renderConfig: before nn.Status=%v", nn.Status)
 
 	//if nn.Status != nil && nn.Status.RenderedVppAgentEntries != nil {
-		// add the current rendered etc keys to the before config transaction
-		CopyRenderedVppAgentEntriesToBeforeCfgTxn(ModelTypeNetworkNode + "/" + nn.Metadata.Name)
+	// add the current rendered etc keys to the before config transaction
+	CopyRenderedVppAgentEntriesToBeforeCfgTxn(ModelTypeNetworkNode + "/" + nn.Metadata.Name)
 	//}
 
 	nn.Status = &controller.NetworkNodeStatus{}

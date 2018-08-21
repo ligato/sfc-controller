@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
@@ -108,7 +109,7 @@ func (mgr *NetworkNodeOverlayMgr) AllocateVxlanAddress(poolName string, nodeName
 			return ipAddress, err
 		}
 		if nodeLabel != "" {
-			nodeInterfaces, nodeIfTypes := ctlrPlugin.NetworkNodeMgr.FindInterfacesForThisLabelInNode(nodeName , []string{nodeLabel})
+			nodeInterfaces, nodeIfTypes := ctlrPlugin.NetworkNodeMgr.FindInterfacesForThisLabelInNode(nodeName, []string{nodeLabel})
 			if len(nodeInterfaces) != 1 {
 				return "", fmt.Errorf("One interface must have a label: %s", nodeLabel)
 			}
@@ -234,9 +235,9 @@ func (mgr *NetworkNodeOverlayMgr) InitHTTPHandlers() {
 
 	log.Infof("InitHTTPHandlers: registering GET/POST %s", mgr.KeyPrefix())
 	url := fmt.Sprintf(mgr.KeyPrefix()+"{%s}", networkNodeOverlayName)
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(url, networkNodeOverlayHandler, "GET", "POST", "DELETE")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, networkNodeOverlayHandler, "GET", "POST", "DELETE")
 	log.Infof("InitHTTPHandlers: registering GET %s", mgr.GetAllURL())
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(mgr.GetAllURL(), networkNodeOverlayGetAllHandler, "GET")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(mgr.GetAllURL(), networkNodeOverlayGetAllHandler, "GET")
 }
 
 // curl -X GET http://localhost:9191/sfc_controller/v2/config/network-service-mesh/<networkNodeOverlayName>

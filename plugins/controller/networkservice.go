@@ -21,6 +21,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
@@ -196,9 +197,9 @@ func (mgr *NetworkServiceMgr) InitHTTPHandlers() {
 
 	log.Infof("InitHTTPHandlers: registering GET/POST %s", mgr.KeyPrefix())
 	url := fmt.Sprintf(mgr.KeyPrefix()+"{%s}", networkServiceName)
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(url, networkServiceHandler, "GET", "POST", "DELETE")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, networkServiceHandler, "GET", "POST", "DELETE")
 	log.Infof("InitHTTPHandlers: registering GET %s", mgr.GetAllURL())
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(mgr.GetAllURL(), networkServiceGetAllHandler, "GET")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(mgr.GetAllURL(), networkServiceGetAllHandler, "GET")
 }
 
 // curl -X GET http://localhost:9191/sfc_controller/v2/config/network-service/<networkServiceName>
@@ -342,7 +343,6 @@ func (ns *NetworkService) renderConfig() error {
 
 	defer ns.renderComplete()
 
-
 	for i, conn := range ns.Spec.Connections {
 		log.Debugf("RenderNetworkService: network-service/conn: ", ns.Metadata.Name, conn)
 
@@ -429,12 +429,12 @@ func (ns *NetworkService) validateConnections() error {
 
 		switch conn.ConnType {
 		case controller.ConnTypeL2PP:
-			if len(conn.PodInterfaces) + len(conn.NodeInterfaces) + len(conn.NodeInterfaceLabels) != 2 {
+			if len(conn.PodInterfaces)+len(conn.NodeInterfaces)+len(conn.NodeInterfaceLabels) != 2 {
 				return fmt.Errorf("network-service: %s conn: p2p must have 2 interfaces only",
 					ns.Metadata.Name)
 			}
 		case controller.ConnTypeL2MP:
-			if len(conn.PodInterfaces) + len(conn.NodeInterfaces) == 0 {
+			if len(conn.PodInterfaces)+len(conn.NodeInterfaces) == 0 {
 				return fmt.Errorf("network-service: %s conn: p2mp must have at least one interface",
 					ns.Metadata.Name)
 			}

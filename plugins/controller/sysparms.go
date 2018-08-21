@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/sfc-controller/plugins/controller/database"
@@ -159,7 +160,7 @@ func (mgr *SystemParametersMgr) InitHTTPHandlers() {
 	log.Infof("InitHTTPHandlers: registering ...")
 
 	log.Infof("InitHTTPHandlers: registering GET/POST %s", mgr.KeyPrefix())
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(mgr.KeyPrefix(), systemParametersHandler, "GET", "POST")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(mgr.KeyPrefix(), systemParametersHandler, "GET", "POST")
 }
 
 // curl -X GET http://localhost:9191/sfc_controller/v2/config/system-parameters

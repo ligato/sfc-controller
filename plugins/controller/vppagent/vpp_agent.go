@@ -25,10 +25,10 @@ import (
 	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/ligato/cn-infra/utils/addrs"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l3"
-	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxplugin/common/model/interfaces"
+	linuxIntf "github.com/ligato/vpp-agent/plugins/linux/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/vpp/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vpp/model/l3"
 )
 
 var (
@@ -259,8 +259,8 @@ func ConstructMemInterface(vppAgent string,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
 		Memif: &interfaces.Interfaces_Interface_Memif{
-			Id:             memifID,
-			Master:         isMaster,
+			Id:     memifID,
+			Master: isMaster,
 		},
 	}
 

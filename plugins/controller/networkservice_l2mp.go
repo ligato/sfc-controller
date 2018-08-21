@@ -19,7 +19,7 @@ import (
 
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
 )
 
 // The L2MP topology is rendered in this module for a connection with a vnf-service

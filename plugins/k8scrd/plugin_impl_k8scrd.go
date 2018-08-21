@@ -15,9 +15,6 @@
 package k8scrd
 
 import (
-	"github.com/ligato/cn-infra/core"
-	"github.com/ligato/cn-infra/db/keyval/etcdv3"
-	"github.com/ligato/cn-infra/flavors/local"
 	"github.com/ligato/cn-infra/health/statuscheck"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/logging/logrus"
@@ -33,10 +30,12 @@ import (
 	clientset "github.com/ligato/sfc-controller/plugins/k8scrd/pkg/client/clientset/versioned"
 	informers "github.com/ligato/sfc-controller/plugins/k8scrd/pkg/client/informers/externalversions"
 	"github.com/ligato/sfc-controller/plugins/k8scrd/pkg/signals"
+	"github.com/ligato/cn-infra/infra"
+	"github.com/ligato/cn-infra/db/keyval/etcd"
 )
 
 // PluginID is plugin identifier (must be unique throughout the system)
-const PluginID core.PluginName = "k8sCRD"
+const PluginID infra.PluginName = "k8sCRD"
 
 var (
 	kubeconfig   string // cli flag - see RegisterFlags
@@ -75,16 +74,23 @@ type CacheType struct {
 
 // Plugin contains the controllers information
 type Plugin struct {
-	Etcd    *etcdv3.Plugin
-	HTTPmux *rest.Plugin
-	*local.FlavorLocal
-	Controller     *controller.Plugin
+	Deps
+
 	ramConfigCache CacheType
 	CrdController *Controller
 	IpamPoolMgr CRDIpamPoolMgr
 	NetworkNodeMgr CRDNetworkNodeMgr
 	NetworkNodeOverlayMgr CRDNetworkNodeOverlayMgr
 	NetworkServiceMgr CRDNetworkServiceMgr
+}
+
+// Deps groups the dependencies of the Plugin.
+type Deps struct {
+	infra.PluginDeps
+	Etcd         *etcd.Plugin
+	HTTPHandlers rest.HTTPHandlers
+	Controller     *controller.Plugin
+	StatusCheck statuscheck.Plugin
 }
 
 // Init the controller, read the db, reconcile/resync, render config to etcd
