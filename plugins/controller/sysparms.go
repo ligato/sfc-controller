@@ -27,15 +27,18 @@ import (
 	"github.com/unrolled/render"
 )
 
+// SystemParametersMgr contains the system parameters for the system
 type SystemParametersMgr struct {
 	sysParmCache *SystemParameters
 }
 
+// Init initializes the ram cache then pulls in the entries from the db
 func (mgr *SystemParametersMgr) Init() {
 	mgr.InitRAMCache()
 	mgr.LoadAllFromDatastoreIntoCache()
 }
 
+// AfterInit sets up the watchers and http handlers
 func (mgr *SystemParametersMgr) AfterInit() {
 	go mgr.InitAndRunWatcher()
 	if !ctlrPlugin.BypassModelTypeHttpHandlers {
@@ -43,7 +46,7 @@ func (mgr *SystemParametersMgr) AfterInit() {
 	}
 }
 
-// SystemParameters holds all network node specific info
+// SystemParameters holds all system parameter specific info
 type SystemParameters struct {
 	controller.SystemParameters
 }
@@ -235,7 +238,7 @@ func (sp *SystemParameters) renderConfig() error {
 	return nil
 }
 
-// RenderAll renders all entites in the cache
+// RenderAll renders all entities in the cache
 func (mgr *SystemParametersMgr) RenderAll() {
 	mgr.sysParmCache.renderConfig()
 }

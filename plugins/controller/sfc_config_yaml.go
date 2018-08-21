@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This config yaml file is loaded into a data structure and pulled in by the
-// controller.
-
 package controller
 
 import (
@@ -27,17 +24,17 @@ import (
 
 const sfcYamlVersion = 2
 
-// SfcConfigYaml is container struct for yaml config file
+// SfcConfigYaml is the container struct for the YAML config file
 type SfcConfigYaml struct {
 	Version             int                    `json:"sfc_controller_config_version"`
 	Description         string                 `json:"description"`
-	SysParms            SystemParameters      `json:"system_parameters"`
+	SysParms            SystemParameters       `json:"system_parameters"`
 	IPAMPools           []*IPAMPool            `json:"ipam_pools"`
 	NetworkPodToNodeMap []*NetworkPodToNodeMap `json:"network_pod_to_node_map"`
 	NetworkNodeOverlays []*NetworkNodeOverlay  `json:"network_node_overlays"`
 	NetworkNodes        []*NetworkNode         `json:"network_nodes"`
 	NetworkServices     []*NetworkService      `json:"network_services"`
-	RamCache          	*CacheType      `json:"ram_cache"`
+	RAMCache            *CacheType             `json:"ram_cache"`
 }
 
 // SfcConfigYamlReadFromFile parses the yaml into YamlConfig
@@ -59,7 +56,7 @@ func (s *Plugin) SfcConfigYamlReadFromFile(fpath string) (*SfcConfigYaml, error)
 }
 
 
-// utility used by http to return the whole system config in YAML format
+// SfcSystemCacheToYaml is used by http to return the whole system config in YAML format
 func (s *Plugin) SfcSystemCacheToYaml() ([]byte, error) {
 	yamlConfig := &SfcConfigYaml{}
 
@@ -71,7 +68,7 @@ func (s *Plugin) SfcSystemCacheToYaml() ([]byte, error) {
 	yamlConfig.NetworkNodeOverlays = ctlrPlugin.NetworkNodeOverlayMgr.ToArray()
 	yamlConfig.IPAMPools = ctlrPlugin.IpamPoolMgr.ToArray()
 	yamlConfig.SysParms = *ctlrPlugin.SysParametersMgr.sysParmCache
-	yamlConfig.RamCache = &ctlrPlugin.ramCache
+	yamlConfig.RAMCache = &ctlrPlugin.ramCache
 
 	yamlBytes, err := yaml.Marshal(yamlConfig)
 	if err != nil {

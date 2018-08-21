@@ -22,6 +22,7 @@ import (
 	"fmt"
 )
 
+// ConnPodName extracts the pod name from the pod/interface string
 func ConnPodName(connPodInterfaceString string) string {
 	n := strings.Index(connPodInterfaceString, "/")
 	if n == -1 {
@@ -30,6 +31,7 @@ func ConnPodName(connPodInterfaceString string) string {
 	return connPodInterfaceString[0:n]
 }
 
+// ConnInterfaceName extracts the interface from the pod/interface string
 func ConnInterfaceName(connPodInterfaceString string) string {
 	n := strings.Index(connPodInterfaceString, "/")
 	if n == -1 {
@@ -38,6 +40,7 @@ func ConnInterfaceName(connPodInterfaceString string) string {
 	return connPodInterfaceString[n+1:]
 }
 
+// ConnPodInterfaceNames returns 2 strings (pod, interface)
 func ConnPodInterfaceNames(connPodInterfaceString string) (string, string) {
 	n := strings.Index(connPodInterfaceString, "/")
 	if n == -1 {
@@ -46,10 +49,12 @@ func ConnPodInterfaceNames(connPodInterfaceString string) (string, string) {
 	return connPodInterfaceString[0:n], connPodInterfaceString[n+1:]
 }
 
+// NodeInterfaceNames returns 2 strings (node, interface)
 func NodeInterfaceNames(nodePodInterfaceString string) (string, string) {
 	return ConnPodInterfaceNames(nodePodInterfaceString)
 }
 
+// ConnPodInterfaceSlashToUScore changes the / to a _
 func ConnPodInterfaceSlashToUScore(connPodInterfaceString string) string {
 	s0, s1 := ConnPodInterfaceNames(connPodInterfaceString)
 	return fmt.Sprintf("%s_%s", s0, s1)

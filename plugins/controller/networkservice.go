@@ -351,7 +351,7 @@ func (ns *NetworkService) renderConfig() error {
 		}
 	}
 
-	log.Debugf("RenderNetworkService: network-service:%s, status:%v", ns.Metadata.Name, ns.Status)
+	log.Debugf("RenderNetworkService: network-service: %s, status: %v", ns.Metadata.Name, ns.Status)
 
 	return nil
 }
