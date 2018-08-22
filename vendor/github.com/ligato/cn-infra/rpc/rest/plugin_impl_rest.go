@@ -15,105 +15,103 @@
 package rest
 
 import (
-	"io"
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/ligato/cn-infra/config"
-	"github.com/ligato/cn-infra/core"
-	"github.com/ligato/cn-infra/logging"
-	"github.com/ligato/cn-infra/utils/safeclose"
 	"github.com/unrolled/render"
-)
 
-const (
-	// DefaultHTTPPort is used during HTTP server startup unless different port was configured
-	DefaultHTTPPort = "9191"
-	// DefaultIP 0.0.0.0
-	DefaultIP = "0.0.0.0"
-	// DefaultEndpoint 0.0.0.0:9191
-	DefaultEndpoint = DefaultIP + ":" + DefaultHTTPPort
+	"github.com/ligato/cn-infra/infra"
+	"github.com/ligato/cn-infra/utils/safeclose"
 )
 
 // Plugin struct holds all plugin-related data.
 type Plugin struct {
 	Deps
+
 	*Config
 
-	// Used mainly for testing purposes
-	listenAndServe ListenAndServe
-
-	server    io.Closer
+	server    *http.Server
 	mx        *mux.Router
 	formatter *render.Render
 }
 
 // Deps lists the dependencies of the Rest plugin.
 type Deps struct {
-	Log                 logging.PluginLogger //inject
-	PluginName          core.PluginName      //inject
-	config.PluginConfig                      //inject
+	infra.PluginDeps
+
+	// Authenticator can be injected in a flavor inject method.
+	// If there is no authenticator injected and config contains
+	// user password, the default staticAuthenticator is instantiated.
+	// By default the authenticator is disabled.
+	Authenticator BasicHTTPAuthenticator //inject
 }
 
 // Init is the plugin entry point called by Agent Core
 // - It prepares Gorilla MUX HTTP Router
-func (plugin *Plugin) Init() (err error) {
-	if plugin.Config == nil {
-		plugin.Config = DefaultConfig()
+func (p *Plugin) Init() (err error) {
+	if p.Config == nil {
+		p.Config = DefaultConfig()
 	}
-	if err := PluginConfig(plugin.Deps.PluginConfig, plugin.Config, plugin.Deps.PluginName); err != nil {
+	if err := PluginConfig(p.Cfg, p.Config, p.PluginName); err != nil {
 		return err
 	}
 
-	plugin.mx = mux.NewRouter()
-	plugin.formatter = render.New(render.Options{
+	// if there is no injected authenticator and there are credentials defined in the config file
+	// instantiate staticAuthenticator otherwise do not use basic Auth
+	if p.Authenticator == nil && len(p.Config.ClientBasicAuth) > 0 {
+		p.Authenticator, err = newStaticAuthenticator(p.Config.ClientBasicAuth)
+		if err != nil {
+			return err
+		}
+	}
+
+	p.mx = mux.NewRouter()
+	p.formatter = render.New(render.Options{
 		IndentJSON: true,
 	})
 
 	return err
 }
 
-// RegisterHTTPHandler registers HTTP <handler> at the given <path>.
-func (plugin *Plugin) RegisterHTTPHandler(path string,
-	handler func(formatter *render.Render) http.HandlerFunc,
-	methods ...string) *mux.Route {
-	plugin.Log.Debug("Register handler ", path)
+// AfterInit starts the HTTP server.
+func (p *Plugin) AfterInit() (err error) {
+	cfgCopy := *p.Config
 
-	return plugin.mx.HandleFunc(path, handler(plugin.formatter)).Methods(methods...)
+	var handler http.Handler = p.mx
+	if p.Authenticator != nil {
+		handler = auth(handler, p.Authenticator)
+	}
+
+	p.server, err = ListenAndServe(cfgCopy, handler)
+	if err != nil {
+		return err
+	}
+
+	if cfgCopy.UseHTTPS() {
+		p.Log.Info("Listening on https://", cfgCopy.Endpoint)
+	} else {
+		p.Log.Info("Listening on http://", cfgCopy.Endpoint)
+	}
+
+	return nil
+}
+
+// RegisterHTTPHandler registers HTTP <handler> at the given <path>.
+func (p *Plugin) RegisterHTTPHandler(path string, provider HandlerProvider, methods ...string) *mux.Route {
+	p.Log.Debug("Registering handler: ", path)
+
+	return p.mx.Handle(path, provider(p.formatter)).Methods(methods...)
 }
 
 // GetPort returns plugin configuration port
-func (plugin *Plugin) GetPort() int {
-	if plugin.Config != nil {
-		return plugin.Config.GetPort()
+func (p *Plugin) GetPort() int {
+	if p.Config != nil {
+		return p.Config.GetPort()
 	}
 	return 0
 }
 
-// AfterInit starts the HTTP server.
-func (plugin *Plugin) AfterInit() (err error) {
-	cfgCopy := *plugin.Config
-
-	if plugin.listenAndServe != nil {
-		plugin.server, err = plugin.listenAndServe(cfgCopy, plugin.mx)
-	} else {
-		plugin.Log.Info("Listening on http://", cfgCopy.Endpoint)
-		plugin.server, err = ListenAndServeHTTP(cfgCopy, plugin.mx)
-	}
-
-	return err
-}
-
 // Close stops the HTTP server.
-func (plugin *Plugin) Close() error {
-	_, err := safeclose.CloseAll(plugin.server)
-	return err
-}
-
-// String returns plugin name (if not set defaults to "HTTP")
-func (plugin *Plugin) String() string {
-	if plugin.Deps.PluginName != "" {
-		return string(plugin.Deps.PluginName)
-	}
-	return "HTTP"
+func (p *Plugin) Close() error {
+	return safeclose.Close(p.server)
 }

@@ -24,14 +24,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
 	"sync/atomic"
-
 	"unsafe"
 
-	"github.com/ligato/cn-infra/logging"
 	"github.com/satori/go.uuid"
 	lg "github.com/sirupsen/logrus"
+
+	"github.com/ligato/cn-infra/logging"
 )
 
 // DefaultLoggerName is logger name of global instance of logger
@@ -41,8 +40,12 @@ var (
 	defaultLogger = NewLogger(DefaultLoggerName)
 )
 
-// DefaultLogger returns a global Logrus logger. Please notice, that recommended
-// approach is to create a custom logger.
+func init() {
+	logging.DefaultLogger = defaultLogger
+}
+
+// DefaultLogger returns a global Logrus logger.
+// Note, that recommended approach is to create a custom logger.
 func DefaultLogger() *Logger {
 	return defaultLogger
 }
@@ -276,8 +279,8 @@ func (logger *Logger) WithField(key string, value interface{}) logging.LogWithLe
 //
 // Note that it doesn't log until you call Debug, Print, Info, Warn, Fatal
 // or Panic on the LogMsg it returns.
-func (logger *Logger) WithFields(fields map[string]interface{}) logging.LogWithLevel {
-	return logger.withFields(logging.Fields(fields), 1)
+func (logger *Logger) WithFields(fields logging.Fields) logging.LogWithLevel {
+	return logger.withFields(fields, 1)
 }
 
 func (logger *Logger) withFields(fields logging.Fields, depth int) *Entry {

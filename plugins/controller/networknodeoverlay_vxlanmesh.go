@@ -16,9 +16,10 @@ package controller
 
 import (
 	"fmt"
+
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	"github.com/ligato/vpp-agent/plugins/defaultplugins/common/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
 )
 
 // renderConnL2MPVxlanMesh renders these L2MP tunnels between nodes
@@ -218,7 +219,6 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 			ModelTypeNetworkService+"/"+ns.Metadata.Name,
 			vppKV)
-
 
 		renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanLoopbackInterfaceAndStaticRoutes(
 			ModelTypeNetworkService+"/"+ns.Metadata.Name,

@@ -20,6 +20,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"time"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
@@ -27,7 +29,6 @@ import (
 	"github.com/ligato/sfc-controller/plugins/controller/database"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/unrolled/render"
-	"time"
 )
 
 type NetworkPodToNodeMapMgr struct {
@@ -92,7 +93,6 @@ func (mgr *NetworkPodToNodeMapMgr) HandleContivKSRStatusUpdate(p2n *NetworkPodTo
 	}
 
 	ctlrPlugin.ramCache.NetworkPodToNodeMap[p2n.Pod] = p2n
-
 
 	if render {
 		p2n.renderConfig()
@@ -197,9 +197,9 @@ func (mgr *NetworkPodToNodeMapMgr) InitHTTPHandlers() {
 
 	log.Infof("InitHTTPHandlers: registering GET/POST %s", mgr.KeyPrefix())
 	url := fmt.Sprintf(mgr.KeyPrefix()+"{%s}", networkPodName)
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(url, networkPodNodeMapHandler, "GET", "POST", "DELETE")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, networkPodNodeMapHandler, "GET", "POST", "DELETE")
 	log.Infof("InitHTTPHandlers: registering GET %s", mgr.GetAllURL())
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(mgr.GetAllURL(), networkPodNodeMapGetAllHandler, "GET")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(mgr.GetAllURL(), networkPodNodeMapGetAllHandler, "GET")
 }
 
 // curl -X GET http://localhost:9191/sfc_controller/v2/config/vnf-to-node-map/<networkPodName>

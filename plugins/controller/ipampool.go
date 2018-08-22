@@ -17,6 +17,11 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"os"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
@@ -25,10 +30,6 @@ import (
 	"github.com/ligato/sfc-controller/plugins/controller/idapi/ipam"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/unrolled/render"
-	"io/ioutil"
-	"net"
-	"net/http"
-	"os"
 )
 
 type IPAMPoolMgr struct {
@@ -358,9 +359,9 @@ func (mgr *IPAMPoolMgr) InitHTTPHandlers() {
 
 	log.Infof("InitHTTPHandlers: registering GET/POST %s", mgr.KeyPrefix())
 	url := fmt.Sprintf(mgr.KeyPrefix()+"{%s}", entityName)
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(url, entityHandler, "GET", "POST", "DELETE")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, entityHandler, "GET", "POST", "DELETE")
 	log.Infof("InitHTTPHandlers: registering GET %s", mgr.GetAllURL())
-	ctlrPlugin.HTTPmux.RegisterHTTPHandler(mgr.GetAllURL(), getAllHandler, "GET")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(mgr.GetAllURL(), getAllHandler, "GET")
 }
 
 // curl -X GET http://localhost:9191/sfc_controller/v2/config/ipam-pool/<entityName>

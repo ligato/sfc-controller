@@ -20,43 +20,18 @@ import (
 	"time"
 
 	"github.com/ligato/cn-infra/config"
-	"github.com/ligato/cn-infra/core"
+	"github.com/ligato/cn-infra/infra"
 	"github.com/namsral/flag"
 )
 
-// PluginConfig tries :
-// - to load flag <plugin-name>-port and then FixConfig() just in case
-// - alternatively <plugin-name>-config and then FixConfig() just in case
-// - alternatively DefaultConfig()
-func PluginConfig(pluginCfg config.PluginConfig, cfg *Config, pluginName core.PluginName) error {
-	portFlag := flag.Lookup(httpPortFlag(pluginName))
-	if portFlag != nil && portFlag.Value != nil && portFlag.Value.String() != "" && cfg != nil {
-		cfg.Endpoint = DefaultIP + ":" + portFlag.Value.String()
-	}
-
-	if pluginCfg != nil {
-		_, err := pluginCfg.GetValue(cfg)
-		if err != nil {
-			return err
-		}
-	}
-
-	FixConfig(cfg)
-
-	return nil
-}
-
-// DefaultConfig returns new instance of config with default endpoint
-func DefaultConfig() *Config {
-	return &Config{Endpoint: DefaultEndpoint}
-}
-
-// FixConfig fill default values for empty fields
-func FixConfig(cfg *Config) {
-	if cfg != nil && cfg.Endpoint == "" {
-		cfg.Endpoint = DefaultEndpoint
-	}
-}
+const (
+	// DefaultHost is a host used by default
+	DefaultHost = "0.0.0.0"
+	// DefaultHTTPPort is a port used by default
+	DefaultHTTPPort = "9191"
+	// DefaultEndpoint 0.0.0.0:9191
+	DefaultEndpoint = DefaultHost + ":" + DefaultHTTPPort
+)
 
 // Config is a configuration for HTTP server
 // It is meant to be extended with security (TLS...)
@@ -97,6 +72,62 @@ type Config struct {
 	// size of the request body.
 	// If zero, DefaultMaxHeaderBytes is used.
 	MaxHeaderBytes int
+
+	// ServerCertfile is path to the server certificate. If the certificate and corresponding
+	// key (see config item below) is defined server uses HTTPS instead of HTTP.
+	ServerCertfile string `json:"server-cert-file"`
+
+	// ServerKeyfile is path to the server key file.
+	ServerKeyfile string `json:"server-key-file"`
+
+	// ClientBasicAuth is a slice of credentials in form "username:password"
+	// used for basic HTTP authentication. If defined only authenticated users are allowed
+	// to access the server.
+	ClientBasicAuth []string `json:"client-basic-auth"`
+
+	// ClientCerts is a slice of the root certificate authorities
+	// that servers uses to verify a client certificate
+	ClientCerts []string `json:"client-cert-files"`
+}
+
+// DefaultConfig returns new instance of config with default endpoint
+func DefaultConfig() *Config {
+	return &Config{
+		Endpoint: DefaultEndpoint,
+	}
+}
+
+// PluginConfig tries :
+// - to load flag <plugin-name>-port and then FixConfig() just in case
+// - alternatively <plugin-name>-config and then FixConfig() just in case
+// - alternatively DefaultConfig()
+func PluginConfig(pluginCfg config.PluginConfig, cfg *Config, pluginName infra.PluginName) error {
+	portFlag := flag.Lookup(httpPortFlag(pluginName))
+
+	if portFlag != nil && portFlag.Value != nil && portFlag.Value.String() != "" && cfg != nil {
+		cfg.Endpoint = DefaultHost + ":" + portFlag.Value.String()
+	}
+
+	if pluginCfg != nil {
+		_, err := pluginCfg.LoadValue(cfg)
+		if err != nil {
+			return err
+		}
+	}
+
+	FixConfig(cfg)
+
+	return nil
+}
+
+// FixConfig fill default values for empty fields
+func FixConfig(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	if cfg.Endpoint == "" {
+		cfg.Endpoint = DefaultEndpoint
+	}
 }
 
 // GetPort parses suffix from endpoint & returns integer after last ":" (otherwise it returns 0)
@@ -114,8 +145,13 @@ func (cfg *Config) GetPort() int {
 	return 0
 }
 
+// UseHTTPS returns true if server certificate and key is defined.
+func (cfg *Config) UseHTTPS() bool {
+	return cfg.ServerCertfile != "" && cfg.ServerKeyfile != ""
+}
+
 // DeclareHTTPPortFlag declares http port (with usage & default value) a flag for a particular plugin name
-func DeclareHTTPPortFlag(pluginName core.PluginName, defaultPortOpts ...uint) {
+func DeclareHTTPPortFlag(pluginName infra.PluginName, defaultPortOpts ...uint) {
 	var defaultPort string
 	if len(defaultPortOpts) > 0 {
 		defaultPort = string(defaultPortOpts[0])
@@ -130,6 +166,6 @@ func DeclareHTTPPortFlag(pluginName core.PluginName, defaultPortOpts ...uint) {
 	flag.String(httpPortFlag(pluginName), defaultPort, usage)
 }
 
-func httpPortFlag(pluginName core.PluginName) string {
+func httpPortFlag(pluginName infra.PluginName) string {
 	return strings.ToLower(string(pluginName)) + "-port"
 }
