@@ -30,6 +30,7 @@ import (
 	"github.com/ligato/cn-infra/health/probe"
 
 	"github.com/ligato/cn-infra/db/keyval/etcd"
+	"github.com/ligato/cn-infra/health/statuscheck"
 	sfc "github.com/ligato/sfc-controller/plugins/controller"
 	crd "github.com/ligato/sfc-controller/plugins/k8scrd"
 )
@@ -85,6 +86,7 @@ func main() {
 		sfc.UseDeps(func(deps *sfc.Deps) {
 			deps.HTTPHandlers = &rest.DefaultPlugin
 			deps.Etcd = &etcd.DefaultPlugin
+			deps.StatusCheck = &statuscheck.DefaultPlugin
 		}),
 	)
 
@@ -93,7 +95,7 @@ func main() {
 			deps.HTTPHandlers = &rest.DefaultPlugin
 			deps.Etcd = &etcd.DefaultPlugin
 			deps.Controller = sfcPlugin
-
+			deps.StatusCheck = &statuscheck.DefaultPlugin
 		}),
 	)
 

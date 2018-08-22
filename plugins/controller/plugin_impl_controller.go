@@ -114,7 +114,7 @@ type Deps struct {
 	infra.PluginDeps
 	Etcd         *etcd.Plugin
 	HTTPHandlers *rest.Plugin
-	StatusCheck  statuscheck.Plugin
+	StatusCheck  *statuscheck.Plugin
 }
 
 // Init the controller, read the DB, reconcile/resync, render config to etcd
