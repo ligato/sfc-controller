@@ -16,26 +16,23 @@
 package main
 
 import (
-
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/logging/logmanager"
-	"github.com/ligato/cn-infra/logging/logrus"
+	log "github.com/ligato/cn-infra/logging/logrus"
 
 	"github.com/ligato/cn-infra/rpc/rest"
 	"github.com/namsral/flag"
 
-	"github.com/ligato/cn-infra/health/probe"
-	sfc "github.com/ligato/sfc-controller/plugins/controller"
-	crd "github.com/ligato/sfc-controller/plugins/k8scrd"
-	"time"
 	"os"
-	"github.com/ligato/cn-infra/agent"
+	"time"
 
+	"github.com/ligato/cn-infra/agent"
+	"github.com/ligato/cn-infra/health/probe"
 
 	"github.com/ligato/cn-infra/db/keyval/etcd"
+	sfc "github.com/ligato/sfc-controller/plugins/controller"
+	crd "github.com/ligato/sfc-controller/plugins/k8scrd"
 )
-
-var log = logrus.DefaultLogger()
 
 // Init is the Go init() function for the plugin. It should
 // contain the boiler plate initialization code that is executed
@@ -44,8 +41,8 @@ func init() {
 	flag.String("etcdv3-config", "etcd.conf",
 		"Location of the Etcd configuration file; also set via 'ETCDV3_CONFIG' env variable.")
 
-	log.SetLevel(logging.DebugLevel)
-	//TODO with Lukas pluginapi.RegisterLogger(PluginID, log.StandardLogger())
+	log.DefaultLogger().SetOutput(os.Stdout)
+	log.DefaultLogger().SetLevel(logging.DebugLevel)
 }
 
 // Flavor is set of common used generic plugins. This flavour can be used as a base
@@ -55,32 +52,34 @@ type SfcController struct {
 	LogManager  *logmanager.Plugin
 	HTTP        *rest.Plugin
 	HealthProbe *probe.Plugin
-	ETCD    	*etcd.Plugin
+	ETCD        *etcd.Plugin
 
-	Sfc 		*sfc.Plugin
-	Crd     	*crd.Plugin
+	Sfc *sfc.Plugin
+	Crd *crd.Plugin
 }
 
-func (c *SfcController) String() string {
+func (SfcController) String() string {
 	return "SfcController"
 }
 
 // Init is called in startup phase. Method added in order to implement Plugin interface.
-func (c *SfcController) Init() error {
+func (SfcController) Init() error {
 	return nil
 }
 
 // AfterInit triggers the first resync.
-func (c *SfcController) AfterInit() error {
+func (SfcController) AfterInit() error {
 	return nil
 }
 
 // Close is called in agent's cleanup phase. Method added in order to implement Plugin interface.
-func (c *SfcController) Close() error {
+func (SfcController) Close() error {
 	return nil
 }
 
 func main() {
+
+	log.DefaultLogger().SetLevel(logging.DebugLevel)
 
 	sfcPlugin := sfc.NewPlugin(
 		sfc.UseDeps(func(deps *sfc.Deps) {
@@ -99,17 +98,17 @@ func main() {
 	)
 
 	sfcAgent := &SfcController{
-		LogManager:      &logmanager.DefaultPlugin,
-		HTTP:            &rest.DefaultPlugin,
-		HealthProbe:     &probe.DefaultPlugin,
-		ETCD: 			 &etcd.DefaultPlugin,
-		Sfc:             sfcPlugin,
-		Crd:             crdPlugin,
+		LogManager:  &logmanager.DefaultPlugin,
+		HTTP:        &rest.DefaultPlugin,
+		HealthProbe: &probe.DefaultPlugin,
+		ETCD:        &etcd.DefaultPlugin,
+		Sfc:         sfcPlugin,
+		Crd:         crdPlugin,
 	}
 
 	a := agent.NewAgent(agent.AllPlugins(sfcAgent), agent.StartTimeout(getStartupTimeout()))
 	if err := a.Run(); err != nil {
-		logrus.DefaultLogger().Fatal(err)
+		log.DefaultLogger().Fatal(err)
 	}
 
 }
@@ -123,7 +122,7 @@ func getStartupTimeout() time.Duration {
 	envVal := os.Getenv("STARTUPTIMEOUT")
 
 	if timeout, err = time.ParseDuration(envVal); err != nil {
-		timeout = 45
+		timeout = 45 * time.Second
 	}
 
 	return timeout

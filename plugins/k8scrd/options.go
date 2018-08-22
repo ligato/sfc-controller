@@ -15,9 +15,7 @@
 package k8scrd
 
 import (
-	"github.com/ligato/cn-infra/db/keyval/etcd"
 	"github.com/ligato/cn-infra/logging"
-	"github.com/ligato/cn-infra/rpc/rest"
 )
 
 const (
@@ -35,9 +33,7 @@ const (
 func NewPlugin(opts ...Option) *Plugin {
 	p := &Plugin{}
 
-	p.PluginName = "k8s-crd"
-	p.Etcd = &etcd.DefaultPlugin
-	p.HTTPHandlers = &rest.DefaultPlugin
+	p.PluginName = "k8sCRD"
 
 	for _, o := range opts {
 		o(p)

@@ -20,18 +20,19 @@ import (
 	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/ligato/cn-infra/rpc/rest"
 
-	"github.com/ligato/sfc-controller/plugins/controller"
-	"github.com/namsral/flag"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/kubernetes"
 	"time"
-	kubeinformers "k8s.io/client-go/informers"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+
+	"github.com/ligato/cn-infra/db/keyval/etcd"
+	"github.com/ligato/cn-infra/infra"
+	"github.com/ligato/sfc-controller/plugins/controller"
 	clientset "github.com/ligato/sfc-controller/plugins/k8scrd/pkg/client/clientset/versioned"
 	informers "github.com/ligato/sfc-controller/plugins/k8scrd/pkg/client/informers/externalversions"
 	"github.com/ligato/sfc-controller/plugins/k8scrd/pkg/signals"
-	"github.com/ligato/cn-infra/infra"
-	"github.com/ligato/cn-infra/db/keyval/etcd"
+	"github.com/namsral/flag"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	kubeinformers "k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // PluginID is plugin identifier (must be unique throughout the system)
@@ -39,7 +40,7 @@ const PluginID infra.PluginName = "k8sCRD"
 
 var (
 	kubeconfig   string // cli flag - see RegisterFlags
-	log                        = logrus.DefaultLogger()
+	log          = logrus.DefaultLogger()
 	ctlrPlugin   *controller.Plugin
 	k8scrdPlugin *Plugin
 )
@@ -76,21 +77,21 @@ type CacheType struct {
 type Plugin struct {
 	Deps
 
-	ramConfigCache CacheType
-	CrdController *Controller
-	IpamPoolMgr CRDIpamPoolMgr
-	NetworkNodeMgr CRDNetworkNodeMgr
+	ramConfigCache        CacheType
+	CrdController         *Controller
+	IpamPoolMgr           CRDIpamPoolMgr
+	NetworkNodeMgr        CRDNetworkNodeMgr
 	NetworkNodeOverlayMgr CRDNetworkNodeOverlayMgr
-	NetworkServiceMgr CRDNetworkServiceMgr
+	NetworkServiceMgr     CRDNetworkServiceMgr
 }
 
 // Deps groups the dependencies of the Plugin.
 type Deps struct {
 	infra.PluginDeps
 	Etcd         *etcd.Plugin
-	HTTPHandlers rest.HTTPHandlers
-	Controller     *controller.Plugin
-	StatusCheck statuscheck.Plugin
+	HTTPHandlers *rest.Plugin
+	Controller   *controller.Plugin
+	StatusCheck  statuscheck.Plugin
 }
 
 // Init the controller, read the db, reconcile/resync, render config to etcd

@@ -15,9 +15,7 @@
 package controller
 
 import (
-	"github.com/ligato/cn-infra/db/keyval/etcd"
 	"github.com/ligato/cn-infra/logging"
-	"github.com/ligato/cn-infra/rpc/rest"
 )
 
 const (
@@ -35,21 +33,21 @@ const (
 func NewPlugin(opts ...Option) *Plugin {
 	p := &Plugin{}
 
-	p.PluginName = "sfc-controller"
-	p.Etcd = &etcd.DefaultPlugin
-	p.HTTPHandlers = &rest.DefaultPlugin
+	p.PluginName = "Controller"
 
 	for _, o := range opts {
 		o(p)
 	}
 
 	if p.Deps.Log == nil {
+		log.Println(p.String())
 		p.Deps.Log = logging.ForPlugin(p.String())
 	}
 
 	//if p.Deps.Cfg == nil {
 	//	p.Deps.Cfg = config.ForPlugin(p.String(), config.WithCustomizedFlag(ConfigFlagName, ContivConfigPath, ContivConfigPathUsage))
 	//}
+
 	return p
 }
 

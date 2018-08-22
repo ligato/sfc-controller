@@ -39,7 +39,7 @@ import (
 )
 
 // PluginID is plugin identifier (must be unique throughout the system)
-const PluginID infra.PluginName = "SfcController"
+const PluginID infra.PluginName = "Controller"
 
 var (
 	sfcConfigFile               string // cli flag - see RegisterFlags
@@ -113,7 +113,7 @@ type Plugin struct {
 type Deps struct {
 	infra.PluginDeps
 	Etcd         *etcd.Plugin
-	HTTPHandlers rest.HTTPHandlers
+	HTTPHandlers *rest.Plugin
 	StatusCheck  statuscheck.Plugin
 }
 
