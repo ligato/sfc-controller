@@ -1,3 +1,4 @@
+---
 sfc_controller_config_version: 2
 description: 3 node with 1 nic port, host-host vxlan mesh, vnf on each node
 
@@ -5,7 +6,7 @@ system_parameters:
   ipam_pools:
     - name: vxlan_loopback_pool
       network: 111.111.111.0/24
-      
+
 vnf_to_node_map:
   - vnf: vnf1
     node: vswitch1
@@ -32,7 +33,7 @@ nodes:
         ip_addresses:
           - "10.100.2.2/24"
         custom_labels:
-          - vxlan 
+          - vxlan
 
   - name: vswitch3
     node_type: host
@@ -42,7 +43,7 @@ nodes:
         ip_addresses:
           - "10.100.3.3/24"
         custom_labels:
-          - vxlan         
+          - vxlan
 
 vnf_services:
   - name: service1
@@ -73,7 +74,7 @@ vnf_services:
           - vnf: vnf2
             interface: port1
           - vnf: vnf3
-            interface: port1                    
+            interface: port1
 
 vnf_service_meshes:
   - name: inter_host_vxlan_mesh

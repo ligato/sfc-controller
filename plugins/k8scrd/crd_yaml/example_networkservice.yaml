@@ -1,3 +1,4 @@
+---
 apiVersion: sfccontroller.ligato.github.com/v1alpha1
 kind: NetworkService
 metadata:

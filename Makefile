@@ -169,4 +169,14 @@ test-examples:
 test-cover:
 	$(call test_cover_only)
 
-.PHONY: build get-dep dep-install dep-update test lint clean
+# Install yamllint
+get-yamllint:
+	pip install --user yamllint
+
+# Lint the yaml files
+yamllint: get-yamllint
+	@echo "=> linting the yaml files"
+	yamllint -c .yamllint.yml $(shell git ls-files '*.yaml' '*.yml' | grep -v 'vendor/')
+
+.PHONY: build get-dep dep-install dep-update test lint clean \
+	get-yamllint yamllint
