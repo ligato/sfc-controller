@@ -30,7 +30,7 @@ type YamlConfig struct {
 	EEs         []controller.ExternalEntity   `json:"external_entities"`
 	HEs         []controller.HostEntity       `json:"host_entities"`
 	SFCs        []controller.SfcEntity        `json:"sfc_entities"`
-	SysParms    controller.SystemParameters   `json:"system_parameters"`
+	SysParms    *controller.SystemParameters   `json:"system_parameters"`
 }
 
 // open the file and parse the yaml into the json datastructure
@@ -57,8 +57,10 @@ func (sfcCtrlPlugin *SfcControllerPluginHandler) readConfigFromFile(fpath string
 // read external, hosts and chains, and render config via CNP and EE drivers
 func (sfcCtrlPlugin *SfcControllerPluginHandler) copyYamlConfigToRAMCache() error {
 
-	sfcCtrlPlugin.ramConfigCache.SysParms = sfcCtrlPlugin.yamlConfig.SysParms
-	log.Debugf("copyYamlConfigToRAMCache: sp: ", sfcCtrlPlugin.yamlConfig.SysParms)
+	if sfcCtrlPlugin.yamlConfig.SysParms != nil {
+		sfcCtrlPlugin.ramConfigCache.SysParms = *sfcCtrlPlugin.yamlConfig.SysParms
+		log.Debugf("copyYamlConfigToRAMCache: sp: ", sfcCtrlPlugin.yamlConfig.SysParms)
+	}
 
 	for _, ee := range sfcCtrlPlugin.yamlConfig.EEs {
 		sfcCtrlPlugin.ramConfigCache.EEs[ee.Name] = ee
