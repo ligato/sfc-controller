@@ -32,7 +32,6 @@ import (
 	"github.com/ligato/cn-infra/db/keyval/etcd"
 	"github.com/ligato/cn-infra/health/statuscheck"
 	sfc "github.com/ligato/sfc-controller/plugins/controller"
-	crd "github.com/ligato/sfc-controller/plugins/k8scrd"
 )
 
 // Init is the Go init() function for the plugin. It should
@@ -56,7 +55,7 @@ type SfcController struct {
 	ETCD        *etcd.Plugin
 
 	Sfc *sfc.Plugin
-	Crd *crd.Plugin
+	//Crd *crd.Plugin
 }
 
 func (SfcController) String() string {
@@ -90,14 +89,14 @@ func main() {
 		}),
 	)
 
-	crdPlugin := crd.NewPlugin(
-		crd.UseDeps(func(deps *crd.Deps) {
-			deps.HTTPHandlers = &rest.DefaultPlugin
-			deps.Etcd = &etcd.DefaultPlugin
-			deps.Controller = sfcPlugin
-			deps.StatusCheck = &statuscheck.DefaultPlugin
-		}),
-	)
+	//crdPlugin := crd.NewPlugin(
+	//	crd.UseDeps(func(deps *crd.Deps) {
+	//		deps.HTTPHandlers = &rest.DefaultPlugin
+	//		deps.Etcd = &etcd.DefaultPlugin
+	//		deps.Controller = sfcPlugin
+	//		deps.StatusCheck = &statuscheck.DefaultPlugin
+	//	}),
+	//)
 
 	sfcAgent := &SfcController{
 		LogManager:  &logmanager.DefaultPlugin,
@@ -105,7 +104,7 @@ func main() {
 		HealthProbe: &probe.DefaultPlugin,
 		ETCD:        &etcd.DefaultPlugin,
 		Sfc:         sfcPlugin,
-		Crd:         crdPlugin,
+		//Crd:         crdPlugin,
 	}
 
 	a := agent.NewAgent(agent.AllPlugins(sfcAgent), agent.StartTimeout(getStartupTimeout()))

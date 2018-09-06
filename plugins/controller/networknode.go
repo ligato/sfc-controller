@@ -554,9 +554,12 @@ func (mgr *NetworkNodeMgr) FindVppL2BDForNode(nodeName string, l2bdName string) 
 		return nil, nil
 	}
 
+	// first look in the txn cache then the system cache
 	key := vppagent.L2BridgeDomainKey(nodeName, vppKeyL2BDName(nodeName, l2bdName))
 	if vppKey, exists = RenderTxnGetAfterMap(key); !exists {
-		return nil, nil
+		if vppKey, exists = ctlrPlugin.ramCache.VppEntries[key]; !exists {
+			return nil, nil
+		}
 	}
 
 	return mgr.networkNodeCache[nodeName], vppKey.L2BD
