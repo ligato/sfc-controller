@@ -1,14 +1,15 @@
+---
 sfc_controller_config_version: 2
 description: 2 vnf chains spanning 2 hosts, memif's and vxlan tunnels
 
-ipam_pools: # allocate internode vxlan mesh enpoints from a pool
+ipam_pools:  # allocate internode vxlan mesh enpoints from a pool
   - name: vxlan_loopback_pool
     scope: system
-    network: 192.168.20.0/24 # allocate ip's from 192.168.20.30 to 192.168.20.40
+    network: 192.168.20.0/24  # allocate ip's from 192.168.20.30 to 192.168.20.40
     start_range: 30
     end_range: 40
 
-vnf_to_node_map: # this mapping can be static or supplied by k8s discovering pod placement
+vnf_to_node_map:  # this mapping can be static or supplied by k8s discovering pod placement
   - vnf: vnf1
     node: k8s-worker1
   - vnf: vnf2

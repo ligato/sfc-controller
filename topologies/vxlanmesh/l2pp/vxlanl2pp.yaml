@@ -1,3 +1,4 @@
+---
 sfc_controller_config_version: 2
 description: 3 nodes with 1 nic port, host-host vxlan mesh, vnf on each node
 
@@ -52,7 +53,7 @@ nodes:
         if_type: ethernet
         ip_addresses:
           - "10.100.3.1/16"
-       
+
 vnf_services:
   - name: service1
     vnfs:
@@ -66,8 +67,8 @@ vnf_services:
         forwarding:
           - type: l2xc
             l2xc_interfaces:
-                - port1
-                - port2   
+              - port1
+              - port2
       - name: vnf2
         node: vswitch2
         vnf_type: vppcontainer
@@ -79,8 +80,8 @@ vnf_services:
         forwarding:
           - type: l2xc
             l2xc_interfaces:
-                - port1
-                - port2   
+              - port1
+              - port2
       - name: vnf3
         node: vswitch3
         vnf_type: vppcontainer
@@ -92,8 +93,8 @@ vnf_services:
         forwarding:
           - type: l2xc
             l2xc_interfaces:
-                - port1
-                - port2
+              - port1
+              - port2
     connections:
       - conn_type: l2pp
         vnf_service_mesh: inter_host_vxlan_mesh
@@ -108,7 +109,7 @@ vnf_services:
           - vnf: vnf2
             interface: port2
           - vnf: vnf3
-            interface: port1           
+            interface: port1
 
 vnf_service_meshes:
   - name: inter_host_vxlan_mesh
@@ -119,4 +120,3 @@ vnf_service_meshes:
       vni_range_end: 5999
       loopback_ipam_pool_name: vxlan_loopback_pool
       outgoing_interface_label: vxlan
-

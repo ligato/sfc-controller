@@ -1,3 +1,4 @@
+---
 apiVersion: sfccontroller.ligato.github.com/v1alpha1
 kind: NetworkNodeOverlay
 metadata:
@@ -10,5 +11,4 @@ spec:
   vxlan_mesh_parms:
     vni_range_start: 5000
     vni_range_end: 5999
-    #loopback_ipam_pool_name: vxlan_loopback_pool
     network_node_interface_label: vxlan

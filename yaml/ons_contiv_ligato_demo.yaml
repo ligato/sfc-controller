@@ -1,13 +1,14 @@
+---
 sfc_controller_config_version: 2
 description: 2 vnf chains spanning 2 hosts, memif's and vxlan tunnels
 
-ipam_pools: # allocate internode vxlan mesh enpoints from a pool
+ipam_pools:  # allocate internode vxlan mesh enpoints from a pool
   - metadata:
       name: vxlan_loopback_pool
       labels:
     spec:
       scope: system
-      network: 192.168.30.0/24 # allocate ip's from 192.168.30.200 to 192.168.30.205
+      network: 192.168.30.0/24  # allocate ip's from 192.168.30.200 to 192.168.30.205
       start_range: 200
       end_range: 205
 
@@ -33,7 +34,7 @@ network_nodes:
               - "192.168.16.1/24"
         - metadata:
             name: vxlan_endpoint
-          spec:        
+          spec:
             if_type: vxlan_tunnel
             ip_addresses:
               - "200.200.200.1/24"
@@ -53,7 +54,7 @@ network_nodes:
               - "192.168.16.2/24"
         - metadata:
             name: vxlan_endpoint
-          spec:        
+          spec:
             if_type: vxlan_tunnel
             ip_addresses:
               - "200.200.200.2/24"
@@ -73,11 +74,11 @@ network_nodes:
               - "192.168.16.3/24"
         - metadata:
             name: vxlan_endpoint
-          spec:        
+          spec:
             if_type: vxlan_tunnel
             ip_addresses:
               - "200.200.200.3/24"
-                  
+
 network_services:
   - metadata:
       name: l2pp_service_chain1

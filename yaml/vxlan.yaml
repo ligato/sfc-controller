@@ -1,3 +1,4 @@
+---
 sfc_controller_config_version: 2
 
 ipam_pools:
@@ -8,21 +9,10 @@ ipam_pools:
       network: 10.10.1.0/24
       start_range: 1
       end_range: 254
-#  - metadata:
-#      name: vxlan_loopback_pool
-#    spec:
-#      scope: system
-#      network: 200.200.200.0/24
-#      start_range: 200
-#      end_range: 205
 
 network_pod_to_node_map:
   - pod: MOB
     node: ts1-host1
-#  - pod: BIA_1
-#    node: ts1-host1
-#  - pod: BIA_2
-#    node: ts1-host1
 
 network_nodes:
   - metadata:
@@ -30,31 +20,16 @@ network_nodes:
     spec:
       node_type: host
       interfaces:
-        - name: GIGE_MOB # mobility network
+        - name: GIGE_MOB  # mobility network
           labels:
             - mob_label
           if_type: ethernet
-        - name: GIGE_INTER_HOST # inter-host network
+        - name: GIGE_INTER_HOST  # inter-host network
           labels:
             - vxlan
           ip_addresses:
             - 5.5.5.1/32
           if_type: ethernet
-#  - metadata:
-#      name: ts1-host2
-#    spec:
-#      node_type: host
-#      interfaces:
-#        - name: GIGE_MOB # mobility network
-#          labels:
-#            - mob_label
-#          if_type: ethernet
-#        - name: GIGE_INTER_HOST # inter-host network
-#          labels:
-#            - vxlan
-#          ip_addresses:
-#            - 5.5.6.1/32
-#          if_type: ethernet
 
 network_services:
   - metadata:
@@ -70,40 +45,12 @@ network_services:
                 if_type: memif
                 ipam_pool_names:
                   - network_service_pool
-#              - name: bia
-#                if_type: memif
-#                ipam_pool_names:
-#                  - network_service_pool
-#        - metadata:
-#            name: BIA_1
-#          spec:
-#            pod_type: nonvppcontainer
-#            interfaces:
-#              - name: bia
-#                if_type: veth
-#                ipam_pool_names:
-#                  - network_service_pool
-#        - metadata:
-#            name: BIA_2
-#          spec:
-#            pod_type: nonvppcontainer
-#            interfaces:
-#              - name: bia
-#                if_type: veth
-#                ipam_pool_names:
-#                  - network_service_pool
       connections:
         - conn_type: l2pp
           pod_interfaces:
             - MOB/mob
           node_interface_labels:
             - mob_label
-#        - conn_type: l2mp
-#          pod_interfaces:
-#            - MOB/bia
-#            - BIA_1/bia
-#            - BIA_2/bia
-#          network_node_overlay_name: inter_node_vxlan_mesh
 
 network_node_overlays:
   - metadata:
@@ -114,5 +61,4 @@ network_node_overlays:
       vxlan_mesh_parms:
         vni_range_start: 5000
         vni_range_end: 5999
-        #loopback_ipam_pool_name: vxlan_loopback_pool
         network_node_interface_label: vxlan
