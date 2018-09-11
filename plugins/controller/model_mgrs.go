@@ -14,6 +14,8 @@
 
 package controller
 
+import "time"
+
 const (
 	ModelTypeSysParameters      = "system-parameters"
 	ModelTypeIPAMPool           = "ipam-pool"
@@ -46,21 +48,14 @@ type registeredManagersInterface interface {
 	DumpCache()
 	LoadAllFromDatastoreIntoCache() error
 
-	RenderAll()
-
 	InitAndRunWatcher()
 
 	// rest handlers
 	InitHTTPHandlers()
-	//KeyPrefix()
-	//GetAllURL()
 
-	// model type specific crud handlers ... not part of interface as they return
-	// model specifc parms but implement these for each new model type
-	//HandleCRUDOperationCU()
-	//HandleCRUDOperationR()
-	//HandleCRUDOperationD()
-	//HandleCRUDOperationGetAll()
+	// CRUD handlers
+	HandleCRUDOperationCU(data interface{}) error
+	HandleCRUDOperationD(data interface{}) error
 }
 
 func (s *Plugin) RegisterModelTypeManagers() {
@@ -70,4 +65,88 @@ func (s *Plugin) RegisterModelTypeManagers() {
 	RegisterModelType(ModelTypeNetworkNodeOverlay, &s.NetworkNodeOverlayMgr)
 	RegisterModelType(ModelTypeNetworkNode, &s.NetworkNodeMgr)
 	RegisterModelType(ModelTypeNetworkService, &s.NetworkServiceMgr)
+}
+
+func findModelManager(modelName string) registeredManagersInterface {
+	for _, entry := range RegisteredManagers {
+		if entry.modelTypeName == modelName {
+			return entry.mgr
+		}
+	}
+	return nil
+}
+
+const (
+	OperationalMsgOpCodeRender = iota + 1
+	OperationalMsgOpCodeCreateUpdate
+	OperationalMsgOpCodeDelete
+)
+
+type OperationalMsg struct {
+	model string
+	opCode int
+	data interface{}
+}
+var OperationalMsgChannel = make(chan *OperationalMsg,0)
+
+//ProcessOperationalMessages is a single threaded go routine processing all operations in sequence
+func (s *Plugin) ProcessOperationalMessages() {
+
+	then := time.Now()
+	isRenderingEnabled := false
+
+	for msg := range OperationalMsgChannel {
+
+		log.Debugf("ProcessOperationalMessages: %v", msg)
+
+		switch msg.opCode {
+		case OperationalMsgOpCodeRender:
+			log.Debugf("ProcessOperationalMessages: received rendering msg")
+			// special msg for startup after all config from db/yaml have been processed
+			isRenderingEnabled = true
+
+		case OperationalMsgOpCodeCreateUpdate:
+			findModelManager(msg.model).HandleCRUDOperationCU(msg.data)
+
+		case OperationalMsgOpCodeDelete:
+			findModelManager(msg.model).HandleCRUDOperationD(msg.data)
+
+		}
+
+		if isRenderingEnabled {
+			log.Debugf("ProcessOperationalMessages: check if rendering required")
+			if numInChan := len(OperationalMsgChannel); numInChan != 0 {
+				// there are more messages in the channel so "skip" rendering until there are no more or
+				// 1 second has elapsed
+				now := time.Now()
+				if now.Second()-then.Second() > 1 {
+					then = now
+					ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
+					log.Debugf("ProcessOperationalMessages: queueLen: %d, 1 second elapsed ... force a render",
+						numInChan)
+					RenderTxnConfigStart()
+					s.RenderAll()
+					RenderTxnConfigEnd()
+				} else {
+					log.Debugf("ProcessOperationalMessages: queueLen: %d, delaying render msg for at least 1 second",
+						numInChan)
+				}
+			} else {
+				log.Debugf("ProcessOperationalMessages: queue is empty ... rendering")
+				RenderTxnConfigStart()
+				s.RenderAll()
+				RenderTxnConfigEnd()
+			}
+		}
+	}
+}
+
+func (s *Plugin) AddOperationMsgToQueue(model string, opCode int, data interface{}) {
+	msg := &OperationalMsg {
+		model : model,
+		opCode: opCode,
+		data: data,
+	}
+	log.Debugf("AddOperationMsgToQueue: %v", msg)
+	OperationalMsgChannel <- msg
 }

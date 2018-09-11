@@ -18,6 +18,7 @@ import (
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 	"sync"
+	"github.com/ligato/sfc-controller/plugins/controller/database"
 )
 
 // a cache of before and after entries per
@@ -218,6 +219,19 @@ func CopyRenderedVppAgentEntriesToBeforeCfgTxn(entityName string) {
 		}
 	}
 	log.Debugf("CopyRenderedVppAgentEntriesToBeforeCfgTxn: beforeMap: %v", beforeMap)
+}
+
+// DeleteRenderedVppAgentEntries deletes the existing rendered set
+func DeleteRenderedVppAgentEntries(renderedVppAgentEntries map[string]*controller.RenderedVppAgentEntry) {
+
+	log.Debugf("DeleteRenderedVppAgentEntriesFromBeforeCfgTxn: renderedEntities=%v",
+		renderedVppAgentEntries)
+
+	for _, vppAgentEntry := range renderedVppAgentEntries {
+		log.Debugf("DeleteRenderedVppAgentEntriesFromBeforeCfgTxn: entry=%v", vppAgentEntry)
+		delete(ctlrPlugin.ramCache.VppEntries, vppAgentEntry.VppAgentKey)
+		database.DeleteFromDatastore(vppAgentEntry.VppAgentKey)
+	}
 }
 
 // transferAfterVppKVEntriesToSystemCache updates the system cache with the new vpp agent entries

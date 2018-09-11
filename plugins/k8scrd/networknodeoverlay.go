@@ -81,10 +81,8 @@ func (mgr *CRDNetworkNodeOverlayMgr) HandleCRDSync(crdNNO crd.NetworkNodeOverlay
 		}
 	}
 
-	if err := ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationCU(&nno, false); err != nil {
-		log.Errorf("%s", err.Error())
-		return
-	}
+	ctlrPlugin.AddOperationMsgToQueue(controller.ModelTypeNetworkNodeOverlay,
+		controller.OperationalMsgOpCodeCreateUpdate, &nno)
 
 	log.Infof("NetworkNodeOverlay %s", opStr)
 }

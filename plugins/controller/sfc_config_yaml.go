@@ -86,41 +86,41 @@ func (s *Plugin) SfcConfigYamlProcessConfig(y *SfcConfigYaml) error {
 	}
 
 	log.Debugf("SfcConfigYamlProcessConfig: system parameters: ", y.SysParms)
-	if err := ctlrPlugin.SysParametersMgr.HandleCRUDOperationCU(&y.SysParms, false); err != nil {
+	if err := ctlrPlugin.SysParametersMgr.HandleCRUDOperationCU(&y.SysParms); err != nil {
 		return err
 	}
 
 	log.Debugf("SfcConfigYamlProcessConfig: ipam pools: ", y.IPAMPools)
 	for _, ipamPool := range y.IPAMPools {
-		if err := ctlrPlugin.IpamPoolMgr.HandleCRUDOperationCU(ipamPool, false); err != nil {
+		if err := ctlrPlugin.IpamPoolMgr.HandleCRUDOperationCU(ipamPool); err != nil {
 			return err
 		}
 	}
 
 	for _, nn := range y.NetworkNodes {
 		log.Debugf("SfcConfigYamlProcessConfig: network node: ", nn)
-		if err := ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationCU(nn, false); err != nil {
+		if err := ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationCU(nn); err != nil {
 			return err
 		}
 	}
 
 	for _, ns := range y.NetworkServices {
 		log.Debugf("SfcConfigYamlProcessConfig: network-service: ", ns)
-		if err := ctlrPlugin.NetworkServiceMgr.HandleCRUDOperationCU(ns, false); err != nil {
+		if err := ctlrPlugin.NetworkServiceMgr.HandleCRUDOperationCU(ns); err != nil {
 			return err
 		}
 	}
 
 	for _, p2n := range y.NetworkPodToNodeMap {
 		log.Debugf("SfcConfigYamlProcessConfig: network-pod-to-node-map: ", p2n)
-		if err := ctlrPlugin.NetworkPodNodeMapMgr.HandleCRUDOperationCU(p2n, false); err != nil {
+		if err := ctlrPlugin.NetworkPodNodeMapMgr.HandleCRUDOperationCU(p2n); err != nil {
 			return err
 		}
 	}
 
 	log.Debugf("SfcConfigYamlProcessConfig: network-node-overlays: ", y.NetworkNodeOverlays)
 	for _, nno := range y.NetworkNodeOverlays {
-		if err := ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationCU(nno, false); err != nil {
+		if err := ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationCU(nno); err != nil {
 			return err
 		}
 	}

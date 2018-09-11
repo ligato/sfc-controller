@@ -206,9 +206,12 @@ func (s *Plugin) AfterInit() error {
 	// so render the config ... note: resync will ensure etcd is not written to
 	// unnecessarily
 
-	RenderTxnConfigStart()
-	s.RenderAll()
-	RenderTxnConfigEnd()
+	go s.ProcessOperationalMessages()
+
+	s.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
+	//RenderTxnConfigStart()
+	//s.RenderAll()
+	//RenderTxnConfigEnd()
 
 	s.afterInitMgrs()
 
@@ -223,12 +226,9 @@ func (s *Plugin) AfterInit() error {
 
 // RenderAll calls only node and service as the rest are resources used by these
 func (s *Plugin) RenderAll() {
+	// nodes and services ONLY render VPP entries ... the rest are resources used by the renderers
 	ctlrPlugin.NetworkNodeMgr.RenderAll()
 	ctlrPlugin.NetworkServiceMgr.RenderAll()
-	//for _, entry := range RegisteredManagers {
-	//	log.Infof("RenderAll: initial rendering %s ...", entry.modelTypeName)
-	//	entry.mgr.RenderAll()
-	//}
 }
 
 // InitRAMCache creates the ram cache

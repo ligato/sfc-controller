@@ -180,3 +180,14 @@ func loadAllInterfacesFromDatastore(iFaces map[string]*controller.InterfaceStatu
 			//log.Debugf("loadAllInterfacesFromDatastore: n=%v", ip)
 		})
 }
+
+// DeleteInterfaceEntries deletes the existing rendered set
+func DeleteInterfaceEntries(interfaces map[string]*controller.InterfaceStatus) {
+
+	log.Debugf("DeleteInterfaceEntries: interfaces=%v", interfaces)
+
+	for _, ifStatus := range interfaces {
+		log.Debugf("DeleteInterfaceEntries: entry=%v", ifStatus)
+		RemoveInterfaceStatus(interfaces, ConnPodName(ifStatus.Name), ConnInterfaceName(ifStatus.Name))
+	}
+}

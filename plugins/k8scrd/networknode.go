@@ -81,10 +81,8 @@ func (mgr *CRDNetworkNodeMgr) HandleCRDSync(crdNN crd.NetworkNode) {
 		}
 	}
 
-	if err := ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationCU(&nn, false); err != nil {
-		log.Errorf("%s", err.Error())
-		return
-	}
+	ctlrPlugin.AddOperationMsgToQueue(controller.ModelTypeNetworkNode,
+		controller.OperationalMsgOpCodeCreateUpdate, &nn)
 
 	log.Infof("NetworkNode %s", opStr)
 }

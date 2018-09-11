@@ -132,7 +132,7 @@ func (mgr *IPAMPoolMgr) AllocateAddress(poolName string, nodeName string, vsName
 		return "", 0, fmt.Errorf("Cannot allocate address from ipam pool %s", poolName)
 	}
 
-	log.Errorf("AllocateAddress: allocatorPool: %v", allocatorPool)
+	log.Debugf("AllocateAddress: allocatorPool: %v", allocatorPool)
 
 	ipamPool.Status.Addresses[allocatorPool.Name] = allocatorPool.GetAllocatedAddressesStatus()
 
@@ -238,7 +238,9 @@ func (mgr *IPAMPoolMgr) EntityDelete(entityName string, scope string) {
 }
 
 // HandleCRUDOperationCU add to ram cache and render
-func (mgr *IPAMPoolMgr) HandleCRUDOperationCU(_ipamPool *IPAMPool, render bool) error {
+func (mgr *IPAMPoolMgr) HandleCRUDOperationCU(data interface{}) error {
+
+	_ipamPool := data.(*IPAMPool)
 
 	ipamPool := &IPAMPool{}
 	ipamPool.Metadata = _ipamPool.Metadata
@@ -247,10 +249,6 @@ func (mgr *IPAMPoolMgr) HandleCRUDOperationCU(_ipamPool *IPAMPool, render bool) 
 	if _ipamPool.Status != nil {
 		log.Warnf("IPAM Pool: %s status section: not empty for this config, ignoring %v",
 			_ipamPool.Metadata.Name, _ipamPool.Status)
-	}
-
-	if err := ipamPool.validate(); err != nil {
-		return err
 	}
 
 	mgr.ipamPoolCache[_ipamPool.Metadata.Name] = ipamPool
@@ -277,10 +275,6 @@ func (mgr *IPAMPoolMgr) HandleCRUDOperationCU(_ipamPool *IPAMPool, render bool) 
 		return err
 	}
 
-	if render {
-		ipamPool.renderConfig()
-	}
-
 	return nil
 }
 
@@ -291,7 +285,9 @@ func (mgr *IPAMPoolMgr) HandleCRUDOperationR(name string) (*IPAMPool, bool) {
 }
 
 // HandleCRUDOperationD removes from ram cache
-func (mgr *IPAMPoolMgr) HandleCRUDOperationD(name string, render bool) error {
+func (mgr *IPAMPoolMgr) HandleCRUDOperationD(data interface{}) error {
+
+	name := data.(string)
 
 	ipamPool, exists := mgr.ipamPoolCache[name]
 	if !exists {
@@ -305,10 +301,6 @@ func (mgr *IPAMPoolMgr) HandleCRUDOperationD(name string, render bool) error {
 	database.DeleteFromDatastore(mgr.NameKey(name))
 
 	ctlrPlugin.IpamPoolMgr.EntityDelete(name, ipamPool.Spec.Scope)
-
-	if render {
-		log.Errorf("HandleCRUDOperationD: need to implement rerender ...")
-	}
 
 	return nil
 }
@@ -390,9 +382,6 @@ func entityHandler(formatter *render.Render) http.HandlerFunc {
 
 func processPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
-	RenderTxnConfigStart()
-	defer RenderTxnConfigEnd()
-
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		log.Debugf("Can't read body, error '%s'", err)
@@ -400,8 +389,8 @@ func processPost(formatter *render.Render, w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	var ip IPAMPool
-	err = json.Unmarshal(body, &ip)
+	var ipamPool IPAMPool
+	err = json.Unmarshal(body, &ipamPool)
 	if err != nil {
 		log.Debugf("Can't parse body, error '%s'", err)
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
@@ -409,38 +398,37 @@ func processPost(formatter *render.Render, w http.ResponseWriter, req *http.Requ
 	}
 
 	vars := mux.Vars(req)
-	if vars[entityName] != ip.Metadata.Name {
+	if vars[entityName] != ipamPool.Metadata.Name {
 		formatter.JSON(w, http.StatusBadRequest, "json name does not matach url name")
 		return
 	}
 
 	if existing, exists := ctlrPlugin.IpamPoolMgr.HandleCRUDOperationR(vars[entityName]); exists {
 		// if nothing has changed, simply return OK and waste no cycles
-		if existing.ConfigEqual(&ip) {
+		if existing.ConfigEqual(&ipamPool) {
+			log.Debugf("processPost: config equal no further processing required")
 			formatter.JSON(w, http.StatusOK, "OK")
 			return
 		}
+		log.Debugf("processPost: old: %v", existing)
+		log.Debugf("processPost: new: %v", ipamPool)
 	}
 
-	log.Debugf("processPost: POST: %v", ip)
-	if err := ctlrPlugin.IpamPoolMgr.HandleCRUDOperationCU(&ip, true); err != nil {
+	if err := ipamPool.validate(); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
+
+	ctlrPlugin.AddOperationMsgToQueue(ModelTypeIPAMPool, OperationalMsgOpCodeCreateUpdate, &ipamPool)
 
 	formatter.JSON(w, http.StatusOK, "OK")
 }
 
 func processDelete(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
-	RenderTxnConfigStart()
-	defer RenderTxnConfigEnd()
-
 	vars := mux.Vars(req)
-	if err := ctlrPlugin.IpamPoolMgr.HandleCRUDOperationD(vars[entityName], true); err != nil {
-		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
-		return
-	}
+
+	ctlrPlugin.AddOperationMsgToQueue(ModelTypeIPAMPool, OperationalMsgOpCodeDelete, vars[entityName])
 
 	formatter.JSON(w, http.StatusOK, "OK")
 }
@@ -475,28 +463,6 @@ func (mgr *IPAMPoolMgr) GetAllURL() string {
 // NameKey provides sfc controller's entity name key prefix
 func (mgr *IPAMPoolMgr) NameKey(name string) string {
 	return mgr.KeyPrefix() + name
-}
-
-func (ip *IPAMPool) renderConfig() error {
-	RenderTxnConfigEntityStart()
-	defer RenderTxnConfigEntityEnd()
-
-	// first validate the config as it may have come in via a dartastore
-	// update from outside rest, startup yaml ... crd?
-	if err := ip.validate(); err != nil {
-		return err
-	}
-
-	ctlrPlugin.RenderAll()
-
-	return nil
-}
-
-// RenderAll renders all entities in the cache
-func (mgr *IPAMPoolMgr) RenderAll() {
-	for _, ip := range mgr.ipamPoolCache {
-		ip.renderConfig()
-	}
 }
 
 func (ip *IPAMPool) validate() error {
@@ -555,32 +521,6 @@ func (mgr *IPAMPoolMgr) InitAndRunWatcher() {
 	log.Info("IPAMPoolWatcher: enter ...")
 	defer log.Info("IPAMPoolWatcher: exit ...")
 
-	//go func() {
-	//	// back up timer ... paranoid about missing events ...
-	//	// check every minute just in case
-	//	ticker := time.NewTicker(1 * time.Minute)
-	//	for _ = range ticker.C {
-	//		tempIPAMPoolMap := make(map[string]*IPAMPool)
-	//		mgr.loadAllFromDatastore(tempIPAMPoolMap)
-	//		renderingRequired := false
-	//		for _, dbEntry := range tempIPAMPoolMap {
-	//			ramEntry, exists := mgr.HandleCRUDOperationR(dbEntry.Metadata.Name)
-	//			if !exists || !ramEntry.ConfigEqual(dbEntry) {
-	//				log.Debugf("IPAMPoolWatcher: timer new config: %v", dbEntry)
-	//				renderingRequired = true
-	//				mgr.HandleCRUDOperationCU(dbEntry, false) // render at the end
-	//			}
-	//		}
-	//		// if any of the entities required rendering, do it now
-	//		if renderingRequired {
-	//			RenderTxnConfigStart()
-	//			ctlrPlugin.RenderAll()
-	//			RenderTxnConfigEnd()
-	//		}
-	//		tempIPAMPoolMap = nil
-	//	}
-	//}()
-
 	respChan := make(chan keyval.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())
 	err := watcher.Watch(keyval.ToChanProto(respChan), make(chan string), "")
@@ -594,24 +534,10 @@ func (mgr *IPAMPoolMgr) InitAndRunWatcher() {
 		select {
 		case resp := <-respChan:
 			switch resp.GetChangeType() {
-			case datasync.Put:
-				dbNode := &IPAMPool{}
-				if err := resp.GetValue(dbNode); err == nil {
-					ramNode, exists := mgr.HandleCRUDOperationR(dbNode.Metadata.Name)
-					if !exists || !ramNode.ConfigEqual(dbNode) {
-						log.Infof("IPAMPoolWatcher: watch config key: %s, value:%v",
-							resp.GetKey(), dbNode)
-						RenderTxnConfigStart()
-						mgr.HandleCRUDOperationCU(dbNode, true)
-						RenderTxnConfigEnd()
-					}
-				}
-
 			case datasync.Delete:
 				log.Infof("IPAMPoolWatcher: deleting key: %s ", resp.GetKey())
-				RenderTxnConfigStart()
-				mgr.HandleCRUDOperationD(resp.GetKey(), true)
-				RenderTxnConfigEnd()
+				ctlrPlugin.AddOperationMsgToQueue(ModelTypeIPAMPool, OperationalMsgOpCodeDelete, resp.GetKey())
+
 			}
 		}
 	}

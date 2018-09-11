@@ -99,7 +99,9 @@ func (mgr *SystemParametersMgr) FindL2BDTemplate(templateName string) *controlle
 }
 
 // HandleCRUDOperationCU add to ram cache and render
-func (mgr *SystemParametersMgr) HandleCRUDOperationCU(sp *SystemParameters, render bool) error {
+func (mgr *SystemParametersMgr) HandleCRUDOperationCU(data interface{}) error {
+
+	sp := data.(*SystemParameters)
 
 	if err := sp.validate(); err != nil {
 		return err
@@ -111,10 +113,6 @@ func (mgr *SystemParametersMgr) HandleCRUDOperationCU(sp *SystemParameters, rend
 		return err
 	}
 
-	if render {
-		sp.renderConfig()
-	}
-
 	return nil
 }
 
@@ -124,10 +122,11 @@ func (mgr *SystemParametersMgr) HandleCRUDOperationR() (*SystemParameters, bool)
 }
 
 // HandleCRUDOperationD finds in ram cache
-func (mgr *SystemParametersMgr) HandleCRUDOperationD(render bool) {
+func (mgr *SystemParametersMgr) HandleCRUDOperationD(data interface{}) error {
 	log.Debugf("HandleCRUDOperationD: resetting to defaults")
 	mgr.sysParmCache = &SystemParameters{}
-	mgr.HandleCRUDOperationCU(mgr.sysParmCache, render)
+	mgr.HandleCRUDOperationCU(mgr.sysParmCache)
+	return nil
 }
 
 // HandleCRUDOperationGetAll returns the map
@@ -184,9 +183,6 @@ func systemParametersHandler(formatter *render.Render) http.HandlerFunc {
 
 func systemParametersProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
-	RenderTxnConfigStart()
-	defer RenderTxnConfigEnd()
-
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		log.Debugf("Can't read body, error '%s'", err)
@@ -205,16 +201,20 @@ func systemParametersProcessPost(formatter *render.Render, w http.ResponseWriter
 	if existing, exists := ctlrPlugin.SysParametersMgr.HandleCRUDOperationR(); exists {
 		// if nothing has changed, simply return OK and waste no cycles
 		if existing.ConfigEqual(&sp) {
+			log.Debugf("processPost: config equal no further processing required")
 			formatter.JSON(w, http.StatusOK, "OK")
 			return
 		}
+		log.Debugf("processPost: old: %v", existing)
+		log.Debugf("processPost: new: %v", sp)
 	}
 
-	log.Debugf("systemParametersProcessPost: POST: %v", sp)
-	if err := ctlrPlugin.SysParametersMgr.HandleCRUDOperationCU(&sp, true); err != nil {
+	if err := sp.validate(); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
+
+	ctlrPlugin.AddOperationMsgToQueue(ModelTypeSysParameters, OperationalMsgOpCodeCreateUpdate, &sp)
 
 	formatter.JSON(w, http.StatusOK, "OK")
 }
@@ -222,26 +222,6 @@ func systemParametersProcessPost(formatter *render.Render, w http.ResponseWriter
 // KeyPrefix provides sfc controller's node key prefix
 func (mgr *SystemParametersMgr) KeyPrefix() string {
 	return controller.SfcControllerConfigPrefix() + "system-parameters"
-}
-
-func (sp *SystemParameters) renderConfig() error {
-	RenderTxnConfigEntityStart()
-	defer RenderTxnConfigEntityEnd()
-
-	// first validate the config as it may have come in via a datastore
-	// update from outside rest, startup yaml ... crd?
-	if err := sp.validate(); err != nil {
-		return err
-	}
-
-	ctlrPlugin.RenderAll()
-
-	return nil
-}
-
-// RenderAll renders all entities in the cache
-func (mgr *SystemParametersMgr) RenderAll() {
-	mgr.sysParmCache.renderConfig()
 }
 
 func (sp *SystemParameters) validate() error {
@@ -275,21 +255,6 @@ func (mgr *SystemParametersMgr) InitAndRunWatcher() {
 	log.Info("SystemParametersWatcher: enter ...")
 	defer log.Info("SystemParametersWatcher: exit ...")
 
-	//go func() {
-	//	// back up timer ... paranoid about missing events ...
-	//	// check every minute just in case
-	//	ticker := time.NewTicker(1 * time.Minute)
-	//	for _ = range ticker.C {
-	//		var dbEntry SystemParameters
-	//		mgr.loadAllFromDatastore(&dbEntry)
-	//		ramEntry, exists := mgr.HandleCRUDOperationR()
-	//		if !exists || !ramEntry.ConfigEqual(&dbEntry) {
-	//			log.Debugf("SystemParametersWatcher: timer new config: %v", dbEntry)
-	//			mgr.HandleCRUDOperationCU(&dbEntry, true) // render at the end
-	//		}
-	//	}
-	//}()
-
 	respChan := make(chan keyval.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())
 	err := watcher.Watch(keyval.ToChanProto(respChan), make(chan string), "")
@@ -303,24 +268,9 @@ func (mgr *SystemParametersMgr) InitAndRunWatcher() {
 		select {
 		case resp := <-respChan:
 			switch resp.GetChangeType() {
-			case datasync.Put:
-				dbEntry := &SystemParameters{}
-				if err := resp.GetValue(dbEntry); err == nil {
-					ramEntry, exists := mgr.HandleCRUDOperationR()
-					if !exists || !ramEntry.ConfigEqual(dbEntry) {
-						log.Infof("SystemParametersWatcher: watch config key: %s, value:%v",
-							resp.GetKey(), dbEntry)
-						RenderTxnConfigStart()
-						mgr.HandleCRUDOperationCU(dbEntry, true)
-						RenderTxnConfigEnd()
-					}
-				}
-
 			case datasync.Delete:
 				log.Infof("SystemParametersWatcher: deleting key: %s ", resp.GetKey())
-				RenderTxnConfigStart()
-				mgr.HandleCRUDOperationD(true)
-				RenderTxnConfigEnd()
+				ctlrPlugin.AddOperationMsgToQueue(ModelTypeSysParameters, OperationalMsgOpCodeDelete, resp.GetKey())
 			}
 		}
 	}

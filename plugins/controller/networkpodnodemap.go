@@ -95,26 +95,26 @@ func (mgr *NetworkPodToNodeMapMgr) HandleContivKSRStatusUpdate(p2n *NetworkPodTo
 	ctlrPlugin.ramCache.NetworkPodToNodeMap[p2n.Pod] = p2n
 
 	if render {
-		p2n.renderConfig()
+		ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
 	}
 
 	return nil
 }
 
 // HandleContivKSRStatusDelete add to ram cache and render
-func (mgr *NetworkPodToNodeMapMgr) HandleContivKSRStatusDelete(podName string, render bool) error {
+func (mgr *NetworkPodToNodeMapMgr) HandleContivKSRStatusDelete(podName string) error {
 
 	delete(ctlrPlugin.ramCache.NetworkPodToNodeMap, podName)
 
-	if render {
-		mgr.RenderAll()
-	}
+	ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
 
 	return nil
 }
 
 // HandleCRUDOperationCU add to ram cache and render
-func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationCU(p2n *NetworkPodToNodeMap, render bool) error {
+func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationCU(data interface{}) error {
+
+	p2n := data.(*NetworkPodToNodeMap)
 
 	if err := p2n.validate(); err != nil {
 		return err
@@ -127,10 +127,6 @@ func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationCU(p2n *NetworkPodToNodeMa
 		return err
 	}
 
-	if render {
-		p2n.renderConfig()
-	}
-
 	return nil
 }
 
@@ -141,12 +137,14 @@ func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationR(name string) (*NetworkPo
 }
 
 // HandleCRUDOperationD removes from ram cache
-func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationD(name string, render bool) error {
+func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationD(data interface{}) error {
+
+	name := data.(string)
 
 	delete(mgr.networkPodNodeCache, name)
-	if render {
-		mgr.RenderAll()
-	}
+
+	// remove from the database
+	database.DeleteFromDatastore(mgr.NameKey(name))
 
 	return nil
 }
@@ -228,9 +226,6 @@ func networkPodNodeMapHandler(formatter *render.Render) http.HandlerFunc {
 
 func networkPodNodeMapProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
-	RenderTxnConfigStart()
-	defer RenderTxnConfigEnd()
-
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		log.Debugf("Can't read body, error '%s'", err)
@@ -255,30 +250,30 @@ func networkPodNodeMapProcessPost(formatter *render.Render, w http.ResponseWrite
 	if existing, exists := ctlrPlugin.NetworkPodNodeMapMgr.HandleCRUDOperationR(vars[networkPodName]); exists {
 		// if nothing has changed, simply return OK and waste no cycles
 		if existing.ConfigEqual(&p2n) {
+			log.Debugf("processPost: config equal no further processing required")
 			formatter.JSON(w, http.StatusOK, "OK")
 			return
 		}
+		log.Debugf("processPost: old: %v", existing)
+		log.Debugf("processPost: new: %v", p2n)
 	}
 
-	log.Debugf("processPost: POST: %v", p2n)
-	if err := ctlrPlugin.NetworkPodNodeMapMgr.HandleCRUDOperationCU(&p2n, true); err != nil {
+	if err := p2n.validate(); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
+
+	ctlrPlugin.AddOperationMsgToQueue(ModelTypeNetworkPodNodeMap, OperationalMsgOpCodeCreateUpdate, &p2n)
 
 	formatter.JSON(w, http.StatusOK, "OK")
 }
 
 func networkPodNodeMapProcessDelete(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
-	RenderTxnConfigStart()
-	defer RenderTxnConfigEnd()
-
 	vars := mux.Vars(req)
-	if err := ctlrPlugin.NetworkPodNodeMapMgr.HandleCRUDOperationD(vars[networkPodName], true); err != nil {
-		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
-		return
-	}
+
+	ctlrPlugin.AddOperationMsgToQueue(ModelTypeNetworkPodNodeMap,
+		OperationalMsgOpCodeDelete, vars[networkPodName])
 
 	formatter.JSON(w, http.StatusOK, "OK")
 }
@@ -321,29 +316,6 @@ func (mgr *NetworkPodToNodeMapMgr) ContivKsrNetworkPodToNodePrefix() string {
 		"network-pod-to-node-map/"
 }
 
-func (p2n *NetworkPodToNodeMap) renderConfig() error {
-	RenderTxnConfigEntityStart()
-	defer RenderTxnConfigEntityEnd()
-
-	// first validate the config as it may have come in via a datastore
-	// update from outside rest, startup yaml ... crd?
-	if err := p2n.validate(); err != nil {
-		return err
-	}
-
-	ctlrPlugin.NetworkServiceMgr.RenderAll()
-
-	return nil
-}
-
-// RenderAll renders all entites in the cache
-func (mgr *NetworkPodToNodeMapMgr) RenderAll() {
-	RenderTxnConfigEntityStart()
-	defer RenderTxnConfigEntityEnd()
-
-	ctlrPlugin.NetworkServiceMgr.RenderAll()
-}
-
 func (p2n *NetworkPodToNodeMap) validate() error {
 	log.Debugf("Validating NetworkPodToNodeMap: %v ...", p2n)
 	return nil
@@ -354,32 +326,6 @@ func (mgr *NetworkPodToNodeMapMgr) InitAndRunWatcher() {
 
 	log.Info("NetworkPodToNodeMapWatcher: enter ...")
 	defer log.Info("NetworkPodToNodeMapWatcher: exit ...")
-
-	//go func() {
-	//	// back up timer ... paranoid about missing events ...
-	//	// check every minute just in case
-	//	ticker := time.NewTicker(1 * time.Minute)
-	//	for _ = range ticker.C {
-	//		tempNetworkPodToNodeMapMap := make(map[string]*NetworkPodToNodeMap)
-	//		mgr.loadAllFromDatastore(mgr.KeyPrefix(), tempNetworkPodToNodeMapMap)
-	//		renderingRequired := false
-	//		for _, dbEntry := range tempNetworkPodToNodeMapMap {
-	//			ramEntry, exists := mgr.HandleCRUDOperationR(dbEntry.Pod)
-	//			if !exists || !ramEntry.ConfigEqual(dbEntry) {
-	//				log.Debugf("NetworkPodToNodeMapWatcher: timer new config: %v", dbEntry)
-	//				renderingRequired = true
-	//				mgr.HandleCRUDOperationCU(dbEntry, false) // render at the end
-	//			}
-	//		}
-	//		// if any of the entities required rendering, do it now
-	//		if renderingRequired {
-	//			RenderTxnConfigStart()
-	//			ctlrPlugin.RenderAll()
-	//			RenderTxnConfigEnd()
-	//		}
-	//		tempNetworkPodToNodeMapMap = nil
-	//	}
-	//}()
 
 	respChan := make(chan keyval.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())
@@ -394,24 +340,9 @@ func (mgr *NetworkPodToNodeMapMgr) InitAndRunWatcher() {
 		select {
 		case resp := <-respChan:
 			switch resp.GetChangeType() {
-			case datasync.Put:
-				dbEntry := &NetworkPodToNodeMap{}
-				if err := resp.GetValue(dbEntry); err == nil {
-					ramEntry, exists := mgr.HandleCRUDOperationR(dbEntry.Pod)
-					if !exists || !ramEntry.ConfigEqual(dbEntry) {
-						log.Infof("NetworkPodToNodeMapWatcher: watch config key: %s, value:%v",
-							resp.GetKey(), dbEntry)
-						RenderTxnConfigStart()
-						mgr.HandleCRUDOperationCU(dbEntry, true)
-						RenderTxnConfigEnd()
-					}
-				}
-
 			case datasync.Delete:
 				log.Infof("NetworkPodToNodeMapWatcher: deleting key: %s ", resp.GetKey())
-				RenderTxnConfigStart()
-				mgr.HandleCRUDOperationD(resp.GetKey(), true)
-				RenderTxnConfigEnd()
+				ctlrPlugin.AddOperationMsgToQueue(ModelTypeNetworkPodNodeMap, OperationalMsgOpCodeDelete, resp.GetKey())
 			}
 		}
 	}
@@ -441,9 +372,7 @@ func (mgr *NetworkPodToNodeMapMgr) RunContivKSRNetworkPodToNodeMappingWatcher() 
 			}
 			// if any of the entities required rendering, do it now
 			if renderingRequired {
-				RenderTxnConfigStart()
-				ctlrPlugin.RenderAll()
-				RenderTxnConfigEnd()
+				ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
 			}
 			tempNetworkPodToNodeMapMap = nil
 		}
@@ -467,16 +396,12 @@ func (mgr *NetworkPodToNodeMapMgr) RunContivKSRNetworkPodToNodeMappingWatcher() 
 				p2n := &NetworkPodToNodeMap{}
 				if err := resp.GetValue(p2n); err == nil {
 					log.Infof("ContivKSRNetworkPodToNodeMappingWatcher: key: %s, value:%v", resp.GetKey(), p2n)
-					RenderTxnConfigStart()
 					mgr.HandleContivKSRStatusUpdate(p2n, true)
-					RenderTxnConfigEnd()
 				}
 
 			case datasync.Delete:
 				log.Infof("ContivKSRNetworkPodToNodeMappingWatcher: deleting key: %s ", resp.GetKey())
-				RenderTxnConfigStart()
-				mgr.HandleContivKSRStatusDelete(resp.GetKey(), true)
-				RenderTxnConfigEnd()
+				mgr.HandleContivKSRStatusDelete(resp.GetKey())
 			}
 		}
 	}

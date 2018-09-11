@@ -95,7 +95,9 @@ func (ns *NetworkService) AppendStatusMsg(msg string) {
 }
 
 // HandleCRUDOperationCU add to ram cache and render
-func (mgr *NetworkServiceMgr) HandleCRUDOperationCU(_ns *NetworkService, render bool) error {
+func (mgr *NetworkServiceMgr) HandleCRUDOperationCU(data interface{}) error {
+
+	_ns := data.(*NetworkService)
 
 	ns := &NetworkService{}
 	ns.Metadata = _ns.Metadata
@@ -107,7 +109,7 @@ func (mgr *NetworkServiceMgr) HandleCRUDOperationCU(_ns *NetworkService, render 
 	}
 
 	if err := ns.validate(); err != nil {
-		return err
+		ns.AppendStatusMsg(err.Error())
 	}
 
 	mgr.networkServiceCache[ns.Metadata.Name] = ns
@@ -119,10 +121,6 @@ func (mgr *NetworkServiceMgr) HandleCRUDOperationCU(_ns *NetworkService, render 
 	// inform ipam pool that a new ns might need a network service scope pool allocated
 	ctlrPlugin.IpamPoolMgr.EntityCreate(ns.Metadata.Name, controller.IPAMPoolScopeNetworkService)
 
-	if render {
-		ns.renderConfig()
-	}
-
 	return nil
 }
 
@@ -133,10 +131,14 @@ func (mgr *NetworkServiceMgr) HandleCRUDOperationR(name string) (*NetworkService
 }
 
 // HandleCRUDOperationD removes from ram cache
-func (mgr *NetworkServiceMgr) HandleCRUDOperationD(name string, render bool) error {
+func (mgr *NetworkServiceMgr) HandleCRUDOperationD(data interface{}) error {
 
-	if _, exists := mgr.networkServiceCache[name]; !exists {
+	name := data.(string)
+
+	if ns, exists := mgr.networkServiceCache[name]; !exists {
 		return nil
+	} else {
+		ns.renderDelete()
 	}
 
 	// remove from cache
@@ -228,9 +230,6 @@ func networkServiceHandler(formatter *render.Render) http.HandlerFunc {
 
 func networkServiceProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
-	RenderTxnConfigStart()
-	defer RenderTxnConfigEnd()
-
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		log.Debugf("Can't read body, error '%s'", err)
@@ -255,30 +254,29 @@ func networkServiceProcessPost(formatter *render.Render, w http.ResponseWriter, 
 	if existing, exists := ctlrPlugin.NetworkServiceMgr.HandleCRUDOperationR(vars[networkServiceName]); exists {
 		// if nothing has changed, simply return OK and waste no cycles
 		if existing.ConfigEqual(&ns) {
+			log.Debugf("processPost: config equal no further processing required")
 			formatter.JSON(w, http.StatusOK, "OK")
 			return
 		}
+		log.Debugf("processPost: old: %v", existing)
+		log.Debugf("processPost: new: %v", ns)
 	}
 
-	log.Debugf("processPost: POST: %v", ns)
-	if err := ctlrPlugin.NetworkServiceMgr.HandleCRUDOperationCU(&ns, true); err != nil {
+	if err := ns.validate(); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
+
+	ctlrPlugin.AddOperationMsgToQueue(ModelTypeNetworkService, OperationalMsgOpCodeCreateUpdate, &ns)
 
 	formatter.JSON(w, http.StatusOK, "OK")
 }
 
 func networkServiceProcessDelete(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
-	RenderTxnConfigStart()
-	defer RenderTxnConfigEnd()
-
 	vars := mux.Vars(req)
-	if err := ctlrPlugin.NetworkServiceMgr.HandleCRUDOperationD(vars[networkServiceName], true); err != nil {
-		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
-		return
-	}
+
+	ctlrPlugin.AddOperationMsgToQueue(ModelTypeNetworkService, OperationalMsgOpCodeDelete, vars[networkServiceName])
 
 	formatter.JSON(w, http.StatusOK, "OK")
 }
@@ -320,6 +318,14 @@ func (mgr *NetworkServiceMgr) RenderAll() {
 	for _, ns := range mgr.networkServiceCache {
 		ns.renderConfig()
 	}
+}
+
+func (ns *NetworkService) renderDelete() error {
+
+	DeleteRenderedVppAgentEntries(ns.Status.RenderedVppAgentEntries)
+	DeleteInterfaceEntries(ns.Status.Interfaces)
+
+	return nil
 }
 
 func (ns *NetworkService) renderConfig() error {
@@ -403,15 +409,19 @@ func (ns *NetworkService) validate() error {
 	log.Debugf("Validating NetworkService: %v", ns)
 
 	if ns.Metadata == nil || ns.Metadata.Name == "" {
-		return fmt.Errorf("network-service: missing metadata or name")
+		errStr := "Validate error: network-service: missing metadata or name"
+		log.Debugf(errStr)
+		return fmt.Errorf(errStr)
 	}
 
 	if err := ns.validateNetworkPods(); err != nil {
+		log.Debugf(err.Error())
 		return err
 	}
 
 	if ns.Spec.Connections != nil {
 		if err := ns.validateConnections(); err != nil {
+			log.Debugf(err.Error())
 			return err
 		}
 	}
@@ -597,32 +607,6 @@ func (mgr *NetworkServiceMgr) InitAndRunWatcher() {
 	log.Info("NetworkServiceWatcher: enter ...")
 	defer log.Info("NetworkServiceWatcher: exit ...")
 
-	//go func() {
-	//	// back up timer ... paranoid about missing events ...
-	//	// check every minute just in case
-	//	ticker := time.NewTicker(1 * time.Minute)
-	//	for _ = range ticker.C {
-	//		tempNetworkServiceMap := make(map[string]*NetworkService)
-	//		mgr.loadAllFromDatastore(tempNetworkServiceMap)
-	//		renderingRequired := false
-	//		for _, dbNode := range tempNetworkServiceMap {
-	//			ramNode, exists := mgr.HandleCRUDOperationR(dbNode.Metadata.Name)
-	//			if !exists || !ramNode.ConfigEqual(dbNode) {
-	//				log.Debugf("NetworkServiceWatcher: timer new config: %v", dbNode)
-	//				renderingRequired = true
-	//				mgr.HandleCRUDOperationCU(dbNode, false) // render at the end
-	//			}
-	//		}
-	//		// if any of the entities required rendering, do it now
-	//		if renderingRequired {
-	//			RenderTxnConfigStart()
-	//			ctlrPlugin.RenderAll()
-	//			RenderTxnConfigEnd()
-	//		}
-	//		tempNetworkServiceMap = nil
-	//	}
-	//}()
-
 	respChan := make(chan keyval.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())
 	err := watcher.Watch(keyval.ToChanProto(respChan), make(chan string), "")
@@ -636,24 +620,9 @@ func (mgr *NetworkServiceMgr) InitAndRunWatcher() {
 		select {
 		case resp := <-respChan:
 			switch resp.GetChangeType() {
-			case datasync.Put:
-				dbNode := &NetworkService{}
-				if err := resp.GetValue(dbNode); err == nil {
-					ramNode, exists := mgr.HandleCRUDOperationR(dbNode.Metadata.Name)
-					if !exists || !ramNode.ConfigEqual(dbNode) {
-						log.Infof("NetworkServiceWatcher: watch config key: %s, value:%v",
-							resp.GetKey(), dbNode)
-						RenderTxnConfigStart()
-						mgr.HandleCRUDOperationCU(dbNode, true)
-						RenderTxnConfigEnd()
-					}
-				}
-
 			case datasync.Delete:
 				log.Infof("NetworkServiceWatcher: deleting key: %s ", resp.GetKey())
-				RenderTxnConfigStart()
-				mgr.HandleCRUDOperationD(resp.GetKey(), true)
-				RenderTxnConfigEnd()
+				ctlrPlugin.AddOperationMsgToQueue(ModelTypeNetworkService, OperationalMsgOpCodeDelete, resp.GetKey())
 			}
 		}
 	}

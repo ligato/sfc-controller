@@ -81,10 +81,8 @@ func (mgr *CRDNetworkServiceMgr) HandleCRDSync(crdNS crd.NetworkService) {
 		}
 	}
 
-	if err := ctlrPlugin.NetworkServiceMgr.HandleCRUDOperationCU(&ns, false); err != nil {
-		log.Errorf("%s", err.Error())
-		return
-	}
+	ctlrPlugin.AddOperationMsgToQueue(controller.ModelTypeNetworkService,
+		controller.OperationalMsgOpCodeCreateUpdate, &ns)
 
 	log.Infof("NetworkService %s", opStr)
 }

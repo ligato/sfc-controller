@@ -91,7 +91,7 @@ func (nno *NetworkNodeOverlay) ConfigEqual(n2 *NetworkNodeOverlay) bool {
 	if nno.Spec.String() != n2.Spec.String() {
 		return false
 	}
-	// ignore snno.Status as just comparing config
+	// ignore nno.Status as just comparing config
 	return true
 }
 
@@ -139,7 +139,9 @@ func (mgr *NetworkNodeOverlayMgr) AllocateVxlanAddress(poolName string, nodeName
 }
 
 // HandleCRUDOperationCU add to ram cache and render
-func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationCU(_nno *NetworkNodeOverlay, render bool) error {
+func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationCU(data interface{}) error {
+
+	_nno := data.(*NetworkNodeOverlay)
 
 	nno := &NetworkNodeOverlay{}
 	nno.Metadata = _nno.Metadata
@@ -151,7 +153,7 @@ func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationCU(_nno *NetworkNodeOverlay
 	}
 
 	if err := nno.validate(); err != nil {
-		return err
+		nno.AppendStatusMsg(err.Error())
 	}
 
 	mgr.networkNodeOverlayCache[_nno.Metadata.Name] = nno
@@ -171,10 +173,6 @@ func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationCU(_nno *NetworkNodeOverlay
 		return err
 	}
 
-	if render {
-		nno.renderConfig()
-	}
-
 	return nil
 }
 
@@ -185,8 +183,23 @@ func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationR(name string) (*NetworkNod
 }
 
 // HandleCRUDOperationD removes from ram cache
-func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationD(name string, render bool) error {
-	return fmt.Errorf("delete not implemented %s", name)
+func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationD(data interface{}) error {
+
+	name := data.(string)
+
+	if _, exists := mgr.networkNodeOverlayCache[name]; !exists {
+		return nil
+	} else {
+		//nn0.renderDelete()
+	}
+
+	// remove from cache
+	delete(mgr.networkNodeOverlayCache, name)
+
+	// remove from the database
+	database.DeleteFromDatastore(mgr.NameKey(name))
+
+	return nil
 }
 
 // HandleCRUDOperationGetAll returns the map
@@ -266,9 +279,6 @@ func networkNodeOverlayHandler(formatter *render.Render) http.HandlerFunc {
 
 func networkNodeOverlayProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
-	RenderTxnConfigStart()
-	defer RenderTxnConfigEnd()
-
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		log.Debugf("Can't read body, error '%s'", err)
@@ -298,25 +308,22 @@ func networkNodeOverlayProcessPost(formatter *render.Render, w http.ResponseWrit
 		}
 	}
 
-	log.Debugf("processPost: POST: %v", nno)
-	if err := ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationCU(&nno, true); err != nil {
+	if err := nno.validate(); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
+
+	ctlrPlugin.AddOperationMsgToQueue(ModelTypeNetworkNodeOverlay, OperationalMsgOpCodeCreateUpdate, &nno)
 
 	formatter.JSON(w, http.StatusOK, "OK")
 }
 
 func networkNodeOverlayProcessDelete(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
-	//sfcplg.ConfigTransactionStart()
-	//defer sfcplg.ConfigTransactionEnd()
-
 	vars := mux.Vars(req)
-	if err := ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationD(vars[networkNodeOverlayName], true); err != nil {
-		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
-		return
-	}
+
+	ctlrPlugin.AddOperationMsgToQueue(ModelTypeNetworkNodeOverlay,
+		OperationalMsgOpCodeDelete, vars[networkNodeOverlayName])
 
 	formatter.JSON(w, http.StatusOK, "OK")
 }
@@ -351,28 +358,6 @@ func (mgr *NetworkNodeOverlayMgr) GetAllURL() string {
 // NameKey provides sfc controller's node name key prefix
 func (mgr *NetworkNodeOverlayMgr) NameKey(name string) string {
 	return mgr.KeyPrefix() + name
-}
-
-func (nno *NetworkNodeOverlay) renderConfig() error {
-	RenderTxnConfigEntityStart()
-	defer RenderTxnConfigEntityEnd()
-
-	// first validate the config as it may have come in via a dartastore
-	// update from outside rest, startup yaml ... crd?
-	if err := nno.validate(); err != nil {
-		return err
-	}
-
-	ctlrPlugin.RenderAll()
-
-	return nil
-}
-
-// RenderAll renders all entites in the cache
-func (mgr *NetworkNodeOverlayMgr) RenderAll() {
-	for _, nno := range mgr.networkNodeOverlayCache {
-		nno.renderConfig()
-	}
 }
 
 func (nno *NetworkNodeOverlay) validate() error {
@@ -428,32 +413,6 @@ func (mgr *NetworkNodeOverlayMgr) InitAndRunWatcher() {
 	log.Info("networkNodeOverlayWatcher: enter ...")
 	defer log.Info("networkNodeOverlayWatcher: exit ...")
 
-	//go func() {
-	//	// back up timer ... paranoid about missing events ...
-	//	// check every minute just in case
-	//	ticker := time.NewTicker(1 * time.Minute)
-	//	for _ = range ticker.C {
-	//		tempnetworkNodeOverlayMap := make(map[string]*NetworkNodeOverlay)
-	//		mgr.loadAllFromDatastore(tempnetworkNodeOverlayMap)
-	//		renderingRequired := false
-	//		for _, dbEntry := range tempnetworkNodeOverlayMap {
-	//			ramEntry, exists := mgr.HandleCRUDOperationR(dbEntry.Metadata.Name)
-	//			if !exists || !ramEntry.ConfigEqual(dbEntry) {
-	//				log.Debugf("networkNodeOverlayWatcher: timer new config: %v", dbEntry)
-	//				renderingRequired = true
-	//				mgr.HandleCRUDOperationCU(dbEntry, false) // render at the end
-	//			}
-	//		}
-	//		// if any of the entities required rendering, do it now
-	//		if renderingRequired {
-	//			RenderTxnConfigStart()
-	//			ctlrPlugin.RenderAll()
-	//			RenderTxnConfigEnd()
-	//		}
-	//		tempnetworkNodeOverlayMap = nil
-	//	}
-	//}()
-
 	respChan := make(chan keyval.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())
 	err := watcher.Watch(keyval.ToChanProto(respChan), make(chan string), "")
@@ -467,24 +426,9 @@ func (mgr *NetworkNodeOverlayMgr) InitAndRunWatcher() {
 		select {
 		case resp := <-respChan:
 			switch resp.GetChangeType() {
-			case datasync.Put:
-				dbNode := &NetworkNodeOverlay{}
-				if err := resp.GetValue(dbNode); err == nil {
-					ramNode, exists := mgr.HandleCRUDOperationR(dbNode.Metadata.Name)
-					if !exists || !ramNode.ConfigEqual(dbNode) {
-						log.Infof("networkNodeOverlayWatcher: watch config key: %s, value:%v",
-							resp.GetKey(), dbNode)
-						RenderTxnConfigStart()
-						mgr.HandleCRUDOperationCU(dbNode, true)
-						RenderTxnConfigEnd()
-					}
-				}
-
 			case datasync.Delete:
 				log.Infof("networkNodeOverlayWatcher: deleting key: %s ", resp.GetKey())
-				RenderTxnConfigStart()
-				mgr.HandleCRUDOperationD(resp.GetKey(), true)
-				RenderTxnConfigEnd()
+				ctlrPlugin.AddOperationMsgToQueue(ModelTypeNetworkNodeOverlay, OperationalMsgOpCodeDelete, resp.GetKey())
 			}
 		}
 	}

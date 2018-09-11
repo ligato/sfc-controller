@@ -81,10 +81,8 @@ func (mgr *CRDIpamPoolMgr) HandleCRDSync(crdIP crd.IpamPool) {
 		}
 	}
 
-	if err := ctlrPlugin.IpamPoolMgr.HandleCRUDOperationCU(&ip, false); err != nil {
-		log.Errorf("%s", err.Error())
-		return
-	}
+	ctlrPlugin.AddOperationMsgToQueue(controller.ModelTypeIPAMPool,
+		controller.OperationalMsgOpCodeCreateUpdate, &ip)
 
 	log.Infof("IpamPool %s", opStr)
 }

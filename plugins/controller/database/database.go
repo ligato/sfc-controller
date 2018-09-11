@@ -42,7 +42,7 @@ func WriteToDatastore(key string, data proto.Message) error {
 	return nil
 }
 
-// ReadIterate is a utility func to interate over a set
+// ReadIterate is a utility func to iterate over a set
 func ReadIterate(
 	keyPrefix string,
 	getDataBuffer func() proto.Message,
