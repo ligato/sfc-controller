@@ -87,7 +87,7 @@ func (s *Plugin) SfcConfigYamlProcessConfig(y *SfcConfigYaml) error {
 
 	if y.SysParms != nil {
 		log.Debugf("SfcConfigYamlProcessConfig: system parameters: ", y.SysParms)
-		if err := ctlrPlugin.SysParametersMgr.HandleCRUDOperationCU(&y.SysParms); err != nil {
+		if err := ctlrPlugin.SysParametersMgr.HandleCRUDOperationCU(y.SysParms); err != nil {
 			return err
 		}
 	}
