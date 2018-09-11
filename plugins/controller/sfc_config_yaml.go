@@ -28,7 +28,7 @@ const sfcYamlVersion = 2
 type SfcConfigYaml struct {
 	Version             int                    `json:"sfc_controller_config_version"`
 	Description         string                 `json:"description"`
-	SysParms            SystemParameters       `json:"system_parameters"`
+	SysParms            *SystemParameters       `json:"system_parameters"`
 	IPAMPools           []*IPAMPool            `json:"ipam_pools"`
 	NetworkPodToNodeMap []*NetworkPodToNodeMap `json:"network_pod_to_node_map"`
 	NetworkNodeOverlays []*NetworkNodeOverlay  `json:"network_node_overlays"`
@@ -67,7 +67,7 @@ func (s *Plugin) SfcSystemCacheToYaml() ([]byte, error) {
 	yamlConfig.NetworkServices = ctlrPlugin.NetworkServiceMgr.ToArray()
 	yamlConfig.NetworkNodeOverlays = ctlrPlugin.NetworkNodeOverlayMgr.ToArray()
 	yamlConfig.IPAMPools = ctlrPlugin.IpamPoolMgr.ToArray()
-	yamlConfig.SysParms = *ctlrPlugin.SysParametersMgr.sysParmCache
+	yamlConfig.SysParms = ctlrPlugin.SysParametersMgr.sysParmCache
 	yamlConfig.RAMCache = &ctlrPlugin.ramCache
 
 	yamlBytes, err := yaml.Marshal(yamlConfig)
@@ -85,9 +85,11 @@ func (s *Plugin) SfcConfigYamlProcessConfig(y *SfcConfigYaml) error {
 			sfcYamlVersion, y.Version)
 	}
 
-	log.Debugf("SfcConfigYamlProcessConfig: system parameters: ", y.SysParms)
-	if err := ctlrPlugin.SysParametersMgr.HandleCRUDOperationCU(&y.SysParms); err != nil {
-		return err
+	if y.SysParms != nil {
+		log.Debugf("SfcConfigYamlProcessConfig: system parameters: ", y.SysParms)
+		if err := ctlrPlugin.SysParametersMgr.HandleCRUDOperationCU(&y.SysParms); err != nil {
+			return err
+		}
 	}
 
 	log.Debugf("SfcConfigYamlProcessConfig: ipam pools: ", y.IPAMPools)
