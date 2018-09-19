@@ -32,6 +32,7 @@ const (
 	VppEntryTypeL2BD           = "l2bd"
 	VppEntryTypeL3Route        = "l3vrf"
 	VppEntryTypeL2XC           = "l2xc"
+	VppEntryTypeArp            = "arp"
 )
 
 // KVType tracks each allocated key/value vnf/vpp agent
@@ -44,6 +45,7 @@ type KVType struct {
 	L3Route      *l3.StaticRoutes_Route               `json:"L3Route,omitempty"`
 	XConn        *l2.XConnectPairs_XConnectPair       `json:"XConn,omitempty"`
 	LinuxIFace   *linuxIntf.LinuxInterfaces_Interface `json:"LinuxIFace,omitempty"`
+	ArpEntry     *l3.ArpTable_ArpEntry                `json:"ArpEntry,omitempty"`
 }
 
 // NewKVEntry initializes a vpp KV entry type
@@ -60,9 +62,14 @@ func (kv *KVType) InterfaceSet(iface *interfaces.Interfaces_Interface) {
 	kv.IFace = iface
 }
 
-// L3StaticRouteSet updates the interface
+// L3StaticRouteSet updates the static route
 func (kv *KVType) L3StaticRouteSet(l3sr *l3.StaticRoutes_Route) {
 	kv.L3Route = l3sr
+}
+
+// ArpEntrySet updates the arp entry
+func (kv *KVType) ArpEntrySet(ae *l3.ArpTable_ArpEntry) {
+	kv.ArpEntry = ae
 }
 
 // LinuxInterfaceSet updates the interface
@@ -114,6 +121,10 @@ func (kv *KVType) Equal(kv2 *KVType) bool {
 		if l3Route1.String() != l3Route2.String() {
 			return false
 		}
+	case VppEntryTypeArp:
+		if kv.ArpEntry.String() != kv2.ArpEntry.String() {
+			return false
+		}
 	default:
 		log.Errorf("Equal: unknown interface type: %v", kv)
 		return false
@@ -137,6 +148,8 @@ func (kv *KVType) WriteToEtcd(db keyval.ProtoBroker) error {
 		err = database.WriteToDatastore(kv.VppKey, kv.LinuxIFace)
 	case VppEntryTypeL3Route:
 		err = database.WriteToDatastore(kv.VppKey, kv.L3Route)
+	case VppEntryTypeArp:
+		err = database.WriteToDatastore(kv.VppKey, kv.ArpEntry)
 	default:
 		msg := fmt.Sprintf("WriteToEtcd: unknown vpp entry type: %v", kv)
 		log.Errorf(msg)
@@ -186,6 +199,13 @@ func (kv *KVType) ReadFromEtcd(db keyval.ProtoBroker) (bool, error) {
 		if found && err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, l3sr)
 			kv.L3StaticRouteSet(l3sr)
+		}
+	case VppEntryTypeArp:
+		ae := &l3.ArpTable_ArpEntry{}
+		found, _, err = db.GetValue(kv.VppKey, ae)
+		if found && err == nil {
+			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, ae)
+			kv.ArpEntrySet(ae)
 		}
 	default:
 		msg := fmt.Sprintf("ReadFromEtcd: unsupported vpp entry type: %v", kv)

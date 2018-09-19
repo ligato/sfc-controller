@@ -52,6 +52,8 @@ const (
 
 	ConnTypeL2PP = "l2pp"
 	ConnTypeL2MP = "l2mp"
+	ConnTypeL3PP = "l3pp"
+	ConnTypeL3MP = "l3mp"
 
 	OperStatusUp   = "OperUp"
 	OperStatusDown = "OperDown"

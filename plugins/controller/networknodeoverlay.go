@@ -97,45 +97,46 @@ func (nno *NetworkNodeOverlay) ConfigEqual(n2 *NetworkNodeOverlay) bool {
 
 // AppendStatusMsg adds the message to the status section
 func (nno *NetworkNodeOverlay) AppendStatusMsg(msg string) {
+	nno.Status = &controller.NetworkNodeOverlayStatus{}
 	nno.Status.Msg = append(nno.Status.Msg, msg)
 }
 
 // AllocateVxlanAddress allocates a free address from the pool
-func (mgr *NetworkNodeOverlayMgr) AllocateVxlanAddress(poolName string, nodeName string, nodeLabel string) (string, error) {
+func (mgr *NetworkNodeOverlayMgr) AllocateVxlanAddress(poolName string, nodeName string, nodeLabel string) (string, uint32, error) {
 
 	if poolName == "" { // no pool specified ... try the hard coded vxlan endpoints in the node i/f list
 		ipAddress, err := ctlrPlugin.NetworkNodeMgr.FindVxlanIPaddress(nodeName)
 		if err == nil {
-			return ipAddress, err
+			return ipAddress, 0, err
 		}
 		if nodeLabel != "" {
 			nodeInterfaces, nodeIfTypes := ctlrPlugin.NetworkNodeMgr.FindInterfacesForThisLabelInNode(nodeName, []string{nodeLabel})
 			if len(nodeInterfaces) != 1 {
-				return "", fmt.Errorf("One interface must have a label: %s", nodeLabel)
+				return "", 0, fmt.Errorf("One interface must have a label: %s", nodeLabel)
 			}
 			if nodeIfTypes[0] != controller.IfTypeEthernet || len(nodeInterfaces[0].IpAddresses) != 1 {
-				return "", fmt.Errorf("An ethernet interface with an ip_address is required for this label: %s", nodeLabel)
+				return "", 0, fmt.Errorf("An ethernet interface with an ip_address is required for this label: %s", nodeLabel)
 			}
-			return nodeInterfaces[0].IpAddresses[0], nil
+			return nodeInterfaces[0].IpAddresses[0], 0, nil
 		}
-		return ipAddress, err
+		return ipAddress, 0, err
 	}
 
 	if vxlanIPAddress, exists := mgr.vxLanAddresses[nodeName]; exists {
-		return vxlanIPAddress, nil
+		return vxlanIPAddress, 0, nil
 	}
 	vxlanIpamPool, err := ctlrPlugin.IpamPoolMgr.FindAllocator(poolName, "") // system txnLevel pool for vxlans
 	if err != nil {
-		return "", fmt.Errorf("Cannot find system vxlan pool %s: %s", poolName, err)
+		return "", 0, fmt.Errorf("Cannot find system vxlan pool %s: %s", poolName, err)
 	}
-	vxlanIPAddress, _, err := vxlanIpamPool.AllocateIPAddress()
+	vxlanIPAddress, ipNum, err := vxlanIpamPool.AllocateIPAddress()
 	if err != nil {
-		return "", fmt.Errorf("Cannot allocate address from node overlay vxlan pool %s", poolName)
+		return "", 0, fmt.Errorf("Cannot allocate address from node overlay vxlan pool %s", poolName)
 	}
 
 	mgr.vxLanAddresses[nodeName] = vxlanIPAddress
 
-	return vxlanIPAddress, nil
+	return vxlanIPAddress, ipNum, nil
 }
 
 // HandleCRUDOperationCU add to ram cache and render
@@ -343,6 +344,11 @@ func networkNodeOverlayGetAllHandler(formatter *render.Render) http.HandlerFunc 
 			formatter.JSON(w, http.StatusOK, array)
 		}
 	}
+}
+
+// NNOStatusKeyPrefix provides sfc controller's network node overlay prefix
+func NNOStatusKeyPrefix() string {
+	return controller.SfcControllerStatusPrefix() + "network-node-overlay/"
 }
 
 // KeyPrefix provides sfc controller's node key prefix

@@ -92,7 +92,7 @@ func PersistInterfaceStatus(
 	podName string, ifName string) {
 
 	entityInterfaceName := 	podName + "/" + ifName
-	interfaceKey := InterfaceKeyPrefix() + entityInterfaceName
+	interfaceKey := InterfaceStatusKeyPrefix() + entityInterfaceName
 
 	interfaces[entityInterfaceName] = ifStatus
 	ctlrPlugin.ramCache.InterfaceStates[entityInterfaceName] = ifStatus
@@ -120,7 +120,7 @@ func RemoveInterfaceStatus(
 	podName string, ifName string) {
 
 	entityInterfaceName := 	podName + "/" + ifName
-	interfaceKey := InterfaceKeyPrefix() + entityInterfaceName
+	interfaceKey := InterfaceStatusKeyPrefix() + entityInterfaceName
 
 	delete(interfaces, entityInterfaceName)
 	delete(ctlrPlugin.ramCache.InterfaceStates, entityInterfaceName)
@@ -157,7 +157,7 @@ func UpdateRamCacheAllocatorsForInterfaceStatus(
 }
 
 // KeyPrefix provides sfc controller's interface
-func InterfaceKeyPrefix() string {
+func InterfaceStatusKeyPrefix() string {
 	return controller.SfcControllerStatusPrefix() + "interface/"
 }
 
@@ -170,7 +170,7 @@ func LoadAllInterfacesFromDatastoreIntoCache() error {
 // loadAllInterfacesFromDatastore iterates over the etcd set
 func loadAllInterfacesFromDatastore(iFaces map[string]*controller.InterfaceStatus) error {
 	var iFace *controller.InterfaceStatus
-	return database.ReadIterate(InterfaceKeyPrefix(),
+	return database.ReadIterate(InterfaceStatusKeyPrefix(),
 		func() proto.Message {
 			iFace = &controller.InterfaceStatus{}
 			return iFace

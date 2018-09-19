@@ -178,6 +178,7 @@ func (mgr *NetworkNodeMgr) HandleCRUDOperationCU(data interface{}) error {
 	}
 
 	if err := nn.validate(); err != nil {
+		nn.Status = &controller.NetworkNodeStatus{}
 		nn.AppendStatusMsg(err.Error())
 	}
 
@@ -584,6 +585,7 @@ func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 	renderingEntity string,
 	fromNode string,
 	toNode string,
+	vrfID uint32,
 	fromVxlanAddress string,
 	toVxlanAddress string,
 	createLoopbackInterface bool,
@@ -592,6 +594,9 @@ func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 
 	//var renderedEntries map[string]*controller.RenderedVppAgentEntry
 	var renderedEntries = make(map[string]*controller.RenderedVppAgentEntry)
+
+	fromVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(fromVxlanAddress)
+	toVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(toVxlanAddress)
 
 	// depending on the number of ethernet/label:vxlan interfaces on the source node and
 	// the number of ethernet/label:vxlan inerfaces on the dest node, a set of static
@@ -630,9 +635,9 @@ func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 				}
 
 				l3sr := &controller.L3VRFRoute{
-					VrfId:             0,
+					VrfId:             vrfID,
 					Description:       fmt.Sprintf("L3VRF_VXLAN Node:%s to Node:%s", fromNode, toNode),
-					DstIpAddr:         toVxlanAddress, // des node vxlan address
+					DstIpAddr:         toVxlanAddress, // dest node vxlan address
 					NextHopAddr:       node2Iface.IpAddresses[0],
 					OutgoingInterface: node1Iface.Name,
 					Weight:            ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRouteWeight,

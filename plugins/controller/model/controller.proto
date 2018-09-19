@@ -31,6 +31,7 @@ message L3VRFRoute {
 message L3ArpEntry {
     string ip_address = 1;               /* IP address */
     string phys_address = 2;             /* MAC address matching to the IP */
+    string outgoing_interface = 3;
 };
 
 message L2FIBEntry {
@@ -81,6 +82,7 @@ message SystemParameters {
     uint32 default_static_route_preference = 4; // optional, overrrides default 0
     repeated BDParms l2bd_templates =  5; // L2BDs can referene these
     string rx_mode = 7; // polling|interrupt|adaptive
+    uint32 min_vrf_id = 8; // start value for l3 network services
 }
 
 message NetworkPodToNodeMap {
@@ -107,8 +109,10 @@ message InterfaceStatus {
     map<string,uint32> ipam_pool_nums = 6; // format: pool_name/ipNum
     repeated string ip_addresses = 7;
     uint32 memifID  = 8;
-    uint32 vrfID = 9;
     string node = 10;
+    string host_port_label = 11;
+    uint32 vni = 12;
+    string nno_name = 13;
 }
 
 message Interface {
@@ -120,7 +124,6 @@ message Interface {
     uint32 mtu = 5;         // optional: if omitted, use system parameter default
     string rx_mode = 6;     // optional: polling|interrupt|adaptive or uses system defaults
     repeated string ip_addresses = 7; // format i.p.v.4/xx, or ip::v6/xx
-    uint32 vrf_id = 8;
     repeated string ipam_pool_names = 9;
     string admin_status = 10; // enabled|disabled
     message MemIFParms {
@@ -131,6 +134,7 @@ message Interface {
     MemIFParms memif_parms = 11;
     repeated string labels = 12;
     string parent = 13; // internal field: could be a node or pod
+    string host_port_label = 14;
 }
 
 message NetworkPodSpec {
@@ -145,7 +149,7 @@ message NetworkPod {
 }
 
 message Connection {
-    string conn_type = 1; // l2pp|l2mp|   future: ip4pp|ip6pp|ip4mp|ip6mp
+    string conn_type = 1; // l2pp|l2mp|   future: l3mp|l3pp
     string network_node_overlay_name = 2; // needed if require inter-node vnf's
     repeated string pod_interfaces = 3; // format: pod/ifname
     repeated string node_interfaces = 4; // format: node/ifname
@@ -154,6 +158,7 @@ message Connection {
                               // only for l2mp connections
     L2BD l2bd = 7; // optional: if omitted and use_node_l2bd is not set then
                    // create a l2bd with default parms for l2mp connections
+    uint32 vrf_id = 8;
 }
 
 message NetworkServiceStatus {

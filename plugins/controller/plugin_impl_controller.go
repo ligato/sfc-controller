@@ -87,6 +87,7 @@ type CacheType struct {
 	VppEntries            map[string]*vppagent.KVType                             // key[vppkey]
 	MacAddrAllocator      *idapi.MacAddrAllocatorType
 	MemifIDAllocator      *idapi.MemifAllocatorType
+	VrfIDAllocator        *idapi.VrfAllocatorType
 	IPAMPoolAllocators    map[string]*ipam.PoolAllocatorType // key[modelType/ipamPoolName]
 	NetworkPodToNodeMap   map[string]*NetworkPodToNodeMap    // key[pod]
 }
@@ -205,19 +206,15 @@ func (s *Plugin) AfterInit() error {
 	// at this point, plugins are all loaded, all is read in from the database
 	// so render the config ... note: resync will ensure etcd is not written to
 	// unnecessarily
-
-	go s.ProcessOperationalMessages()
-
-	s.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
-	//RenderTxnConfigStart()
-	//s.RenderAll()
-	//RenderTxnConfigEnd()
-
+	
 	s.afterInitMgrs()
 
 	if s.ContivKSREnabled {
 		go ctlrPlugin.NetworkPodNodeMapMgr.RunContivKSRNetworkPodToNodeMappingWatcher()
 	}
+
+	go s.ProcessOperationalMessages()
+	s.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
 
 	s.StatusCheck.ReportStateChange(PluginID, statuscheck.OK, nil)
 
@@ -248,6 +245,9 @@ func (s *Plugin) InitRAMCache() {
 
 	s.ramCache.MemifIDAllocator = nil
 	s.ramCache.MemifIDAllocator = idapi.NewMemifAllocator()
+
+	s.ramCache.VrfIDAllocator = nil
+	s.ramCache.VrfIDAllocator = idapi.NewVrfAllocator()
 
 	s.ramCache.InterfaceStates = nil
 	s.ramCache.InterfaceStates = make(map[string]*controller.InterfaceStatus)
@@ -311,6 +311,7 @@ func (s *Plugin) PostProcessLoadedDatastore() error {
 			}
 		}
 	}
+	ctlrPlugin.IpamPoolMgr.EntityCreate("", controller.IPAMPoolScopeSystem)
 
 	log.Debugf("PostProcessLoadedDatastore: processing nodes state: num: %d",
 		len(s.NetworkNodeMgr.networkNodeCache))

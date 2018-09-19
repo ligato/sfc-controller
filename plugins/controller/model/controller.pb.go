@@ -58,8 +58,9 @@ func (m *L3VRFRoute) String() string { return proto.CompactTextString(m) }
 func (*L3VRFRoute) ProtoMessage()    {}
 
 type L3ArpEntry struct {
-	IpAddress   string `protobuf:"bytes,1,opt,name=ip_address,proto3" json:"ip_address,omitempty"`
-	PhysAddress string `protobuf:"bytes,2,opt,name=phys_address,proto3" json:"phys_address,omitempty"`
+	IpAddress         string `protobuf:"bytes,1,opt,name=ip_address,proto3" json:"ip_address,omitempty"`
+	PhysAddress       string `protobuf:"bytes,2,opt,name=phys_address,proto3" json:"phys_address,omitempty"`
+	OutgoingInterface string `protobuf:"bytes,3,opt,name=outgoing_interface,proto3" json:"outgoing_interface,omitempty"`
 }
 
 func (m *L3ArpEntry) Reset()         { *m = L3ArpEntry{} }
@@ -175,6 +176,7 @@ type SystemParameters struct {
 	DefaultStaticRoutePreference uint32     `protobuf:"varint,4,opt,name=default_static_route_preference,proto3" json:"default_static_route_preference,omitempty"`
 	L2BdTemplates                []*BDParms `protobuf:"bytes,5,rep,name=l2bd_templates" json:"l2bd_templates,omitempty"`
 	RxMode                       string     `protobuf:"bytes,7,opt,name=rx_mode,proto3" json:"rx_mode,omitempty"`
+	MinVrfId                     uint32     `protobuf:"varint,8,opt,name=min_vrf_id,proto3" json:"min_vrf_id,omitempty"`
 }
 
 func (m *SystemParameters) Reset()         { *m = SystemParameters{} }
@@ -209,19 +211,19 @@ func (m *RenderedVppAgentEntry) String() string { return proto.CompactTextString
 func (*RenderedVppAgentEntry) ProtoMessage()    {}
 
 //
-// Interface ... channel?
+// Interface
 //
 type InterfaceStatus struct {
-	Name         string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Status       string            `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	Msg          []string          `protobuf:"bytes,3,rep,name=msg" json:"msg,omitempty"`
-	MacAddress   string            `protobuf:"bytes,4,opt,name=mac_address,proto3" json:"mac_address,omitempty"`
-	MacAddrID    uint32            `protobuf:"varint,5,opt,name=macAddrID,proto3" json:"macAddrID,omitempty"`
-	IpamPoolNums map[string]uint32 `protobuf:"bytes,6,rep,name=ipam_pool_nums" json:"ipam_pool_nums,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
-	IpAddresses  []string          `protobuf:"bytes,7,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
-	MemifID      uint32            `protobuf:"varint,8,opt,name=memifID,proto3" json:"memifID,omitempty"`
-	VrfID        uint32            `protobuf:"varint,9,opt,name=vrfID,proto3" json:"vrfID,omitempty"`
-	Node         string            `protobuf:"bytes,10,opt,name=node,proto3" json:"node,omitempty"`
+	Name          string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Status        string            `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	Msg           []string          `protobuf:"bytes,3,rep,name=msg" json:"msg,omitempty"`
+	MacAddress    string            `protobuf:"bytes,4,opt,name=mac_address,proto3" json:"mac_address,omitempty"`
+	MacAddrID     uint32            `protobuf:"varint,5,opt,name=macAddrID,proto3" json:"macAddrID,omitempty"`
+	IpamPoolNums  map[string]uint32 `protobuf:"bytes,6,rep,name=ipam_pool_nums" json:"ipam_pool_nums,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	IpAddresses   []string          `protobuf:"bytes,7,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
+	MemifID       uint32            `protobuf:"varint,8,opt,name=memifID,proto3" json:"memifID,omitempty"`
+	Node          string            `protobuf:"bytes,10,opt,name=node,proto3" json:"node,omitempty"`
+	HostPortLabel string            `protobuf:"bytes,11,opt,name=host_port_label,proto3" json:"host_port_label,omitempty"`
 }
 
 func (m *InterfaceStatus) Reset()         { *m = InterfaceStatus{} }
@@ -244,12 +246,12 @@ type Interface struct {
 	Mtu           uint32                `protobuf:"varint,5,opt,name=mtu,proto3" json:"mtu,omitempty"`
 	RxMode        string                `protobuf:"bytes,6,opt,name=rx_mode,proto3" json:"rx_mode,omitempty"`
 	IpAddresses   []string              `protobuf:"bytes,7,rep,name=ip_addresses" json:"ip_addresses,omitempty"`
-	VrfId         uint32                `protobuf:"varint,8,opt,name=vrf_id,proto3" json:"vrf_id,omitempty"`
 	IpamPoolNames []string              `protobuf:"bytes,9,rep,name=ipam_pool_names" json:"ipam_pool_names,omitempty"`
 	AdminStatus   string                `protobuf:"bytes,10,opt,name=admin_status,proto3" json:"admin_status,omitempty"`
 	MemifParms    *Interface_MemIFParms `protobuf:"bytes,11,opt,name=memif_parms" json:"memif_parms,omitempty"`
 	Labels        []string              `protobuf:"bytes,12,rep,name=labels" json:"labels,omitempty"`
 	Parent        string                `protobuf:"bytes,13,opt,name=parent,proto3" json:"parent,omitempty"`
+	HostPortLabel string                `protobuf:"bytes,14,opt,name=host_port_label,proto3" json:"host_port_label,omitempty"`
 }
 
 func (m *Interface) Reset()         { *m = Interface{} }
@@ -329,6 +331,8 @@ type Connection struct {
 	UseNodeL2Bd            string   `protobuf:"bytes,6,opt,name=use_node_l2bd,proto3" json:"use_node_l2bd,omitempty"`
 	// only for l2mp connections
 	L2Bd *L2BD `protobuf:"bytes,7,opt,name=l2bd" json:"l2bd,omitempty"`
+	// create a l2bd with default parms for l2mp connections
+	VrfId uint32 `protobuf:"varint,8,opt,name=vrf_id,proto3" json:"vrf_id,omitempty"`
 }
 
 func (m *Connection) Reset()         { *m = Connection{} }
@@ -343,9 +347,8 @@ func (m *Connection) GetL2Bd() *L2BD {
 }
 
 type NetworkServiceStatus struct {
-	OperStatus string   `protobuf:"bytes,2,opt,name=oper_status,proto3" json:"oper_status,omitempty"`
-	Msg        []string `protobuf:"bytes,3,rep,name=msg" json:"msg,omitempty"`
-	// repeated RenderedVppAgentEntry rendered_vpp_agent_entries = 4;
+	OperStatus              string                            `protobuf:"bytes,2,opt,name=oper_status,proto3" json:"oper_status,omitempty"`
+	Msg                     []string                          `protobuf:"bytes,3,rep,name=msg" json:"msg,omitempty"`
 	RenderedVppAgentEntries map[string]*RenderedVppAgentEntry `protobuf:"bytes,4,rep,name=rendered_vpp_agent_entries" json:"rendered_vpp_agent_entries,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
 	Interfaces              map[string]*InterfaceStatus       `protobuf:"bytes,5,rep,name=interfaces" json:"interfaces,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
 }
@@ -423,9 +426,8 @@ func (m *NetworkService) GetStatus() *NetworkServiceStatus {
 }
 
 type NetworkNodeOverlayStatus struct {
-	Status string   `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	Msg    []string `protobuf:"bytes,2,rep,name=msg" json:"msg,omitempty"`
-	// repeated RenderedVppAgentEntry rendered_vpp_agent_entries = 3;
+	Status                  string                            `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Msg                     []string                          `protobuf:"bytes,2,rep,name=msg" json:"msg,omitempty"`
 	RenderedVppAgentEntries map[string]*RenderedVppAgentEntry `protobuf:"bytes,3,rep,name=rendered_vpp_agent_entries" json:"rendered_vpp_agent_entries,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
 }
 
@@ -553,9 +555,8 @@ func (m *NetworkNodeSpec) GetL2Bds() []*L2BD {
 }
 
 type NetworkNodeStatus struct {
-	Status string   `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	Msg    []string `protobuf:"bytes,2,rep,name=msg" json:"msg,omitempty"`
-	// repeated RenderedVppAgentEntry rendered_vpp_agent_entries = 3;
+	Status                  string                            `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Msg                     []string                          `protobuf:"bytes,2,rep,name=msg" json:"msg,omitempty"`
 	RenderedVppAgentEntries map[string]*RenderedVppAgentEntry `protobuf:"bytes,3,rep,name=rendered_vpp_agent_entries" json:"rendered_vpp_agent_entries,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
 	Interfaces              map[string]*InterfaceStatus       `protobuf:"bytes,5,rep,name=interfaces" json:"interfaces,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
 }
