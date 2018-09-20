@@ -44,7 +44,6 @@ const PluginID infra.PluginName = "Controller"
 var (
 	sfcConfigFile               string // cli flag - see RegisterFlags
 	CleanDatastore              bool
-	ContivKSREnabled            bool
 	BypassModelTypeHttpHandlers bool
 	log                         = logrus.DefaultLogger()
 	ctlrPlugin                  *Plugin
@@ -56,8 +55,6 @@ func RegisterFlags() {
 		"Name of a sfc config (yaml) file to load at startup")
 	flag.BoolVar(&CleanDatastore, "clean", false,
 		"Clean the controller datastore entries")
-	flag.BoolVar(&ContivKSREnabled, "contiv-ksr", false,
-		"Interact with contiv ksr to learn k8s config/state")
 	flag.BoolVar(&BypassModelTypeHttpHandlers, "bypass-rest-for-model-objects", false,
 		"Disable HTTP handling for controller objects")
 }
@@ -67,7 +64,6 @@ func LogFlags() {
 	log.Debugf("LogFlags:")
 	log.Debugf("\tsfcConfigFile:'%s'", sfcConfigFile)
 	log.Debugf("\tclean:'%v'", CleanDatastore)
-	log.Debugf("\tcontiv ksr:'%v'", ContivKSREnabled)
 	log.Debugf("\tmodel REST disabled:'%v'", BypassModelTypeHttpHandlers)
 }
 
@@ -124,7 +120,6 @@ func (s *Plugin) Init() error {
 	ctlrPlugin = s
 
 	s.CleanDatastore = CleanDatastore
-	s.ContivKSREnabled = ContivKSREnabled
 	s.BypassModelTypeHttpHandlers = BypassModelTypeHttpHandlers
 
 	log.Infof("Init: %s enter ...", PluginID)
@@ -209,9 +204,7 @@ func (s *Plugin) AfterInit() error {
 	
 	s.afterInitMgrs()
 
-	if s.ContivKSREnabled {
-		go ctlrPlugin.NetworkPodNodeMapMgr.RunContivKSRNetworkPodToNodeMappingWatcher()
-	}
+	go ctlrPlugin.NetworkPodNodeMapMgr.RunContivKSRNetworkPodToNodeMappingWatcher()
 
 	go s.ProcessOperationalMessages()
 	s.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)

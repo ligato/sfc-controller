@@ -33,7 +33,6 @@ COPY docker/dev_sfc_controller_alpine/build-controller.sh .
 RUN ./build-controller.sh
 
 COPY docker/dev_sfc_controller_alpine/etcd.conf .
-COPY docker/dev_sfc_controller_alpine/kafka.conf .
 COPY docker/dev_sfc_controller_alpine/sfc.conf .
 
 WORKDIR /root/

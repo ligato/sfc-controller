@@ -22,7 +22,6 @@ go get -insecure github.com/ligato/sfc-controller
 
 # build the agent
 cd $GOPATH/src/github.com/ligato/sfc-controller
-#git checkout v2.1
 
 source setup-env.sh
 make

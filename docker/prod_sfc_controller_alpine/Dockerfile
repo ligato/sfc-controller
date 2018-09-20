@@ -17,7 +17,6 @@ RUN rm -rf sfc/
 
 # add config files
 COPY etcd.conf .
-COPY kafka.conf .
 
 WORKDIR /root/
 

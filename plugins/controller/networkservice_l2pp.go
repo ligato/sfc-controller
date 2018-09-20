@@ -177,12 +177,33 @@ func (ns *NetworkService) RenderConnL2PP(
 		nno, p2nArray, networkPodTypes)
 }
 
+// renderConnL2PPSameVnf renders this L2PP connection on same vnf
+func (ns *NetworkService) renderConnL2PPSameVnf(
+	networkPodInterfaces []*controller.Interface) error {
+
+	for i := 0; i < 2; i++ {
+		// create xconns between both interfaces on the same vnf
+		vppKVs := vppagent.ConstructXConnect(networkPodInterfaces[0].Parent, networkPodInterfaces[i].Name, networkPodInterfaces[^i&1].Name)
+		RenderTxnAddVppEntriesToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
+			vppKVs)
+	}
+
+	return nil
+}
+
 // renderConnL2PPSameNode renders this L2PP connection on same node
 func (ns *NetworkService) renderConnL2PPSameNode(
 	vppAgent string,
 	conn *controller.Connection,
 	networkPodInterfaces []*controller.Interface,
 	networkPodTypes []string) error {
+
+	// there is a connection "hack" where it is possible to l2x 2 ports together in the same vnf
+	if networkPodInterfaces[0].Parent == networkPodInterfaces[1].Parent &&
+		networkPodInterfaces[0].Name != networkPodInterfaces[1].Name {
+		return ns.renderConnL2PPSameVnf(networkPodInterfaces)
+	}
 
 	// if both interfaces are memIf's, we can do a direct inter-vnf memif
 	// otherwise, each interface drops into the vswitch and an l2xc is used
