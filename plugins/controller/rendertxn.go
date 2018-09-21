@@ -47,8 +47,7 @@ func RenderTxnConfigStart() {
 
 	configMutex.Lock()
 
-	log.Info("ConfigStart: starting ...")
-	defer log.Info("ConfigStart: finished ...")
+	log.Infof("ConfigStart: starting ...len vppEntries=%d", len(ctlrPlugin.ramCache.VppEntries))
 
 	beforeMap = nil
 	afterMap = nil
@@ -56,6 +55,15 @@ func RenderTxnConfigStart() {
 	beforeMap = make(map[int]map[string]*vppagent.KVType)
 	afterMap = make(map[int]map[string]*vppagent.KVType)
 	initLevelMap(0)
+
+	for key, vppKV := range ctlrPlugin.ramCache.VppEntries {
+		if key != vppKV.VppKey {
+			log.Fatal("RenderTxnConfigStart: whoa")
+		}
+		beforeMap[0][vppKV.VppKey] = vppKV
+	}
+
+	log.Infof("ConfigStart: finished ...len before[0]: %d", len(beforeMap[0]))
 }
 
 // RenderTxnConfigEntityStart has ability to track resources for this particular entity
@@ -126,8 +134,9 @@ func RenderTxnConfigEnd() error {
 
 	defer configMutex.Unlock()
 
-	log.Info("ConfigEnd: starting ...")
-	defer log.Info("ConfigEnd: finished ...")
+	log.Infof("ConfigEnd: starting ...len before[0]/after[0]=%d/%d",
+		len(beforeMap[0]), len(afterMap[0]))
+
 
 	// traverse the entries in the before cache
 	for key := range beforeMap[0] {
@@ -157,7 +166,12 @@ func RenderTxnConfigEnd() error {
 		}
 	}
 
-	transferAfterVppKVEntriesToSystemCache()
+	for _, vppKV := range afterMap[0] {
+		ctlrPlugin.ramCache.VppEntries[vppKV.VppKey] = vppKV
+	}
+
+	log.Infof("ConfigEnd: finished ...len before[0]/after[0]/vpp_entries: %d/%d/%d",
+		len(beforeMap[0]), len(afterMap[0]), len(ctlrPlugin.ramCache.VppEntries))
 
 	return nil
 }
@@ -197,30 +211,6 @@ func RenderTxnAddVppEntryToTxn(
 		len(renderedVppAgentEntries), txnLevel, vppKV)
 }
 
-// CopyRenderedVppAgentEntriesToBeforeCfgTxn cache the existing set before new keys are rendered
-func CopyRenderedVppAgentEntriesToBeforeCfgTxn(entityName string) {
-
-	vppAgentEntries, exists := ctlrPlugin.ramCache.RenderedEntitesStates[entityName]
-	if !exists {
-		return
-	}
-	for _, vppAgentEntry := range vppAgentEntries {
-		log.Debugf("CopyRendered...BeforeCfgTxn: entry=%v", vppAgentEntry)
-		if vppKV, exists := ctlrPlugin.ramCache.VppEntries[vppAgentEntry.VppAgentKey]; !exists {
-			log.Warnf("CopyRendered...BeforeCfgTxn: ouch ... missing vpp cache entry: %s",
-				vppAgentEntry.VppAgentKey)
-			vppKV = &vppagent.KVType{
-				VppKey:       vppAgentEntry.VppAgentKey,
-				VppEntryType: vppAgentEntry.VppAgentType,
-			}
-			beforeMap[0][vppAgentEntry.VppAgentKey] = vppKV
-		} else {
-			beforeMap[0][vppAgentEntry.VppAgentKey] = vppKV
-		}
-	}
-	log.Debugf("CopyRenderedVppAgentEntriesToBeforeCfgTxn: beforeMap: %v", beforeMap)
-}
-
 // DeleteRenderedVppAgentEntries deletes the existing rendered set
 func DeleteRenderedVppAgentEntries(renderedVppAgentEntries map[string]*controller.RenderedVppAgentEntry) {
 
@@ -233,12 +223,3 @@ func DeleteRenderedVppAgentEntries(renderedVppAgentEntries map[string]*controlle
 		database.DeleteFromDatastore(vppAgentEntry.VppAgentKey)
 	}
 }
-
-// transferAfterVppKVEntriesToSystemCache updates the system cache with the new vpp agent entries
-func transferAfterVppKVEntriesToSystemCache() {
-
-	for _, vppKV := range afterMap[0] {
-		ctlrPlugin.ramCache.VppEntries[vppKV.VppKey] = vppKV
-	}
-}
-

@@ -406,9 +406,6 @@ func (nn *NetworkNode) renderConfig() error {
 
 	log.Debugf("renderConfig: before nn.Status=%v", nn.Status)
 
-	// add the current rendered etc keys to the before config transaction
-	CopyRenderedVppAgentEntriesToBeforeCfgTxn(ModelTypeNetworkNode + "/" + nn.Metadata.Name)
-
 	nn.Status = &controller.NetworkNodeStatus{}
 	nn.Status.RenderedVppAgentEntries = make(map[string]*controller.RenderedVppAgentEntry, 0)
 	nn.Status.Interfaces = make(map[string]*controller.InterfaceStatus, 0)

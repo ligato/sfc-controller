@@ -339,9 +339,6 @@ func (ns *NetworkService) renderConfig() error {
 		return err
 	}
 
-	// remember the existing entries for this entity so we can compare afterwards to see what changed
-	CopyRenderedVppAgentEntriesToBeforeCfgTxn(ModelTypeNetworkService + "/" + ns.Metadata.Name)
-
 	// initialize the network service status
 	ns.Status = &controller.NetworkServiceStatus{}
 	ns.Status.RenderedVppAgentEntries = make(map[string]*controller.RenderedVppAgentEntry, 0)

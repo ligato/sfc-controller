@@ -79,7 +79,6 @@ func init() {
 type CacheType struct {
 	// state
 	InterfaceStates       map[string]*controller.InterfaceStatus                  // key[entity/ifname]
-	RenderedEntitesStates map[string]map[string]*controller.RenderedVppAgentEntry // key[modelType/name][vppkey]
 	VppEntries            map[string]*vppagent.KVType                             // key[vppkey]
 	MacAddrAllocator      *idapi.MacAddrAllocatorType
 	MemifIDAllocator      *idapi.MemifAllocatorType
@@ -229,9 +228,6 @@ func (s *Plugin) InitRAMCache() {
 
 	s.ramCache.VppEntries = nil
 	s.ramCache.VppEntries = make(map[string]*vppagent.KVType)
-
-	s.ramCache.RenderedEntitesStates = nil
-	s.ramCache.RenderedEntitesStates = make(map[string]map[string]*controller.RenderedVppAgentEntry)
 
 	s.ramCache.MacAddrAllocator = nil
 	s.ramCache.MacAddrAllocator = idapi.NewMacAddrAllocator()
@@ -387,6 +383,7 @@ func (s *Plugin) LoadVppAgentEntriesFromRenderedVppAgentEntries(
 
 	log.Debugf("LoadVppAgentEntriesFromRenderedVppAgentEntries: entity: %s, num: %d, %v",
 		entityName, len(vppAgentEntries), vppAgentEntries)
+
 	for _, vppAgentEntry := range vppAgentEntries {
 
 		vppKVEntry := vppagent.NewKVEntry(vppAgentEntry.VppAgentKey, vppAgentEntry.VppAgentType)
@@ -397,14 +394,6 @@ func (s *Plugin) LoadVppAgentEntriesFromRenderedVppAgentEntries(
 		if found {
 			// add ref to VppEntries indexed by the vppKey
 			s.ramCache.VppEntries[vppKVEntry.VppKey] = vppKVEntry
-
-			// add ref to the rendering entity
-			if renderedEntities, exists := s.ramCache.RenderedEntitesStates[entityName]; !exists {
-				renderedEntities = make(map[string]*controller.RenderedVppAgentEntry, 0)
-				s.ramCache.RenderedEntitesStates[entityName] = renderedEntities
-
-			}
-			s.ramCache.RenderedEntitesStates[entityName][vppAgentEntry.VppAgentKey] = vppAgentEntry
 		}
 	}
 
