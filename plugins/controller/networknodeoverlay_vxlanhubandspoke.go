@@ -81,7 +81,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 					ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 			}
 
-			vxlanIPFromAddress, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
+			vxlanIPFromAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
 				nno.Spec.VxlanHubAndSpokeParms.LoopbackIpamPoolName, fromNode,
 				nno.Spec.VxlanHubAndSpokeParms.NetworkNodeInterfaceLabel)
 			if err != nil {
@@ -92,7 +92,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 				ns.AppendStatusMsg(msg)
 				return fmt.Errorf(msg)
 			}
-			vxlanIPToAddress, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
+			vxlanIPToAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
 				nno.Spec.VxlanHubAndSpokeParms.LoopbackIpamPoolName, toNode,
 				nno.Spec.VxlanHubAndSpokeParms.NetworkNodeInterfaceLabel)
 			if err != nil {
@@ -124,7 +124,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 
 			renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanLoopbackInterfaceAndStaticRoutes(
 				ModelTypeNetworkService+"/"+ns.Metadata.Name,
-				fromNode, toNode,
+				fromNode, toNode, 0,
 				vxlanIPFromAddress, vxlanIPToAddress,
 				nno.Spec.VxlanHubAndSpokeParms.CreateLoopbackInterface,
 				nno.Spec.VxlanHubAndSpokeParms.CreateLoopbackStaticRoutes,

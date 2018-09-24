@@ -37,5 +37,4 @@ COPY \
 
 WORKDIR /root/
 
-CMD ["/root/go/bin/sfc-controller", "--contiv-ksr=true", "--etcd-config=/opt/sfc-controller/dev/etcd.conf", "--sfc-config=/opt/sfc-controller/dev/sfc.conf"]
-
+CMD ["/root/go/bin/sfc-controller", "--etcd-config=/opt/sfc-controller/dev/etcd.conf", "--sfc-config=/opt/sfc-controller/dev/sfc.conf"]

@@ -296,8 +296,8 @@ func ConstructVxlanInterface(vppAgent string,
 	ep1IPAddress string,
 	ep2IPAddress string) *KVType {
 
-	ep1 := stripSlashAndSubnetIPAddress(ep1IPAddress)
-	ep2 := stripSlashAndSubnetIPAddress(ep2IPAddress)
+	ep1 := StripSlashAndSubnetIPAddress(ep1IPAddress)
+	ep2 := StripSlashAndSubnetIPAddress(ep2IPAddress)
 
 	iface := &interfaces.Interfaces_Interface{
 		Name:    ifname,
@@ -322,8 +322,8 @@ func ConstructVxlanInterface(vppAgent string,
 	return kv
 }
 
-// if the ip address has a /xx subnet attached, it is stripped off
-func stripSlashAndSubnetIPAddress(ipAndSubnetStr string) string {
+//StripSlashAndSubnetIPAddress if the ip address has a /xx subnet attached, it is stripped off
+func StripSlashAndSubnetIPAddress(ipAndSubnetStr string) string {
 	strs := strings.Split(ipAndSubnetStr, "/")
 	return strs[0]
 }
@@ -476,7 +476,7 @@ func ConstructStaticRoute(vppAgent string, l3sr *controller.L3VRFRoute) *KVType 
 		VrfId:             l3sr.VrfId,
 		Description:       l3sr.Description,
 		DstIpAddr:         l3sr.DstIpAddr,
-		NextHopAddr:       stripSlashAndSubnetIPAddress(l3sr.NextHopAddr),
+		NextHopAddr:       StripSlashAndSubnetIPAddress(l3sr.NextHopAddr),
 		Weight:            l3sr.Weight,
 		OutgoingInterface: l3sr.OutgoingInterface,
 		Preference:        l3sr.Preference,
@@ -495,40 +495,26 @@ func ConstructStaticRoute(vppAgent string, l3sr *controller.L3VRFRoute) *KVType 
 	return kv
 }
 
-// func (vppapi *VppAgentAPIType) createStaticArpEntry(etcdPrefix string, destIPAddress string, physAddress string,
-// 	outGoingIf string) (*l3.ArpTable_ArpTableEntry, error) {
+func ConstructStaticArpEntry(vppAgent string, l3ae *controller.L3ArpEntry) *KVType {
 
-// 	ae := &l3.ArpTable_ArpTableEntry{
-// 		Interface:   outGoingIf,
-// 		Static:      true,
-// 		IpAddress:   destIPAddress,
-// 		PhysAddress: physAddress,
-// 	}
+	ae := &l3.ArpTable_ArpEntry{
+		Interface:   l3ae.OutgoingInterface,
+		Static:      true,
+		IpAddress:   l3ae.IpAddress,
+		PhysAddress: l3ae.PhysAddress,
+	}
 
-// 	//if vppapi.reconcileInProgress {
-// 	//vppapi.reconcileStaticArpEntry(etcdPrefix, ae)
-// 	//} else {
+	key := ArpEntryKey(vppAgent, ae.Interface, ae.PhysAddress)
 
-// 	key := utils.ArpEntryKey(etcdPrefix, outGoingIf, destIPAddress)
+	log.Debugf("ConstructStaticArpEntry: key='%s', arp='%v", key, ae)
 
-// 	log.Println(key)
-// 	log.Println(ae)
-
-// 	log.Info("createStaticArpEntry: arp entry: : ", key, ae)
-
-// 	//rc := NewRemoteClientTxn(etcdPrefix, vppapi.dbFactory)
-// 	err := vppapi.db.Put(key, ae)
-// 	//err := rc.Put(key, ae)
-
-// 	if err != nil {
-// 		log.Error("createStaticArpEntry: databroker.Store: ", err)
-// 		return nil, err
-
-// 	}
-// 	//}
-
-// 	return ae, nil
-// }
+	kv := &KVType{
+		VppKey:       key,
+		VppEntryType: VppEntryTypeArp,
+		ArpEntry:      ae,
+	}
+	return kv
+}
 
 // func (vppapi *VppAgentAPIType) createL2FibEntry(etcdPrefix string, bdName string, destMacAddr string,
 // 	outGoingIf string) (*l2.FibTableEntries_FibTableEntry, error) {

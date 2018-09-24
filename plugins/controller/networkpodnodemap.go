@@ -167,6 +167,7 @@ func (p2n *NetworkPodToNodeMap) deleteFromDatastore() {
 // LoadAllFromDatastoreIntoCache iterates over the etcd set
 func (mgr *NetworkPodToNodeMapMgr) LoadAllFromDatastoreIntoCache() error {
 	log.Debugf("LoadAllFromDatastore: ...")
+	mgr.loadAllFromDatastore(mgr.KeyPrefix(), ctlrPlugin.ramCache.NetworkPodToNodeMap)
 	return mgr.loadAllFromDatastore(mgr.KeyPrefix(), mgr.networkPodNodeCache)
 }
 

@@ -20,10 +20,10 @@ import (
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 )
 
-// The L2PP topology is rendered in this module for a connection with a vnf-service
+// The L3PP topology is rendered in this module for a connection with a vnf-service
 
-// RenderConnL2PP renders this L2PP connection
-func (ns *NetworkService) RenderConnL2PP(
+// RenderConnL3PP renders this L3PP connection
+func (ns *NetworkService) RenderConnL3PP(
 	conn *controller.Connection,
 	connIndex uint32) error {
 
@@ -34,9 +34,9 @@ func (ns *NetworkService) RenderConnL2PP(
 	allPodsAssignedToNodes := true
 	staticNodesInInterfacesSpecified := false
 
-	log.Debugf("RenderConnL2PP: num pod interfaces: %d", len(conn.PodInterfaces))
-	log.Debugf("RenderConnL2PP: num node interfaces: %d", len(conn.NodeInterfaces))
-	log.Debugf("RenderConnL2PP: num node labels: %d", len(conn.NodeInterfaceLabels))
+	log.Debugf("RenderConnL3PP: num pod interfaces: %d", len(conn.PodInterfaces))
+	log.Debugf("RenderConnL3PP: num node interfaces: %d", len(conn.NodeInterfaces))
+	log.Debugf("RenderConnL3PP: num node labels: %d", len(conn.NodeInterfaceLabels))
 
 	ifIndex := 0
 
@@ -44,7 +44,7 @@ func (ns *NetworkService) RenderConnL2PP(
 	for i, connPodInterface := range conn.PodInterfaces {
 
 		if ifIndex >= 2 {
-			msg := fmt.Sprintf("Too many connection segments specified for a l2pp connection")
+			msg := fmt.Sprintf("Too many connection segments specified for a l3pp connection")
 			ns.AppendStatusMsg(msg)
 			return fmt.Errorf(msg)
 		}
@@ -81,7 +81,7 @@ func (ns *NetworkService) RenderConnL2PP(
 	for _, nodeInterface := range conn.NodeInterfaces {
 
 		if ifIndex >= 2 {
-			msg := fmt.Sprintf("Too many connection segments specified for a l2pp connection")
+			msg := fmt.Sprintf("Too many connection segments specified for a l3pp connection")
 			ns.AppendStatusMsg(msg)
 			return fmt.Errorf(msg)
 		}
@@ -136,11 +136,11 @@ func (ns *NetworkService) RenderConnL2PP(
 		p2nArray[1].Pod = p2nArray[0].Node
 	}
 
-	log.Debugf("RenderConnL2PP: p2nArray=%v, netPodIf=%v, conn=%v", p2nArray, netPodInterfaces, conn)
+	log.Debugf("RenderConnL3PP: p2nArray=%v, netPodIf=%v, conn=%v", p2nArray, netPodInterfaces, conn)
 
 	// see if the vnfs are on the same node ...
 	if p2nArray[0].Node == p2nArray[1].Node {
-		return ns.renderConnL2PPSameNode(p2nArray[0].Node, conn, netPodInterfaces, networkPodTypes)
+		return ns.renderConnL3PPSameNode(p2nArray[0].Node, conn, netPodInterfaces, networkPodTypes)
 	} else if staticNodesInInterfacesSpecified {
 		msg := fmt.Sprintf("netwrok service: %s, nodes %s/%s must be the same",
 			ns.Metadata.Name,
@@ -173,37 +173,16 @@ func (ns *NetworkService) RenderConnL2PP(
 	}
 
 	// now setup the connection between nodes
-	return ns.renderConnL2PPInterNode(conn, connIndex, netPodInterfaces,
+	return ns.renderConnL3PPInterNode(conn, connIndex, netPodInterfaces,
 		nno, p2nArray, networkPodTypes)
 }
 
-// renderConnL2PPSameVnf renders this L2PP connection on same vnf
-func (ns *NetworkService) renderConnL2PPSameVnf(
-	networkPodInterfaces []*controller.Interface) error {
-
-	for i := 0; i < 2; i++ {
-		// create xconns between both interfaces on the same vnf
-		vppKVs := vppagent.ConstructXConnect(networkPodInterfaces[0].Parent, networkPodInterfaces[i].Name, networkPodInterfaces[^i&1].Name)
-		RenderTxnAddVppEntriesToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService+"/"+ns.Metadata.Name,
-			vppKVs)
-	}
-
-	return nil
-}
-
-// renderConnL2PPSameNode renders this L2PP connection on same node
-func (ns *NetworkService) renderConnL2PPSameNode(
+// renderConnL3PPSameNode renders this L3PP connection on same node
+func (ns *NetworkService) renderConnL3PPSameNode(
 	vppAgent string,
 	conn *controller.Connection,
 	networkPodInterfaces []*controller.Interface,
 	networkPodTypes []string) error {
-
-	// there is a connection "hack" where it is possible to l2x 2 ports together in the same vnf
-	if networkPodInterfaces[0].Parent == networkPodInterfaces[1].Parent &&
-		networkPodInterfaces[0].Name != networkPodInterfaces[1].Name {
-		return ns.renderConnL2PPSameVnf(networkPodInterfaces)
-	}
 
 	// if both interfaces are memIf's, we can do a direct inter-vnf memif
 	// otherwise, each interface drops into the vswitch and an l2xc is used
@@ -255,8 +234,8 @@ func (ns *NetworkService) renderConnL2PPSameNode(
 	return nil
 }
 
-// renderConnL2PPInterNode renders this L2PP connection between nodes
-func (ns *NetworkService) renderConnL2PPInterNode(
+// renderConnL3PPInterNode renders this L3PP connection between nodes
+func (ns *NetworkService) renderConnL3PPInterNode(
 	conn *controller.Connection,
 	connIndex uint32,
 	networkPodInterfaces []*controller.Interface,
@@ -265,29 +244,50 @@ func (ns *NetworkService) renderConnL2PPInterNode(
 	networkPodTypes []string) error {
 
 	var xconn [2][2]string // [0][i] for vnf interfaces [1][i] for vxlan
+	var ifStatuses [2]*controller.InterfaceStatus
+
+	if conn.VrfId == 0 {
+		conn.VrfId = ctlrPlugin.ramCache.VrfIDAllocator.Allocate()
+	}
 
 	// create the interfaces in the containers and vswitch on each node
 	for i := 0; i < 2; i++ {
 
-		ifName, _, err := ns.RenderConnInterfacePair(p2nArray[i].Node, conn, networkPodInterfaces[i], networkPodTypes[i])
+		ifName, ifStatus, err := ns.RenderConnInterfacePair(p2nArray[i].Node, conn, networkPodInterfaces[i], networkPodTypes[i])
 		if err != nil {
 			return err
 		}
+		ifStatuses[i] = ifStatus
 		xconn[0][i] = ifName
+
+		if len(ifStatus.IpAddresses) != 0 {
+			desc := fmt.Sprintf("L3PP NS_%s_VRF_%d_CONN_%d", ns.Metadata.Name, conn.VrfId, connIndex+1)
+			l3sr := &controller.L3VRFRoute{
+				VrfId:             conn.VrfId,
+				Description:       desc,
+				DstIpAddr:         vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
+				OutgoingInterface: ifName,
+			}
+			vppKV := vppagent.ConstructStaticRoute(p2nArray[i].Node, l3sr)
+			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+				ModelTypeNetworkService + "/" + ns.Metadata.Name,
+				vppKV)
+		}
 	}
 
 	switch nno.Spec.ConnectionType {
 	case controller.NetworkNodeOverlayConnectionTypeVxlan:
 		switch nno.Spec.ServiceMeshType {
 		case controller.NetworkNodeOverlayTypeMesh:
-			return nno.renderConnL2PPVxlanMesh(ns,
+			return nno.renderConnL3PPVxlanMesh(ns,
 				conn,
 				connIndex,
 				networkPodInterfaces,
+				ifStatuses,
 				p2nArray,
 				xconn)
 		case controller.NetworkNodeOverlayTypeHubAndSpoke:
-			msg := fmt.Sprintf("vnf-service: %s, conn: %d, %s to %s node overlay: %s type not supported for L2PP",
+			msg := fmt.Sprintf("vnf-service: %s, conn: %d, %s to %s node overlay: %s type not supported for L3PP",
 				ns.Metadata.Name,
 				connIndex,
 				conn.PodInterfaces[0],

@@ -339,9 +339,6 @@ func (ns *NetworkService) renderConfig() error {
 		return err
 	}
 
-	// remember the existing entries for this entity so we can compare afterwards to see what changed
-	CopyRenderedVppAgentEntriesToBeforeCfgTxn(ModelTypeNetworkService + "/" + ns.Metadata.Name)
-
 	// initialize the network service status
 	ns.Status = &controller.NetworkServiceStatus{}
 	ns.Status.RenderedVppAgentEntries = make(map[string]*controller.RenderedVppAgentEntry, 0)
@@ -399,6 +396,14 @@ func (ns *NetworkService) renderConnectionSegments(
 		if err := ns.RenderConnL2MP(conn, i); err != nil {
 			return err
 		}
+	case controller.ConnTypeL3PP:
+		if err := ns.RenderConnL3PP(conn, i); err != nil {
+			return err
+		}
+	case controller.ConnTypeL3MP:
+		if err := ns.RenderConnL3MP(conn, i); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -440,12 +445,12 @@ func (ns *NetworkService) validateConnections() error {
 		switch conn.ConnType {
 		case controller.ConnTypeL2PP:
 			if len(conn.PodInterfaces)+len(conn.NodeInterfaces)+len(conn.NodeInterfaceLabels) != 2 {
-				return fmt.Errorf("network-service: %s conn: p2p must have 2 interfaces only",
+				return fmt.Errorf("network-service: %s conn: l2 p2p must have 2 interfaces only",
 					ns.Metadata.Name)
 			}
 		case controller.ConnTypeL2MP:
 			if len(conn.PodInterfaces)+len(conn.NodeInterfaces) == 0 {
-				return fmt.Errorf("network-service: %s conn: p2mp must have at least one interface",
+				return fmt.Errorf("network-service: %s conn: l2 p2mp must have at least one interface",
 					ns.Metadata.Name)
 			}
 			if conn.UseNodeL2Bd != "" && conn.L2Bd != nil {
@@ -466,6 +471,20 @@ func (ns *NetworkService) validateConnections() error {
 					return fmt.Errorf("network-service: %s, conn: l2bd: %s has no DB parms nor refer to a template",
 						ns.Metadata.Name, conn.L2Bd.Name)
 				}
+			}
+		case controller.ConnTypeL3PP:
+			if len(conn.PodInterfaces)+len(conn.NodeInterfaces)+len(conn.NodeInterfaceLabels) != 2 {
+				return fmt.Errorf("network-service: %s conn: l3 p2p must have 2 interfaces only",
+					ns.Metadata.Name)
+			}
+		case controller.ConnTypeL3MP:
+			if len(conn.PodInterfaces)+len(conn.NodeInterfaces) == 0 {
+				return fmt.Errorf("network-service: %s conn: l3 p2mp must have at least one interface",
+					ns.Metadata.Name)
+			}
+			if conn.UseNodeL2Bd != "" || conn.L2Bd != nil {
+				return fmt.Errorf("network-service: %s conn: cannot refer to a node bd OR provide l2bd parameters",
+					ns.Metadata.Name)
 			}
 		default:
 			return fmt.Errorf("network-service: %s, connection has invalid conn type '%s'",

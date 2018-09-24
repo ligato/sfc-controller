@@ -44,7 +44,6 @@ const PluginID infra.PluginName = "Controller"
 var (
 	sfcConfigFile               string // cli flag - see RegisterFlags
 	CleanDatastore              bool
-	ContivKSREnabled            bool
 	BypassModelTypeHttpHandlers bool
 	log                         = logrus.DefaultLogger()
 	ctlrPlugin                  *Plugin
@@ -56,8 +55,6 @@ func RegisterFlags() {
 		"Name of a sfc config (yaml) file to load at startup")
 	flag.BoolVar(&CleanDatastore, "clean", false,
 		"Clean the controller datastore entries")
-	flag.BoolVar(&ContivKSREnabled, "contiv-ksr", false,
-		"Interact with contiv ksr to learn k8s config/state")
 	flag.BoolVar(&BypassModelTypeHttpHandlers, "bypass-rest-for-model-objects", false,
 		"Disable HTTP handling for controller objects")
 }
@@ -67,7 +64,6 @@ func LogFlags() {
 	log.Debugf("LogFlags:")
 	log.Debugf("\tsfcConfigFile:'%s'", sfcConfigFile)
 	log.Debugf("\tclean:'%v'", CleanDatastore)
-	log.Debugf("\tcontiv ksr:'%v'", ContivKSREnabled)
 	log.Debugf("\tmodel REST disabled:'%v'", BypassModelTypeHttpHandlers)
 }
 
@@ -83,10 +79,10 @@ func init() {
 type CacheType struct {
 	// state
 	InterfaceStates       map[string]*controller.InterfaceStatus                  // key[entity/ifname]
-	RenderedEntitesStates map[string]map[string]*controller.RenderedVppAgentEntry // key[modelType/name][vppkey]
 	VppEntries            map[string]*vppagent.KVType                             // key[vppkey]
 	MacAddrAllocator      *idapi.MacAddrAllocatorType
 	MemifIDAllocator      *idapi.MemifAllocatorType
+	VrfIDAllocator        *idapi.VrfAllocatorType
 	IPAMPoolAllocators    map[string]*ipam.PoolAllocatorType // key[modelType/ipamPoolName]
 	NetworkPodToNodeMap   map[string]*NetworkPodToNodeMap    // key[pod]
 }
@@ -123,7 +119,6 @@ func (s *Plugin) Init() error {
 	ctlrPlugin = s
 
 	s.CleanDatastore = CleanDatastore
-	s.ContivKSREnabled = ContivKSREnabled
 	s.BypassModelTypeHttpHandlers = BypassModelTypeHttpHandlers
 
 	log.Infof("Init: %s enter ...", PluginID)
@@ -205,19 +200,13 @@ func (s *Plugin) AfterInit() error {
 	// at this point, plugins are all loaded, all is read in from the database
 	// so render the config ... note: resync will ensure etcd is not written to
 	// unnecessarily
-
-	go s.ProcessOperationalMessages()
-
-	s.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
-	//RenderTxnConfigStart()
-	//s.RenderAll()
-	//RenderTxnConfigEnd()
-
+	
 	s.afterInitMgrs()
 
-	if s.ContivKSREnabled {
-		go ctlrPlugin.NetworkPodNodeMapMgr.RunContivKSRNetworkPodToNodeMappingWatcher()
-	}
+	go ctlrPlugin.NetworkPodNodeMapMgr.RunContivKSRNetworkPodToNodeMappingWatcher()
+
+	go s.ProcessOperationalMessages()
+	s.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
 
 	s.StatusCheck.ReportStateChange(PluginID, statuscheck.OK, nil)
 
@@ -240,14 +229,14 @@ func (s *Plugin) InitRAMCache() {
 	s.ramCache.VppEntries = nil
 	s.ramCache.VppEntries = make(map[string]*vppagent.KVType)
 
-	s.ramCache.RenderedEntitesStates = nil
-	s.ramCache.RenderedEntitesStates = make(map[string]map[string]*controller.RenderedVppAgentEntry)
-
 	s.ramCache.MacAddrAllocator = nil
 	s.ramCache.MacAddrAllocator = idapi.NewMacAddrAllocator()
 
 	s.ramCache.MemifIDAllocator = nil
 	s.ramCache.MemifIDAllocator = idapi.NewMemifAllocator()
+
+	s.ramCache.VrfIDAllocator = nil
+	s.ramCache.VrfIDAllocator = idapi.NewVrfAllocator()
 
 	s.ramCache.InterfaceStates = nil
 	s.ramCache.InterfaceStates = make(map[string]*controller.InterfaceStatus)
@@ -311,6 +300,7 @@ func (s *Plugin) PostProcessLoadedDatastore() error {
 			}
 		}
 	}
+	ctlrPlugin.IpamPoolMgr.EntityCreate("", controller.IPAMPoolScopeSystem)
 
 	log.Debugf("PostProcessLoadedDatastore: processing nodes state: num: %d",
 		len(s.NetworkNodeMgr.networkNodeCache))
@@ -393,6 +383,7 @@ func (s *Plugin) LoadVppAgentEntriesFromRenderedVppAgentEntries(
 
 	log.Debugf("LoadVppAgentEntriesFromRenderedVppAgentEntries: entity: %s, num: %d, %v",
 		entityName, len(vppAgentEntries), vppAgentEntries)
+
 	for _, vppAgentEntry := range vppAgentEntries {
 
 		vppKVEntry := vppagent.NewKVEntry(vppAgentEntry.VppAgentKey, vppAgentEntry.VppAgentType)
@@ -403,14 +394,6 @@ func (s *Plugin) LoadVppAgentEntriesFromRenderedVppAgentEntries(
 		if found {
 			// add ref to VppEntries indexed by the vppKey
 			s.ramCache.VppEntries[vppKVEntry.VppKey] = vppKVEntry
-
-			// add ref to the rendering entity
-			if renderedEntities, exists := s.ramCache.RenderedEntitesStates[entityName]; !exists {
-				renderedEntities = make(map[string]*controller.RenderedVppAgentEntry, 0)
-				s.ramCache.RenderedEntitesStates[entityName] = renderedEntities
-
-			}
-			s.ramCache.RenderedEntitesStates[entityName][vppAgentEntry.VppAgentKey] = vppAgentEntry
 		}
 	}
 

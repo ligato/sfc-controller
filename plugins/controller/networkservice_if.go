@@ -24,32 +24,34 @@ import (
 // RenderConnInterfacePair renders this interface pair on the vnf and vswitch
 func (ns *NetworkService) RenderConnInterfacePair(
 	vppAgent string,
+	conn *controller.Connection,
 	netPodInterface *controller.Interface,
-	networkPodType string) (string, error) {
+	networkPodType string) (string, *controller.InterfaceStatus, error) {
 
 	// The interface should be created in the vnf and the vswitch then the nsitch
 	// interfaces will be added to the bridge.
 
 	switch netPodInterface.IfType {
 	case controller.IfTypeMemif:
-		return ns.RenderConnMemifPair(vppAgent, netPodInterface, networkPodType)
+		return ns.RenderConnMemifPair(vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeVeth:
-		return ns.RenderConnVethAfpPair(vppAgent, netPodInterface, networkPodType)
+		return ns.RenderConnVethAfpPair(vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeTap:
-		return ns.RenderConnTapPair(vppAgent, netPodInterface, networkPodType)
+		return ns.RenderConnTapPair(vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeEthernet:
 		// the ethernet interface is special and has been created by the node already
-		return netPodInterface.Name, nil
+		return netPodInterface.Name, nil, nil
 	}
 
-	return "", nil
+	return "", nil, nil
 }
 
 // RenderConnMemifPair renders this vnf/vswitch interface pair
 func (ns *NetworkService) RenderConnMemifPair(
 	vppAgent string,
+	conn *controller.Connection,
 	networkPodInterface *controller.Interface,
-	networkPodType string) (string, error) {
+	networkPodType string) (string, *controller.InterfaceStatus, error) {
 
 	var ifName string
 
@@ -61,7 +63,7 @@ func (ns *NetworkService) RenderConnMemifPair(
 		RemoveInterfaceStatus(ns.Status.Interfaces, connPodName, connInterfaceName)
 		msg := fmt.Sprintf("network pod interface: %s/%s, %s", connPodName, connInterfaceName, err)
 		ns.AppendStatusMsg(msg)
-		return "", err
+		return "", nil, err
 	}
 	if ifStatus.MemifID == 0 {
 		ifStatus.MemifID = ctlrPlugin.ramCache.MemifIDAllocator.Allocate()
@@ -81,6 +83,9 @@ func (ns *NetworkService) RenderConnMemifPair(
 		networkPodInterface.MemifParms,
 		ctlrPlugin.SysParametersMgr.sysParmCache.MemifDirectory,
 		vppAgent)
+
+	vppKV.IFace.Vrf = conn.VrfId
+
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
@@ -102,13 +107,16 @@ func (ns *NetworkService) RenderConnMemifPair(
 		networkPodInterface.MemifParms,
 		ctlrPlugin.SysParametersMgr.sysParmCache.MemifDirectory,
 		vppAgent)
+
+	vppKV.IFace.Vrf = conn.VrfId
+
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
 
 	log.Debugf("RenderToplogyMemifPair: ifName: %s, %v", ifName, vppKV)
 
-	return ifName, nil
+	return ifName, ifStatus, nil
 }
 
 // RenderConnDirectInterPodMemifPair renders this pod-pod interface pair
@@ -189,17 +197,19 @@ func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
 // RenderConnTapPair renders this pod/vswitch tap interface pair
 func (ns *NetworkService) RenderConnTapPair(
 	vppAgent string,
+	conn *controller.Connection,
 	networkPodInterface *controller.Interface,
-	networkPodType string) (string, error) {
+	networkPodType string) (string, *controller.InterfaceStatus, error) {
 
-	return "", fmt.Errorf("tap not supported")
+	return "", nil, fmt.Errorf("tap not supported")
 }
 
 // RenderConnVethAfpPair renders this pod/vswitch veth/afp interface pair
 func (ns *NetworkService) RenderConnVethAfpPair(
 	vppAgent string,
+	conn *controller.Connection,
 	networkPodInterface *controller.Interface,
-	networkPodType string) (string, error) {
+	networkPodType string) (string, *controller.InterfaceStatus, error) {
 
 	var ifName string
 
@@ -211,7 +221,7 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 		RemoveInterfaceStatus(ns.Status.Interfaces, connPodName, connInterfaceName)
 		msg := fmt.Sprintf("network pod interface: %s/%s, %s", connPodName, connInterfaceName, err)
 		ns.AppendStatusMsg(msg)
-		return "", err
+		return "", nil, err
 	}
 	PersistInterfaceStatus(ns.Status.Interfaces, ifStatus, connPodName, connInterfaceName)
 
@@ -243,7 +253,6 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 		veth2Name,
 		connPodName)
 
-	log.Printf("%v", vppKV)
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
@@ -258,6 +267,7 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 		host2Name,
 		veth1Name,
 		vppAgent)
+
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
@@ -286,11 +296,14 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 		networkPodInterface.AdminStatus,
 		ctlrPlugin.SysParametersMgr.ResolveRxMode(networkPodInterface.RxMode),
 		host2Name)
+
+	vppKV.IFace.Vrf = conn.VrfId
+
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
 
-	return ifName, nil
+	return ifName, ifStatus, nil
 }
 
 func stringFirstNLastM(n int, m int, str string) string {

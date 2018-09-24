@@ -70,7 +70,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 			ifName := fmt.Sprintf("IF_VXLAN_MESH_NET_SRVC_%s_CONN_%d_FROM_%s_TO_%s_VNI_%d",
 				ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 
-			vxlanIPFromAddress, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
+			vxlanIPFromAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
 				nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, fromNode, nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 			if err != nil {
 				msg := fmt.Sprintf("network service: %s, conn: %d, overlay: %s %s",
@@ -80,7 +80,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 				ns.AppendStatusMsg(msg)
 				return fmt.Errorf(msg)
 			}
-			vxlanIPToAddress, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
+			vxlanIPToAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
 				nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, toNode, nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 			if err != nil {
 				msg := fmt.Sprintf("network service: %s, conn: %d, overlay: %s %s",
@@ -97,6 +97,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 				vni,
 				vxlanIPFromAddress,
 				vxlanIPToAddress)
+
 			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 				ModelTypeNetworkService+"/"+ns.Metadata.Name,
 				vppKV)
@@ -110,7 +111,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 
 			renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanLoopbackInterfaceAndStaticRoutes(
 				ModelTypeNetworkService+"/"+ns.Metadata.Name,
-				fromNode, toNode,
+				fromNode, toNode, 0,
 				vxlanIPFromAddress, vxlanIPToAddress,
 				nno.Spec.VxlanMeshParms.CreateLoopbackInterface,
 				nno.Spec.VxlanMeshParms.CreateLoopbackStaticRoutes,
@@ -141,10 +142,115 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 	p2nArray [2]NetworkPodToNodeMap,
 	xconn [2][2]string) error {
 
-	// The nodeMap contains the set of nodes involved in the l2mp connection.  There
-	// must be a vxlan mesh created between the nodes.  On each node, the vnf interfaces
-	// will join the l2bd created for this connection, and the vxlan endpoint created
-	// below is also associated with this bridge.
+	// create the vxlan endpoints
+	vniAllocator, exists := ctlrPlugin.NetworkNodeOverlayMgr.vniAllocators[nno.Metadata.Name]
+	if !exists {
+		msg := fmt.Sprintf("network service: %s, conn: %d, %s to %s node overlay: %s out of vni's",
+			ns.Metadata.Name,
+			connIndex+1,
+			conn.PodInterfaces[0],
+			conn.PodInterfaces[1],
+			nno.Metadata.Name)
+		ns.AppendStatusMsg(msg)
+		return fmt.Errorf(msg)
+	}
+	vni, err := vniAllocator.AllocateVni()
+	if err != nil {
+		msg := fmt.Sprintf("network service: %s, conn: %d, %s/%s to %s/%s overlay: %s out of vni's",
+			ns.Metadata.Name,
+			connIndex+1,
+			conn.PodInterfaces[0],
+			conn.PodInterfaces[1],
+			nno.Metadata.Name)
+		ns.AppendStatusMsg(msg)
+		return fmt.Errorf(msg)
+	}
+
+	for i := 0; i < 2; i++ {
+
+		from := i
+		to := ^i & 1
+
+		ifName := fmt.Sprintf("IF_VXLAN_L2PP_NET_SRVC_%s_CONN_%d_FROM_%s_%s_TO_%s_%s_VNI_%d",
+			ns.Metadata.Name, connIndex+1,
+			p2nArray[from].Node, ConnPodInterfaceSlashToUScore(conn.PodInterfaces[from]),
+			p2nArray[to].Node, ConnPodInterfaceSlashToUScore(conn.PodInterfaces[to]),
+			vni)
+
+		xconn[1][i] = ifName
+
+		vxlanIPFromAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
+			nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, p2nArray[i].Node,
+			nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
+		if err != nil {
+			msg := fmt.Sprintf("network-service: %s, conn: %d, %s to %s node overlay: %s, %s",
+				ns.Metadata.Name,
+				connIndex+1,
+				conn.PodInterfaces[0],
+				conn.PodInterfaces[1],
+				nno.Metadata.Name, err)
+			ns.AppendStatusMsg(msg)
+			return fmt.Errorf(msg)
+		}
+		vxlanIPToAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
+			nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, p2nArray[^i&1].Node,
+			nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
+		if err != nil {
+			msg := fmt.Sprintf("network-service: %s, conn: %d, %s to %s node overlay: %s %s",
+				ns.Metadata.Name,
+				connIndex+1,
+				conn.PodInterfaces[0],
+				conn.PodInterfaces[1],
+				nno.Metadata.Name, err)
+			ns.AppendStatusMsg(msg)
+			return fmt.Errorf(msg)
+		}
+
+		vppKV := vppagent.ConstructVxlanInterface(
+			p2nArray[i].Node,
+			ifName,
+			vni,
+			vxlanIPFromAddress,
+			vxlanIPToAddress)
+		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
+			vppKV)
+
+		renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanLoopbackInterfaceAndStaticRoutes(
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
+			p2nArray[i].Node, p2nArray[^i&1].Node, 0,
+			vxlanIPFromAddress, vxlanIPToAddress,
+			nno.Spec.VxlanMeshParms.CreateLoopbackInterface,
+			nno.Spec.VxlanMeshParms.CreateLoopbackStaticRoutes,
+			nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
+
+		for k, v := range renderedEntries {
+			ns.Status.RenderedVppAgentEntries[k] = v
+		}
+	}
+
+	// create xconns between vswitch side of the container interfaces and the vxlan ifs
+	for i := 0; i < 2; i++ {
+		vppKVs := vppagent.ConstructXConnect(p2nArray[i].Node, xconn[0][i], xconn[1][i])
+		log.Printf("%v", vppKVs)
+
+		RenderTxnAddVppEntriesToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
+			vppKVs)
+	}
+
+	return nil
+}
+
+// renderConnL3PPVxlanMesh renders this L3PP tunnel between nodes
+func (nno *NetworkNodeOverlay) renderConnL3PPVxlanMesh(
+	ns *NetworkService,
+	conn *controller.Connection,
+	connIndex uint32,
+	networkPodInterfaces []*controller.Interface,
+	ifStatuses [2]*controller.InterfaceStatus,
+	p2nArray [2]NetworkPodToNodeMap,
+	xconn [2][2]string) error {
 
 	// create the vxlan endpoints
 	vniAllocator, exists := ctlrPlugin.NetworkNodeOverlayMgr.vniAllocators[nno.Metadata.Name]
@@ -175,7 +281,7 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 		from := i
 		to := ^i & 1
 
-		ifName := fmt.Sprintf("IF_VXLAN_L2PP__NET_SRVC_%s_CONN_%d_FROM_%s_%s_TO_%s_%s_VNI_%d",
+		ifName := fmt.Sprintf("IF_VXLAN_L2PP_NET_SRVC_%s_CONN_%d_FROM_%s_%s_TO_%s_%s_VNI_%d",
 			ns.Metadata.Name, connIndex+1,
 			p2nArray[from].Node, ConnPodInterfaceSlashToUScore(conn.PodInterfaces[from]),
 			p2nArray[to].Node, ConnPodInterfaceSlashToUScore(conn.PodInterfaces[to]),
@@ -183,7 +289,7 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 
 		xconn[1][i] = ifName
 
-		vxlanIPFromAddress, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
+		vxlanIPFromAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
 			nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, p2nArray[i].Node,
 			nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 		if err != nil {
@@ -196,7 +302,7 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 			ns.AppendStatusMsg(msg)
 			return fmt.Errorf(msg)
 		}
-		vxlanIPToAddress, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
+		vxlanIPToAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
 			nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, p2nArray[^i&1].Node,
 			nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
 		if err != nil {
@@ -210,19 +316,32 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 			return fmt.Errorf(msg)
 		}
 
+		//ifStatus, err := InitInterfaceStatus(nno.Metadata.Name, nno.Metadata.Name, iFace)
+		//if err != nil {
+		//	RemoveInterfaceStatus(nno.Status.Interfaces, iFace.Parent, iFace.Name)
+		//	msg := fmt.Sprintf("network node overlay tunnel: %s/%s, %s", iFace.Parent, iFace.Name, err)
+		//	nno.AppendStatusMsg(msg)
+		//	return err
+		//}
+		//iFace.Vni = vni
+		//PersistInterfaceStatus(nno.Status.Interfaces, ifStatus, iFace.Parent, iFace.Name)
+
 		vppKV := vppagent.ConstructVxlanInterface(
 			p2nArray[i].Node,
 			ifName,
 			vni,
 			vxlanIPFromAddress,
 			vxlanIPToAddress)
+
+		vppKV.IFace.Vrf = conn.VrfId
+
 		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 			ModelTypeNetworkService+"/"+ns.Metadata.Name,
 			vppKV)
 
 		renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanLoopbackInterfaceAndStaticRoutes(
 			ModelTypeNetworkService+"/"+ns.Metadata.Name,
-			p2nArray[i].Node, p2nArray[^i&1].Node,
+			p2nArray[i].Node, p2nArray[^i&1].Node, conn.VrfId,
 			vxlanIPFromAddress, vxlanIPToAddress,
 			nno.Spec.VxlanMeshParms.CreateLoopbackInterface,
 			nno.Spec.VxlanMeshParms.CreateLoopbackStaticRoutes,
@@ -231,16 +350,138 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 		for k, v := range renderedEntries {
 			ns.Status.RenderedVppAgentEntries[k] = v
 		}
+
+		// now create a route for the dest container's ipaddress using the local vxlan tunnel
+		if len(ifStatuses[to].IpAddresses) != 0 {
+			desc := fmt.Sprintf("L3PP NS_%s_VRF_%d_CONN_%d", ns.Metadata.Name, conn.VrfId, connIndex+1)
+			l3sr := &controller.L3VRFRoute{
+				VrfId:             conn.VrfId,
+				Description:       desc,
+				DstIpAddr:         vppagent.StripSlashAndSubnetIPAddress(ifStatuses[to].IpAddresses[0]),
+				OutgoingInterface: ifName,
+			}
+			vppKV := vppagent.ConstructStaticRoute(p2nArray[from].Node, l3sr)
+			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+				ModelTypeNetworkService + "/" + ns.Metadata.Name,
+				vppKV)
+		}
 	}
 
-	// create xconns between vswitch side of the container interfaces and the vxlan ifs
-	for i := 0; i < 2; i++ {
-		vppKVs := vppagent.ConstructXConnect(p2nArray[i].Node, xconn[0][i], xconn[1][i])
-		log.Printf("%v", vppKVs)
+	return nil
+}
 
-		RenderTxnAddVppEntriesToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService+"/"+ns.Metadata.Name,
-			vppKVs)
+// renderConnL2MPVxlanMesh renders these L2MP tunnels between nodes
+func (nno *NetworkNodeOverlay) renderConnL3MPVxlanMesh(
+	ns *NetworkService,
+	conn *controller.Connection,
+	connIndex uint32,
+	vnfInterfaces []*controller.Interface,
+	p2nArray []NetworkPodToNodeMap,
+	vnfTypes []string,
+	nodeMap map[string]bool,
+	l3vrfs map[string][]*controller.L3VRFRoute) error {
+
+	// The nodeMap contains the set of nodes involved in the l2mp connection.  There
+	// must be a vxlan mesh created between the nodes.
+
+	// create the vxlan endpoints
+	vniAllocator, exists := ctlrPlugin.NetworkNodeOverlayMgr.vniAllocators[nno.Metadata.Name]
+	if !exists {
+		msg := fmt.Sprintf("network-service: %s, conn: %d, node overlay: %s out of vni's",
+			ns.Metadata.Name,
+			connIndex+1,
+			nno.Metadata.Name)
+		ns.AppendStatusMsg(msg)
+		return fmt.Errorf(msg)
+	}
+	vni, err := vniAllocator.AllocateVni()
+	if err != nil {
+		msg := fmt.Sprintf("network-service: %s, conn: %d, node overlay: %s out of vni's",
+			ns.Metadata.Name,
+			connIndex+1,
+			nno.Metadata.Name)
+		ns.AppendStatusMsg(msg)
+		return fmt.Errorf(msg)
+	}
+
+	tunnelMeshMap := make(map[string]string)
+
+	// create a vxlan tunnel between each "from" node and "to" node
+	// create l3vrf from each "to" node towards the "from" node tunnel
+	for fromNode := range nodeMap {
+
+		for toNode := range nodeMap {
+
+			if fromNode == toNode {
+				continue
+			}
+
+			ifName := fmt.Sprintf("IF_VXLAN_MESH_NET_SRVC_%s_CONN_%d_FROM_%s_TO_%s_VNI_%d",
+				ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
+
+			tunnelMeshMap[fromNode + "/" + toNode] = ifName
+
+			vxlanIPFromAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
+				nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, fromNode, nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
+			if err != nil {
+				msg := fmt.Sprintf("network service: %s, conn: %d, overlay: %s %s",
+					ns.Metadata.Name,
+					connIndex+1,
+					nno.Metadata.Name, err)
+				ns.AppendStatusMsg(msg)
+				return fmt.Errorf(msg)
+			}
+			vxlanIPToAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
+				nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, toNode, nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
+			if err != nil {
+				msg := fmt.Sprintf("network service: %s, conn: %d, overlay: %s %s",
+					ns.Metadata.Name,
+					connIndex+1,
+					nno.Metadata.Name, err)
+				ns.AppendStatusMsg(msg)
+				return fmt.Errorf(msg)
+			}
+
+			vppKV := vppagent.ConstructVxlanInterface(
+				fromNode,
+				ifName,
+				vni,
+				vxlanIPFromAddress,
+				vxlanIPToAddress)
+
+			vppKV.IFace.Vrf = conn.VrfId
+
+			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
+				vppKV)
+
+			renderedEntries := ctlrPlugin.NetworkNodeMgr.RenderVxlanLoopbackInterfaceAndStaticRoutes(
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
+				fromNode, toNode, conn.VrfId,
+				vxlanIPFromAddress, vxlanIPToAddress,
+				nno.Spec.VxlanMeshParms.CreateLoopbackInterface,
+				nno.Spec.VxlanMeshParms.CreateLoopbackStaticRoutes,
+				nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
+
+			for k, v := range renderedEntries {
+				ns.Status.RenderedVppAgentEntries[k] = v
+			}
+
+			// fromNode needs a static entry for each container residing in the toNode using the
+			// outgoing tunnel from the fromNode to the toNode
+			for _, toNodel3Vrf := range l3vrfs[toNode] {
+				l3sr := &controller.L3VRFRoute{
+					VrfId: toNodel3Vrf.VrfId,
+					DstIpAddr: toNodel3Vrf.DstIpAddr,
+					OutgoingInterface: ifName,
+					Description: toNodel3Vrf.Description,
+				}
+				vppKV := vppagent.ConstructStaticRoute(fromNode, l3sr)
+				RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+					ModelTypeNetworkService + "/" + ns.Metadata.Name,
+					vppKV)
+			}
+		}
 	}
 
 	return nil

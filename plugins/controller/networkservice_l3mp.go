@@ -19,13 +19,12 @@ import (
 
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
 )
 
-// The L2MP topology is rendered in this module for a connection with a vnf-service
+// The L3MP topology is rendered in this module for a connection with a vnf-service
 
-// RenderConnL2MP renders this L2MP connection
-func (ns *NetworkService) RenderConnL2MP(
+// RenderConnL3MP renders this L3MP connection
+func (ns *NetworkService) RenderConnL3MP(
 	conn *controller.Connection,
 	connIndex uint32) error {
 
@@ -38,9 +37,9 @@ func (ns *NetworkService) RenderConnL2MP(
 	staticNodesInInterfacesSpecified := false
 	var nodeMap = make(map[string]bool, 0) // determine the set of nodes
 
-	log.Debugf("RenderConnL2MP: num pod interfaces: %d", len(conn.PodInterfaces))
-	log.Debugf("RenderConnL2MP: num node interfaces: %d", len(conn.NodeInterfaces))
-	log.Debugf("RenderConnL2MP: num node labels: %d", len(conn.NodeInterfaceLabels))
+	log.Debugf("RenderConnL3MP: num pod interfaces: %d", len(conn.PodInterfaces))
+	log.Debugf("RenderConnL3MP: num node interfaces: %d", len(conn.NodeInterfaces))
+	log.Debugf("RenderConnL3MP: num node labels: %d", len(conn.NodeInterfaceLabels))
 
 	// let's see if all interfaces in the conn are associated with a node
 	for connIndex, connPodInterface := range conn.PodInterfaces {
@@ -101,8 +100,8 @@ func (ns *NetworkService) RenderConnL2MP(
 		return fmt.Errorf(msg)
 	}
 
-	log.Debugf("RenderTopologyL2MP: num unique nodes for this connection: %d", len(nodeMap))
-	// log.Debugf("RenderTopologyL2MP: p2n=%v, vnfI=%v, conn=%v", p2n, netPodInterfaces, conn)
+	log.Debugf("RenderTopologyL3MP: num unique nodes for this connection: %d", len(nodeMap))
+	// log.Debugf("RenderTopologyL3MP: p2n=%v, vnfI=%v, conn=%v", p2n, netPodInterfaces, conn)
 
 	// if an overlay is specified, see if it exists
 	var nno *NetworkNodeOverlay
@@ -158,7 +157,7 @@ func (ns *NetworkService) RenderConnL2MP(
 
 	// see if the networkPods are on the same node ...
 	if len(nodeMap) == 1 {
-		return ns.renderConnL2MPSameNode(conn, connIndex, netPodInterfaces,
+		return ns.renderConnL3MPSameNode(conn, connIndex, netPodInterfaces,
 			nno, p2nArray, networkPodTypes)
 	} else if staticNodesInInterfacesSpecified {
 		msg := fmt.Sprintf("network service: %s, nodes %s/%s must be the same",
@@ -170,12 +169,12 @@ func (ns *NetworkService) RenderConnL2MP(
 	}
 
 	// now setup the connection between nodes
-	return ns.renderConnL2MPInterNode(conn, connIndex, netPodInterfaces,
+	return ns.renderConnL3MPInterNode(conn, connIndex, netPodInterfaces,
 		nno, p2nArray, networkPodTypes, nodeMap)
 }
 
-// renderToplogySegmentL2MPSameNode renders this L2MP connection set on same node
-func (ns *NetworkService) renderConnL2MPSameNode(
+// renderConnL3MPSameNode renders this L3MP connection set on same node
+func (ns *NetworkService) renderConnL3MPSameNode(
 	conn *controller.Connection,
 	connIndex uint32,
 	netPodInterfaces []*controller.Interface,
@@ -184,23 +183,42 @@ func (ns *NetworkService) renderConnL2MPSameNode(
 	networkPodTypes []string) error {
 
 	// The interfaces should be created in the vnf and the vswitch then the vswitch
-	// interfaces will be added to the bridge.
-
-	var l2bdIFs = make(map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces, 0)
+	// interfaces will be added associated with the vrf.
 
 	nodeName := p2nArray[0].Node
 
+	if conn.VrfId == 0 {
+		conn.VrfId = ctlrPlugin.ramCache.VrfIDAllocator.Allocate()
+	}
+
 	for i := 0; i < len(netPodInterfaces); i++ {
 
-		ifName, _, err := ns.RenderConnInterfacePair(nodeName, conn, netPodInterfaces[i], networkPodTypes[i])
+		ifName, ifStatus, err := ns.RenderConnInterfacePair(nodeName, conn, netPodInterfaces[i], networkPodTypes[i])
 		if err != nil {
 			return err
 		}
-		l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
-			Name: ifName,
-			BridgedVirtualInterface: false,
+		if len(ifStatus.IpAddresses) != 0 {
+			desc := fmt.Sprintf("L3MP NS_%s_VRF_%d_CONN_%d", ns.Metadata.Name, conn.VrfId, connIndex+1)
+			l3sr := &controller.L3VRFRoute{
+				VrfId:             conn.VrfId,
+				Description:       desc,
+				DstIpAddr:         vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
+				OutgoingInterface: ifName,
+			}
+			vppKV := vppagent.ConstructStaticRoute(nodeName, l3sr)
+			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+				ModelTypeNetworkService + "/" + ns.Metadata.Name,
+				vppKV)
 		}
-		l2bdIFs[nodeName] = append(l2bdIFs[nodeName], l2bdIF)
+		ae := &controller.L3ArpEntry{
+			IpAddress:vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
+			PhysAddress: ifStatus.MacAddress,
+			OutgoingInterface: ifName,
+		}
+		vppKV := vppagent.ConstructStaticArpEntry(nodeName, ae)
+		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService + "/" + ns.Metadata.Name,
+			vppKV)
 	}
 
 	// all VNFs are on the same node so no vxlan inter-node mesh code required but
@@ -221,63 +239,15 @@ func (ns *NetworkService) renderConnL2MPSameNode(
 				p2nArray,
 				networkPodTypes,
 				singleSpokeMap,
-				l2bdIFs)
+				nil)
 		}
 	}
 
-	// no external hub and spoke so simply render the nodes l2bd and local vnf interfaces
-	return ns.renderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName])
-}
-
-func (ns *NetworkService) renderL2BD(
-	conn *controller.Connection, connIndex uint32,
-	nodeName string,
-	l2bdIFs []*l2.BridgeDomains_BridgeDomain_Interfaces) error {
-
-	// if using an existing node txnLevel bridge, we simply add the i/f's to the bridge
-	if conn.UseNodeL2Bd != "" {
-
-		var nodeL2BD *l2.BridgeDomains_BridgeDomain
-
-		// find the l2db for this node ...
-		nn, nodeL2BD := ctlrPlugin.NetworkNodeMgr.FindVppL2BDForNode(nodeName, conn.UseNodeL2Bd)
-		if nodeL2BD == nil {
-			msg := fmt.Sprintf("network-service: %s, referencing a missing node/l2bd: %s/%s",
-				ns.Metadata.Name, nn.Metadata.Name, conn.UseNodeL2Bd)
-			ns.AppendStatusMsg(msg)
-			return fmt.Errorf(msg)
-		}
-		vppKV := vppagent.AppendInterfacesToL2BD(nodeName, nodeL2BD, l2bdIFs)
-		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService+"/"+ns.Metadata.Name,
-			vppKV)
-
-	} else {
-		var bdParms *controller.BDParms
-		if conn.L2Bd != nil {
-			// need to create a bridge for this conn
-			if conn.L2Bd.L2BdTemplate != "" {
-				bdParms = ctlrPlugin.SysParametersMgr.FindL2BDTemplate(conn.L2Bd.L2BdTemplate)
-			} else {
-				bdParms = conn.L2Bd.BdParms
-			}
-		} else {
-			bdParms = ctlrPlugin.SysParametersMgr.GetDefaultSystemBDParms()
-		}
-		vppKV := vppagent.ConstructL2BD(
-			nodeName,
-			fmt.Sprintf("L2BD_%s_CONN_%d", ns.Metadata.Name, connIndex+1),
-			l2bdIFs,
-			bdParms)
-		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService+"/"+ns.Metadata.Name,
-			vppKV)
-	}
 	return nil
 }
 
-// renderConnL2MPInterNode renders this L2MP connection between nodes
-func (ns *NetworkService) renderConnL2MPInterNode(
+// renderConnL3MPInterNode renders this L3MP connection between nodes
+func (ns *NetworkService) renderConnL3MPInterNode(
 	conn *controller.Connection,
 	connIndex uint32,
 	netPodInterfaces []*controller.Interface,
@@ -287,44 +257,66 @@ func (ns *NetworkService) renderConnL2MPInterNode(
 	nodeMap map[string]bool) error {
 
 	// The interfaces may be spread across a set of nodes (nodeMap), each of these
-	// interfaces should be created in the pod and node's vswitch.  Then for each
-	// node, these must be associated with a per node l2bd.  This might be an
-	// existing node l2bd, or a bd that must be created.  The other matter is the
+	// interfaces should be created in the pod and node's vswitch.  The other matter is the
 	// inter-node connectivity.  Example: if vxlan mesh is the chosen inter node
 	// strategy, for each node in the nodeMap, a vxlan tunnel mesh must be created
 	// using a free vni from the mesh's vniPool.
+	// And, each local i/f must have a vrf entry on every remote node.
 
-	var l2bdIFs = make(map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces, 0)
+	if conn.VrfId == 0 {
+		conn.VrfId = ctlrPlugin.ramCache.VrfIDAllocator.Allocate()
+	}
 
-	// create the interfaces from the pod to the vswitch, note that depending on
-	// the meshing strategy, I might have to create the interfaces with vrf_id's for
-	// example, or ...
+	l3vrfs := make(map[string][]*controller.L3VRFRoute, 0)
+
+	// create the interfaces from the pod to the vswitch, also construct l3vrf routes for the local
+	// interfaces per node
 	for i := 0; i < len(netPodInterfaces); i++ {
 
-		ifName, _, err := ns.RenderConnInterfacePair(p2nArray[i].Node, conn, netPodInterfaces[i], networkPodTypes[i])
+		ifName, ifStatus, err := ns.RenderConnInterfacePair(p2nArray[i].Node, conn, netPodInterfaces[i], networkPodTypes[i])
 		if err != nil {
 			return err
 		}
-		l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
-			Name: ifName,
-			BridgedVirtualInterface: false,
-			SplitHorizonGroup:       0,
+
+		if len(ifStatus.IpAddresses) != 0 {
+			desc := fmt.Sprintf("L3MP NS_%s_VRF_%d_CONN_%d", ns.Metadata.Name, conn.VrfId, connIndex+1)
+			l3sr := &controller.L3VRFRoute{
+				VrfId:             conn.VrfId,
+				Description:       desc,
+				DstIpAddr:         vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
+				OutgoingInterface: ifName,
+			}
+
+			l3vrfs[p2nArray[i].Node] = append(l3vrfs[p2nArray[i].Node], l3sr)
+
+			vppKV := vppagent.ConstructStaticRoute(p2nArray[i].Node, l3sr)
+			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+				ModelTypeNetworkService + "/" + ns.Metadata.Name,
+				vppKV)
 		}
-		l2bdIFs[p2nArray[i].Node] = append(l2bdIFs[p2nArray[i].Node], l2bdIF)
+		ae := &controller.L3ArpEntry{
+			IpAddress:vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
+			PhysAddress: ifStatus.MacAddress,
+			OutgoingInterface: ifName,
+		}
+		vppKV := vppagent.ConstructStaticArpEntry(p2nArray[i].Node, ae)
+		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService + "/" + ns.Metadata.Name,
+			vppKV)
 	}
 
 	switch nno.Spec.ConnectionType {
 	case controller.NetworkNodeOverlayConnectionTypeVxlan:
 		switch nno.Spec.ServiceMeshType {
 		case controller.NetworkNodeOverlayTypeMesh:
-			return nno.renderConnL2MPVxlanMesh(ns,
+			return nno.renderConnL3MPVxlanMesh(ns,
 				conn,
 				connIndex,
 				netPodInterfaces,
 				p2nArray,
 				networkPodTypes,
 				nodeMap,
-				l2bdIFs)
+				l3vrfs)
 		case controller.NetworkNodeOverlayTypeHubAndSpoke:
 			return nno.renderConnL2MPVxlanHubAndSpoke(ns,
 				conn,
@@ -333,7 +325,7 @@ func (ns *NetworkService) renderConnL2MPInterNode(
 				p2nArray,
 				networkPodTypes,
 				nodeMap,
-				l2bdIFs)
+					nil)
 		}
 	default:
 		msg := fmt.Sprintf("network-service: %s, conn: %d, node overlay: %s type not implemented",
