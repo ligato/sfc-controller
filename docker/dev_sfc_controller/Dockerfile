@@ -1,42 +1,40 @@
 FROM ubuntu:16.04
 
 RUN apt-get update && apt-get install -y \
-    sudo wget git build-essential gdb vim nano python \
-    iproute2 iputils-ping inetutils-traceroute libapr1 supervisor
+    sudo wget git make nano iproute2 iputils-ping inetutils-traceroute unzip
 
-RUN mkdir /opt/sfc-controller
-RUN mkdir /opt/sfc-controller/dev
-RUN mkdir /opt/sfc-controller/plugin
+RUN mkdir -p /opt/sfc-controller/plugin /opt/sfc-controller/dev
 
 WORKDIR /opt/sfc-controller/dev
 
-# install Go & Glide
-RUN wget https://storage.googleapis.com/golang/go1.9.linux-amd64.tar.gz && \
-    tar -xvf go1.9.linux-amd64.tar.gz && \
-    mv go /usr/local && \
-    rm -f go1.9.linux-amd64.tar.gz
+# install Go
+ENV GOLANG_VERSION 1.11
+ARG GOLANG_OS_ARCH=linux-amd64
+RUN wget -O go.tgz "https://golang.org/dl/go${GOLANG_VERSION}.${GOLANG_OS_ARCH}.tar.gz" \
+ && tar -C /usr/local -xzf go.tgz \
+ && rm go.tgz
 
-# build & install Protobuf & gogo protobuf compiler
-RUN apt-get install -y make && \
-    apt-get install -y autoconf automake libtool curl make g++ unzip
+ENV GOPATH /go
+ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
+RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" \
+ && chmod -R 777 "$GOPATH"
 
-RUN git clone https://github.com/google/protobuf.git && \
-    cd protobuf && ./autogen.sh && ./configure && \
-    make -j4 && \
-    make install && \
-    ldconfig && \
-    cd .. && rm -rf protobuf
-
-RUN apt-get install -y golang-gogoprotobuf-dev
+# install Protobuf
+ARG PROTOC_VERSION=3.6.1
+RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip \
+ && unzip protoc-${PROTOC_VERSION}-linux-x86_64.zip -d protoc3 \
+ && mv protoc3/bin/protoc /usr/local/bin \
+ && mv protoc3/include/google /usr/local/include \
+ && rm -rf protoc-${PROTOC_VERSION}-linux-x86_64.zip protoc3
 
 COPY docker/dev_sfc_controller/build-controller.sh .
 RUN ./build-controller.sh
 
-COPY docker/dev_sfc_controller/etcd.conf .
-COPY docker/dev_sfc_controller/sfc.conf .
+COPY \
+	docker/dev_sfc_controller/etcd.conf \
+	docker/dev_sfc_controller/sfc.conf \
+ ./
 
 WORKDIR /root/
 
-# run supervisor as the default executable
 CMD ["/root/go/bin/sfc-controller", "--etcd-config=/opt/sfc-controller/dev/etcd.conf", "--sfc-config=/opt/sfc-controller/dev/sfc.conf"]
-
