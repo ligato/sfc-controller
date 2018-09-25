@@ -1,7 +1,7 @@
 #!/bin/bash -l
 
 AGENT_DEVS_DIR="/opt/sfc-controller/dev"
-AGENT_PLUGINS_DIR="/opt/sfc-controller/plugins"
+AGENT_PLUGINS_DIR="/opt/sfc-controller/plugin"
 ETCD_CFG_FILE="etcd.conf"
 SFC_CFG_FILE="sfc.conf"
 

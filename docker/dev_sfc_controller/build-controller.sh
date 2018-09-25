@@ -11,8 +11,8 @@ mkdir $GOPATH
 
 # install golint, gvt & Glide
 go get -u github.com/golang/lint/golint
-go get -u github.com/FiloSottile/gvt
-curl https://glide.sh/get | sh
+#go get -u github.com/FiloSottile/gvt
+#curl https://glide.sh/get | sh
 
 # install binary API generator
 #go get -u git.fd.io/govpp.git/binapi_generator
@@ -24,7 +24,7 @@ go get -insecure github.com/ligato/sfc-controller
 cd $GOPATH/src/github.com/ligato/sfc-controller
 
 source setup-env.sh
-make
+#make
 make install
 #make test
 #make generate
