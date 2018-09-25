@@ -242,9 +242,6 @@ func (sp *SystemParameters) validate() error {
 			return fmt.Errorf("SysParm: Invalid rxMode setting %s", sp.RxMode)
 		}
 	}
-	if sp.MemifDirectory == "" {
-		sp.MemifDirectory = controller.MemifDirectoryName
-	}
 
 	return nil
 }

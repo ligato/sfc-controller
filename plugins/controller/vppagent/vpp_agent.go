@@ -273,6 +273,10 @@ func ConstructMemInterface(vppAgent string,
 		}
 	}
 
+	if defaultMemifDirectory == "" {
+		defaultMemifDirectory = controller.MemifDirectoryName
+	}
+
 	iface.Memif.SocketFilename = defaultMemifDirectory + "/memif_" + masterVppAgent + ".sock"
 
 	iface.RxModeSettings = rxModeControllerToInterface(rxMode)

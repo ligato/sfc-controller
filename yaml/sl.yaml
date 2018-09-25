@@ -1,0 +1,167 @@
+sfc_controller_config_version: 2
+description: edge vpp containers attached to a host cloud over ipsec tunnels
+
+system_parameters:
+  mtu: 2200
+
+ipam_pools:
+  - metadata:
+      name: ew-pool-1
+    spec:
+      scope: system
+      network: 10.10.1.0/24
+      start_range: 1
+      end_range: 254
+
+  - metadata:
+      name: ew-pool-2
+    spec:
+      scope: system
+      network: 10.10.2.0/24
+      start_range: 1
+      end_range: 254
+
+network_pod_to_node_map:
+  - pod: application-pod
+    node: cloud-host-1
+  - pod: firewall-pod
+    node: cloud-host-1
+  - pod: edge-pod-1
+    node: edge-host-1
+  - pod: edge-pod-2
+    node: edge-host-2
+  - pod: edge-pod-3
+    node: edge-host-3
+
+
+network_nodes:
+  - metadata:
+     name: cloud-host-1
+    spec:
+      node_type: host
+      interfaces:
+        - name: GigabitEthernet13/0/1
+          if_type: ethernet
+          ip_addresses:
+            - "100.100.1.1/24"
+          labels:
+            - vxlan
+        - name: vxlan_tunnel
+          if_type: vxlan_tunnel
+          ip_addresses:
+            - "200.200.200.1/24"
+      l2bds:
+        - name: ew-bd
+
+  - metadata:
+      name: edge-host-1
+    spec:
+      node_type: external
+      interfaces:
+        - name: gige-edge-1
+          if_type: ethernet
+          ip_addresses:
+            - "100.100.2.2/24"
+          labels:
+            - vxlan
+        - name: vxlan_tunnel
+          if_type: vxlan_tunnel
+          ip_addresses:
+            - "200.200.200.2/24"
+
+  - metadata:
+      name: vrouter-a
+    spec:
+      node_type: external
+      interfaces:
+        - name: GigabitEthernet14/0/2
+          if_type: ethernet
+          ip_addresses:
+            - "100.100.3.3/24"
+          labels:
+            - vxlan
+        - name: vxlan_tunnel
+          if_type: vxlan_tunnel
+          ip_addresses:
+            - "200.200.200.3/24"
+
+network_services:
+  - metadata:
+      name: vpn-head-end-service
+    spec:
+      network_pods:
+        - metadata:
+            name:
+              firewall-pod
+          spec:
+            pod_type: vppcontainer
+            interfaces:
+              - name: wan-port
+                if_type: memif
+              - name: lan-port
+                if_type: memif
+                ipam_pool_names:
+                  - ew-pool-2
+        - metadata:
+            name:
+              app-pod
+          spec:
+            pod_type: nonvppcontainer
+            interfaces:
+              - name: port1
+                if_type: veth
+                ip_addresses:
+                  - "66.66.67.1/24"
+        - metadata:
+            name: edge-pod-1
+          spec:
+            pod_type: vppcontainer
+            interfaces:
+              - name: port1
+                if_type: memif
+                ip_addresses:
+                  - "10.10.10.1/24"
+      connections:
+        - conn_type: l2mp
+          network_node_overlay_name: ipsec_hub_and_spoke
+          pod_interfaces:
+            - edge-pod-1/port1
+            - edge-pod-2/port1
+            - edge-pod-3/port1
+            - firewall-pod/wan-port
+        - conn_type: l2pp
+          network_node_overlay_name: inter-cloud-host-vxlan-mesh
+          pod_interfaces:
+            - firewall-pod/lan-port
+            - app-pod/port1
+        - conn_type: l2pp
+          pod_interfaces:
+            - firewall-pod/wan-port
+            - firewall-pod/lan-port
+
+network_node_overlays:
+  - metadata:
+      name:
+        ipsec_hub_and_spoke
+    spec:
+      service_mesh_type: hub_and_spoke
+      connection_type: vxlan
+      vxlan_hub_and_spoke_parms:
+        hub_node_name: cloud-host-1
+        vni: 5000
+        network_node_interface_label: vxlan
+        create_loopback_interface: true
+        create_loopback_static_routes: true
+
+  - metadata:
+      name:
+        inter-cloud-host-vxlan-mesh
+    spec:
+      service_mesh_type: mesh
+      connection_type: vxlan
+      vxlan_mesh_parms:
+        start_range_vni: 6000
+        end_range_vni: 6999
+        network_node_interface_label: vxlan
+        create_loopback_interface: true
+        create_loopback_static_routes: true

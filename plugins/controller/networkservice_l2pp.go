@@ -232,6 +232,28 @@ func (ns *NetworkService) renderConnL2PPSameNode(
 
 	} else {
 
+		if networkPodInterfaces[0].IfType == networkPodInterfaces[1].IfType &&
+			networkPodInterfaces[0].IfType == controller.IfTypeMemif {
+			// see if memifID's are equal as used to be a direct, reset to 0
+			log.Debugf("renderConnL2PPSameNode: checking for memif id's equal in existing if's")
+			log.Debugf("renderConnL2PPSameNode: [0]: %s/%s, [1]: %s/%s",
+				networkPodInterfaces[0].Parent, networkPodInterfaces[0].Name,
+				networkPodInterfaces[1].Parent, networkPodInterfaces[1].Name)
+			ifStatus0, exists := ctlrPlugin.ramCache.InterfaceStates[networkPodInterfaces[0].Parent + "/" +
+				networkPodInterfaces[0].Name]
+			if exists {
+				ifStatus1, exists := ctlrPlugin.ramCache.InterfaceStates[networkPodInterfaces[1].Parent + "/" +
+					networkPodInterfaces[1].Name]
+				if exists {
+					if ifStatus0.MemifID == ifStatus1.MemifID { // reset as MUST be different id's
+						ifStatus0.MemifID = 0
+						ifStatus1.MemifID = 0
+						log.Debugf("renderConnL2PPSameNode: resettting memif's as need to reallocate separate id's")
+					}
+				}
+			}
+		}
+
 		var xconn [2]string
 		// render the if's, and then l2xc them
 		for i := 0; i < 2; i++ {

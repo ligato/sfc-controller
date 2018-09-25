@@ -396,13 +396,20 @@ func (mgr *NetworkPodToNodeMapMgr) RunContivKSRNetworkPodToNodeMappingWatcher() 
 			case datasync.Put:
 				p2n := &NetworkPodToNodeMap{}
 				if err := resp.GetValue(p2n); err == nil {
-					log.Infof("ContivKSRNetworkPodToNodeMappingWatcher: key: %s, value:%v", resp.GetKey(), p2n)
-					mgr.HandleContivKSRStatusUpdate(p2n, true)
+					log.Infof("ContivKSRNetworkPodToNodeMappingWatcher: key: %s, value:%v", p2n.Pod, p2n)
+					if p2n.Pod != "" {
+						mgr.HandleContivKSRStatusUpdate(p2n, true)
+					}
 				}
 
 			case datasync.Delete:
-				log.Infof("ContivKSRNetworkPodToNodeMappingWatcher: deleting key: %s ", resp.GetKey())
-				mgr.HandleContivKSRStatusDelete(resp.GetKey())
+				p2n := &NetworkPodToNodeMap{}
+				if err := resp.GetValue(p2n); err == nil {
+					log.Infof("ContivKSRNetworkPodToNodeMappingWatcher: deleting key: %s, value:%v", p2n.Pod, p2n)
+					if p2n.Pod != "" {
+						mgr.HandleContivKSRStatusDelete(p2n.Pod)
+					}
+				}
 			}
 		}
 	}
