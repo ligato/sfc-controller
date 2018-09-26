@@ -128,8 +128,7 @@ message Interface {
     string admin_status = 10; // enabled|disabled
     message MemIFParms {
         string mode = 1; //ethernet|ip|puntinject optional/default: ethernet
-        string inter_pod_conn = 2; //direct|vswitch optional/default: direct
-        string memif_directory = 3; // optional: use system parameter if empty
+        string memif_directory = 2; // optional: use system parameter if empty
     }
     MemIFParms memif_parms = 11;
     repeated string labels = 12;
@@ -159,6 +158,7 @@ message Connection {
     L2BD l2bd = 7; // optional: if omitted and use_node_l2bd is not set then
                    // create a l2bd with default parms for l2mp connections
     uint32 vrf_id = 8;
+    string conn_method = 9; //direct|vswitch optional/default: direct
 }
 
 message NetworkServiceStatus {

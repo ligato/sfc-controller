@@ -36,8 +36,9 @@ const (
 	IfMemifModeEhernet             = "ethernet"
 	IfMemifModeIP                  = "ip"
 	IfMemifModePuntInject          = "puntinject"
-	IfMemifInterPodConnTypeDirect  = "direct"
-	IfMemifInterPodConnTypeVswitch = "vswitch"
+
+	ConnMethodDirect  = "direct"
+	ConnMethodVswitch = "vswitch"
 
 	NetworkPodTypeVPPVswitch      = "vppvswitch"
 	NetworkPodTypeExternal        = "external"

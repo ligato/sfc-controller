@@ -224,6 +224,8 @@ type InterfaceStatus struct {
 	MemifID       uint32            `protobuf:"varint,8,opt,name=memifID,proto3" json:"memifID,omitempty"`
 	Node          string            `protobuf:"bytes,10,opt,name=node,proto3" json:"node,omitempty"`
 	HostPortLabel string            `protobuf:"bytes,11,opt,name=host_port_label,proto3" json:"host_port_label,omitempty"`
+	Vni           uint32            `protobuf:"varint,12,opt,name=vni,proto3" json:"vni,omitempty"`
+	NnoName       string            `protobuf:"bytes,13,opt,name=nno_name,proto3" json:"nno_name,omitempty"`
 }
 
 func (m *InterfaceStatus) Reset()         { *m = InterfaceStatus{} }
@@ -267,8 +269,7 @@ func (m *Interface) GetMemifParms() *Interface_MemIFParms {
 
 type Interface_MemIFParms struct {
 	Mode           string `protobuf:"bytes,1,opt,name=mode,proto3" json:"mode,omitempty"`
-	InterPodConn   string `protobuf:"bytes,2,opt,name=inter_pod_conn,proto3" json:"inter_pod_conn,omitempty"`
-	MemifDirectory string `protobuf:"bytes,3,opt,name=memif_directory,proto3" json:"memif_directory,omitempty"`
+	MemifDirectory string `protobuf:"bytes,2,opt,name=memif_directory,proto3" json:"memif_directory,omitempty"`
 }
 
 func (m *Interface_MemIFParms) Reset()         { *m = Interface_MemIFParms{} }
@@ -332,7 +333,8 @@ type Connection struct {
 	// only for l2mp connections
 	L2Bd *L2BD `protobuf:"bytes,7,opt,name=l2bd" json:"l2bd,omitempty"`
 	// create a l2bd with default parms for l2mp connections
-	VrfId uint32 `protobuf:"varint,8,opt,name=vrf_id,proto3" json:"vrf_id,omitempty"`
+	VrfId      uint32 `protobuf:"varint,8,opt,name=vrf_id,proto3" json:"vrf_id,omitempty"`
+	ConnMethod string `protobuf:"bytes,9,opt,name=conn_method,proto3" json:"conn_method,omitempty"`
 }
 
 func (m *Connection) Reset()         { *m = Connection{} }

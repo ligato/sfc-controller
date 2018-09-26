@@ -211,19 +211,14 @@ func (ns *NetworkService) renderConnL2PPSameNode(
 	// both interfaces can override direct by specifying "vswitch" as its
 	// inter vnf connection type
 
-	memifConnType := controller.IfMemifInterPodConnTypeDirect // assume direct
-	for i := 0; i < 2; i++ {
-		if networkPodInterfaces[i].MemifParms != nil {
-			if networkPodInterfaces[i].MemifParms.InterPodConn != "" &&
-				networkPodInterfaces[i].MemifParms.InterPodConn != controller.IfMemifInterPodConnTypeDirect {
-				memifConnType = networkPodInterfaces[i].MemifParms.InterPodConn
-			}
-		}
+	memifConnType := conn.ConnMethod
+	if conn.ConnMethod == "" {
+		memifConnType = controller.ConnMethodDirect
 	}
 
 	if networkPodInterfaces[0].IfType == networkPodInterfaces[1].IfType &&
 		networkPodInterfaces[0].IfType == controller.IfTypeMemif &&
-		memifConnType == controller.IfMemifInterPodConnTypeDirect {
+		memifConnType == controller.ConnMethodDirect {
 
 		err := ns.RenderConnDirectInterPodMemifPair(networkPodInterfaces, controller.IfTypeMemif)
 		if err != nil {

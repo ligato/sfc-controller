@@ -503,6 +503,16 @@ func (ns *NetworkService) validateConnections() error {
 					ns.Metadata.Name, connPodInterface)
 			}
 		}
+
+		if conn.ConnMethod != "" {
+			switch conn.ConnMethod {
+			case controller.ConnMethodDirect:
+			case controller.ConnMethodVswitch:
+			default:
+				return fmt.Errorf("network-service: %s, connection has invalid conn method '%s'",
+					ns.Metadata.Name, conn.ConnMethod)
+			}
+		}
 	}
 
 	return nil
@@ -589,15 +599,6 @@ func (ns *NetworkService) validateNetworkPod(networkPod *controller.NetworkPod) 
 				default:
 					return fmt.Errorf("network-service/if: %s/%s, unsupported memif mode=%s",
 						ns.Metadata.Name, iFace.Name, iFace.MemifParms.Mode)
-				}
-			}
-			if iFace.MemifParms.InterPodConn != "" {
-				switch iFace.MemifParms.InterPodConn {
-				case controller.IfMemifInterPodConnTypeDirect:
-				case controller.IfMemifInterPodConnTypeVswitch:
-				default:
-					return fmt.Errorf("network-service/if: %s/%s, unsupported memif inter-vnf connection type=%s",
-						ns.Metadata.Name, iFace.Name, iFace.MemifParms.InterPodConn)
 				}
 			}
 		}
