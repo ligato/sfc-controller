@@ -223,7 +223,6 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 		ns.AppendStatusMsg(msg)
 		return "", nil, err
 	}
-	PersistInterfaceStatus(ns.Status.Interfaces, ifStatus, connPodName, connInterfaceName)
 
 	// Create a VETH i/f for the vnf container, the ETH will get created
 	// by the vpp-agent in a more privileged vswitch.
@@ -237,6 +236,9 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 	host1Name := connInterfaceName
 	baseHostName := constructBaseHostName(connPodName, connInterfaceName)
 	host2Name := baseHostName
+
+	ifStatus.HostPortLabel = host2Name
+	PersistInterfaceStatus(ns.Status.Interfaces, ifStatus, connPodName, connInterfaceName)
 
 	vethIPAddresses := ifStatus.IpAddresses
 	if networkPodType == controller.NetworkPodTypeVPPContainer {
