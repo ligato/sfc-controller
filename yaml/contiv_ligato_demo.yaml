@@ -55,8 +55,6 @@ network_services:
                 if_type: memif
                 ip_addresses:
                   - "10.0.1.1/24"
-                memif_parms:
-                  inter_pod_conn: vswitch
         - metadata:
             name: vnf2
           spec:
@@ -66,11 +64,10 @@ network_services:
                 if_type: memif
                 ip_addresses:
                   - "10.0.1.2/24"
-                memif_parms:
-                  inter_pod_conn: vswitch
       connections:
         - conn_type: l2pp
           network_node_overlay_name: inter_node_vxlan_mesh
+          conn_method: vswitch
           pod_interfaces:
             - vnf1/port1
             - vnf2/port1
@@ -87,8 +84,6 @@ network_services:
                 if_type: memif
                 ip_addresses:
                   - "10.0.1.1/24"
-                memif_parms:
-                  inter_pod_conn: vswitch
         - metadata:
             name: vnf4
           spec:
@@ -98,11 +93,10 @@ network_services:
                 if_type: memif
                 ip_addresses:
                   - "10.0.1.2/24"
-                memif_parms:
-                  inter_pod_conn: vswitch
       connections:
         - conn_type: l2pp
           network_node_overlay_name: inter_node_vxlan_mesh
+          conn_method: vswitch
           pod_interfaces:
             - vnf3/port1
             - vnf4/port1
