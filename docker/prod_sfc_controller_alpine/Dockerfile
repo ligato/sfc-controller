@@ -21,7 +21,7 @@ COPY etcd.conf .
 WORKDIR /root/
 
 # run sfc-controller as the default executable
-CMD ["/bin/sfc-controller", "--etcdv3-config=/opt/sfc-controller/dev/etcd.conf", "--sfc-config=/opt/sfc-controller/dev/sfc.conf"]
+CMD ["/bin/sfc-controller", "--etcd-config=/opt/sfc-controller/dev/etcd.conf", "--sfc-config=/opt/sfc-controller/dev/sfc.conf"]
 
 
 

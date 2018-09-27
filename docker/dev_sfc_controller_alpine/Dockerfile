@@ -38,4 +38,4 @@ COPY docker/dev_sfc_controller_alpine/sfc.conf .
 WORKDIR /root/
 
 # run supervisor as the default executable
-CMD ["/root/go/bin/sfc-controller", "--etcdv3-config=/opt/sfc-controller/dev/etcd.conf", "--sfc-config=/opt/sfc-controller/dev/sfc.conf"]
+CMD ["/root/go/bin/sfc-controller", "--etcd-config=/opt/sfc-controller/dev/etcd.conf", "--sfc-config=/opt/sfc-controller/dev/sfc.conf"]
