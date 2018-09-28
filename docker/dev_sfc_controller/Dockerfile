@@ -1,4 +1,5 @@
-FROM ubuntu:16.04
+ARG BASE_IMG
+FROM ${BASE_IMG} 
 
 RUN apt-get update && apt-get install -y \
     sudo wget git make nano iproute2 iputils-ping inetutils-traceroute unzip build-essential
