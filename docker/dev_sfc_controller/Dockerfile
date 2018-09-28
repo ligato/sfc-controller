@@ -22,7 +22,7 @@ RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" \
 # install Protobuf
 ARG PROTOC_VERSION=3.6.1
 ARG PROTOC_OS_ARCH=linux_x86_64
-RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${PROTOC_OS_ARCH}.zip \
+RUN wget -q https://github.com/google/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-${PROTOC_OS_ARCH}.zip \
  && unzip protoc-${PROTOC_VERSION}-${PROTOC_OS_ARCH}.zip -d protoc3 \
  && mv protoc3/bin/protoc /usr/local/bin \
  && mv protoc3/include/google /usr/local/include \
