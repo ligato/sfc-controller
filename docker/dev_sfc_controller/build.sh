@@ -18,7 +18,7 @@ case "$BUILDARCH" in
 
   "x86_64" )
     GOLANG_OS_ARCH=${GOLANG_OS_ARCH:-'linux-amd64'}
-    PROTOC_OS_ARCH=${PROTOC_OS_ARCH:-'linux_x86_64'}
+    PROTOC_OS_ARCH=${PROTOC_OS_ARCH:-'linux-x86_64'}
    ;;
   * )
     echo "Architecture ${BUILDARCH} is not supported."
