@@ -7,6 +7,11 @@ contains:
   to build both the controller.
 
 ### Getting an Image from Dockerhub
+
+Supported architectures are:
+* AMD64 (a.k.a. x86_64)
+* ARM64 (a.k.a. aarch64) - see [arm64 docker image](https://hub.docker.com/r/ligato/dev-sfc-controller-arm64/) and [arm64 related docs](../../docs/arm64/).
+
 For a quick start with the Development image, you can use pre-built 
 Development docker images that contain pre-built controller, and 
 tools, the Ligato source code, Git, and build tools for the controller.
@@ -23,6 +28,14 @@ To build the docker image on your local machine,  type:
 ```
 ./build.sh
 ```
+Note: The script build.sh will recognize the architecture (AMD64 or ARM64) and build the proper image.
+
+#### Pushing docker image to repository
+To push the docker image into your repository, type:
+```
+REPO_OWNER=yourdockerhubreponame ./push_image.sh
+```
+
 #### Verifying a Created or Downloaded Image
 You can verify the newly built or downloaded image as follows:
 
@@ -124,6 +137,7 @@ sudo docker run -p 2379:2379 --name etcd --rm \
 The ETCD server will be available on your host OS IP (most likely 
 `172.17.0.1` in the default docker environment) on port `2379`.
 
+Note: **For ARM64 see the information about [etcd][2]**.
 
 ### Rebuilding the Controller
 ```
@@ -250,3 +264,4 @@ console.
   '[Running the controller](#running_the_sfc_controller)'.
 
 [1]: #-starting-the-image
+[2]: ../../docs/arm64/etcd.md
