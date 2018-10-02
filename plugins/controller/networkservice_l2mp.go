@@ -18,7 +18,6 @@ import (
 	"fmt"
 
 	"github.com/ligato/sfc-controller/plugins/controller/model"
-	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
 )
 
@@ -226,55 +225,9 @@ func (ns *NetworkService) renderConnL2MPSameNode(
 	}
 
 	// no external hub and spoke so simply render the nodes l2bd and local vnf interfaces
-	return ns.renderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName])
+	return ns.RenderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName])
 }
 
-func (ns *NetworkService) renderL2BD(
-	conn *controller.Connection, connIndex uint32,
-	nodeName string,
-	l2bdIFs []*l2.BridgeDomains_BridgeDomain_Interfaces) error {
-
-	// if using an existing node txnLevel bridge, we simply add the i/f's to the bridge
-	if conn.UseNodeL2Bd != "" {
-
-		var nodeL2BD *l2.BridgeDomains_BridgeDomain
-
-		// find the l2db for this node ...
-		nn, nodeL2BD := ctlrPlugin.NetworkNodeMgr.FindVppL2BDForNode(nodeName, conn.UseNodeL2Bd)
-		if nodeL2BD == nil {
-			msg := fmt.Sprintf("network-service: %s, referencing a missing node/l2bd: %s/%s",
-				ns.Metadata.Name, nn.Metadata.Name, conn.UseNodeL2Bd)
-			ns.AppendStatusMsg(msg)
-			return fmt.Errorf(msg)
-		}
-		vppKV := vppagent.AppendInterfacesToL2BD(nodeName, nodeL2BD, l2bdIFs)
-		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService+"/"+ns.Metadata.Name,
-			vppKV)
-
-	} else {
-		var bdParms *controller.BDParms
-		if conn.L2Bd != nil {
-			// need to create a bridge for this conn
-			if conn.L2Bd.L2BdTemplate != "" {
-				bdParms = ctlrPlugin.SysParametersMgr.FindL2BDTemplate(conn.L2Bd.L2BdTemplate)
-			} else {
-				bdParms = conn.L2Bd.BdParms
-			}
-		} else {
-			bdParms = ctlrPlugin.SysParametersMgr.GetDefaultSystemBDParms()
-		}
-		vppKV := vppagent.ConstructL2BD(
-			nodeName,
-			fmt.Sprintf("L2BD_%s_CONN_%d", ns.Metadata.Name, connIndex+1),
-			l2bdIFs,
-			bdParms)
-		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService+"/"+ns.Metadata.Name,
-			vppKV)
-	}
-	return nil
-}
 
 // renderConnL2MPInterNode renders this L2MP connection between nodes
 func (ns *NetworkService) renderConnL2MPInterNode(

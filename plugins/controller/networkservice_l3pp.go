@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
+	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
 )
 
 // The L3PP topology is rendered in this module for a connection with a vnf-service
@@ -245,6 +246,8 @@ func (ns *NetworkService) renderConnL3PPInterNode(
 		conn.VrfId = ctlrPlugin.ramCache.VrfIDAllocator.Allocate()
 	}
 
+	l2bdIFs := make(map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces, 0)
+
 	// create the interfaces in the containers and vswitch on each node
 	for i := 0; i < 2; i++ {
 
@@ -268,6 +271,13 @@ func (ns *NetworkService) renderConnL3PPInterNode(
 				ModelTypeNetworkService + "/" + ns.Metadata.Name,
 				vppKV)
 		}
+
+		l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+			Name: ifName,
+			BridgedVirtualInterface: false,
+			SplitHorizonGroup:       0,
+		}
+		l2bdIFs[p2nArray[i].Node] = append(l2bdIFs[p2nArray[i].Node], l2bdIF)
 	}
 
 	switch nno.Spec.ConnectionType {
@@ -280,7 +290,8 @@ func (ns *NetworkService) renderConnL3PPInterNode(
 				networkPodInterfaces,
 				ifStatuses,
 				p2nArray,
-				xconn)
+				xconn,
+				l2bdIFs)
 		case controller.NetworkNodeOverlayTypeHubAndSpoke:
 			msg := fmt.Sprintf("vnf-service: %s, conn: %d, %s to %s node overlay: %s type not supported for L3PP",
 				ns.Metadata.Name,

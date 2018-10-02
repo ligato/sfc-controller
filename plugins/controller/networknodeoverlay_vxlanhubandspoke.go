@@ -138,12 +138,12 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 
 	// create the spoke node l2bd's and add the vnf interfaces and vxlan if's from abve
 	for nodeName := range spokeNodeMap {
-		if err := ns.renderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
+		if err := ns.RenderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
 			return err
 		}
 	}
 	// create the hub l2bd and add the vxaln if's from above
-	if err := ns.renderL2BD(conn, connIndex, hubNodeName, l2bdIFs[hubNodeName]); err != nil {
+	if err := ns.RenderL2BD(conn, connIndex, hubNodeName, l2bdIFs[hubNodeName]); err != nil {
 		return err
 	}
 

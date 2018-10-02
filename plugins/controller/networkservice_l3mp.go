@@ -19,6 +19,7 @@ import (
 
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
+	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
 )
 
 // The L3MP topology is rendered in this module for a connection with a vnf-service
@@ -185,6 +186,8 @@ func (ns *NetworkService) renderConnL3MPSameNode(
 	// The interfaces should be created in the vnf and the vswitch then the vswitch
 	// interfaces will be added associated with the vrf.
 
+	var l2bdIFs = make(map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces, 0)
+
 	nodeName := p2nArray[0].Node
 
 	if conn.VrfId == 0 {
@@ -197,6 +200,13 @@ func (ns *NetworkService) renderConnL3MPSameNode(
 		if err != nil {
 			return err
 		}
+
+		l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+			Name: ifName,
+			BridgedVirtualInterface: false,
+		}
+		l2bdIFs[nodeName] = append(l2bdIFs[nodeName], l2bdIF)
+
 		if len(ifStatus.IpAddresses) != 0 {
 			desc := fmt.Sprintf("L3MP NS_%s_VRF_%d_CONN_%d", ns.Metadata.Name, conn.VrfId, connIndex+1)
 			l3sr := &controller.L3VRFRoute{
@@ -239,11 +249,11 @@ func (ns *NetworkService) renderConnL3MPSameNode(
 				p2nArray,
 				networkPodTypes,
 				singleSpokeMap,
-				nil)
+				l2bdIFs)
 		}
 	}
 
-	return nil
+	return ns.RenderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName])
 }
 
 // renderConnL3MPInterNode renders this L3MP connection between nodes
@@ -267,6 +277,7 @@ func (ns *NetworkService) renderConnL3MPInterNode(
 		conn.VrfId = ctlrPlugin.ramCache.VrfIDAllocator.Allocate()
 	}
 
+	l2bdIFs := make(map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces, 0)
 	l3vrfs := make(map[string][]*controller.L3VRFRoute, 0)
 
 	// create the interfaces from the pod to the vswitch, also construct l3vrf routes for the local
@@ -277,6 +288,13 @@ func (ns *NetworkService) renderConnL3MPInterNode(
 		if err != nil {
 			return err
 		}
+
+		l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+			Name: ifName,
+			BridgedVirtualInterface: false,
+			SplitHorizonGroup:       0,
+		}
+		l2bdIFs[p2nArray[i].Node] = append(l2bdIFs[p2nArray[i].Node], l2bdIF)
 
 		if len(ifStatus.IpAddresses) != 0 {
 			desc := fmt.Sprintf("L3MP NS_%s_VRF_%d_CONN_%d", ns.Metadata.Name, conn.VrfId, connIndex+1)
@@ -316,7 +334,8 @@ func (ns *NetworkService) renderConnL3MPInterNode(
 				p2nArray,
 				networkPodTypes,
 				nodeMap,
-				l3vrfs)
+				l3vrfs,
+				l2bdIFs)
 		case controller.NetworkNodeOverlayTypeHubAndSpoke:
 			return nno.renderConnL2MPVxlanHubAndSpoke(ns,
 				conn,
@@ -325,7 +344,7 @@ func (ns *NetworkService) renderConnL3MPInterNode(
 				p2nArray,
 				networkPodTypes,
 				nodeMap,
-					nil)
+				l2bdIFs)
 		}
 	default:
 		msg := fmt.Sprintf("network-service: %s, conn: %d, node overlay: %s type not implemented",

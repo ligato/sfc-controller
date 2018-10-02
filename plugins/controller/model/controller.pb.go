@@ -251,9 +251,10 @@ type Interface struct {
 	IpamPoolNames []string              `protobuf:"bytes,9,rep,name=ipam_pool_names" json:"ipam_pool_names,omitempty"`
 	AdminStatus   string                `protobuf:"bytes,10,opt,name=admin_status,proto3" json:"admin_status,omitempty"`
 	MemifParms    *Interface_MemIFParms `protobuf:"bytes,11,opt,name=memif_parms" json:"memif_parms,omitempty"`
-	Labels        []string              `protobuf:"bytes,12,rep,name=labels" json:"labels,omitempty"`
-	Parent        string                `protobuf:"bytes,13,opt,name=parent,proto3" json:"parent,omitempty"`
-	HostPortLabel string                `protobuf:"bytes,14,opt,name=host_port_label,proto3" json:"host_port_label,omitempty"`
+	TapParms      *Interface_TapParms   `protobuf:"bytes,12,opt,name=tap_parms" json:"tap_parms,omitempty"`
+	Labels        []string              `protobuf:"bytes,13,rep,name=labels" json:"labels,omitempty"`
+	Parent        string                `protobuf:"bytes,14,opt,name=parent,proto3" json:"parent,omitempty"`
+	HostPortLabel string                `protobuf:"bytes,15,opt,name=host_port_label,proto3" json:"host_port_label,omitempty"`
 }
 
 func (m *Interface) Reset()         { *m = Interface{} }
@@ -267,14 +268,36 @@ func (m *Interface) GetMemifParms() *Interface_MemIFParms {
 	return nil
 }
 
+func (m *Interface) GetTapParms() *Interface_TapParms {
+	if m != nil {
+		return m.TapParms
+	}
+	return nil
+}
+
 type Interface_MemIFParms struct {
 	Mode           string `protobuf:"bytes,1,opt,name=mode,proto3" json:"mode,omitempty"`
 	MemifDirectory string `protobuf:"bytes,2,opt,name=memif_directory,proto3" json:"memif_directory,omitempty"`
+	Secret         string `protobuf:"bytes,3,opt,name=secret,proto3" json:"secret,omitempty"`
+	RingSize       string `protobuf:"bytes,4,opt,name=ring_size,proto3" json:"ring_size,omitempty"`
+	BufferSize     string `protobuf:"bytes,5,opt,name=buffer_size,proto3" json:"buffer_size,omitempty"`
+	RxQueues       string `protobuf:"bytes,6,opt,name=rx_queues,proto3" json:"rx_queues,omitempty"`
+	TxQueues       string `protobuf:"bytes,7,opt,name=tx_queues,proto3" json:"tx_queues,omitempty"`
 }
 
 func (m *Interface_MemIFParms) Reset()         { *m = Interface_MemIFParms{} }
 func (m *Interface_MemIFParms) String() string { return proto.CompactTextString(m) }
 func (*Interface_MemIFParms) ProtoMessage()    {}
+
+type Interface_TapParms struct {
+	Namespace  string `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	RxRingSize string `protobuf:"bytes,2,opt,name=rx_ring_size,proto3" json:"rx_ring_size,omitempty"`
+	TxRingSize string `protobuf:"bytes,3,opt,name=tx_ring_size,proto3" json:"tx_ring_size,omitempty"`
+}
+
+func (m *Interface_TapParms) Reset()         { *m = Interface_TapParms{} }
+func (m *Interface_TapParms) String() string { return proto.CompactTextString(m) }
+func (*Interface_TapParms) ProtoMessage()    {}
 
 type NetworkPodSpec struct {
 	PodType    string       `protobuf:"bytes,2,opt,name=pod_type,proto3" json:"pod_type,omitempty"`

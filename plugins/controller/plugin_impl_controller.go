@@ -45,7 +45,7 @@ var (
 	sfcConfigFile               string // cli flag - see RegisterFlags
 	CleanDatastore              bool
 	BypassModelTypeHttpHandlers bool
-	log                         = logrus.DefaultLogger()
+	log                         = logrus.NewLogger("Controller")
 	ctlrPlugin                  *Plugin
 )
 
@@ -68,11 +68,8 @@ func LogFlags() {
 }
 
 func init() {
-	// Logger must be initialized for each s individually.
-	//log.SetLevel(logging.DebugLevel)
-	log.SetLevel(logging.InfoLevel)
 	RegisterFlags()
-
+	log.SetLevel(logging.DebugLevel)
 }
 
 // CacheType is ram cache of controller entities
@@ -134,8 +131,8 @@ func (s *Plugin) Init() error {
 	ConfigMutexSet(&s.ConfigMutex)
 
 	s.DB = s.Etcd.NewBroker(keyval.Root)
-	database.InitDatabase(s.DB)
-
+	database.InitDatabase(s.DB, log)
+	vppagent.VppAgentSetLogger(log)
 	s.RegisterModelTypeManagers()
 
 	s.InitRAMCache()
@@ -206,6 +203,9 @@ func (s *Plugin) AfterInit() error {
 	go ctlrPlugin.NetworkPodNodeMapMgr.RunContivKSRNetworkPodToNodeMappingWatcher()
 
 	go s.ProcessOperationalMessages()
+
+	// enable the renderer and kick it to run as the .conf config has been read in
+	s.AddOperationMsgToQueue("", OperationalMsgOpCodeEnableRenderer, nil)
 	s.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
 
 	s.StatusCheck.ReportStateChange(PluginID, statuscheck.OK, nil)

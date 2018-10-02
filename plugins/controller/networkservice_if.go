@@ -201,7 +201,68 @@ func (ns *NetworkService) RenderConnTapPair(
 	networkPodInterface *controller.Interface,
 	networkPodType string) (string, *controller.InterfaceStatus, error) {
 
-	return "", nil, fmt.Errorf("tap not supported")
+	var ifName string
+
+	connPodName := networkPodInterface.Parent
+	connInterfaceName := networkPodInterface.Name
+
+	ifStatus, err := InitInterfaceStatus(ns.Metadata.Name, vppAgent, networkPodInterface)
+	if err != nil {
+		RemoveInterfaceStatus(ns.Status.Interfaces, connPodName, connInterfaceName)
+		msg := fmt.Sprintf("network pod interface: %s/%s, %s", connPodName, connInterfaceName, err)
+		ns.AppendStatusMsg(msg)
+		return "", nil, err
+	}
+
+	linTapIfName := "IF_TAP_VNF_" + connPodName + "_" + connInterfaceName
+	tapIfName := "IF_TAP_VSWITCH_" + connPodName + "_" + connInterfaceName
+
+	hostPortLabel := networkPodInterface.HostPortLabel
+	if hostPortLabel == "" {
+		hostPortLabel = constructBaseHostName(connPodName, connInterfaceName)
+	}
+
+	ifStatus.HostPortLabel = hostPortLabel
+	PersistInterfaceStatus(ns.Status.Interfaces, ifStatus, connPodName, connInterfaceName)
+
+	microServiceLabel := connPodName
+	hostNameSpace := ""
+	if networkPodInterface.TapParms != nil {
+		hostNameSpace = networkPodInterface.TapParms.Namespace
+	}
+	// Configure the linux tap interface for the VNF end
+	vppKV := vppagent.ConstructLinuxTapInterface(vppAgent,
+		linTapIfName,
+		ifStatus.IpAddresses,
+		ifStatus.MacAddress,
+		ctlrPlugin.SysParametersMgr.ResolveMtu(networkPodInterface.Mtu),
+		networkPodInterface.AdminStatus,
+		hostPortLabel,
+		hostNameSpace,
+		microServiceLabel)
+
+	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+		ModelTypeNetworkService + "/" + ns.Metadata.Name,
+		vppKV)
+
+	// Configure the tap interface for the VSWITCH end
+	vppKV = vppagent.ConstructTapInterface(vppAgent,
+		tapIfName,
+		[]string{},
+		"",
+		ctlrPlugin.SysParametersMgr.ResolveMtu(networkPodInterface.Mtu),
+		networkPodInterface.AdminStatus,
+		ctlrPlugin.SysParametersMgr.ResolveRxMode(networkPodInterface.RxMode),
+		networkPodInterface.TapParms,
+		hostPortLabel)
+
+	vppKV.IFace.Vrf = conn.VrfId
+
+	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+		ModelTypeNetworkService + "/" + ns.Metadata.Name,
+		vppKV)
+
+	return ifName, ifStatus, nil
 }
 
 // RenderConnVethAfpPair renders this pod/vswitch veth/afp interface pair
@@ -234,8 +295,11 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 	veth1Name := "IF_VETH_VNF_" + connPodName + "_" + connInterfaceName
 	veth2Name := "IF_VETH_VSWITCH_" + connPodName + "_" + connInterfaceName
 	host1Name := connInterfaceName
-	baseHostName := constructBaseHostName(connPodName, connInterfaceName)
-	host2Name := baseHostName
+
+	host2Name := networkPodInterface.HostPortLabel
+	if host2Name == "" {
+		host2Name = constructBaseHostName(connPodName, connInterfaceName)
+	}
 
 	ifStatus.HostPortLabel = host2Name
 	PersistInterfaceStatus(ns.Status.Interfaces, ifStatus, connPodName, connInterfaceName)
@@ -284,6 +348,9 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 			networkPodInterface.AdminStatus,
 			ctlrPlugin.SysParametersMgr.ResolveRxMode(networkPodInterface.RxMode),
 			host1Name)
+
+		vppKV.IFace.Vrf = conn.VrfId
+
 		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 			ModelTypeNetworkService + "/" + ns.Metadata.Name,
 			vppKV)

@@ -78,8 +78,11 @@ func findModelManager(modelName string) registeredManagersInterface {
 
 const (
 	OperationalMsgOpCodeRender = iota + 1
+	OperationalMsgOpCodeEnableRenderer
+	OperationalMsgOpCodeDisableRenderer
 	OperationalMsgOpCodeCreateUpdate
 	OperationalMsgOpCodeDelete
+	OperationalMsgOpCodeResyncContivNetworkPodMap
 )
 
 type OperationalMsg struct {
@@ -94,6 +97,7 @@ func (s *Plugin) ProcessOperationalMessages() {
 
 	then := time.Now()
 	isRenderingEnabled := false
+	isRenderingPending := false
 
 	for msg := range OperationalMsgChannel {
 
@@ -103,22 +107,39 @@ func (s *Plugin) ProcessOperationalMessages() {
 		case OperationalMsgOpCodeRender:
 			log.Debugf("ProcessOperationalMessages: received rendering msg")
 			// special msg for startup after all config from db/yaml have been processed
+			isRenderingPending = true
+
+		case OperationalMsgOpCodeDisableRenderer:
+			log.Debugf("ProcessOperationalMessages: received disable rendering msg")
+			isRenderingEnabled = false
+
+		case OperationalMsgOpCodeEnableRenderer:
+			log.Debugf("ProcessOperationalMessages: received enable rendering msg")
 			isRenderingEnabled = true
 
 		case OperationalMsgOpCodeCreateUpdate:
 			findModelManager(msg.model).HandleCRUDOperationCU(msg.data)
+			isRenderingPending = true
 
 		case OperationalMsgOpCodeDelete:
 			findModelManager(msg.model).HandleCRUDOperationD(msg.data)
+			isRenderingPending = true
+
+		case OperationalMsgOpCodeResyncContivNetworkPodMap:
+			s.NetworkPodNodeMapMgr.SyncNetworkPodToNodeMap()
 
 		}
 
-		if isRenderingEnabled {
-			log.Debugf("ProcessOperationalMessages: check if rendering required")
-			if numInChan := len(OperationalMsgChannel); numInChan != 0 {
+		if isRenderingEnabled && isRenderingPending {
+
+			numInChan := len(OperationalMsgChannel)
+
+			now := time.Now() // for time since last render processing
+
+			log.Debugf("ProcessOperationalMessages: check if rendering required, len q=%d", numInChan)
+			if numInChan != 0 {
 				// there are more messages in the channel so "skip" rendering until there are no more or
 				// 1 second has elapsed
-				now := time.Now()
 				if now.Second()-then.Second() > 1 {
 					then = now
 					ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
@@ -127,6 +148,7 @@ func (s *Plugin) ProcessOperationalMessages() {
 					RenderTxnConfigStart()
 					s.RenderAll()
 					RenderTxnConfigEnd()
+					isRenderingPending = false
 				} else {
 					log.Debugf("ProcessOperationalMessages: queueLen: %d, delaying render msg for at least 1 second",
 						numInChan)
@@ -136,6 +158,8 @@ func (s *Plugin) ProcessOperationalMessages() {
 				RenderTxnConfigStart()
 				s.RenderAll()
 				RenderTxnConfigEnd()
+				isRenderingPending = false
+				then = now
 			}
 		}
 	}

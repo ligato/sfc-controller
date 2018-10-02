@@ -29,11 +29,16 @@ import (
 	"github.com/ligato/vpp-agent/plugins/vpp/model/interfaces"
 	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
 	"github.com/ligato/vpp-agent/plugins/vpp/model/l3"
+	"strconv"
 )
 
 var (
-	log = logrus.DefaultLogger()
+	log *logrus.Logger
 )
+
+func VppAgentSetLogger(l *logrus.Logger) {
+	log = l
+}
 
 func rxModeControllerToInterface(contrtollerRxMode string) *interfaces.Interfaces_Interface_RxModeSettings {
 
@@ -237,6 +242,14 @@ func memifMode(modeString string) interfaces.Interfaces_Interface_Memif_MemifMod
 	return mode
 }
 
+func strToUInt32(v string) uint32 { // assume str is a uint
+	i, err := strconv.Atoi(v)
+	if err != nil {
+		return 0
+	}
+	return uint32(i)
+}
+
 // ConstructMemInterface returns an KVType
 func ConstructMemInterface(vppAgent string,
 	ifname string,
@@ -271,6 +284,19 @@ func ConstructMemInterface(vppAgent string,
 		if memifParms.MemifDirectory != "" {
 			defaultMemifDirectory = memifParms.MemifDirectory
 		}
+		if memifParms.RingSize != "" {
+			iface.Memif.RingSize = strToUInt32(memifParms.RingSize)
+		}
+		if memifParms.BufferSize != "" {
+			iface.Memif.BufferSize = strToUInt32(memifParms.BufferSize)
+		}
+		if memifParms.RxQueues != "" {
+			iface.Memif.RxQueues = strToUInt32(memifParms.RxQueues)
+		}
+		if memifParms.TxQueues != "" {
+			iface.Memif.TxQueues = strToUInt32(memifParms.TxQueues)
+		}
+		iface.Memif.Secret = memifParms.Secret
 	}
 
 	if defaultMemifDirectory == "" {
@@ -369,6 +395,7 @@ func ConstructTapInterface(vppAgent string,
 	mtu uint32,
 	adminStatus string,
 	rxMode string,
+	tapParms *controller.Interface_TapParms,
 	hostIfName string) *KVType {
 
 	iface := &interfaces.Interfaces_Interface{
@@ -380,10 +407,21 @@ func ConstructTapInterface(vppAgent string,
 		Mtu:         mtu,
 		Tap: &interfaces.Interfaces_Interface_Tap{
 			HostIfName: hostIfName,
+			Version: 2,
 		},
 	}
 
 	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
+
+	if tapParms != nil {
+		iface.Tap.Namespace = tapParms.Namespace
+		if tapParms.RxRingSize != "" {
+			iface.Tap.RxRingSize = strToUInt32(tapParms.RxRingSize)
+		}
+		if tapParms.TxRingSize != "" {
+			iface.Tap.TxRingSize = strToUInt32(tapParms.TxRingSize)
+		}
+	}
 
 	key := InterfaceKey(vppAgent, iface.Name)
 
@@ -393,6 +431,49 @@ func ConstructTapInterface(vppAgent string,
 		VppKey:       key,
 		VppEntryType: VppEntryTypeInterface,
 		IFace:        iface,
+	}
+	return kv
+}
+
+// ConstructLinuxTapInterface returns an KVType
+func ConstructLinuxTapInterface(vppAgent string,
+	ifname string,
+	ipAddresses []string,
+	macAddr string,
+	mtu uint32,
+	adminStatus string,
+	hostIfName string,
+	hostNameSpace string,
+	microsServiceLabel string) *KVType {
+
+	iface := &linuxIntf.LinuxInterfaces_Interface{
+		Name:        ifname,
+		Type:        linuxIntf.LinuxInterfaces_AUTO_TAP,
+		Enabled:     adminStatusStringToBool(adminStatus),
+		PhysAddress: macAddr,
+		IpAddresses: sortedIPAddresses(ipAddresses),
+		Mtu:         mtu,
+		HostIfName: hostIfName,
+	}
+
+	ns := &linuxIntf.LinuxInterfaces_Interface_Namespace{}
+	if hostNameSpace == "" {
+		ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_MICROSERVICE_REF_NS
+		ns.Microservice = microsServiceLabel
+	} else {
+		ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_NAMED_NS
+		ns.Microservice = hostNameSpace
+	}
+	iface.Namespace = ns
+
+	key := LinuxInterfaceKey(vppAgent, iface.Name)
+
+	log.Debugf("ConstructLinuxTapInterface: key='%s', iface='%v", key, iface)
+
+	kv := &KVType{
+		VppKey:       key,
+		VppEntryType: VppEntryTypeLinuxInterface,
+		LinuxIFace:   iface,
 	}
 	return kv
 }

@@ -85,32 +85,6 @@ func (p2n *NetworkPodToNodeMap) ConfigEqual(_p2n *NetworkPodToNodeMap) bool {
 	return true
 }
 
-// HandleContivKSRStatusUpdate add to ram cache and render
-func (mgr *NetworkPodToNodeMapMgr) HandleContivKSRStatusUpdate(p2n *NetworkPodToNodeMap, render bool) error {
-
-	if err := p2n.validate(); err != nil {
-		return err
-	}
-
-	ctlrPlugin.ramCache.NetworkPodToNodeMap[p2n.Pod] = p2n
-
-	if render {
-		ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
-	}
-
-	return nil
-}
-
-// HandleContivKSRStatusDelete add to ram cache and render
-func (mgr *NetworkPodToNodeMapMgr) HandleContivKSRStatusDelete(podName string) error {
-
-	delete(ctlrPlugin.ramCache.NetworkPodToNodeMap, podName)
-
-	ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
-
-	return nil
-}
-
 // HandleCRUDOperationCU add to ram cache and render
 func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationCU(data interface{}) error {
 
@@ -349,6 +323,55 @@ func (mgr *NetworkPodToNodeMapMgr) InitAndRunWatcher() {
 	}
 }
 
+//SyncNetworkPodToNodeMap ensures the contiv, local config cache, and ram cache are in sync.  The config cache
+// is populated by configuration (crd, rest, yaml), and also the ram cache is updated with the config info.  The
+// ram cache is also modified (adds, deletes), when the contiv-ksr discovers where pods are hosted.
+// The ram cache MUST be up to date as it is used by the renderer to know where pods are hosted so it can create
+// the correct connectivity configuration in etcd.
+func (mgr *NetworkPodToNodeMapMgr) SyncNetworkPodToNodeMap() {
+
+	// load the contiv ksr pod to node map
+	contivNetworkPodToNodeMapMap := make(map[string]*NetworkPodToNodeMap)
+	mgr.loadAllFromDatastore(mgr.ContivKsrNetworkPodToNodePrefix(), contivNetworkPodToNodeMapMap)
+
+    // copy the ram cache into a temp
+	tempNetworkPodToNodeMapMap := make(map[string]*NetworkPodToNodeMap)
+	for pod, entry := range ctlrPlugin.ramCache.NetworkPodToNodeMap {
+		tempNetworkPodToNodeMapMap[pod] = entry
+	}
+
+	// clear the ram map, put the config cache into it, then put the contiv into it
+	ctlrPlugin.ramCache.NetworkPodToNodeMap = nil
+	ctlrPlugin.ramCache.NetworkPodToNodeMap = make(map[string]*NetworkPodToNodeMap)
+
+	for pod, entry := range ctlrPlugin.NetworkPodNodeMapMgr.networkPodNodeCache {
+		ctlrPlugin.ramCache.NetworkPodToNodeMap[pod] = entry
+	}
+	for pod, entry := range contivNetworkPodToNodeMapMap {
+		ctlrPlugin.ramCache.NetworkPodToNodeMap[pod] = entry
+	}
+
+    // the ram cache has now the most accurate info, compare to temp and if different, we should render
+	renderingRequired := false
+	if len(tempNetworkPodToNodeMapMap) != len(ctlrPlugin.ramCache.NetworkPodToNodeMap) {
+		renderingRequired = true
+	} else {
+		for _, entry := range tempNetworkPodToNodeMapMap {
+			ramEntry, exists := ctlrPlugin.ramCache.NetworkPodToNodeMap[entry.Pod]
+			if !exists || !ramEntry.ConfigEqual(entry) {
+				log.Debugf("SyncNetworkPodToNodeMap: new config: %v", entry)
+				renderingRequired = true
+			}
+		}
+	}
+
+	if renderingRequired {
+		ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
+	} else {
+		log.Debugf("SyncNetworkPodToNodeMap: rendering not required as no change in node-pod map")
+	}
+}
+
 // RunContivKSRNetworkPodToNodeMappingWatcher enables etcd updates to be monitored
 func (mgr *NetworkPodToNodeMapMgr) RunContivKSRNetworkPodToNodeMappingWatcher() {
 
@@ -360,22 +383,7 @@ func (mgr *NetworkPodToNodeMapMgr) RunContivKSRNetworkPodToNodeMappingWatcher() 
 		// check every minute just in case
 		ticker := time.NewTicker(1 * time.Minute)
 		for _ = range ticker.C {
-			tempNetworkPodToNodeMapMap := make(map[string]*NetworkPodToNodeMap)
-			mgr.loadAllFromDatastore(mgr.ContivKsrNetworkPodToNodePrefix(), tempNetworkPodToNodeMapMap)
-			renderingRequired := false
-			for _, dbEntry := range tempNetworkPodToNodeMapMap {
-				ramEntry, exists := ctlrPlugin.ramCache.NetworkPodToNodeMap[dbEntry.Pod]
-				if !exists || !ramEntry.ConfigEqual(dbEntry) {
-					log.Debugf("ContivKSRNetworkPodToNodeMappingWatcher: timer new config: %v", dbEntry)
-					renderingRequired = true
-					mgr.HandleContivKSRStatusUpdate(dbEntry, false) // render at the end
-				}
-			}
-			// if any of the entities required rendering, do it now
-			if renderingRequired {
-				ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
-			}
-			tempNetworkPodToNodeMapMap = nil
+			ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeResyncContivNetworkPodMap, nil)
 		}
 	}()
 
@@ -394,22 +402,9 @@ func (mgr *NetworkPodToNodeMapMgr) RunContivKSRNetworkPodToNodeMappingWatcher() 
 		case resp := <-respChan:
 			switch resp.GetChangeType() {
 			case datasync.Put:
-				p2n := &NetworkPodToNodeMap{}
-				if err := resp.GetValue(p2n); err == nil {
-					log.Infof("ContivKSRNetworkPodToNodeMappingWatcher: key: %s, value:%v", p2n.Pod, p2n)
-					if p2n.Pod != "" {
-						mgr.HandleContivKSRStatusUpdate(p2n, true)
-					}
-				}
-
+				ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeResyncContivNetworkPodMap, nil)
 			case datasync.Delete:
-				p2n := &NetworkPodToNodeMap{}
-				if err := resp.GetValue(p2n); err == nil {
-					log.Infof("ContivKSRNetworkPodToNodeMappingWatcher: deleting key: %s, value:%v", p2n.Pod, p2n)
-					if p2n.Pod != "" {
-						mgr.HandleContivKSRStatusDelete(p2n.Pod)
-					}
-				}
+				ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeResyncContivNetworkPodMap, nil)
 			}
 		}
 	}

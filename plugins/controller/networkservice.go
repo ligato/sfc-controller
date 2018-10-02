@@ -29,6 +29,9 @@ import (
 	"github.com/ligato/sfc-controller/plugins/controller/database"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/unrolled/render"
+	"strconv"
+	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
+	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
 )
 
 type NetworkServiceMgr struct {
@@ -482,9 +485,28 @@ func (ns *NetworkService) validateConnections() error {
 				return fmt.Errorf("network-service: %s conn: l3 p2mp must have at least one interface",
 					ns.Metadata.Name)
 			}
-			if conn.UseNodeL2Bd != "" || conn.L2Bd != nil {
-				return fmt.Errorf("network-service: %s conn: cannot refer to a node bd OR provide l2bd parameters",
+			//if conn.UseNodeL2Bd != "" || conn.L2Bd != nil {
+			//	return fmt.Errorf("network-service: %s conn: cannot refer to a node bd OR provide l2bd parameters",
+			//		ns.Metadata.Name)
+			//}
+			if conn.UseNodeL2Bd != "" && conn.L2Bd != nil {
+				return fmt.Errorf("network-service: %s conn: cannot refer to a node bd AND provide l2bd parameters",
 					ns.Metadata.Name)
+			}
+			if conn.L2Bd != nil {
+				if conn.L2Bd.L2BdTemplate != "" && conn.L2Bd.BdParms != nil {
+					return fmt.Errorf("network-service: %s conn: l2bd: %s  cannot refer to temmplate and provide l2bd parameters",
+						ns.Metadata.Name, conn.L2Bd.Name)
+				}
+				if conn.L2Bd.L2BdTemplate != "" {
+					if l2bdt := ctlrPlugin.SysParametersMgr.FindL2BDTemplate(conn.L2Bd.L2BdTemplate); l2bdt == nil {
+						return fmt.Errorf("network-service: %s, conn: l2bd: %s  has invalid reference to non-existant l2bd template '%s'",
+							ns.Metadata.Name, conn.L2Bd.Name, conn.L2Bd.L2BdTemplate)
+					}
+				} else if conn.L2Bd.BdParms == nil {
+					return fmt.Errorf("network-service: %s, conn: l2bd: %s has no DB parms nor refer to a template",
+						ns.Metadata.Name, conn.L2Bd.Name)
+				}
 			}
 		default:
 			return fmt.Errorf("network-service: %s, connection has invalid conn type '%s'",
@@ -601,6 +623,46 @@ func (ns *NetworkService) validateNetworkPod(networkPod *controller.NetworkPod) 
 						ns.Metadata.Name, iFace.Name, iFace.MemifParms.Mode)
 				}
 			}
+			if iFace.MemifParms.RingSize != "" {
+				if i, err := strconv.Atoi(iFace.MemifParms.RingSize); err != nil || i < 0 {
+					return fmt.Errorf("network-service/if: %s/%s, invalid memif ring_size=%s",
+						ns.Metadata.Name, iFace.Name, iFace.MemifParms.RingSize)
+				}
+			}
+			if iFace.MemifParms.BufferSize != "" {
+				if i, err := strconv.Atoi(iFace.MemifParms.BufferSize); err != nil || i < 0 {
+					return fmt.Errorf("network-service/if: %s/%s, invalid memif buffer_size=%s",
+						ns.Metadata.Name, iFace.Name, iFace.MemifParms.BufferSize)
+				}
+			}
+			if iFace.MemifParms.RxQueues != "" {
+				if i, err := strconv.Atoi(iFace.MemifParms.RxQueues); err != nil || i < 0 {
+					return fmt.Errorf("network-service/if: %s/%s, invalid memif rx_queues=%s",
+						ns.Metadata.Name, iFace.Name, iFace.MemifParms.RxQueues)
+				}
+			}
+			if iFace.MemifParms.TxQueues != "" {
+				if i, err := strconv.Atoi(iFace.MemifParms.TxQueues); err != nil || i < 0 {
+					return fmt.Errorf("network-service/if: %s/%s, invalid memif tx_queues=%s",
+						ns.Metadata.Name, iFace.Name, iFace.MemifParms.TxQueues)
+				}
+			}
+		}
+		if iFace.TapParms != nil {
+			if iFace.TapParms.RxRingSize != "" {
+				if i, err := strconv.Atoi(iFace.TapParms.RxRingSize); err != nil || i < 0 {
+					return fmt.Errorf("network-service/if: %s/%s, invalid tap rx_ring_size=%s",
+						ns.Metadata.Name, iFace.Name, iFace.TapParms.RxRingSize)
+				}
+			}
+		}
+		if iFace.TapParms != nil {
+			if iFace.TapParms.TxRingSize != "" {
+				if i, err := strconv.Atoi(iFace.TapParms.TxRingSize); err != nil || i < 0 {
+					return fmt.Errorf("network-service/if: %s/%s, invalid tap tx_ring_size=%s",
+						ns.Metadata.Name, iFace.Name, iFace.TapParms.TxRingSize)
+				}
+			}
 		}
 	}
 
@@ -617,6 +679,53 @@ func (mgr *NetworkServiceMgr) FindInterfaceStatus(podInterfaceName string) *cont
 		if ifStatus, exists := ns.findInterfaceStatus(podInterfaceName); exists {
 			return ifStatus
 		}
+	}
+	return nil
+}
+
+func (ns *NetworkService) RenderL2BD(
+	conn *controller.Connection, connIndex uint32,
+	nodeName string,
+	l2bdIFs []*l2.BridgeDomains_BridgeDomain_Interfaces) error {
+
+	// if using an existing node txnLevel bridge, we simply add the i/f's to the bridge
+	if conn.UseNodeL2Bd != "" {
+
+		var nodeL2BD *l2.BridgeDomains_BridgeDomain
+
+		// find the l2db for this node ...
+		nn, nodeL2BD := ctlrPlugin.NetworkNodeMgr.FindVppL2BDForNode(nodeName, conn.UseNodeL2Bd)
+		if nodeL2BD == nil {
+			msg := fmt.Sprintf("network-service: %s, referencing a missing node/l2bd: %s/%s",
+				ns.Metadata.Name, nn.Metadata.Name, conn.UseNodeL2Bd)
+			ns.AppendStatusMsg(msg)
+			return fmt.Errorf(msg)
+		}
+		vppKV := vppagent.AppendInterfacesToL2BD(nodeName, nodeL2BD, l2bdIFs)
+		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
+			vppKV)
+
+	} else {
+		var bdParms *controller.BDParms
+		if conn.L2Bd != nil {
+			// need to create a bridge for this conn
+			if conn.L2Bd.L2BdTemplate != "" {
+				bdParms = ctlrPlugin.SysParametersMgr.FindL2BDTemplate(conn.L2Bd.L2BdTemplate)
+			} else {
+				bdParms = conn.L2Bd.BdParms
+			}
+		} else {
+			bdParms = ctlrPlugin.SysParametersMgr.GetDefaultSystemBDParms()
+		}
+		vppKV := vppagent.ConstructL2BD(
+			nodeName,
+			fmt.Sprintf("BD_%s_CONN_%d", ns.Metadata.Name, connIndex+1),
+			l2bdIFs,
+			bdParms)
+		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
+			vppKV)
 	}
 	return nil
 }

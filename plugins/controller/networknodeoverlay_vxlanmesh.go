@@ -125,7 +125,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 
 	// create the perNode L2BD's and add the vnf interfaces
 	for nodeName := range nodeMap {
-		if err := ns.renderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
+		if err := ns.RenderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
 			return err
 		}
 	}
@@ -250,7 +250,8 @@ func (nno *NetworkNodeOverlay) renderConnL3PPVxlanMesh(
 	networkPodInterfaces []*controller.Interface,
 	ifStatuses [2]*controller.InterfaceStatus,
 	p2nArray [2]NetworkPodToNodeMap,
-	xconn [2][2]string) error {
+	xconn [2][2]string,
+	l2bdIFs map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces) error {
 
 	// create the vxlan endpoints
 	vniAllocator, exists := ctlrPlugin.NetworkNodeOverlayMgr.vniAllocators[nno.Metadata.Name]
@@ -365,6 +366,7 @@ func (nno *NetworkNodeOverlay) renderConnL3PPVxlanMesh(
 				ModelTypeNetworkService + "/" + ns.Metadata.Name,
 				vppKV)
 		}
+
 	}
 
 	return nil
@@ -379,7 +381,8 @@ func (nno *NetworkNodeOverlay) renderConnL3MPVxlanMesh(
 	p2nArray []NetworkPodToNodeMap,
 	vnfTypes []string,
 	nodeMap map[string]bool,
-	l3vrfs map[string][]*controller.L3VRFRoute) error {
+	l3vrfs map[string][]*controller.L3VRFRoute,
+	l2bdIFs map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces) error {
 
 	// The nodeMap contains the set of nodes involved in the l2mp connection.  There
 	// must be a vxlan mesh created between the nodes.
@@ -481,6 +484,20 @@ func (nno *NetworkNodeOverlay) renderConnL3MPVxlanMesh(
 					ModelTypeNetworkService + "/" + ns.Metadata.Name,
 					vppKV)
 			}
+
+			l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+				Name: ifName,
+				BridgedVirtualInterface: false,
+				SplitHorizonGroup:       1,
+			}
+			l2bdIFs[fromNode] = append(l2bdIFs[fromNode], l2bdIF)
+		}
+	}
+
+	// create the perNode L2BD's and add the vnf interfaces
+	for nodeName := range nodeMap {
+		if err := ns.RenderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
+			return err
 		}
 	}
 

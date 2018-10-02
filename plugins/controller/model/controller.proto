@@ -129,11 +129,22 @@ message Interface {
     message MemIFParms {
         string mode = 1; //ethernet|ip|puntinject optional/default: ethernet
         string memif_directory = 2; // optional: use system parameter if empty
+        string secret = 3;
+        string ring_size = 4;
+        string buffer_size = 5;
+        string rx_queues = 6;
+        string tx_queues = 7;
     }
     MemIFParms memif_parms = 11;
-    repeated string labels = 12;
-    string parent = 13; // internal field: could be a node or pod
-    string host_port_label = 14;
+    message TapParms {
+        string namespace = 1;
+        string rx_ring_size = 2;
+        string tx_ring_size = 3;
+    }
+    TapParms tap_parms = 12;
+    repeated string labels = 13;
+    string parent = 14; // internal field: could be a node or pod
+    string host_port_label = 15;
 }
 
 message NetworkPodSpec {

@@ -22,11 +22,12 @@ import (
 )
 
 var db keyval.ProtoBroker
-var log = logrus.DefaultLogger()
+var log *logrus.Logger
 
 // InitDatabase initializes access variables
-func InitDatabase(p keyval.ProtoBroker) {
+func InitDatabase(p keyval.ProtoBroker, l *logrus.Logger) {
 	db = p
+	log = l
 }
 
 // WriteToDatastore writes the specified entity in the sfc db in etcd
