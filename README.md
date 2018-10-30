@@ -64,6 +64,8 @@ See the [ContivVPP](https://github.com/contiv/vpp) for a description of its poli
 
 ## Quickstart
 
+Note: **For ARM64 please go [here][9].**.
+
 For a quick start with the sfc-controller, you can use pre-built Docker images with
 the Agent and VPP on [Dockerhub][6].
 
@@ -103,3 +105,4 @@ If you are interested in contributing, please see the [contribution guidelines](
 [6]: https://hub.docker.com/r/ligato/sfc-controller/
 [7]: docker/dev_vpp_agent/README.md#running-etcd-server-on-local-host
 [8]: https://github.com/ligato/vpp-agent#quickstart
+[9]: docs/arm64/README.md
