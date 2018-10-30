@@ -1,122 +1,130 @@
 ---
 sfc_controller_config_version: 2
-description: 3 nodes with 1 nic port, host-host vxlan mesh, vnf on each node
+description: 3 node with 1 nic port, host-host vxlan mesh, vnf on each node
 
 system_parameters:
-  ipam_pools:
-    - name: vxlan_loopback_pool
+  memif_directory: "/run/vpp" # a common folder where all vnf's and vswitches are mounted
+
+ipam_pools:  # allocate internode vxlan mesh enpoints from a pool
+  - metadata:
+      name: vxlan_tunnel_pool
+      labels:
+    spec:
+      scope: system
       network: 111.111.111.0/24
+      start_range: 1
+      end_range: 3
 
-vnf_to_node_map:
-  - vnf: vnf1
+network_pod_to_node_map:
+  - pod: vnf1
     node: vswitch1
-  - vnf: vnf2
+  - pod: vnf2
     node: vswitch1
-  - vnf: vnf3
+  - pod: vnf3
     node: vswitch1
 
-nodes:
-  - name: vswitch1
-    node_type: host
-    interfaces:
-      - name: gigethernet13/1/1
-        if_type: ethernet
-        ip_addresses:
-          - "10.100.1.1/16"
-        custom_labels:
-          - vxlan
-      - name: gigethernet13/1/2
-        if_type: ethernet
-        ip_addresses:
-          - "10.100.1.2/16"
-        custom_labels:
-          - vxlan
+network_nodes:
+  - metadata:
+      name: vswitch1
+    spec:
+      node_type: host
+      interfaces:
+        - name: GigabitEthernet0/8/1
+          if_type: ethernet
+          ip_addresses:
+            - "10.100.1.1/24"
+          labels:
+            - vxlan # outgoing i/f for static route from the vxlan loopback address to remote vxlan dest(s)
+  - metadata:
+      name: vswitch2
+    spec:
+      node_type: host
+      interfaces:
+        - name: GigabitEthernet0/8/2
+          if_type: ethernet
+          ip_addresses:
+            - "10.100.2.2/24"
+          labels:
+            - vxlan # outgoing i/f for static route from the vxlan loopback address to remote vxlan dest(s)
 
-  - name: vswitch2
-    node_type: host
-    interfaces:
-      - name: gigethernet13/2/1
-        if_type: ethernet
-        ip_addresses:
-          - "10.100.2.1/16"
-      - name: gigethernet13/2/2
-        if_type: ethernet
-        ip_addresses:
-          - "10.100.2.2/16"
-        custom_labels:
-          - vxlan
+  - metadata:
+      name: vswitch3
+    spec:
+      node_type: host
+      interfaces:
+        - name: GigabitEthernet0/8/3
+          if_type: ethernet
+          ip_addresses:
+            - "10.100.3.3/24"
+          labels:
+            - vxlan # outgoing i/f for static route from the vxlan loopback address to remote vxlan dest(s)
 
-  - name: vswitch3
-    node_type: host
-    interfaces:
-      - name: gigethernet13/3/1
-        if_type: ethernet
-        ip_addresses:
-          - "10.100.3.1/16"
+network_services:
+  - metadata:
+      name: my-network-service
+    spec:
+      network_pods:
+        - metadata:
+            name: vnf1
+          spec:
+            pod_type: vppcontainer
+            interfaces:
+              - name: port1
+                if_type: memif
+              - name: port2
+                if_type: memif
+        - metadata:
+            name: vnf2
+          spec:
+            pod_type: vppcontainer
+            interfaces:
+              - name: port1
+                if_type: memif
+              - name: port2
+                if_type: memif
+        - metadata:
+            name: vnf3
+          spec:
+            pod_type: vppcontainer
+            interfaces:
+              - name: port1
+                if_type: memif
+              - name: port2
+                if_type: memif
+      connections:
+        - conn_type: l2pp # l2x ports on same vnf
+          pod_interfaces:
+            - vnf1/port1
+            - vnf2/port2
+        - conn_type: l2pp
+          network_node_overlay_name: inter_node_vxlan_mesh
+          pod_interfaces:
+            - vnf1/port2
+            - vnf2/port1
+        - conn_type: l2pp # l2x ports on same vnf
+          pod_interfaces:
+            - vnf2/port1
+            - vnf2/port2
+        - conn_type: l2pp
+          network_node_overlay_name: inter_node_vxlan_mesh
+          pod_interfaces:
+            - vnf2/port2
+            - vnf3/port1
+        - conn_type: l2pp # l2x ports on same vnf
+          pod_interfaces:
+            - vnf3/port1
+            - vnf3/port2
 
-vnf_services:
-  - name: service1
-    vnfs:
-      - name: vnf1
-        vnf_type: vppcontainer
-        interfaces:
-          - name: port1
-            if_type: memif
-          - name: port2
-            if_type: memif
-        forwarding:
-          - type: l2xc
-            l2xc_interfaces:
-              - port1
-              - port2
-      - name: vnf2
-        node: vswitch2
-        vnf_type: vppcontainer
-        interfaces:
-          - name: port1
-            if_type: memif
-          - name: port2
-            if_type: memif
-        forwarding:
-          - type: l2xc
-            l2xc_interfaces:
-              - port1
-              - port2
-      - name: vnf3
-        node: vswitch3
-        vnf_type: vppcontainer
-        interfaces:
-          - name: port1
-            if_type: memif
-          - name: port2
-            if_type: memif
-        forwarding:
-          - type: l2xc
-            l2xc_interfaces:
-              - port1
-              - port2
-    connections:
-      - conn_type: l2pp
-        vnf_service_mesh: inter_host_vxlan_mesh
-        interfaces:
-          - vnf: vnf1
-            interface: port2
-          - vnf: vnf2
-            interface: port1
-      - conn_type: l2pp
-        vnf_service_mesh: inter_host_vxlan_mesh
-        interfaces:
-          - vnf: vnf2
-            interface: port2
-          - vnf: vnf3
-            interface: port1
-
-vnf_service_meshes:
-  - name: inter_host_vxlan_mesh
-    service_mesh_type: mesh
-    connection_type: vxlan
-    vxlan_mesh_parms:
-      vni_range_start: 5000
-      vni_range_end: 5999
-      loopback_ipam_pool_name: vxlan_loopback_pool
-      outgoing_interface_label: vxlan
+network_node_overlays:
+  - metadata:
+      name:
+        inter_node_vxlan_mesh
+    spec:
+      service_mesh_type: mesh
+      connection_type: vxlan
+      vxlan_mesh_parms:
+        vni_range_start: 5000
+        vni_range_end: 5999
+        loopback_ipam_pool_name: vxlan_tunnel_pool
+        create_loopback_interface: true
+        create_loopback_static_routes: true

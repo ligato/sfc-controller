@@ -59,20 +59,6 @@ The controller is responsible for supporting connectivity between hosts, between
 hosts and external routers, and between vnfs.  The traffic can be l2, or l3.
 The inter vnf traffic can be intra-host, or inter-host.
 
-```
-
-               Topology    |vnf-vnf                         | router-vnf
-                           |l2             l3               | l2    .        l3
-                           |l2pp l2mp      l3pp l3mp        | l2pp l2mp      l3pp l3mp
---------------------------------------------------------------------------------------
-intra-host     Direct      |
-               Via Vswitch |
---------------------------------------------------------------------------------------
-inter-host     Vxlan
-               Srv6
-
-```
-
 See [here](topologies/topologies.md) for the current set of supported topologies.
 See the [ContivVPP](https://github.com/contiv/vpp) for a description of its policies.
 
@@ -81,11 +67,11 @@ See the [ContivVPP](https://github.com/contiv/vpp) for a description of its poli
 For a quick start with the sfc-controller, you can use pre-built Docker images with
 the Agent and VPP on [Dockerhub][6].
 
-0. Start ETCD and Kafka on your host (e.g. in Docker as described [here][7]).
+0. Start ETCD on your host (e.g. in Docker as described [here][7]).
    Note: **The SFC Controller in the pre-built Docker image will not start if it can't 
    connect to Etcd**.
 
-1. Run VPP + VPP Agent in a Docker image:
+1. Run the controller in a Docker image:
 ```
 docker pull ligato/sfc-controller
 docker run -it --name sfc-contoller --rm ligato/sfc-controller

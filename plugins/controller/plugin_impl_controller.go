@@ -206,7 +206,11 @@ func (s *Plugin) AfterInit() error {
 
 	// enable the renderer and kick it to run as the .conf config has been read in
 	s.AddOperationMsgToQueue("", OperationalMsgOpCodeEnableRenderer, nil)
-	s.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
+
+	// at startup, "resolve" where the hosts are
+	ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeResyncContivNetworkPodMap, nil)
+
+	//s.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
 
 	s.StatusCheck.ReportStateChange(PluginID, statuscheck.OK, nil)
 

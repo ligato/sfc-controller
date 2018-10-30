@@ -468,10 +468,10 @@ func (m *NetworkNodeOverlayStatus) GetRenderedVppAgentEntries() map[string]*Rend
 }
 
 type NetworkNodeOverlaySpec struct {
-	ServiceMeshType       string                                        `protobuf:"bytes,2,opt,name=service_mesh_type,proto3" json:"service_mesh_type,omitempty"`
-	ConnectionType        string                                        `protobuf:"bytes,3,opt,name=connection_type,proto3" json:"connection_type,omitempty"`
-	VxlanHubAndSpokeParms *NetworkNodeOverlaySpec_VxlanHubAndSpokeParms `protobuf:"bytes,8,opt,name=vxlan_hub_and_spoke_parms" json:"vxlan_hub_and_spoke_parms,omitempty"`
-	VxlanMeshParms        *NetworkNodeOverlaySpec_VxlanMeshParms        `protobuf:"bytes,9,opt,name=vxlan_mesh_parms" json:"vxlan_mesh_parms,omitempty"`
+	ServiceMeshType       string                                        `protobuf:"bytes,1,opt,name=service_mesh_type,proto3" json:"service_mesh_type,omitempty"`
+	ConnectionType        string                                        `protobuf:"bytes,2,opt,name=connection_type,proto3" json:"connection_type,omitempty"`
+	VxlanHubAndSpokeParms *NetworkNodeOverlaySpec_VxlanHubAndSpokeParms `protobuf:"bytes,3,opt,name=vxlan_hub_and_spoke_parms" json:"vxlan_hub_and_spoke_parms,omitempty"`
+	VxlanMeshParms        *NetworkNodeOverlaySpec_VxlanMeshParms        `protobuf:"bytes,4,opt,name=vxlan_mesh_parms" json:"vxlan_mesh_parms,omitempty"`
 }
 
 func (m *NetworkNodeOverlaySpec) Reset()         { *m = NetworkNodeOverlaySpec{} }

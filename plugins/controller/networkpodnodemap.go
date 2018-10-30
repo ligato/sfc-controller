@@ -328,7 +328,7 @@ func (mgr *NetworkPodToNodeMapMgr) InitAndRunWatcher() {
 // ram cache is also modified (adds, deletes), when the contiv-ksr discovers where pods are hosted.
 // The ram cache MUST be up to date as it is used by the renderer to know where pods are hosted so it can create
 // the correct connectivity configuration in etcd.
-func (mgr *NetworkPodToNodeMapMgr) SyncNetworkPodToNodeMap() {
+func (mgr *NetworkPodToNodeMapMgr) SyncNetworkPodToNodeMap() bool {
 
 	// load the contiv ksr pod to node map
 	contivNetworkPodToNodeMapMap := make(map[string]*NetworkPodToNodeMap)
@@ -366,10 +366,14 @@ func (mgr *NetworkPodToNodeMapMgr) SyncNetworkPodToNodeMap() {
 	}
 
 	if renderingRequired {
-		ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
+		log.Debugf("SyncNetworkPodToNodeMap: rendering not required as no change in node-pod map")
+
+		//ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
 	} else {
 		log.Debugf("SyncNetworkPodToNodeMap: rendering not required as no change in node-pod map")
 	}
+
+	return renderingRequired
 }
 
 // RunContivKSRNetworkPodToNodeMappingWatcher enables etcd updates to be monitored

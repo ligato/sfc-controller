@@ -671,7 +671,11 @@ func (ns *NetworkService) validateNetworkPod(networkPod *controller.NetworkPod) 
 
 func (ns *NetworkService) findInterfaceStatus(podInterfaceName string) (*controller.InterfaceStatus, bool) {
 
-	return RetrieveInterfaceStatusFromRamCache(ns.Status.Interfaces, podInterfaceName)
+	if ns.Status != nil && ns.Status.Interfaces != nil {
+		return RetrieveInterfaceStatusFromRamCache(ns.Status.Interfaces, podInterfaceName)
+	}
+	return nil, false
+
 }
 
 func (mgr *NetworkServiceMgr) FindInterfaceStatus(podInterfaceName string) *controller.InterfaceStatus {

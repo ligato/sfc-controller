@@ -253,7 +253,7 @@ func (ns *NetworkService) renderConnL3MPSameNode(
 		}
 	}
 
-	return ns.RenderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName])
+	return nil//ns.RenderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName])
 }
 
 // renderConnL3MPInterNode renders this L3MP connection between nodes
@@ -307,10 +307,10 @@ func (ns *NetworkService) renderConnL3MPInterNode(
 
 			l3vrfs[p2nArray[i].Node] = append(l3vrfs[p2nArray[i].Node], l3sr)
 
-			vppKV := vppagent.ConstructStaticRoute(p2nArray[i].Node, l3sr)
-			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-				ModelTypeNetworkService + "/" + ns.Metadata.Name,
-				vppKV)
+			//vppKV := vppagent.ConstructStaticRoute(p2nArray[i].Node, l3sr)
+			//RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+			//	ModelTypeNetworkService + "/" + ns.Metadata.Name,
+			//	vppKV)
 		}
 		ae := &controller.L3ArpEntry{
 			IpAddress:vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),

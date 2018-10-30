@@ -159,17 +159,18 @@ message NetworkPod {
 }
 
 message Connection {
-    string conn_type = 1; // l2pp|l2mp|   future: l3mp|l3pp
-    string network_node_overlay_name = 2; // needed if require inter-node vnf's
-    repeated string pod_interfaces = 3; // format: pod/ifname
-    repeated string node_interfaces = 4; // format: node/ifname
-    repeated string node_interface_labels = 5; // format: label
-    string use_node_l2bd = 6; // optional: use an existing node level l2bd
-                              // only for l2mp connections
-    L2BD l2bd = 7; // optional: if omitted and use_node_l2bd is not set then
-                   // create a l2bd with default parms for l2mp connections
-    uint32 vrf_id = 8;
-    string conn_method = 9; //direct|vswitch optional/default: direct
+    string name = 1;                           // id for this conn, optional
+    string conn_type = 2;                      // l2pp|l2mp|   future: l3mp|l3pp
+    string network_node_overlay_name = 3;      // needed if require inter-node vnf's
+    repeated string pod_interfaces = 4;        // format: pod/ifname
+    repeated string node_interfaces = 5;       // format: node/ifname
+    repeated string node_interface_labels = 6; // format: label
+    string use_node_l2bd = 7;                  // optional: use an existing node level l2bd
+                                               // only for l2mp connections
+    L2BD l2bd = 8;                             // optional: if omitted and use_node_l2bd is not set then
+                                               // create a l2bd with default parms for l2mp connections
+    uint32 vrf_id = 9;
+    string conn_method = 10;                   // direct|vswitch optional/default: direct
 }
 
 message NetworkServiceStatus {
@@ -194,8 +195,9 @@ message NetworkNodeOverlayStatus {
     map<string,RenderedVppAgentEntry> rendered_vpp_agent_entries = 3; // key: modeltype/name
 }
 message NetworkNodeOverlaySpec {
-    string service_mesh_type = 2; // hubandspoke|mesh
-    string connection_type = 3;   //vxlan|dot1q|srv6
+    string service_mesh_type = 1; // hubandspoke|mesh
+    string connection_type = 2;   //vxlan
+
     message VxlanHubAndSpokeParms {
         string hub_node_name = 1;
         uint32 vni = 2;
@@ -207,7 +209,8 @@ message NetworkNodeOverlaySpec {
                                              // if this outgoing_interface_label is not provided then
                                              // static routes will only be created on the first gige
     }
-    VxlanHubAndSpokeParms vxlan_hub_and_spoke_parms = 8;
+    VxlanHubAndSpokeParms vxlan_hub_and_spoke_parms = 3;
+
     message VxlanMeshParms {
         uint32 vni_range_start = 1;
         uint32 vni_range_end = 2;
@@ -219,8 +222,9 @@ message NetworkNodeOverlaySpec {
                                              // if this outgoing_interface_label is not provided then
                                              // static routes will only be created on the first gige
     }
-    VxlanMeshParms vxlan_mesh_parms = 9;
+    VxlanMeshParms vxlan_mesh_parms = 4;
 }
+
 message NetworkNodeOverlay {
     MetaDataType metadata = 1;
     NetworkNodeOverlaySpec spec = 2;

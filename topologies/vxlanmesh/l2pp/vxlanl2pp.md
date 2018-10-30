@@ -34,324 +34,147 @@ sfc-controller -sfc-config=toplogies/vxlanmesh/l2pp/vxlanl2pp.yaml -clean
 
 The yaml file looks like:
 ```
-sfc_controller_config_version: 2
-description: 3 nodes with 1 nic port, host-host vxlan mesh, vnf on each node
 
-system_parameters:
-  ipam_pools:
-    - name: vxlan_loopback_pool
-      network: 111.111.111.0/24
+    sfc_controller_config_version: 2
+    description: 3 node with 1 nic port, host-host vxlan mesh, vnf on each node
+    
+    system_parameters:
+      memif_directory: "/run/vpp" # a common folder where all vnf's and vswitches are mounted
 
-vnf_to_node_map:
-  - vnf: vnf1
-    node: vswitch1
-  - vnf: vnf2
-    node: vswitch1
-  - vnf: vnf3
-    node: vswitch1
+    ipam_pools:  # allocate internode vxlan mesh enpoints from a pool
+      - metadata:
+          name: vxlan_tunnel_pool
+          labels:
+        spec:
+          scope: system
+          network: 111.111.111.0/24
+          start_range: 1
+          end_range: 3
 
-nodes:
-  - name: vswitch1
-    node_type: host
-    interfaces:
-      - name: gigethernet13/1/1
-        if_type: ethernet
-        ip_addresses:
-          - "10.100.1.1/16"
-        custom_labels:
-          - vxlan
-      - name: gigethernet13/1/2
-        if_type: ethernet
-        ip_addresses:
-          - "10.100.1.2/16"
-        custom_labels:
-          - vxlan
+    network_pod_to_node_map:
+      - pod: vnf1
+        node: vswitch1
+      - pod: vnf2
+        node: vswitch1
+      - pod: vnf3
+        node: vswitch1
+        
+    network_nodes:
+      - metadata:
+          name: vswitch1
+        spec:
+          node_type: host
+          interfaces:
+            - name: GigabitEthernet0/8/1
+              if_type: ethernet
+              ip_addresses:
+                - "10.100.1.1/24"
+              labels:
+                - vxlan # outgoing i/f for static route from the vxlan loopback address to remote vxlan dest(s)
+      - metadata:
+          name: vswitch2
+        spec:
+          node_type: host
+          interfaces:
+            - name: GigabitEthernet0/8/2
+              if_type: ethernet
+              ip_addresses:
+                - "10.100.2.2/24"
+              labels:
+                - vxlan # outgoing i/f for static route from the vxlan loopback address to remote vxlan dest(s)
 
-  - name: vswitch2
-    node_type: host
-    interfaces:
-      - name: gigethernet13/2/1
-        if_type: ethernet
-        ip_addresses:
-          - "10.100.2.1/16"
-      - name: gigethernet13/2/2
-        if_type: ethernet
-        ip_addresses:
-          - "10.100.2.2/16"
-        custom_labels:
-          - vxlan
+      - metadata:
+          name: vswitch3
+        spec:
+          node_type: host
+          interfaces:
+            - name: GigabitEthernet0/8/3
+              if_type: ethernet
+              ip_addresses:
+                - "10.100.3.3/24"
+              labels:
+                - vxlan # outgoing i/f for static route from the vxlan loopback address to remote vxlan dest(s)
 
-  - name: vswitch3
-    node_type: host
-    interfaces:
-      - name: gigethernet13/3/1
-        if_type: ethernet
-        ip_addresses:
-          - "10.100.3.1/16"
-       
-vnf_services:
-  - name: service1
-    vnfs:
-      - name: vnf1
-        vnf_type: vppcontainer
-        interfaces:
-          - name: port1
-            if_type: memif
-          - name: port2
-            if_type: memif
-        forwarding:
-          - type: l2xc
-            l2xc_interfaces:
-                - port1
-                - port2   
-      - name: vnf2
-        node: vswitch2
-        vnf_type: vppcontainer
-        interfaces:
-          - name: port1
-            if_type: memif
-          - name: port2
-            if_type: memif
-        forwarding:
-          - type: l2xc
-            l2xc_interfaces:
-                - port1
-                - port2   
-      - name: vnf3
-        node: vswitch3
-        vnf_type: vppcontainer
-        interfaces:
-          - name: port1
-            if_type: memif
-          - name: port2
-            if_type: memif
-        forwarding:
-          - type: l2xc
-            l2xc_interfaces:
-                - port1
-                - port2
-    connections:
-      - conn_type: l2pp
-        vnf_service_mesh: inter_host_vxlan_mesh
-        interfaces:
-          - vnf: vnf1
-            interface: port2
-          - vnf: vnf2
-            interface: port1
-      - conn_type: l2pp
-        vnf_service_mesh: inter_host_vxlan_mesh
-        interfaces:
-          - vnf: vnf2
-            interface: port2
-          - vnf: vnf3
-            interface: port1
+    network_services:
+      - metadata:
+          name: my-network-service
+        spec:
+          network_pods:
+            - metadata:
+                name: vnf1
+              spec:
+                pod_type: vppcontainer
+                interfaces:
+                  - name: port1
+                    if_type: memif
+                  - name: port2
+                    if_type: memif
+            - metadata:
+                name: vnf2
+              spec:
+                pod_type: vppcontainer
+                interfaces:
+                  - name: port1
+                    if_type: memif
+                  - name: port2
+                    if_type: memif                    
+            - metadata:
+                name: vnf3
+              spec:
+                pod_type: vppcontainer
+                interfaces:
+                  - name: port1
+                    if_type: memif
+                  - name: port2
+                    if_type: memif                  
+          connections:
+            - conn_type: l2pp # l2x ports on same vnf
+              pod_interfaces:
+                - vnf1/port1
+                - vnf2/port2
+            - conn_type: l2pp
+              network_node_overlay_name: inter_node_vxlan_mesh
+              pod_interfaces:
+                - vnf1/port2
+                - vnf2/port1
+            - conn_type: l2pp # l2x ports on same vnf
+              pod_interfaces:
+                - vnf2/port1
+                - vnf2/port2                
+            - conn_type: l2pp
+              network_node_overlay_name: inter_node_vxlan_mesh
+              pod_interfaces:
+                - vnf2/port2
+                - vnf3/port1
+            - conn_type: l2pp # l2x ports on same vnf
+              pod_interfaces:
+                - vnf3/port1
+                - vnf3/port2                  
 
-vnf_service_meshs:
-  - name: inter_host_vxlan_mesh
-    service_mesh_type: mesh
-    connection_type: vxlan
-    vxlan_mesh_parms:
-      vni_range_start: 5000
-      vni_range_end: 5999
-      loopback_ipam_pool_name: vxlan_loopback_pool
-      outgoing_interface_label: vxlan
-
-
-
-```
-
-The vpp agent keys, and values are as follows::
-
-```
-curl http://0.0.0.0:9191/sfc-controller/v2/status/vpp-entries
-[
-  {
-    "VppKey": "/vnf-agent/vnf1/vpp/config/v1/interface/port2",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "port2",
-      "type": 2,
-      "mtu": 1500,
-      "memif": {
-        "id": 1,
-        "socket_filename": "/tmp/memif_vnf2.sock"
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vnf3/vpp/config/v1/interface/port1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "port1",
-      "type": 2,
-      "mtu": 1500,
-      "memif": {
-        "master": true,
-        "id": 2,
-        "socket_filename": "/tmp/memif_vnf3.sock"
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/interface/gigethernet13/2/1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/2/1",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.2.1/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vnf2/vpp/config/v1/interface/port2",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "port2",
-      "type": 2,
-      "mtu": 1500,
-      "memif": {
-        "id": 2,
-        "socket_filename": "/tmp/memif_vnf3.sock"
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch1/vpp/config/v1/interface/gigethernet13/1/2",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/1/2",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.1.2/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vnf2/vpp/config/v1/interface/port1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "port1",
-      "type": 2,
-      "mtu": 1500,
-      "memif": {
-        "master": true,
-        "id": 1,
-        "socket_filename": "/tmp/memif_vnf2.sock"
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/interface/gigethernet13/2/2",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/2/2",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.2.2/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch3/vpp/config/v1/interface/gigethernet13/3/1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/3/1",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.3.1/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch1/vpp/config/v1/interface/gigethernet13/1/1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/1/1",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.1.1/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  }
-]
+    network_node_overlays:
+      - metadata:
+          name:
+            inter_node_vxlan_mesh
+        spec:
+          service_mesh_type: mesh
+          connection_type: vxlan
+          vxlan_mesh_parms:
+            vni_range_start: 5000
+            vni_range_end: 5999
+            loopback_ipam_pool_name: vxlan_tunnel_pool
+            create_loopback_interface: true
+            create_loopback_static_routes: true
+            
 
 ```
 
-The etcd /sfc-controller subtree look like:
+The sfc-controller creates memif's on each of the specified ports in the network service.  As a hack
+for testing the datapath, the ports in the vnf can be wired together via L2 x-connects so data can
+be driven into the vnf1/port1, and easily traverse the pods to vnf3/port2.  The inter-pod connectivity
+is effected by the creation of memif's between the pods.  Note: if a direct memif is not desired and
+the vswitch is required to transport the traffic between the vnf's, the use the conn_method: vswitch
+in the yaml.  Also, if the if_type is veth or tap, then the connectivity will go through the vswitch.
 
-```
-
-/sfc-controller/v2/config/vnf-service-mesh/inter_host_vxlan_mesh
-{"name":"inter_host_vxlan_mesh","service_mesh_type":"mesh","connection_type":"vxlan","vxlan_mesh_parms":{"vni_range_start":5000,"vni_range_end":5999,"loopback_ipam_pool_name":"vxlan_loopback_pool","outgoing_interface_label":"vxlan"}}
-/sfc-controller/v2/config/node/vswitch1
-{"name":"vswitch1","node_type":"host","interfaces":[{"name":"gigethernet13/1/1","if_type":"ethernet","ip_addresses":["10.100.1.1/16"],"custom_labels":["vxlan"]},{"name":"gigethernet13/1/2","if_type":"ethernet","ip_addresses":["10.100.1.2/16"],"custom_labels":["vxlan"]}]}
-/sfc-controller/v2/config/node/vswitch2
-{"name":"vswitch2","node_type":"host","interfaces":[{"name":"gigethernet13/2/1","if_type":"ethernet","ip_addresses":["10.100.2.1/16"]},{"name":"gigethernet13/2/2","if_type":"ethernet","ip_addresses":["10.100.2.2/16"],"custom_labels":["vxlan"]}]}
-/sfc-controller/v2/config/node/vswitch3
-{"name":"vswitch3","node_type":"host","interfaces":[{"name":"gigethernet13/3/1","if_type":"ethernet","ip_addresses":["10.100.3.1/16"]}]}
-/sfc-controller/v2/config/system-parameters
-{"mtu":1500,"default_static_route_preference":5,"ipam_pools":[{"name":"vxlan_loopback_pool","network":"111.111.111.0/24"}]}
-/sfc-controller/v2/config/vnf-service/service1
-{"name":"service1","vnfs":[{"name":"vnf1","vnf_type":"vppcontainer","interfaces":[{"name":"port1","if_type":"memif"},{"name":"port2","if_type":"memif"}]},{"name":"vnf2","vnf_type":"vppcontainer","interfaces":[{"name":"port1","if_type":"memif"},{"name":"port2","if_type":"memif"}]},{"name":"vnf3","vnf_type":"vppcontainer","interfaces":[{"name":"port1","if_type":"memif"},{"name":"port2","if_type":"memif"}]}],"connections":[{"conn_type":"l2pp","vnf_service_mesh":"inter_host_vxlan_mesh","interfaces":[{"vnf":"vnf1","interface":"port2"},{"vnf":"vnf2","interface":"port1"}]},{"conn_type":"l2pp","vnf_service_mesh":"inter_host_vxlan_mesh","interfaces":[{"vnf":"vnf2","interface":"port2"},{"vnf":"vnf3","interface":"port1"}]}]}
-/sfc-controller/v2/config/vnf-to-node/vnf1
-{"vnf":"vnf1","node":"vswitch1"}
-/sfc-controller/v2/config/vnf-to-node/vnf2
-{"vnf":"vnf2","node":"vswitch1"}
-/sfc-controller/v2/config/vnf-to-node/vnf3
-{"vnf":"vnf3","node":"vswitch1"}
-/sfc-controller/v2/status/node/vswitch1
-{"name":"vswitch1","oper_status":"OperUp","msg":["OK"],"rendered_vpp_agent_entries":[{"vpp_agent_key":"/vnf-agent/vswitch1/vpp/config/v1/interface/gigethernet13/1/1","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch1/vpp/config/v1/interface/gigethernet13/1/2","vpp_agent_type":"interface"}]}
-/sfc-controller/v2/status/node/vswitch2
-{"name":"vswitch2","oper_status":"OperUp","msg":["OK"],"rendered_vpp_agent_entries":[{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/interface/gigethernet13/2/1","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/interface/gigethernet13/2/2","vpp_agent_type":"interface"}]}
-/sfc-controller/v2/status/node/vswitch3
-{"name":"vswitch3","oper_status":"OperUp","msg":["OK"],"rendered_vpp_agent_entries":[{"vpp_agent_key":"/vnf-agent/vswitch3/vpp/config/v1/interface/gigethernet13/3/1","vpp_agent_type":"interface"}]}
-/sfc-controller/v2/status/vnf-service/service1
-{"name":"service1","oper_status":"OperUp","msg":["OK"],"rendered_vpp_agent_entries":[{"vpp_agent_key":"/vnf-agent/vnf1/vpp/config/v1/interface/port2","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vnf2/vpp/config/v1/interface/port1","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vnf2/vpp/config/v1/interface/port2","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vnf3/vpp/config/v1/interface/port1","vpp_agent_type":"interface"}]}
-
-
-```
 
 ## VNF's on Three Different Hosts
 
@@ -360,575 +183,30 @@ The etcd /sfc-controller subtree look like:
 1. Send an HTTP POST curl command to the controller
 
 ```
-curl -X POST -d @- << EOF http://0.0.0.0:9191/sfc-controller/v2/config/vnf-to-node-map
+curl -X POST -d @- << EOF http://0.0.0.0:9191/sfc-controller/v2/config/network_pod_to_node_map
 [
   {
-    "vnf": "vnf1",
+    "pod": "vnf1",
     "node": "vswitch1"
   },
   {
-    "vnf": "vnf2",
+    "pod": "vnf2",
     "node": "vswitch2"
   },
   {
-    "vnf": "vnf3",
+    "pod": "vnf3",
     "node": "vswitch3"
   }
 ]
 EOF
 ```
 
-The vpp agent keys, and values are as follows::
-
-```
-
-curl http://0.0.0.0:9191/sfc-controller/v2/status/vpp-entries
-[
-  {
-    "VppKey": "/vnf-agent/vswitch1/vpp/config/v1/interface/IF_MEMIF_VSWITCH_vnf1_port2",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "IF_MEMIF_VSWITCH_vnf1_port2",
-      "type": 2,
-      "mtu": 1500,
-      "memif": {
-        "master": true,
-        "id": 9,
-        "socket_filename": "/tmp/memif_vswitch1.sock"
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch1/vpp/config/v1/interface/IF_VXLAN_vswitch1_vswitch2_CONN_0_VNI_5002",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "IF_VXLAN_vswitch1_vswitch2_CONN_0_VNI_5002",
-      "type": 5,
-      "vxlan": {
-        "src_address": "111.111.111.1",
-        "dst_address": "111.111.111.2",
-        "vni": 5002
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/vrf/0/fib/111.111.111.0/24/10.100.1.1",
-    "VppEntryType": "l3vrf",
-    "IFace": null,
-    "L2BD": null,
-    "L3Route": {
-      "description": "L3VRF_VXLAN Node:vswitch2 to Node:vswitch1",
-      "dst_ip_addr": "111.111.111.1/24",
-      "next_hop_addr": "10.100.1.1",
-      "outgoing_interface": "gigethernet13/2/2",
-      "preference": 5
-    },
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch1/vpp/config/v1/interface/gigethernet13/1/1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/1/1",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.1.1/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/interface/gigethernet13/2/1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/2/1",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.2.1/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch3/vpp/config/v1/interface/gigethernet13/3/1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/3/1",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.3.1/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vnf2/vpp/config/v1/interface/port2",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "port2",
-      "type": 2,
-      "mtu": 1500,
-      "memif": {
-        "id": 11,
-        "socket_filename": "/tmp/memif_vswitch2.sock"
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch3/vpp/config/v1/xconnect/IF_VXLAN_vswitch3_vswitch2_CONN_1_VNI_5003",
-    "VppEntryType": "l2xc",
-    "IFace": null,
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": {
-      "receive_interface": "IF_VXLAN_vswitch3_vswitch2_CONN_1_VNI_5003",
-      "transmit_interface": "IF_MEMIF_VSWITCH_vnf3_port1"
-    },
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/interface/IF_MEMIF_VSWITCH_vnf2_port1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "IF_MEMIF_VSWITCH_vnf2_port1",
-      "type": 2,
-      "mtu": 1500,
-      "memif": {
-        "master": true,
-        "id": 10,
-        "socket_filename": "/tmp/memif_vswitch2.sock"
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch1/vpp/config/v1/interface/gigethernet13/1/2",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/1/2",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.1.2/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/vrf/0/fib/111.111.111.0/24/10.100.1.2",
-    "VppEntryType": "l3vrf",
-    "IFace": null,
-    "L2BD": null,
-    "L3Route": {
-      "description": "L3VRF_VXLAN Node:vswitch2 to Node:vswitch1",
-      "dst_ip_addr": "111.111.111.1/24",
-      "next_hop_addr": "10.100.1.2",
-      "outgoing_interface": "gigethernet13/2/2",
-      "preference": 5
-    },
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vnf3/vpp/config/v1/interface/port1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "port1",
-      "type": 2,
-      "mtu": 1500,
-      "memif": {
-        "id": 12,
-        "socket_filename": "/tmp/memif_vswitch3.sock"
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch3/vpp/config/v1/interface/IF_VXLAN_vswitch3_vswitch2_CONN_1_VNI_5003",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "IF_VXLAN_vswitch3_vswitch2_CONN_1_VNI_5003",
-      "type": 5,
-      "vxlan": {
-        "src_address": "111.111.111.3",
-        "dst_address": "111.111.111.2",
-        "vni": 5003
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/interface/IF_MEMIF_VSWITCH_vnf2_port2",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "IF_MEMIF_VSWITCH_vnf2_port2",
-      "type": 2,
-      "mtu": 1500,
-      "memif": {
-        "master": true,
-        "id": 11,
-        "socket_filename": "/tmp/memif_vswitch2.sock"
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch3/vpp/config/v1/vrf/0/fib/111.111.111.0/24/10.100.2.2",
-    "VppEntryType": "l3vrf",
-    "IFace": null,
-    "L2BD": null,
-    "L3Route": {
-      "description": "L3VRF_VXLAN Node:vswitch3 to Node:vswitch2",
-      "dst_ip_addr": "111.111.111.2/24",
-      "next_hop_addr": "10.100.2.2",
-      "outgoing_interface": "gigethernet13/3/1",
-      "preference": 5
-    },
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vnf2/vpp/config/v1/interface/port1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "port1",
-      "type": 2,
-      "mtu": 1500,
-      "memif": {
-        "id": 10,
-        "socket_filename": "/tmp/memif_vswitch2.sock"
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch3/vpp/config/v1/xconnect/IF_MEMIF_VSWITCH_vnf3_port1",
-    "VppEntryType": "l2xc",
-    "IFace": null,
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": {
-      "receive_interface": "IF_MEMIF_VSWITCH_vnf3_port1",
-      "transmit_interface": "IF_VXLAN_vswitch3_vswitch2_CONN_1_VNI_5003"
-    },
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/interface/IF_VXLAN_vswitch2_vswitch1_CONN_0_VNI_5002",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "IF_VXLAN_vswitch2_vswitch1_CONN_0_VNI_5002",
-      "type": 5,
-      "vxlan": {
-        "src_address": "111.111.111.2",
-        "dst_address": "111.111.111.1",
-        "vni": 5002
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/xconnect/IF_MEMIF_VSWITCH_vnf2_port1",
-    "VppEntryType": "l2xc",
-    "IFace": null,
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": {
-      "receive_interface": "IF_MEMIF_VSWITCH_vnf2_port1",
-      "transmit_interface": "IF_VXLAN_vswitch2_vswitch1_CONN_0_VNI_5002"
-    },
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/interface/IF_VXLAN_vswitch2_vswitch3_CONN_1_VNI_5003",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "IF_VXLAN_vswitch2_vswitch3_CONN_1_VNI_5003",
-      "type": 5,
-      "vxlan": {
-        "src_address": "111.111.111.2",
-        "dst_address": "111.111.111.3",
-        "vni": 5003
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch1/vpp/config/v1/interface/IF_VXLAN_LOOPBACK_vswitch1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "IF_VXLAN_LOOPBACK_vswitch1",
-      "enabled": true,
-      "mtu": 1500,
-      "ip_addresses": [
-        "111.111.111.1/24"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/vrf/0/fib/111.111.111.0/24/10.100.3.1",
-    "VppEntryType": "l3vrf",
-    "IFace": null,
-    "L2BD": null,
-    "L3Route": {
-      "description": "L3VRF_VXLAN Node:vswitch2 to Node:vswitch3",
-      "dst_ip_addr": "111.111.111.3/24",
-      "next_hop_addr": "10.100.3.1",
-      "outgoing_interface": "gigethernet13/2/2",
-      "preference": 5
-    },
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/interface/IF_VXLAN_LOOPBACK_vswitch2",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "IF_VXLAN_LOOPBACK_vswitch2",
-      "enabled": true,
-      "mtu": 1500,
-      "ip_addresses": [
-        "111.111.111.2/24"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch1/vpp/config/v1/xconnect/IF_MEMIF_VSWITCH_vnf1_port2",
-    "VppEntryType": "l2xc",
-    "IFace": null,
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": {
-      "receive_interface": "IF_MEMIF_VSWITCH_vnf1_port2",
-      "transmit_interface": "IF_VXLAN_vswitch1_vswitch2_CONN_0_VNI_5002"
-    },
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/xconnect/IF_VXLAN_vswitch2_vswitch1_CONN_0_VNI_5002",
-    "VppEntryType": "l2xc",
-    "IFace": null,
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": {
-      "receive_interface": "IF_VXLAN_vswitch2_vswitch1_CONN_0_VNI_5002",
-      "transmit_interface": "IF_MEMIF_VSWITCH_vnf2_port1"
-    },
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/interface/gigethernet13/2/2",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/2/2",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.2.2/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch1/vpp/config/v1/vrf/0/fib/111.111.111.0/24/10.100.2.2",
-    "VppEntryType": "l3vrf",
-    "IFace": null,
-    "L2BD": null,
-    "L3Route": {
-      "description": "L3VRF_VXLAN Node:vswitch1 to Node:vswitch2",
-      "dst_ip_addr": "111.111.111.2/24",
-      "next_hop_addr": "10.100.2.2",
-      "outgoing_interface": "gigethernet13/1/2",
-      "preference": 5
-    },
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch3/vpp/config/v1/interface/IF_MEMIF_VSWITCH_vnf3_port1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "IF_MEMIF_VSWITCH_vnf3_port1",
-      "type": 2,
-      "mtu": 1500,
-      "memif": {
-        "master": true,
-        "id": 12,
-        "socket_filename": "/tmp/memif_vswitch3.sock"
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vnf1/vpp/config/v1/interface/port2",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "port2",
-      "type": 2,
-      "mtu": 1500,
-      "memif": {
-        "id": 9,
-        "socket_filename": "/tmp/memif_vswitch1.sock"
-      }
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/xconnect/IF_MEMIF_VSWITCH_vnf2_port2",
-    "VppEntryType": "l2xc",
-    "IFace": null,
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": {
-      "receive_interface": "IF_MEMIF_VSWITCH_vnf2_port2",
-      "transmit_interface": "IF_VXLAN_vswitch2_vswitch3_CONN_1_VNI_5003"
-    },
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/xconnect/IF_VXLAN_vswitch2_vswitch3_CONN_1_VNI_5003",
-    "VppEntryType": "l2xc",
-    "IFace": null,
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": {
-      "receive_interface": "IF_VXLAN_vswitch2_vswitch3_CONN_1_VNI_5003",
-      "transmit_interface": "IF_MEMIF_VSWITCH_vnf2_port2"
-    },
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch1/vpp/config/v1/xconnect/IF_VXLAN_vswitch1_vswitch2_CONN_0_VNI_5002",
-    "VppEntryType": "l2xc",
-    "IFace": null,
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": {
-      "receive_interface": "IF_VXLAN_vswitch1_vswitch2_CONN_0_VNI_5002",
-      "transmit_interface": "IF_MEMIF_VSWITCH_vnf1_port2"
-    },
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch3/vpp/config/v1/interface/IF_VXLAN_LOOPBACK_vswitch3",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "IF_VXLAN_LOOPBACK_vswitch3",
-      "enabled": true,
-      "mtu": 1500,
-      "ip_addresses": [
-        "111.111.111.3/24"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  }
-]
+The point to point traffic in this case will need to traverse hosts so a memif interface is created on the
+vswitch which pairs with the memif in the vnf, then a host to host vxlan tunnel is created.  An l2
+x-connect is made beween the vswitch memif to the vxlan vtep.  The "chain" is effectively formed by
+creating the series of intra-pod l2x connects, and inter-host vxlan tunnels.
 
 
-```
-
-The etcd /sfc-controller subtree look like:
-
-```
-
-/sfc-controller/v2/config/vnf-service-mesh/inter_host_vxlan_mesh
-{"name":"inter_host_vxlan_mesh","service_mesh_type":"mesh","connection_type":"vxlan","vxlan_mesh_parms":{"vni_range_start":5000,"vni_range_end":5999,"loopback_ipam_pool_name":"vxlan_loopback_pool","outgoing_interface_label":"vxlan"}}
-/sfc-controller/v2/config/node/vswitch1
-{"name":"vswitch1","node_type":"host","interfaces":[{"name":"gigethernet13/1/1","if_type":"ethernet","ip_addresses":["10.100.1.1/16"],"custom_labels":["vxlan"]},{"name":"gigethernet13/1/2","if_type":"ethernet","ip_addresses":["10.100.1.2/16"],"custom_labels":["vxlan"]}]}
-/sfc-controller/v2/config/node/vswitch2
-{"name":"vswitch2","node_type":"host","interfaces":[{"name":"gigethernet13/2/1","if_type":"ethernet","ip_addresses":["10.100.2.1/16"]},{"name":"gigethernet13/2/2","if_type":"ethernet","ip_addresses":["10.100.2.2/16"],"custom_labels":["vxlan"]}]}
-/sfc-controller/v2/config/node/vswitch3
-{"name":"vswitch3","node_type":"host","interfaces":[{"name":"gigethernet13/3/1","if_type":"ethernet","ip_addresses":["10.100.3.1/16"]}]}
-/sfc-controller/v2/config/system-parameters
-{"mtu":1500,"default_static_route_preference":5,"ipam_pools":[{"name":"vxlan_loopback_pool","network":"111.111.111.0/24"}]}
-/sfc-controller/v2/config/vnf-service/service1
-{"name":"service1","vnfs":[{"name":"vnf1","vnf_type":"vppcontainer","interfaces":[{"name":"port1","if_type":"memif"},{"name":"port2","if_type":"memif"}]},{"name":"vnf2","vnf_type":"vppcontainer","interfaces":[{"name":"port1","if_type":"memif"},{"name":"port2","if_type":"memif"}]},{"name":"vnf3","vnf_type":"vppcontainer","interfaces":[{"name":"port1","if_type":"memif"},{"name":"port2","if_type":"memif"}]}],"connections":[{"conn_type":"l2pp","vnf_service_mesh":"inter_host_vxlan_mesh","interfaces":[{"vnf":"vnf1","interface":"port2"},{"vnf":"vnf2","interface":"port1"}]},{"conn_type":"l2pp","vnf_service_mesh":"inter_host_vxlan_mesh","interfaces":[{"vnf":"vnf2","interface":"port2"},{"vnf":"vnf3","interface":"port1"}]}]}
-/sfc-controller/v2/config/vnf-to-node/vnf1
-{"vnf":"vnf1","node":"vswitch1"}
-/sfc-controller/v2/config/vnf-to-node/vnf2
-{"vnf":"vnf2","node":"vswitch2"}
-/sfc-controller/v2/config/vnf-to-node/vnf3
-{"vnf":"vnf3","node":"vswitch3"}
-/sfc-controller/v2/status/node/vswitch1
-{"name":"vswitch1","oper_status":"OperUp","msg":["OK"],"rendered_vpp_agent_entries":[{"vpp_agent_key":"/vnf-agent/vswitch1/vpp/config/v1/interface/gigethernet13/1/1","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch1/vpp/config/v1/interface/gigethernet13/1/2","vpp_agent_type":"interface"}]}
-/sfc-controller/v2/status/node/vswitch2
-{"name":"vswitch2","oper_status":"OperUp","msg":["OK"],"rendered_vpp_agent_entries":[{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/interface/gigethernet13/2/1","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/interface/gigethernet13/2/2","vpp_agent_type":"interface"}]}
-/sfc-controller/v2/status/node/vswitch3
-{"name":"vswitch3","oper_status":"OperUp","msg":["OK"],"rendered_vpp_agent_entries":[{"vpp_agent_key":"/vnf-agent/vswitch3/vpp/config/v1/interface/gigethernet13/3/1","vpp_agent_type":"interface"}]}
-/sfc-controller/v2/status/vnf-service/service1
-{"name":"service1","oper_status":"OperUp","msg":["OK"],"rendered_vpp_agent_entries":[{"vpp_agent_key":"/vnf-agent/vnf1/vpp/config/v1/interface/port2","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch1/vpp/config/v1/interface/IF_MEMIF_VSWITCH_vnf1_port2","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vnf2/vpp/config/v1/interface/port1","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/interface/IF_MEMIF_VSWITCH_vnf2_port1","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch1/vpp/config/v1/interface/IF_VXLAN_vswitch1_vswitch2_CONN_0_VNI_5000","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/interface/IF_VXLAN_vswitch2_vswitch1_CONN_0_VNI_5000","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch1/vpp/config/v1/xconnect/IF_MEMIF_VSWITCH_vnf1_port2","vpp_agent_type":"l2xc"},{"vpp_agent_key":"/vnf-agent/vswitch1/vpp/config/v1/xconnect/IF_VXLAN_vswitch1_vswitch2_CONN_0_VNI_5000","vpp_agent_type":"l2xc"},{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/xconnect/IF_MEMIF_VSWITCH_vnf2_port1","vpp_agent_type":"l2xc"},{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/xconnect/IF_VXLAN_vswitch2_vswitch1_CONN_0_VNI_5000","vpp_agent_type":"l2xc"},{"vpp_agent_key":"/vnf-agent/vnf2/vpp/config/v1/interface/port2","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/interface/IF_MEMIF_VSWITCH_vnf2_port2","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vnf3/vpp/config/v1/interface/port1","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch3/vpp/config/v1/interface/IF_MEMIF_VSWITCH_vnf3_port1","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/interface/IF_VXLAN_vswitch2_vswitch3_CONN_1_VNI_5001","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch3/vpp/config/v1/interface/IF_VXLAN_vswitch3_vswitch2_CONN_1_VNI_5001","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/xconnect/IF_MEMIF_VSWITCH_vnf2_port2","vpp_agent_type":"l2xc"},{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/xconnect/IF_VXLAN_vswitch2_vswitch3_CONN_1_VNI_5001","vpp_agent_type":"l2xc"},{"vpp_agent_key":"/vnf-agent/vswitch3/vpp/config/v1/xconnect/IF_MEMIF_VSWITCH_vnf3_port1","vpp_agent_type":"l2xc"},{"vpp_agent_key":"/vnf-agent/vswitch3/vpp/config/v1/xconnect/IF_VXLAN_vswitch3_vswitch2_CONN_1_VNI_5001","vpp_agent_type":"l2xc"}]}
-
-
-```
 
 ## VNF's not on any hosts
 
@@ -937,148 +215,22 @@ The etcd /sfc-controller subtree look like:
 1. Send an HTTP POST curl command to the controller
 
 ```
-
-curl -X POST -d @- << EOF http://0.0.0.0:9191/sfc-controller/v2/config/vnf-to-node-map
+curl -X POST -d @- << EOF http://0.0.0.0:9191/sfc-controller/v2/config/network_pod_to_node_map
 [
   {
-    "vnf": "vnf1"
+    "pod": "vnf1"
   },
   {
-    "vnf": "vnf2"
+    "pod": "vnf2"
   },
   {
-    "vnf": "vnf3"
+    "pod": "vnf3"
   }
 ]
 EOF
-
 ```
-
-The vpp agent keys, and values are as follows::
-
-```
-
-curl http://0.0.0.0:9191/sfc-controller/v2/status/vpp-entries
-[
-  {
-    "VppKey": "/vnf-agent/vswitch1/vpp/config/v1/interface/gigethernet13/1/1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/1/1",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.1.1/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/interface/gigethernet13/2/2",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/2/2",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.2.2/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch3/vpp/config/v1/interface/gigethernet13/3/1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/3/1",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.3.1/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch2/vpp/config/v1/interface/gigethernet13/2/1",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/2/1",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.2.1/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  },
-  {
-    "VppKey": "/vnf-agent/vswitch1/vpp/config/v1/interface/gigethernet13/1/2",
-    "VppEntryType": "interface",
-    "IFace": {
-      "name": "gigethernet13/1/2",
-      "type": 1,
-      "mtu": 1500,
-      "ip_addresses": [
-        "10.100.1.2/16"
-      ]
-    },
-    "L2BD": null,
-    "L3Route": null,
-    "XConn": null,
-    "LinuxIFace": null
-  }
-]
-
-
-```
-
-The etcd /sfc-controller subtree look like:
-
-```
-
-/sfc-controller/v2/config/vnf-service-mesh/inter_host_vxlan_mesh
-{"name":"inter_host_vxlan_mesh","service_mesh_type":"mesh","connection_type":"vxlan","vxlan_mesh_parms":{"vni_range_start":5000,"vni_range_end":5999,"loopback_ipam_pool_name":"vxlan_loopback_pool","outgoing_interface_label":"vxlan"}}
-/sfc-controller/v2/config/node/vswitch1
-{"name":"vswitch1","node_type":"host","interfaces":[{"name":"gigethernet13/1/1","if_type":"ethernet","ip_addresses":["10.100.1.1/16"],"custom_labels":["vxlan"]},{"name":"gigethernet13/1/2","if_type":"ethernet","ip_addresses":["10.100.1.2/16"],"custom_labels":["vxlan"]}]}
-/sfc-controller/v2/config/node/vswitch2
-{"name":"vswitch2","node_type":"host","interfaces":[{"name":"gigethernet13/2/1","if_type":"ethernet","ip_addresses":["10.100.2.1/16"]},{"name":"gigethernet13/2/2","if_type":"ethernet","ip_addresses":["10.100.2.2/16"],"custom_labels":["vxlan"]}]}
-/sfc-controller/v2/config/node/vswitch3
-{"name":"vswitch3","node_type":"host","interfaces":[{"name":"gigethernet13/3/1","if_type":"ethernet","ip_addresses":["10.100.3.1/16"]}]}
-/sfc-controller/v2/config/system-parameters
-{"mtu":1500,"default_static_route_preference":5,"ipam_pools":[{"name":"vxlan_loopback_pool","network":"111.111.111.0/24"}]}
-/sfc-controller/v2/config/vnf-service/service1
-{"name":"service1","vnfs":[{"name":"vnf1","vnf_type":"vppcontainer","interfaces":[{"name":"port1","if_type":"memif"},{"name":"port2","if_type":"memif"}]},{"name":"vnf2","vnf_type":"vppcontainer","interfaces":[{"name":"port1","if_type":"memif"},{"name":"port2","if_type":"memif"}]},{"name":"vnf3","vnf_type":"vppcontainer","interfaces":[{"name":"port1","if_type":"memif"},{"name":"port2","if_type":"memif"}]}],"connections":[{"conn_type":"l2pp","vnf_service_mesh":"inter_host_vxlan_mesh","interfaces":[{"vnf":"vnf1","interface":"port2"},{"vnf":"vnf2","interface":"port1"}]},{"conn_type":"l2pp","vnf_service_mesh":"inter_host_vxlan_mesh","interfaces":[{"vnf":"vnf2","interface":"port2"},{"vnf":"vnf3","interface":"port1"}]}]}
-/sfc-controller/v2/config/vnf-to-node/vnf1
-{"vnf":"vnf1"}
-/sfc-controller/v2/config/vnf-to-node/vnf2
-{"vnf":"vnf2"}
-/sfc-controller/v2/config/vnf-to-node/vnf3
-{"vnf":"vnf3"}
-/sfc-controller/v2/status/node/vswitch1
-{"name":"vswitch1","oper_status":"OperUp","msg":["OK"],"rendered_vpp_agent_entries":[{"vpp_agent_key":"/vnf-agent/vswitch1/vpp/config/v1/interface/gigethernet13/1/1","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch1/vpp/config/v1/interface/gigethernet13/1/2","vpp_agent_type":"interface"}]}
-/sfc-controller/v2/status/node/vswitch2
-{"name":"vswitch2","oper_status":"OperUp","msg":["OK"],"rendered_vpp_agent_entries":[{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/interface/gigethernet13/2/1","vpp_agent_type":"interface"},{"vpp_agent_key":"/vnf-agent/vswitch2/vpp/config/v1/interface/gigethernet13/2/2","vpp_agent_type":"interface"}]}
-/sfc-controller/v2/status/node/vswitch3
-{"name":"vswitch3","oper_status":"OperUp","msg":["OK"],"rendered_vpp_agent_entries":[{"vpp_agent_key":"/vnf-agent/vswitch3/vpp/config/v1/interface/gigethernet13/3/1","vpp_agent_type":"interface"}]}
-/sfc-controller/v2/status/vnf-service/service1
-{"name":"service1","oper_status":"OperDown","msg":["connection segment: vnf1/port2, vnf not associated with a host","connection segment: vnf1/port2, vnf references non existant host: ","connection segment: vnf2/port1, vnf not associated with a host","connection segment: vnf2/port1, vnf references non existant host: ","connection segment: vnf2/port2, vnf not associated with a host","connection segment: vnf2/port2, vnf references non existant host: ","connection segment: vnf3/port1, vnf not associated with a host","connection segment: vnf3/port1, vnf references non existant host: "]}
-
-
-```
-
+The sfc-controller cleans up the configuration in etcd, as it does not know where the vnf's
+are hosted.
 
 [0]: https://github.com/ligato/vpp-agent
 [1]: https://fd.io/

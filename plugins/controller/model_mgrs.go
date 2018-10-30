@@ -126,8 +126,9 @@ func (s *Plugin) ProcessOperationalMessages() {
 			isRenderingPending = true
 
 		case OperationalMsgOpCodeResyncContivNetworkPodMap:
-			s.NetworkPodNodeMapMgr.SyncNetworkPodToNodeMap()
-
+			if s.NetworkPodNodeMapMgr.SyncNetworkPodToNodeMap() {
+				isRenderingPending = true
+			}
 		}
 
 		if isRenderingEnabled && isRenderingPending {

@@ -84,7 +84,7 @@ func (ns *NetworkService) RenderConnMemifPair(
 		ctlrPlugin.SysParametersMgr.sysParmCache.MemifDirectory,
 		vppAgent)
 
-	vppKV.IFace.Vrf = conn.VrfId
+	//vppKV.IFace.Vrf = conn.VrfId
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
