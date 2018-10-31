@@ -7,7 +7,7 @@ Benefits of putting a VPP-based VNF (bascially, just VPP and the VPP Agent)
 into a container are:
  * simplified upgrades and bringup/shutdown, and better scaling  
  * Container-based VNFs are in essence data plane lightweight and reusable 
-   data plane microservices which can be used to build lrger systems and 
+   data plane microservices which can be used to build larger systems and 
    applications
  * supports container healing 
  
