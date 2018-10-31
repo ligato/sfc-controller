@@ -347,17 +347,18 @@ func (m *NetworkPod) GetSpec() *NetworkPodSpec {
 }
 
 type Connection struct {
-	ConnType               string   `protobuf:"bytes,1,opt,name=conn_type,proto3" json:"conn_type,omitempty"`
-	NetworkNodeOverlayName string   `protobuf:"bytes,2,opt,name=network_node_overlay_name,proto3" json:"network_node_overlay_name,omitempty"`
-	PodInterfaces          []string `protobuf:"bytes,3,rep,name=pod_interfaces" json:"pod_interfaces,omitempty"`
-	NodeInterfaces         []string `protobuf:"bytes,4,rep,name=node_interfaces" json:"node_interfaces,omitempty"`
-	NodeInterfaceLabels    []string `protobuf:"bytes,5,rep,name=node_interface_labels" json:"node_interface_labels,omitempty"`
-	UseNodeL2Bd            string   `protobuf:"bytes,6,opt,name=use_node_l2bd,proto3" json:"use_node_l2bd,omitempty"`
+	Name                   string   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	ConnType               string   `protobuf:"bytes,2,opt,name=conn_type,proto3" json:"conn_type,omitempty"`
+	NetworkNodeOverlayName string   `protobuf:"bytes,3,opt,name=network_node_overlay_name,proto3" json:"network_node_overlay_name,omitempty"`
+	PodInterfaces          []string `protobuf:"bytes,4,rep,name=pod_interfaces" json:"pod_interfaces,omitempty"`
+	NodeInterfaces         []string `protobuf:"bytes,5,rep,name=node_interfaces" json:"node_interfaces,omitempty"`
+	NodeInterfaceLabels    []string `protobuf:"bytes,6,rep,name=node_interface_labels" json:"node_interface_labels,omitempty"`
+	UseNodeL2Bd            string   `protobuf:"bytes,7,opt,name=use_node_l2bd,proto3" json:"use_node_l2bd,omitempty"`
 	// only for l2mp connections
-	L2Bd *L2BD `protobuf:"bytes,7,opt,name=l2bd" json:"l2bd,omitempty"`
+	L2Bd *L2BD `protobuf:"bytes,8,opt,name=l2bd" json:"l2bd,omitempty"`
 	// create a l2bd with default parms for l2mp connections
-	VrfId      uint32 `protobuf:"varint,8,opt,name=vrf_id,proto3" json:"vrf_id,omitempty"`
-	ConnMethod string `protobuf:"bytes,9,opt,name=conn_method,proto3" json:"conn_method,omitempty"`
+	VrfId      uint32 `protobuf:"varint,9,opt,name=vrf_id,proto3" json:"vrf_id,omitempty"`
+	ConnMethod string `protobuf:"bytes,10,opt,name=conn_method,proto3" json:"conn_method,omitempty"`
 }
 
 func (m *Connection) Reset()         { *m = Connection{} }
