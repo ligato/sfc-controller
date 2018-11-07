@@ -210,7 +210,7 @@ func (s *Plugin) AfterInit() error {
 	// at startup, "resolve" where the hosts are
 	ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeResyncContivNetworkPodMap, nil)
 
-	//s.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
+	s.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
 
 	s.StatusCheck.ReportStateChange(PluginID, statuscheck.OK, nil)
 
