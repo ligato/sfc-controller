@@ -83,7 +83,7 @@ endef
 # install-only binaries
 define install_only
         @echo "# installing sfc controller with plugins"
-        @go install
+        @go install ${LDFLAGS}
 
         if test "$(ETCDV3_CONFIG)" != "" ; then \
         echo "# Installing '$(ETCD_CONFIG_FILE)' to '$(ETCDV3_CONFIG)''..."; \
