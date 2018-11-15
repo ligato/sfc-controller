@@ -48,7 +48,7 @@ func (ns *NetworkService) RenderConnInterfacePair(
 	}
 
 	if err == nil {
-		if err := ns.renderInterfaceForwarding(netPodInterface); err != nil {
+		if err := ns.RenderInterfaceForwarding(netPodInterface); err != nil {
 			return "", nil, err
 		}
 	}
@@ -168,6 +168,10 @@ func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
 
+	if err = ns.RenderInterfaceForwarding(networkPodInterfaces[0]); err != nil {
+		return err
+	}
+
 	log.Debugf("RenderToplogyDirectInterVnfMemifPair: ifName0: %s/%s, %v",
 		connPodName0, connInterfaceName0, vppKV)
 
@@ -197,6 +201,10 @@ func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
+
+	if err = ns.RenderInterfaceForwarding(networkPodInterfaces[1]); err != nil {
+		return err
+	}
 
 	log.Debugf("RenderToplogyDirectInterVnfMemifPair: ifName1: %s/%s, %v",
 		connPodName1, connInterfaceName1, vppKV)
@@ -386,7 +394,7 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 }
 
 // each interface can have a set of fwd-ing instructions so render them against the interface
-func (ns *NetworkService) renderInterfaceForwarding(
+func (ns *NetworkService) RenderInterfaceForwarding(
 	networkPodInterface *controller.Interface) error {
 
 	log.Debugf("renderInterfaceForwarding: %v", networkPodInterface)
