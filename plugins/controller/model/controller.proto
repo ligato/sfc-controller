@@ -145,6 +145,12 @@ message Interface {
     repeated string labels = 13;
     string parent = 14; // internal field: could be a node or pod
     string host_port_label = 15;
+    message Forwarding {
+      repeated L3VRFRoute l3_vrf_route = 1;
+      repeated L3ArpEntry l3_arp = 2;
+      repeated L2FIBEntry l2_fib = 3;
+    }
+    Forwarding fwd = 16;
 }
 
 message NetworkPodSpec {

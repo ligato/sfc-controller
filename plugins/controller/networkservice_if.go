@@ -31,19 +31,29 @@ func (ns *NetworkService) RenderConnInterfacePair(
 	// The interface should be created in the vnf and the vswitch then the nsitch
 	// interfaces will be added to the bridge.
 
+	var ifName string
+	var ifStatus *controller.InterfaceStatus
+	var err error
+
 	switch netPodInterface.IfType {
 	case controller.IfTypeMemif:
-		return ns.RenderConnMemifPair(vppAgent, conn, netPodInterface, networkPodType)
+		ifName, ifStatus, err = ns.RenderConnMemifPair(vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeVeth:
-		return ns.RenderConnVethAfpPair(vppAgent, conn, netPodInterface, networkPodType)
+		ifName, ifStatus, err =  ns.RenderConnVethAfpPair(vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeTap:
-		return ns.RenderConnTapPair(vppAgent, conn, netPodInterface, networkPodType)
+		ifName, ifStatus, err =  ns.RenderConnTapPair(vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeEthernet:
 		// the ethernet interface is special and has been created by the node already
 		return netPodInterface.Name, nil, nil
 	}
 
-	return "", nil, nil
+	if err == nil {
+		if err := ns.renderInterfaceForwarding(netPodInterface); err != nil {
+			return "", nil, err
+		}
+	}
+
+	return ifName, ifStatus, err
 }
 
 // RenderConnMemifPair renders this vnf/vswitch interface pair
@@ -373,6 +383,47 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 		vppKV)
 
 	return ifName, ifStatus, nil
+}
+
+// each interface can have a set of fwd-ing instructions so render them against the interface
+func (ns *NetworkService) renderInterfaceForwarding(
+	networkPodInterface *controller.Interface) error {
+
+	log.Debugf("renderInterfaceForwarding: %v", networkPodInterface)
+
+	if 	networkPodInterface.Fwd == nil {
+		return nil
+	}
+
+	vppAgent := networkPodInterface.Parent
+
+	for _, l3Vrf := range networkPodInterface.Fwd.L3VrfRoute {
+		desc := fmt.Sprintf("FWD NS_%s_IF_%s_VRF_%d_DST_%s", ns.Metadata.Name,
+			networkPodInterface.Name, l3Vrf.VrfId, l3Vrf.DstIpAddr)
+		l3sr := &controller.L3VRFRoute{
+			VrfId:             l3Vrf.VrfId,
+			Description:       desc,
+			DstIpAddr:         l3Vrf.DstIpAddr,
+			OutgoingInterface: networkPodInterface.Name,
+		}
+		vppKV := vppagent.ConstructStaticRoute(vppAgent, l3sr)
+		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService + "/" + ns.Metadata.Name,
+			vppKV)
+	}
+	for _, l3Arp := range networkPodInterface.Fwd.L3Arp {
+		ae := &controller.L3ArpEntry{
+			IpAddress: l3Arp.IpAddress,
+			PhysAddress: l3Arp.PhysAddress,
+			OutgoingInterface: networkPodInterface.Name,
+		}
+		vppKV := vppagent.ConstructStaticArpEntry(vppAgent, ae)
+		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService + "/" + ns.Metadata.Name,
+			vppKV)
+	}
+
+	return nil
 }
 
 func stringFirstNLastM(n int, m int, str string) string {

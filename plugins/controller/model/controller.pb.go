@@ -255,6 +255,7 @@ type Interface struct {
 	Labels        []string              `protobuf:"bytes,13,rep,name=labels" json:"labels,omitempty"`
 	Parent        string                `protobuf:"bytes,14,opt,name=parent,proto3" json:"parent,omitempty"`
 	HostPortLabel string                `protobuf:"bytes,15,opt,name=host_port_label,proto3" json:"host_port_label,omitempty"`
+	Fwd           *Interface_Forwarding `protobuf:"bytes,16,opt,name=fwd" json:"fwd,omitempty"`
 }
 
 func (m *Interface) Reset()         { *m = Interface{} }
@@ -271,6 +272,13 @@ func (m *Interface) GetMemifParms() *Interface_MemIFParms {
 func (m *Interface) GetTapParms() *Interface_TapParms {
 	if m != nil {
 		return m.TapParms
+	}
+	return nil
+}
+
+func (m *Interface) GetFwd() *Interface_Forwarding {
+	if m != nil {
+		return m.Fwd
 	}
 	return nil
 }
@@ -298,6 +306,37 @@ type Interface_TapParms struct {
 func (m *Interface_TapParms) Reset()         { *m = Interface_TapParms{} }
 func (m *Interface_TapParms) String() string { return proto.CompactTextString(m) }
 func (*Interface_TapParms) ProtoMessage()    {}
+
+type Interface_Forwarding struct {
+	L3VrfRoute []*L3VRFRoute `protobuf:"bytes,1,rep,name=l3_vrf_route" json:"l3_vrf_route,omitempty"`
+	L3Arp      []*L3ArpEntry `protobuf:"bytes,2,rep,name=l3_arp" json:"l3_arp,omitempty"`
+	L2Fib      []*L2FIBEntry `protobuf:"bytes,3,rep,name=l2_fib" json:"l2_fib,omitempty"`
+}
+
+func (m *Interface_Forwarding) Reset()         { *m = Interface_Forwarding{} }
+func (m *Interface_Forwarding) String() string { return proto.CompactTextString(m) }
+func (*Interface_Forwarding) ProtoMessage()    {}
+
+func (m *Interface_Forwarding) GetL3VrfRoute() []*L3VRFRoute {
+	if m != nil {
+		return m.L3VrfRoute
+	}
+	return nil
+}
+
+func (m *Interface_Forwarding) GetL3Arp() []*L3ArpEntry {
+	if m != nil {
+		return m.L3Arp
+	}
+	return nil
+}
+
+func (m *Interface_Forwarding) GetL2Fib() []*L2FIBEntry {
+	if m != nil {
+		return m.L2Fib
+	}
+	return nil
+}
 
 type NetworkPodSpec struct {
 	PodType    string       `protobuf:"bytes,2,opt,name=pod_type,proto3" json:"pod_type,omitempty"`
