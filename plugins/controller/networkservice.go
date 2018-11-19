@@ -692,7 +692,7 @@ func (ns *NetworkService) RenderL2BD(
 	nodeName string,
 	l2bdIFs []*l2.BridgeDomains_BridgeDomain_Interfaces) error {
 
-	// if using an existing node txnLevel bridge, we simply add the i/f's to the bridge
+	// if using an existing node bridge, we simply add the i/f's to the bridge
 	if conn.UseNodeL2Bd != "" {
 
 		var nodeL2BD *l2.BridgeDomains_BridgeDomain
@@ -731,6 +731,44 @@ func (ns *NetworkService) RenderL2BD(
 			ModelTypeNetworkService+"/"+ns.Metadata.Name,
 			vppKV)
 	}
+	return nil
+}
+
+func (ns *NetworkService) RenderNetworkPodL2BD(
+	conn *controller.Connection,
+	connIndex uint32,
+	podName string,
+	l2bdIFs []*l2.BridgeDomains_BridgeDomain_Interfaces) error {
+
+	if conn.UseNodeL2Bd != "" {
+		msg := fmt.Sprintf("network-service/connIndex: %s/%d, cannot use a node/l2bd: %s for vnf=%s bridge",
+			ns.Metadata.Name, connIndex+1, conn.UseNodeL2Bd, podName)
+		ns.AppendStatusMsg(msg)
+		return fmt.Errorf(msg)
+
+	}
+
+
+	var bdParms *controller.BDParms
+	if conn.L2Bd != nil {
+		// need to create a bridge for this conn
+		if conn.L2Bd.L2BdTemplate != "" {
+			bdParms = ctlrPlugin.SysParametersMgr.FindL2BDTemplate(conn.L2Bd.L2BdTemplate)
+		} else {
+			bdParms = conn.L2Bd.BdParms
+		}
+	} else {
+		bdParms = ctlrPlugin.SysParametersMgr.GetDefaultSystemBDParms()
+	}
+	vppKV := vppagent.ConstructL2BD(
+		podName,
+		fmt.Sprintf("BD_%s_CONN_%d", ns.Metadata.Name, connIndex+1),
+		l2bdIFs,
+		bdParms)
+	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+		ModelTypeNetworkService+"/"+ns.Metadata.Name,
+		vppKV)
+
 	return nil
 }
 

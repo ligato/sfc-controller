@@ -156,7 +156,7 @@ message Interface {
 message NetworkPodSpec {
     string pod_type = 2; // vppcontainer|nonvppcontainer|vppvswitch
     repeated Interface interfaces = 3;
-    repeated L2BD l2bds = 4; // per vswitch default l2bds [optional]
+    repeated L2BD l2bds = 4; // per pod default l2bds [future]
 }
 
 message NetworkPod {
