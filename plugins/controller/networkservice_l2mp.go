@@ -33,9 +33,11 @@ func (ns *NetworkService) RenderConnL2MP(
 	netPodInterfaces := make([]*controller.Interface, 0)
 	networkPodTypes := make([]string, 0)
 
+	allInterfacesAssignedToSameVnf := true
 	allPodsAssignedToNodes := true
 	staticNodesInInterfacesSpecified := false
 	var nodeMap = make(map[string]bool, 0) // determine the set of nodes
+	var vnfMap = make(map[string]bool, 0) // determine the set of vnfs
 
 	log.Debugf("RenderConnL2MP: num pod interfaces: %d", len(conn.PodInterfaces))
 	log.Debugf("RenderConnL2MP: num node interfaces: %d", len(conn.NodeInterfaces))
@@ -74,6 +76,9 @@ func (ns *NetworkService) RenderConnL2MP(
 		netPodInterface.Parent = connPodName
 		netPodInterfaces = append(netPodInterfaces, netPodInterface)
 		networkPodTypes = append(networkPodTypes, networkPodType)
+
+		// now lets track which vnf's are involved
+		vnfMap[p2n.Pod] = true
 	}
 
 	for _, nodeInterface := range conn.NodeInterfaces {
@@ -91,6 +96,8 @@ func (ns *NetworkService) RenderConnL2MP(
 		staticNodesInInterfacesSpecified = true
 
 		nodeMap[connNodeName] = true // maintain a map of which nodes are in the conn set
+
+		allInterfacesAssignedToSameVnf = false
 	}
 
 	if !allPodsAssignedToNodes {
@@ -100,7 +107,8 @@ func (ns *NetworkService) RenderConnL2MP(
 		return fmt.Errorf(msg)
 	}
 
-	log.Debugf("RenderTopologyL2MP: num unique nodes for this connection: %d", len(nodeMap))
+	log.Debugf("RenderTopologyL2MP: num unique nodes/vnfs for this connection: %d/%d",
+		len(nodeMap), len(vnfMap))
 	// log.Debugf("RenderTopologyL2MP: p2n=%v, vnfI=%v, conn=%v", p2n, netPodInterfaces, conn)
 
 	// if an overlay is specified, see if it exists
@@ -120,6 +128,8 @@ func (ns *NetworkService) RenderConnL2MP(
 
 	if len(conn.NodeInterfaceLabels) != 0 {
 
+		allInterfacesAssignedToSameVnf = false
+
 		if len(nodeMap) == 0 {
 			msg := fmt.Sprintf("network service: %s, no interfaces specified to connect to node interface label",
 				ns.Metadata.Name)
@@ -128,7 +138,7 @@ func (ns *NetworkService) RenderConnL2MP(
 		}
 
 		if len(nodeMap) != 1 {
-			msg := fmt.Sprintf("network service: %s, all interfaces must be on smae node to connect to node interface label",
+			msg := fmt.Sprintf("network service: %s, all interfaces must be on same node to connect to node interface label",
 				ns.Metadata.Name)
 			ns.AppendStatusMsg(msg)
 			return fmt.Errorf(msg)
@@ -153,6 +163,13 @@ func (ns *NetworkService) RenderConnL2MP(
 		for _, nodeIfType := range nodeIfTypes {
 			networkPodTypes = append(networkPodTypes, nodeIfType)
 		}
+	}
+
+	// special case where need to create a bridge in the vnf
+	if len(vnfMap) == 1 && allInterfacesAssignedToSameVnf {
+		log.Debugf("RenderTopologyL2MP: render a bridge in the vnf")
+		return ns.renderConnL2MPSameVnf(conn, connIndex, netPodInterfaces,
+			nno, p2nArray, networkPodTypes)
 	}
 
 	// see if the networkPods are on the same node ...
@@ -298,4 +315,33 @@ func (ns *NetworkService) renderConnL2MPInterNode(
 	}
 
 	return nil
+}
+
+// renderConnL2MPSameVnf bridge the l2mp interfaces on this vnf
+func (ns *NetworkService) renderConnL2MPSameVnf(
+	conn *controller.Connection,
+	connIndex uint32,
+	netPodInterfaces []*controller.Interface,
+	nno *NetworkNodeOverlay,
+	p2nArray []NetworkPodToNodeMap,
+	networkPodTypes []string) error {
+
+	// The interfaces should be created in the vnf and the vswitch then the vswitch
+	// interfaces will be added to the bridge.
+
+	var l2bdIFs = make(map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces, 0)
+
+	podName := p2nArray[0].Pod
+
+	for i := 0; i < len(netPodInterfaces); i++ {
+
+		l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+			Name: netPodInterfaces[i].Name,
+			BridgedVirtualInterface: false,
+		}
+		l2bdIFs[podName] = append(l2bdIFs[podName], l2bdIF)
+	}
+
+	// associate the local vnf interfaces with the vnf bridge
+	return ns.RenderNetworkPodL2BD(conn, connIndex, podName, l2bdIFs[podName])
 }
