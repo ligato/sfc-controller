@@ -107,7 +107,8 @@ func (ns *NetworkService) RenderConnL2MP(
 		return fmt.Errorf(msg)
 	}
 
-	log.Debugf("RenderTopologyL2MP: num unique nodes for this connection: %d", len(nodeMap))
+	log.Debugf("RenderTopologyL2MP: num unique nodes/vnfs for this connection: %d/%d",
+		len(nodeMap), len(vnfMap))
 	// log.Debugf("RenderTopologyL2MP: p2n=%v, vnfI=%v, conn=%v", p2n, netPodInterfaces, conn)
 
 	// if an overlay is specified, see if it exists
@@ -166,6 +167,7 @@ func (ns *NetworkService) RenderConnL2MP(
 
 	// special case where need to create a bridge in the vnf
 	if len(vnfMap) == 1 && allInterfacesAssignedToSameVnf {
+		log.Debugf("RenderTopologyL2MP: render a bridge in the vnf")
 		return ns.renderConnL2MPSameVnf(conn, connIndex, netPodInterfaces,
 			nno, p2nArray, networkPodTypes)
 	}

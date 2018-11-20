@@ -412,6 +412,7 @@ func (ns *NetworkService) RenderInterfaceForwarding(
 			VrfId:             l3Vrf.VrfId,
 			Description:       desc,
 			DstIpAddr:         l3Vrf.DstIpAddr,
+			NextHopAddr:       l3Vrf.NextHopAddr,
 			OutgoingInterface: networkPodInterface.Name,
 		}
 		vppKV := vppagent.ConstructStaticRoute(vppAgent, l3sr)
