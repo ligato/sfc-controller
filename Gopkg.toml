@@ -31,7 +31,7 @@
 
 [[constraint]]
   name = "github.com/gogo/protobuf"
-  version = "0.5.0"
+  version = "1.1.1"
 
 [[constraint]]
   branch = "master"
@@ -42,12 +42,12 @@
   version = "1.6.1"
 
 [[constraint]]
-  name = "github.com/ligato/vpp-agent"
-  revision = "5fc188c8d9e0ce7ed2898ff2db940864013d7c48"
+  branch = "master"
+  name = "github.com/ligato/cn-infra"
 
 [[constraint]]
-  name = "github.com/ligato/cn-infra"
-  revision = "98e10610edaf49aa2ca14c97302bc252cd6fdb63"
+  name = "github.com/ligato/vpp-agent"
+  branch = "pantheon-dev"
 
 [[constraint]]
   name = "github.com/namsral/flag"
@@ -67,7 +67,7 @@
 
 [[override]]
   name = "google.golang.org/grpc"
-  revision = "8050b9cbc271307e5a716a9d782803d09b0d6f2d"
+  version = "1.14.0"
 
 [[constraint]]
   name = "k8s.io/api"

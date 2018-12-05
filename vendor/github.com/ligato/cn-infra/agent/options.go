@@ -29,6 +29,9 @@ var (
 	DefaultStartTimeout = time.Second * 15
 	// DefaultStopTimeout is default timeout for stopping agent
 	DefaultStopTimeout = time.Second * 5
+
+	// DumpStackTraceOnTimeout prints stack trace on timeout or agent start/stop
+	DumpStackTraceOnTimeout = true
 )
 
 // Options specifies option list for the Agent
@@ -121,23 +124,23 @@ func Plugins(plugins ...infra.Plugin) Option {
 // plugins recursively to the Agent's plugin list.
 func AllPlugins(plugins ...infra.Plugin) Option {
 	return func(o *Options) {
-		agentLogger.Debugf("AllPlugins with %d plugins", len(plugins))
+		infraLogger.Debugf("AllPlugins with %d plugins", len(plugins))
 
 		for _, plugin := range plugins {
 			typ := reflect.TypeOf(plugin)
-			agentLogger.Debugf("searching for all deps in: %v (type: %v)", plugin, typ)
+			infraLogger.Debugf("searching for all deps in: %v (type: %v)", plugin, typ)
 
 			foundPlugins, err := findPlugins(reflect.ValueOf(plugin), o.pluginMap)
 			if err != nil {
 				panic(err)
 			}
 
-			agentLogger.Debugf("found %d plugins in: %v (type: %v)", len(foundPlugins), plugin, typ)
+			infraLogger.Debugf("found %d plugins in: %v (type: %v)", len(foundPlugins), plugin, typ)
 			for _, plug := range foundPlugins {
-				agentLogger.Debugf(" - plugin: %v (%v)", plug, reflect.TypeOf(plug))
+				infraLogger.Debugf(" - plugin: %v (%v)", plug, reflect.TypeOf(plug))
 
 				if _, ok := o.pluginNames[plug.String()]; ok {
-					agentLogger.Fatalf("plugin with name %q already registered", plug.String())
+					infraLogger.Fatalf("plugin with name %q already registered", plug.String())
 				}
 				o.pluginNames[plug.String()] = struct{}{}
 			}
@@ -150,7 +153,7 @@ func AllPlugins(plugins ...infra.Plugin) Option {
 			}*/
 
 			if _, ok := o.pluginNames[plugin.String()]; ok {
-				agentLogger.Fatalf("plugin with name %q already registered, custom name should be used", plugin.String())
+				infraLogger.Fatalf("plugin with name %q already registered, custom name should be used", plugin.String())
 			}
 			o.pluginNames[plugin.String()] = struct{}{}
 			o.Plugins = append(o.Plugins, plugin)
