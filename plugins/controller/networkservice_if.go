@@ -335,6 +335,7 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 		networkPodInterface.AdminStatus,
 		host1Name,
 		veth2Name,
+		networkPodInterface.LinuxNamespace,
 		connPodName)
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
@@ -350,6 +351,7 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 		networkPodInterface.AdminStatus,
 		host2Name,
 		veth1Name,
+		networkPodInterface.LinuxNamespace,
 		vppAgent)
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,

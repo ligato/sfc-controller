@@ -1,7 +1,7 @@
 package datasync
 
 import (
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 )
 
 // Op represents datasync operations.
@@ -11,7 +11,7 @@ const (
 	// Put represents Create or Update operation.
 	Put Op = "Put"
 	// Delete operation
-	Delete = "Delete"
+	Delete Op = "Delete"
 )
 
 // ChangeEvent is used to define the data type for the change channel

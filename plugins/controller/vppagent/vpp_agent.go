@@ -523,7 +523,10 @@ func ConstructVEthInterface(vppAgent string,
 	adminStatus string,
 	hostIfName string,
 	peerIfName string,
+	linuxNamespace *controller.Interface_LinuxNamespace,
 	vnfName string) *KVType {
+
+	ns := &linuxIntf.LinuxInterfaces_Interface_Namespace{}
 
 	iface := &linuxIntf.LinuxInterfaces_Interface{
 		Name:        ifname,
@@ -533,14 +536,31 @@ func ConstructVEthInterface(vppAgent string,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
 		HostIfName:  hostIfName,
-		Namespace: &linuxIntf.LinuxInterfaces_Interface_Namespace{
-			Type:         linuxIntf.LinuxInterfaces_Interface_Namespace_MICROSERVICE_REF_NS,
-			Microservice: vnfName,
-		},
 		Veth: &linuxIntf.LinuxInterfaces_Interface_Veth{
 			PeerIfName: peerIfName,
 		},
 	}
+
+	if linuxNamespace == nil {
+		ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_MICROSERVICE_REF_NS
+		ns.Microservice = vnfName
+	} else {
+		switch linuxNamespace.Type {
+		case controller.LinuxNamespaceMICROSERVICE:
+			ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_MICROSERVICE_REF_NS
+			ns.Microservice = linuxNamespace.Microservice
+		case controller.LinuxNamespaceNAMED:
+			ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_NAMED_NS
+			ns.Name = linuxNamespace.Name
+		case controller.LinuxNamespacePID:
+			ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_PID_REF_NS
+			ns.Pid = linuxNamespace.Pid
+		case controller.LinuxNamespaceFILE:
+			ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_FILE_REF_NS
+			ns.Filepath = linuxNamespace.Filepath
+		}
+	}
+	iface.Namespace = ns
 
 	key := LinuxInterfaceKey(vppAgent, iface.Name)
 

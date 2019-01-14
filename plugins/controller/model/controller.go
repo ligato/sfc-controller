@@ -68,4 +68,9 @@ const (
 	IPAMPoolScopeSystem         = "system"
 	IPAMPoolScopeNode           = "node"
 	IPAMPoolScopeNetworkService = "network_service"
+
+	LinuxNamespacePID          = "pid"          /* Attach to namespace of a given process. */
+	LinuxNamespaceMICROSERVICE = "microservice" /* Attach to namespace of a docker container running given microservice. */
+	LinuxNamespaceNAMED        = "named"        /* Attach to named namespace. */
+	LinuxNamespaceFILE         = "file"         /* Attach to namespace referenced by a file handle.*/
 )

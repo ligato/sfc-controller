@@ -18,7 +18,7 @@
   version = "v0.4.1"
 
 [[projects]]
-  digest = "1:78c50fbac6adb72e7b55afeb23390e8c5fdfb2983ad42240e549cc25bc8486a8"
+  digest = "1:7ae4616edd396840ccc1506d287211ef883d3e93604dde0c9d1dd5721bb449d5"
   name = "github.com/coreos/etcd"
   packages = [
     "auth/authpb",
@@ -28,10 +28,11 @@
     "etcdserver/etcdserverpb",
     "mvcc/mvccpb",
     "pkg/tlsutil",
+    "pkg/types",
   ]
   pruneopts = "UT"
-  revision = "66722b1ada68fcd5227db853ee92003169a975c8"
-  version = "v3.2.0"
+  revision = "27fc7e2296f506182f58ce846e48f36b34fe6842"
+  version = "v3.3.10"
 
 [[projects]]
   digest = "1:ffe9824d294da03b391f44e1ae8281281b4afc1bdaa9588c9097785e3af10cec"
@@ -40,6 +41,14 @@
   pruneopts = "UT"
   revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
   version = "v1.1.1"
+
+[[projects]]
+  digest = "1:76dc72490af7174349349838f2fe118996381b31ea83243812a97e5a0fd5ed55"
+  name = "github.com/dgrijalva/jwt-go"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "06ea1031745cb8b3dab3f6a236daf2b0aa468b7e"
+  version = "v3.2.0"
 
 [[projects]]
   digest = "1:ad7ffa16c33f19ee2c17bce7ee865f5632cdc90d908aa313849900ecb3f722df"
@@ -66,15 +75,40 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:b7a8552c62868d867795b63eaf4f45d3e92d36db82b428e680b9c95a8c33e5b1"
+  digest = "1:f5b1f9c83fa452427436313861548b8bcea56dc30f384921400e6f5973c31057"
   name = "github.com/gogo/protobuf"
   packages = [
+    "gogoproto",
+    "plugin/compare",
+    "plugin/defaultcheck",
+    "plugin/description",
+    "plugin/embedcheck",
+    "plugin/enumstringer",
+    "plugin/equal",
+    "plugin/face",
+    "plugin/gostring",
+    "plugin/marshalto",
+    "plugin/oneofcheck",
+    "plugin/populate",
+    "plugin/size",
+    "plugin/stringer",
+    "plugin/testgen",
+    "plugin/union",
+    "plugin/unmarshal",
     "proto",
+    "protoc-gen-gogo",
+    "protoc-gen-gogo/descriptor",
+    "protoc-gen-gogo/generator",
+    "protoc-gen-gogo/generator/internal/remap",
+    "protoc-gen-gogo/grpc",
+    "protoc-gen-gogo/plugin",
     "sortkeys",
+    "vanity",
+    "vanity/command",
   ]
   pruneopts = "UT"
-  revision = "342cbe0a04158f6dcb03ca0079991a51a4248c02"
-  version = "v0.5"
+  revision = "4cbf7e384e768b4e01799441fdf2a706a5635ae7"
+  version = "v1.2.0"
 
 [[projects]]
   branch = "master"
@@ -189,7 +223,8 @@
   version = "1.1.5"
 
 [[projects]]
-  digest = "1:74a8c0e907f35ee0972a6d08d21b548a7208aadcb74185f1d6de083297e5383e"
+  branch = "master"
+  digest = "1:fe42f564914da2ea034a9e86a5f167f9c47ffc5da61360f0c9663676633d2880"
   name = "github.com/ligato/cn-infra"
   packages = [
     "agent",
@@ -206,18 +241,22 @@
     "logging",
     "logging/logmanager",
     "logging/logrus",
+    "logging/measure",
+    "logging/measure/model/apitrace",
     "rpc/prometheus",
     "rpc/rest",
+    "rpc/rest/security",
+    "rpc/rest/security/model/access-security",
     "servicelabel",
     "utils/addrs",
     "utils/once",
     "utils/safeclose",
   ]
   pruneopts = "UT"
-  revision = "98e10610edaf49aa2ca14c97302bc252cd6fdb63"
+  revision = "f597195a15762fa2bb1ce5bfdd875ec96c63d153"
 
 [[projects]]
-  digest = "1:7d2a49132f52997f2ac3ddf33e31ac434def61c0c8044ada12de30ffdc5e7cc2"
+  digest = "1:31660355a8b640c17c81dfd817de5f247f587763a2985596d89574b087b11b66"
   name = "github.com/ligato/vpp-agent"
   packages = [
     "plugins/linux/model/interfaces",
@@ -226,7 +265,7 @@
     "plugins/vpp/model/l3",
   ]
   pruneopts = "UT"
-  revision = "5fc188c8d9e0ce7ed2898ff2db940864013d7c48"
+  revision = "b325ab3e9252277b1fd6d69f0a6d134cc21bd33a"
 
 [[projects]]
   digest = "1:ff5ebae34cfbf047d505ee150de27e60570e8c394b3b8fdbb720ff6ac71985fc"
@@ -283,6 +322,14 @@
   pruneopts = "UT"
   revision = "bb6d471dc95d4fe11e432687f8b70ff496cf3136"
   version = "v1.0.0"
+
+[[projects]]
+  digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
 
 [[projects]]
   digest = "1:d14a5f4bfecf017cb780bdde1b6483e5deb87e12c332544d2c430eda58734bcb"
@@ -373,9 +420,13 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3f3a05ae0b95893d90b9b3b5afdb79a9b3d96e4e36e099d841ae602e4aca0da8"
+  digest = "1:001a4e7a40e50ff2ef32e2556bca50c4f77daa457db3ac6afc8bea9bb2122cfb"
   name = "golang.org/x/crypto"
-  packages = ["ssh/terminal"]
+  packages = [
+    "bcrypt",
+    "blowfish",
+    "ssh/terminal",
+  ]
   pruneopts = "UT"
   revision = "614d502a4dac94afa3a6ce146bd1736da82514c6"
 
@@ -438,24 +489,53 @@
   revision = "fbb02b2291d28baffd63558aa44b4b56f178d650"
 
 [[projects]]
-  digest = "1:2b235a29dd809925b0149f8625d9b9f8dcb92fdb6f1f661ac6188e419098cd96"
+  branch = "master"
+  digest = "1:077c1c599507b3b3e9156d17d36e1e61928ee9b53a5b420f10f28ebd4a0b275c"
+  name = "google.golang.org/genproto"
+  packages = ["googleapis/rpc/status"]
+  pruneopts = "UT"
+  revision = "bd9b4fb69e2ffd37621a6caa54dcbead29b546f2"
+
+[[projects]]
+  digest = "1:8f56475624fb72854d06ca16c2f7032e3cea14a63074e9c199ba8d46431c1127"
   name = "google.golang.org/grpc"
   packages = [
     ".",
+    "balancer",
+    "balancer/base",
+    "balancer/roundrobin",
+    "binarylog/grpc_binarylog_v1",
     "codes",
+    "connectivity",
     "credentials",
+    "credentials/internal",
+    "encoding",
+    "encoding/proto",
     "grpclog",
+    "health/grpc_health_v1",
     "internal",
+    "internal/backoff",
+    "internal/binarylog",
+    "internal/channelz",
+    "internal/envconfig",
+    "internal/grpcrand",
+    "internal/grpcsync",
+    "internal/syscall",
+    "internal/transport",
     "keepalive",
     "metadata",
     "naming",
     "peer",
+    "resolver",
+    "resolver/dns",
+    "resolver/passthrough",
     "stats",
+    "status",
     "tap",
-    "transport",
   ]
   pruneopts = "UT"
-  revision = "8050b9cbc271307e5a716a9d782803d09b0d6f2d"
+  revision = "df014850f6dee74ba2fc94874043a9f3f75fbfd8"
+  version = "v1.17.0"
 
 [[projects]]
   digest = "1:2d1fbdc6777e5408cabeb02bf336305e724b925ff4546ded0fa8715a7267922a"
@@ -723,6 +803,7 @@
   input-imports = [
     "github.com/ghodss/yaml",
     "github.com/gogo/protobuf/proto",
+    "github.com/gogo/protobuf/protoc-gen-gogo",
     "github.com/golang/glog",
     "github.com/golang/protobuf/proto",
     "github.com/gorilla/mux",

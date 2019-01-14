@@ -24,18 +24,26 @@
 #   go-tests = true
 #   unused-packages = true
 
+required = [
+    "github.com/gogo/protobuf/protoc-gen-gogo"
+]
+
+[[override]]
+  name = "github.com/coreos/etcd"
+  version = "=3.3.10"
 
 [[constraint]]
   name = "github.com/ghodss/yaml"
   version = "1.0.0"
 
 [[constraint]]
-  name = "github.com/gogo/protobuf"
-  version = "0.5.0"
+  name = "github.com/golang/protobuf"
+  branch = "master"
 
 [[constraint]]
-  branch = "master"
-  name = "github.com/golang/protobuf"
+  name = "github.com/gogo/protobuf"
+  version = "1.1.1"
+
 
 [[constraint]]
   name = "github.com/gorilla/mux"
@@ -43,11 +51,12 @@
 
 [[constraint]]
   name = "github.com/ligato/vpp-agent"
-  revision = "5fc188c8d9e0ce7ed2898ff2db940864013d7c48"
+  revision = "b325ab3e9252277b1fd6d69f0a6d134cc21bd33a"
 
 [[constraint]]
   name = "github.com/ligato/cn-infra"
-  revision = "98e10610edaf49aa2ca14c97302bc252cd6fdb63"
+  branch = "master"
+
 
 [[constraint]]
   name = "github.com/namsral/flag"
@@ -65,9 +74,9 @@
   name = "golang.org/x/crypto"
   source = "https://github.com/golang/crypto.git"
 
-[[override]]
+[[constraint]]
   name = "google.golang.org/grpc"
-  revision = "8050b9cbc271307e5a716a9d782803d09b0d6f2d"
+  version = "1.2.1"
 
 [[constraint]]
   name = "k8s.io/api"
