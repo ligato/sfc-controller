@@ -19,7 +19,7 @@ import (
 
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
 )
 
 // renderConnL2MPVxlanMesh renders these L2MP tunnels between nodes
@@ -31,7 +31,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 	p2nArray []NetworkPodToNodeMap,
 	vnfTypes []string,
 	nodeMap map[string]bool,
-	l2bdIFs map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces) error {
+	l2bdIFs map[string][]*l2.BridgeDomain_Interface) error {
 
 	// The nodeMap contains the set of nodes involved in the l2mp connection.  There
 	// must be a vxlan mesh created between the nodes.  On each node, the vnf interfaces
@@ -102,7 +102,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 				ModelTypeNetworkService+"/"+ns.Metadata.Name,
 				vppKV)
 
-			l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+			l2bdIF := &l2.BridgeDomain_Interface{
 				Name: ifName,
 				BridgedVirtualInterface: false,
 				SplitHorizonGroup:       1,
@@ -251,7 +251,7 @@ func (nno *NetworkNodeOverlay) renderConnL3PPVxlanMesh(
 	ifStatuses [2]*controller.InterfaceStatus,
 	p2nArray [2]NetworkPodToNodeMap,
 	xconn [2][2]string,
-	l2bdIFs map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces) error {
+	l2bdIFs map[string][]*l2.BridgeDomain_Interface) error {
 
 	// create the vxlan endpoints
 	vniAllocator, exists := ctlrPlugin.NetworkNodeOverlayMgr.vniAllocators[nno.Metadata.Name]
@@ -382,7 +382,7 @@ func (nno *NetworkNodeOverlay) renderConnL3MPVxlanMesh(
 	vnfTypes []string,
 	nodeMap map[string]bool,
 	l3vrfs map[string][]*controller.L3VRFRoute,
-	l2bdIFs map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces) error {
+	l2bdIFs map[string][]*l2.BridgeDomain_Interface) error {
 
 	// The nodeMap contains the set of nodes involved in the l2mp connection.  There
 	// must be a vxlan mesh created between the nodes.
@@ -485,7 +485,7 @@ func (nno *NetworkNodeOverlay) renderConnL3MPVxlanMesh(
 					vppKV)
 			}
 
-			l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+			l2bdIF := &l2.BridgeDomain_Interface{
 				Name: ifName,
 				BridgedVirtualInterface: false,
 				SplitHorizonGroup:       1,

@@ -18,10 +18,10 @@ import (
 	"net"
 	"strings"
 
-	linux "github.com/ligato/vpp-agent/plugins/linux/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l3"
+	linux "github.com/ligato/vpp-agent/plugins/linuxv2/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/l3"
 )
 
 // this must match what utils the vpp-agent uses
@@ -68,7 +68,7 @@ func LinuxInterfaceKey(vppLabel string, ifaceLabel string) string {
 
 // LinuxInterfacePrefixKey constructs Linux interface prefix db key
 func LinuxInterfacePrefixKey(vppLabel string) string {
-	return agentPrefix + vppLabel + "/" + linux.InterfaceKeyPrefix()
+	return agentPrefix + vppLabel + "/" + linux.InterfaceKeyPrefix
 }
 
 // L2BridgeDomainKey constructs L2 bridge domain db key
@@ -78,7 +78,7 @@ func L2BridgeDomainKey(vppLabel string, bdName string) string {
 
 // L2BridgeDomainKeyPrefix constructs L2 bridge domain db key prefix
 func L2BridgeDomainKeyPrefix(vppLabel string) string {
-	return agentPrefix + vppLabel + "/" + l2.BdPrefix
+	return agentPrefix + vppLabel + "/" + l2.BDPrefix
 }
 
 // L2XConnectKey constructs L2 XConnect db key
@@ -86,11 +86,11 @@ func L2XConnectKey(vppLabel string, rxIf string) string {
 	return agentPrefix + vppLabel + "/" + l2.XConnectKey(rxIf)
 }
 
-// L3RouteKeyPrefix constructs L3 route db key prefix
-func L3RouteKeyPrefix(vppLabel string) string {
-	//return agentPrefix + vppLabel + "/" + l3.RouteKeyPrefix()
-	return agentPrefix + vppLabel + "/" + l3.VrfPrefix
-}
+//// L3RouteKeyPrefix constructs L3 route db key prefix
+//func L3RouteKeyPrefix(vppLabel string) string {
+//	//return agentPrefix + vppLabel + "/" + l3.RouteKeyPrefix()
+//	return agentPrefix + vppLabel + "/" + l3.VRFPrefix
+//}
 
 // L3RouteKey constructs L3 route db key
 func L3RouteKey(vppLabel string, vrf uint32, destNet *net.IPNet, nextHop string) string {

@@ -22,14 +22,14 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/sfc-controller/plugins/controller/database"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
 	"github.com/unrolled/render"
 )
 
@@ -548,7 +548,7 @@ func (mgr *NetworkNodeMgr) FindL2BDForNode(nodeName string, l2bdName string) *co
 
 // FindVppL2BDForNode by name
 func (mgr *NetworkNodeMgr) FindVppL2BDForNode(nodeName string, l2bdName string) (*NetworkNode,
-	*l2.BridgeDomains_BridgeDomain) {
+	*l2.BridgeDomain) {
 
 	var vppKey *vppagent.KVType
 	var exists bool
@@ -735,7 +735,7 @@ func (mgr *NetworkNodeMgr) InitAndRunWatcher() {
 	log.Info("NetworkNodeWatcher: enter ...")
 	defer log.Info("NetworkNodeWatcher: exit ...")
 
-	respChan := make(chan keyval.ProtoWatchResp, 0)
+	respChan := make(chan datasync.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())
 	err := watcher.Watch(keyval.ToChanProto(respChan), make(chan string), "")
 	if err != nil {

@@ -19,7 +19,7 @@ import (
 
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
 )
 
 // The L3MP topology is rendered in this module for a connection with a vnf-service
@@ -186,7 +186,7 @@ func (ns *NetworkService) renderConnL3MPSameNode(
 	// The interfaces should be created in the vnf and the vswitch then the vswitch
 	// interfaces will be added associated with the vrf.
 
-	var l2bdIFs = make(map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces, 0)
+	var l2bdIFs = make(map[string][]*l2.BridgeDomain_Interface, 0)
 
 	nodeName := p2nArray[0].Node
 
@@ -201,7 +201,7 @@ func (ns *NetworkService) renderConnL3MPSameNode(
 			return err
 		}
 
-		l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+		l2bdIF := &l2.BridgeDomain_Interface{
 			Name: ifName,
 			BridgedVirtualInterface: false,
 		}
@@ -277,7 +277,7 @@ func (ns *NetworkService) renderConnL3MPInterNode(
 		conn.VrfId = ctlrPlugin.ramCache.VrfIDAllocator.Allocate()
 	}
 
-	l2bdIFs := make(map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces, 0)
+	l2bdIFs := make(map[string][]*l2.BridgeDomain_Interface, 0)
 	l3vrfs := make(map[string][]*controller.L3VRFRoute, 0)
 
 	// create the interfaces from the pod to the vswitch, also construct l3vrf routes for the local
@@ -289,7 +289,7 @@ func (ns *NetworkService) renderConnL3MPInterNode(
 			return err
 		}
 
-		l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+		l2bdIF := &l2.BridgeDomain_Interface{
 			Name: ifName,
 			BridgedVirtualInterface: false,
 			SplitHorizonGroup:       0,

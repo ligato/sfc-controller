@@ -19,7 +19,7 @@ import (
 
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
 )
 
 // renderConnL2MPVxlanHubAndSpoke renders these L2MP tunnels between hub and nodes
@@ -31,7 +31,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 	p2nArray []NetworkPodToNodeMap,
 	vnfTypes []string,
 	spokeNodeMap map[string]bool,
-	l2bdIFs map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces) error {
+	l2bdIFs map[string][]*l2.BridgeDomain_Interface) error {
 
 	// The spokeNodeMap contains the set of nodes involved in the l2mp connection.  The node
 	// in the node network node overlay is the hub and this set of nodes in the nodeMap are the spokes.
@@ -115,7 +115,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 				vppKV)
 
 			// internode VNFs reach each other via the hub node, need split-horizon 0
-			l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+			l2bdIF := &l2.BridgeDomain_Interface{
 				Name: ifName,
 				BridgedVirtualInterface: false,
 				SplitHorizonGroup:       0,

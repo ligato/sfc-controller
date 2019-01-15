@@ -18,10 +18,10 @@ import (
 	"fmt"
 	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/sfc-controller/plugins/controller/database"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l3"
-	linuxIntf "github.com/ligato/vpp-agent/plugins/linux/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/l3"
+	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxv2/model/interfaces"
 )
 
 // Types in the model were defined as strings for readability not enums with
@@ -40,12 +40,12 @@ type KVType struct {
 	modelType    string
 	VppKey       string
 	VppEntryType string
-	IFace        *interfaces.Interfaces_Interface     `json:"IFace,omitempty"`
-	L2BD         *l2.BridgeDomains_BridgeDomain       `json:"L2BD,omitempty"`
-	L3Route      *l3.StaticRoutes_Route               `json:"L3Route,omitempty"`
-	XConn        *l2.XConnectPairs_XConnectPair       `json:"XConn,omitempty"`
-	LinuxIFace   *linuxIntf.LinuxInterfaces_Interface `json:"LinuxIFace,omitempty"`
-	ArpEntry     *l3.ArpTable_ArpEntry                `json:"ArpEntry,omitempty"`
+	IFace        *interfaces.Interface     `json:"IFace,omitempty"`
+	L2BD         *l2.BridgeDomain       `json:"L2BD,omitempty"`
+	L3Route      *l3.StaticRoute               `json:"L3Route,omitempty"`
+	XConn        *l2.XConnectPair       `json:"XConn,omitempty"`
+	LinuxIFace   *linuxIntf.Interface `json:"LinuxIFace,omitempty"`
+	ArpEntry     *l3.ARPEntry                `json:"ArpEntry,omitempty"`
 }
 
 // NewKVEntry initializes a vpp KV entry type
@@ -58,32 +58,32 @@ func NewKVEntry(vppKey string, vppEntryType string) *KVType {
 }
 
 // InterfaceSet updates the interface
-func (kv *KVType) InterfaceSet(iface *interfaces.Interfaces_Interface) {
+func (kv *KVType) InterfaceSet(iface *interfaces.Interface) {
 	kv.IFace = iface
 }
 
 // L3StaticRouteSet updates the static route
-func (kv *KVType) L3StaticRouteSet(l3sr *l3.StaticRoutes_Route) {
+func (kv *KVType) L3StaticRouteSet(l3sr *l3.StaticRoute) {
 	kv.L3Route = l3sr
 }
 
 // ArpEntrySet updates the arp entry
-func (kv *KVType) ArpEntrySet(ae *l3.ArpTable_ArpEntry) {
+func (kv *KVType) ArpEntrySet(ae *l3.ARPEntry) {
 	kv.ArpEntry = ae
 }
 
 // LinuxInterfaceSet updates the interface
-func (kv *KVType) LinuxInterfaceSet(iface *linuxIntf.LinuxInterfaces_Interface) {
+func (kv *KVType) LinuxInterfaceSet(iface *linuxIntf.Interface) {
 	kv.LinuxIFace = iface
 }
 
 // L2BDSet updates the interface
-func (kv *KVType) L2BDSet(l2bd *l2.BridgeDomains_BridgeDomain) {
+func (kv *KVType) L2BDSet(l2bd *l2.BridgeDomain) {
 	kv.L2BD = l2bd
 }
 
 // L2XCSet updates the interface
-func (kv *KVType) L2XCSet(l2xc *l2.XConnectPairs_XConnectPair) {
+func (kv *KVType) L2XCSet(l2xc *l2.XConnectPair) {
 	kv.XConn = l2xc
 }
 
@@ -115,9 +115,7 @@ func (kv *KVType) Equal(kv2 *KVType) bool {
 	case VppEntryTypeL3Route:
 		// disregard route description when comparing routes
 		l3Route1 := *kv.L3Route
-		l3Route1.Description = ""
 		l3Route2 := *kv2.L3Route
-		l3Route2.Description = ""
 		if l3Route1.String() != l3Route2.String() {
 			return false
 		}
@@ -166,42 +164,42 @@ func (kv *KVType) ReadFromEtcd(db keyval.ProtoBroker) (bool, error) {
 
 	switch kv.VppEntryType {
 	case VppEntryTypeInterface:
-		iface := &interfaces.Interfaces_Interface{}
+		iface := &interfaces.Interface{}
 		found, _, err = db.GetValue(kv.VppKey, iface)
 		if found && err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, iface)
 			kv.InterfaceSet(iface)
 		}
 	case VppEntryTypeLinuxInterface:
-		iface := &linuxIntf.LinuxInterfaces_Interface{}
+		iface := &linuxIntf.Interface{}
 		found, _, err = db.GetValue(kv.VppKey, iface)
 		if found && err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, iface)
 			kv.LinuxInterfaceSet(iface)
 		}
 	case VppEntryTypeL2BD:
-		l2bd := &l2.BridgeDomains_BridgeDomain{}
+		l2bd := &l2.BridgeDomain{}
 		found, _, err = db.GetValue(kv.VppKey, l2bd)
 		if found && err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, l2bd)
 			kv.L2BDSet(l2bd)
 		}
 	case VppEntryTypeL2XC:
-		l2xc := &l2.XConnectPairs_XConnectPair{}
+		l2xc := &l2.XConnectPair{}
 		found, _, err = db.GetValue(kv.VppKey, l2xc)
 		if found && err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, l2xc)
 			kv.L2XCSet(l2xc)
 		}
 	case VppEntryTypeL3Route:
-		l3sr := &l3.StaticRoutes_Route{}
+		l3sr := &l3.StaticRoute{}
 		found, _, err = db.GetValue(kv.VppKey, l3sr)
 		if found && err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, l3sr)
 			kv.L3StaticRouteSet(l3sr)
 		}
 	case VppEntryTypeArp:
-		ae := &l3.ArpTable_ArpEntry{}
+		ae := &l3.ARPEntry{}
 		found, _, err = db.GetValue(kv.VppKey, ae)
 		if found && err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, ae)

@@ -18,7 +18,7 @@ import (
 	"fmt"
 
 	"github.com/ligato/sfc-controller/plugins/controller/model"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
 )
 
 // The L2MP topology is rendered in this module for a connection with a vnf-service
@@ -202,7 +202,7 @@ func (ns *NetworkService) renderConnL2MPSameNode(
 	// The interfaces should be created in the vnf and the vswitch then the vswitch
 	// interfaces will be added to the bridge.
 
-	var l2bdIFs = make(map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces, 0)
+	var l2bdIFs = make(map[string][]*l2.BridgeDomain_Interface, 0)
 
 	nodeName := p2nArray[0].Node
 
@@ -212,7 +212,7 @@ func (ns *NetworkService) renderConnL2MPSameNode(
 		if err != nil {
 			return err
 		}
-		l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+		l2bdIF := &l2.BridgeDomain_Interface{
 			Name: ifName,
 			BridgedVirtualInterface: false,
 		}
@@ -264,7 +264,7 @@ func (ns *NetworkService) renderConnL2MPInterNode(
 	// strategy, for each node in the nodeMap, a vxlan tunnel mesh must be created
 	// using a free vni from the mesh's vniPool.
 
-	var l2bdIFs = make(map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces, 0)
+	var l2bdIFs = make(map[string][]*l2.BridgeDomain_Interface, 0)
 
 	// create the interfaces from the pod to the vswitch, note that depending on
 	// the meshing strategy, I might have to create the interfaces with vrf_id's for
@@ -275,7 +275,7 @@ func (ns *NetworkService) renderConnL2MPInterNode(
 		if err != nil {
 			return err
 		}
-		l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+		l2bdIF := &l2.BridgeDomain_Interface{
 			Name: ifName,
 			BridgedVirtualInterface: false,
 			SplitHorizonGroup:       0,
@@ -329,13 +329,13 @@ func (ns *NetworkService) renderConnL2MPSameVnf(
 	// The interfaces should be created in the vnf and the vswitch then the vswitch
 	// interfaces will be added to the bridge.
 
-	var l2bdIFs = make(map[string][]*l2.BridgeDomains_BridgeDomain_Interfaces, 0)
+	var l2bdIFs = make(map[string][]*l2.BridgeDomain_Interface, 0)
 
 	podName := p2nArray[0].Pod
 
 	for i := 0; i < len(netPodInterfaces); i++ {
 
-		l2bdIF := &l2.BridgeDomains_BridgeDomain_Interfaces{
+		l2bdIF := &l2.BridgeDomain_Interface{
 			Name: netPodInterfaces[i].Name,
 			BridgedVirtualInterface: false,
 		}

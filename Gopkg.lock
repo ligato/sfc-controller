@@ -75,10 +75,11 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:f5b1f9c83fa452427436313861548b8bcea56dc30f384921400e6f5973c31057"
+  digest = "1:a4e6cb9d433cdd86e8b80f65e0578d5fc13bfb1bbd18daefda89539675c71ccb"
   name = "github.com/gogo/protobuf"
   packages = [
     "gogoproto",
+    "jsonpb",
     "plugin/compare",
     "plugin/defaultcheck",
     "plugin/description",
@@ -103,6 +104,7 @@
     "protoc-gen-gogo/grpc",
     "protoc-gen-gogo/plugin",
     "sortkeys",
+    "types",
     "vanity",
     "vanity/command",
   ]
@@ -223,8 +225,8 @@
   version = "1.1.5"
 
 [[projects]]
-  branch = "master"
-  digest = "1:fe42f564914da2ea034a9e86a5f167f9c47ffc5da61360f0c9663676633d2880"
+  branch = "dev"
+  digest = "1:18a21a322a5610ae7861b2c1de6cfd8a94bda5f94e24f7fa394fa0560ec0c4c1"
   name = "github.com/ligato/cn-infra"
   packages = [
     "agent",
@@ -253,19 +255,21 @@
     "utils/safeclose",
   ]
   pruneopts = "UT"
-  revision = "f597195a15762fa2bb1ce5bfdd875ec96c63d153"
+  revision = "70b53374283d0bc70cbd9573826830f5a1d69ad1"
 
 [[projects]]
-  digest = "1:31660355a8b640c17c81dfd817de5f247f587763a2985596d89574b087b11b66"
+  branch = "dev"
+  digest = "1:fd9dfb646d5be327282a7e88ee564247eb3cbe30a7fae713cef10eb5d1f15f6d"
   name = "github.com/ligato/vpp-agent"
   packages = [
-    "plugins/linux/model/interfaces",
-    "plugins/vpp/model/interfaces",
-    "plugins/vpp/model/l2",
-    "plugins/vpp/model/l3",
+    "plugins/linuxv2/model/interfaces",
+    "plugins/linuxv2/model/namespace",
+    "plugins/vppv2/model/interfaces",
+    "plugins/vppv2/model/l2",
+    "plugins/vppv2/model/l3",
   ]
   pruneopts = "UT"
-  revision = "b325ab3e9252277b1fd6d69f0a6d134cc21bd33a"
+  revision = "fb7f8cda15d3a3bd3a46a5215be2d13b89f2003a"
 
 [[projects]]
   digest = "1:ff5ebae34cfbf047d505ee150de27e60570e8c394b3b8fdbb720ff6ac71985fc"
@@ -805,7 +809,6 @@
     "github.com/gogo/protobuf/proto",
     "github.com/gogo/protobuf/protoc-gen-gogo",
     "github.com/golang/glog",
-    "github.com/golang/protobuf/proto",
     "github.com/gorilla/mux",
     "github.com/ligato/cn-infra/agent",
     "github.com/ligato/cn-infra/datasync",
@@ -819,10 +822,11 @@
     "github.com/ligato/cn-infra/logging/logrus",
     "github.com/ligato/cn-infra/rpc/rest",
     "github.com/ligato/cn-infra/utils/addrs",
-    "github.com/ligato/vpp-agent/plugins/linux/model/interfaces",
-    "github.com/ligato/vpp-agent/plugins/vpp/model/interfaces",
-    "github.com/ligato/vpp-agent/plugins/vpp/model/l2",
-    "github.com/ligato/vpp-agent/plugins/vpp/model/l3",
+    "github.com/ligato/vpp-agent/plugins/linuxv2/model/interfaces",
+    "github.com/ligato/vpp-agent/plugins/linuxv2/model/namespace",
+    "github.com/ligato/vpp-agent/plugins/vppv2/model/interfaces",
+    "github.com/ligato/vpp-agent/plugins/vppv2/model/l2",
+    "github.com/ligato/vpp-agent/plugins/vppv2/model/l3",
     "github.com/namsral/flag",
     "github.com/unrolled/render",
     "k8s.io/api/core/v1",

@@ -252,7 +252,7 @@ func (mgr *SystemParametersMgr) InitAndRunWatcher() {
 	log.Info("SystemParametersWatcher: enter ...")
 	defer log.Info("SystemParametersWatcher: exit ...")
 
-	respChan := make(chan keyval.ProtoWatchResp, 0)
+	respChan := make(chan datasync.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())
 	err := watcher.Watch(keyval.ToChanProto(respChan), make(chan string), "")
 	if err != nil {

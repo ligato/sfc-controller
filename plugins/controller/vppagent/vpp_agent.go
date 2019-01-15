@@ -25,10 +25,11 @@ import (
 	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/ligato/cn-infra/utils/addrs"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
-	linuxIntf "github.com/ligato/vpp-agent/plugins/linux/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l3"
+	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxv2/model/interfaces"
+	namespace "github.com/ligato/vpp-agent/plugins/linuxv2/model/namespace"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/interfaces"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/l3"
 	"strconv"
 )
 
@@ -40,18 +41,18 @@ func VppAgentSetLogger(l *logrus.Logger) {
 	log = l
 }
 
-func rxModeControllerToInterface(contrtollerRxMode string) *interfaces.Interfaces_Interface_RxModeSettings {
+func rxModeControllerToInterface(controllerRxMode string) *interfaces.Interface_RxModeSettings {
 
-	rxSettings := &interfaces.Interfaces_Interface_RxModeSettings{}
-	switch contrtollerRxMode {
+	rxSettings := &interfaces.Interface_RxModeSettings{}
+	switch controllerRxMode {
 	case controller.RxModePolling:
-		rxSettings.RxMode = interfaces.RxModeType_POLLING
+		rxSettings.RxMode = interfaces.Interface_RxModeSettings_POLLING
 		return rxSettings
 	case controller.RxModeInterrupt:
-		rxSettings.RxMode = interfaces.RxModeType_INTERRUPT
+		rxSettings.RxMode = interfaces.Interface_RxModeSettings_INTERRUPT
 		return rxSettings
 	case controller.RxModeAdaptive:
-		rxSettings.RxMode = interfaces.RxModeType_ADAPTIVE
+		rxSettings.RxMode = interfaces.Interface_RxModeSettings_ADAPTIVE
 		return rxSettings
 	}
 	return nil
@@ -60,19 +61,19 @@ func rxModeControllerToInterface(contrtollerRxMode string) *interfaces.Interface
 // ConstructL2BD returns an KVType
 func ConstructL2BD(vppAgent string,
 	bdName string,
-	ifaces []*l2.BridgeDomains_BridgeDomain_Interfaces,
+	ifaces []*l2.BridgeDomain_Interface,
 	bdParms *controller.BDParms) *KVType {
 
 	// keep the ifaces sorted so subsequent comparing during transaction processing
 	// is easier as it does a String() then compares strings and an unsorted array
 	// banjaxes the compare if two bridges are equal but have a same set of iFaces but
 	// are in a different order
-	var sortedInterfaces []*l2.BridgeDomains_BridgeDomain_Interfaces
+	var sortedInterfaces []*l2.BridgeDomain_Interface
 	for _, iface := range ifaces {
 		sortedInterfaces = insertSortBridgedInterface(sortedInterfaces, iface)
 	}
 
-	l2bd := &l2.BridgeDomains_BridgeDomain{
+	l2bd := &l2.BridgeDomain{
 		Name:                bdName,
 		Flood:               bdParms.Flood,
 		UnknownUnicastFlood: bdParms.UnknownUnicastFlood,
@@ -97,8 +98,8 @@ func ConstructL2BD(vppAgent string,
 
 // AppendInterfacesToL2BD returns an KVType
 func AppendInterfacesToL2BD(vppAgent string,
-	l2bd *l2.BridgeDomains_BridgeDomain,
-	ifaces []*l2.BridgeDomains_BridgeDomain_Interfaces) *KVType {
+	l2bd *l2.BridgeDomain,
+	ifaces []*l2.BridgeDomain_Interface) *KVType {
 
 	// keep the ifaces sorted so subsequent comparing during transaction processing
 	// is easier as it does a String() then compares strings and an unsorted array
@@ -123,10 +124,10 @@ func AppendInterfacesToL2BD(vppAgent string,
 }
 
 func insertSortBridgedInterface(
-	data []*l2.BridgeDomains_BridgeDomain_Interfaces,
-	el *l2.BridgeDomains_BridgeDomain_Interfaces) []*l2.BridgeDomains_BridgeDomain_Interfaces {
+	data []*l2.BridgeDomain_Interface,
+	el *l2.BridgeDomain_Interface) []*l2.BridgeDomain_Interface {
 	index := sort.Search(len(data), func(i int) bool { return data[i].Name > el.Name })
-	data = append(data, &l2.BridgeDomains_BridgeDomain_Interfaces{})
+	data = append(data, &l2.BridgeDomain_Interface{})
 	copy(data[index+1:], data[index:])
 	data[index] = el
 	return data
@@ -141,9 +142,9 @@ func ConstructEthernetInterface(vppAgent string,
 	adminStatus string,
 	rxMode string) *KVType {
 
-	iface := &interfaces.Interfaces_Interface{
+	iface := &interfaces.Interface{
 		Name:        ifname,
-		Type:        interfaces.InterfaceType_ETHERNET_CSMACD,
+		Type:        interfaces.Interface_DPDK,
 		Enabled:     adminStatusStringToBool(adminStatus),
 		PhysAddress: macAddr,
 		IpAddresses: sortedIPAddresses(ipAddresses),
@@ -196,9 +197,9 @@ func ConstructLoopbackInterface(vppAgent string,
 	adminStatus string,
 	rxMode string) *KVType {
 
-	iface := &interfaces.Interfaces_Interface{
+	iface := &interfaces.Interface{
 		Name:        ifname,
-		Type:        interfaces.InterfaceType_SOFTWARE_LOOPBACK,
+		Type:        interfaces.Interface_SOFTWARE_LOOPBACK,
 		Enabled:     adminStatusStringToBool(adminStatus),
 		PhysAddress: macAddr,
 		IpAddresses: sortedIPAddresses(ipAddresses),
@@ -226,17 +227,17 @@ func adminStatusStringToBool(adminStatusString string) bool {
 	return true
 }
 
-func memifMode(modeString string) interfaces.Interfaces_Interface_Memif_MemifMode {
+func memifMode(modeString string) interfaces.MemifLink_MemifMode {
 
-	mode := interfaces.Interfaces_Interface_Memif_ETHERNET
+	mode := interfaces.MemifLink_ETHERNET
 	if modeString != "" {
 		switch modeString {
 		case controller.IfMemifModeEhernet:
-			mode = interfaces.Interfaces_Interface_Memif_ETHERNET
+			mode = interfaces.MemifLink_ETHERNET
 		case controller.IfMemifModeIP:
-			mode = interfaces.Interfaces_Interface_Memif_IP
+			mode = interfaces.MemifLink_IP
 		case controller.IfMemifModePuntInject:
-			mode = interfaces.Interfaces_Interface_Memif_PUNT_INJECT
+			mode = interfaces.MemifLink_PUNT_INJECT
 		}
 	}
 	return mode
@@ -264,46 +265,48 @@ func ConstructMemInterface(vppAgent string,
 	defaultMemifDirectory string,
 	masterVppAgent string) *KVType {
 
-	iface := &interfaces.Interfaces_Interface{
+	ifaceMemif := &interfaces.Interface_Memif{
+		Memif: &interfaces.MemifLink{
+			Id: memifID,
+		},
+	}
+	iface := &interfaces.Interface{
 		Name:        ifname,
-		Type:        interfaces.InterfaceType_MEMORY_INTERFACE,
+		Type:        interfaces.Interface_MEMIF,
 		Enabled:     adminStatusStringToBool(adminStatus),
 		PhysAddress: macAddr,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
-		Memif: &interfaces.Interfaces_Interface_Memif{
-			Id:     memifID,
-			Master: isMaster,
-		},
+		Link: ifaceMemif,
 	}
 
 	if memifParms != nil {
 		if memifParms.Mode != "" {
-			iface.Memif.Mode = memifMode(memifParms.Mode)
+			ifaceMemif.Memif.Mode = memifMode(memifParms.Mode)
 		}
 		if memifParms.MemifDirectory != "" {
 			defaultMemifDirectory = memifParms.MemifDirectory
 		}
 		if memifParms.RingSize != "" {
-			iface.Memif.RingSize = strToUInt32(memifParms.RingSize)
+			ifaceMemif.Memif.RingSize = strToUInt32(memifParms.RingSize)
 		}
 		if memifParms.BufferSize != "" {
-			iface.Memif.BufferSize = strToUInt32(memifParms.BufferSize)
+			ifaceMemif.Memif.BufferSize = strToUInt32(memifParms.BufferSize)
 		}
 		if memifParms.RxQueues != "" {
-			iface.Memif.RxQueues = strToUInt32(memifParms.RxQueues)
+			ifaceMemif.Memif.RxQueues = strToUInt32(memifParms.RxQueues)
 		}
 		if memifParms.TxQueues != "" {
-			iface.Memif.TxQueues = strToUInt32(memifParms.TxQueues)
+			ifaceMemif.Memif.TxQueues = strToUInt32(memifParms.TxQueues)
 		}
-		iface.Memif.Secret = memifParms.Secret
+		ifaceMemif.Memif.Secret = memifParms.Secret
 	}
 
 	if defaultMemifDirectory == "" {
 		defaultMemifDirectory = controller.MemifDirectoryName
 	}
 
-	iface.Memif.SocketFilename = defaultMemifDirectory + "/memif_" + masterVppAgent + ".sock"
+	ifaceMemif.Memif.SocketFilename = defaultMemifDirectory + "/memif_" + masterVppAgent + ".sock"
 
 	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
 
@@ -329,14 +332,16 @@ func ConstructVxlanInterface(vppAgent string,
 	ep1 := StripSlashAndSubnetIPAddress(ep1IPAddress)
 	ep2 := StripSlashAndSubnetIPAddress(ep2IPAddress)
 
-	iface := &interfaces.Interfaces_Interface{
+	iface := &interfaces.Interface{
 		Name:    ifname,
-		Type:    interfaces.InterfaceType_VXLAN_TUNNEL,
+		Type:    interfaces.Interface_VXLAN_TUNNEL,
 		Enabled: true,
-		Vxlan: &interfaces.Interfaces_Interface_Vxlan{
-			SrcAddress: ep1,
-			DstAddress: ep2,
-			Vni:        vni,
+		Link: &interfaces.Interface_Vxlan{
+			Vxlan: &interfaces.VxlanLink{
+				SrcAddress: ep1,
+				DstAddress: ep2,
+				Vni:        vni,
+			},
 		},
 	}
 
@@ -361,7 +366,7 @@ func StripSlashAndSubnetIPAddress(ipAndSubnetStr string) string {
 // constructUniDirXConnect creates a unit directional entry returns an KVType
 func constructUniDirXConnect(vppAgent, if1, if2 string) *KVType {
 
-	xconn := &l2.XConnectPairs_XConnectPair{
+	xconn := &l2.XConnectPair{
 		ReceiveInterface:  if1,
 		TransmitInterface: if2,
 	}
@@ -398,28 +403,31 @@ func ConstructTapInterface(vppAgent string,
 	tapParms *controller.Interface_TapParms,
 	hostIfName string) *KVType {
 
-	iface := &interfaces.Interfaces_Interface{
+	ifaceTap := &interfaces.Interface_Tap{
+		Tap: &interfaces.TapLink{
+			HostIfName: hostIfName,
+			Version:    2,
+		},
+	}
+	iface := &interfaces.Interface{
 		Name:        ifname,
-		Type:        interfaces.InterfaceType_TAP_INTERFACE,
+		Type:        interfaces.Interface_TAP,
 		Enabled:     adminStatusStringToBool(adminStatus),
 		PhysAddress: macAddr,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
-		Tap: &interfaces.Interfaces_Interface_Tap{
-			HostIfName: hostIfName,
-			Version: 2,
-		},
+		Link: 		 ifaceTap,
 	}
 
 	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
 
 	if tapParms != nil {
-		iface.Tap.Namespace = tapParms.Namespace
+		ifaceTap.Tap.ToMicroservice = tapParms.Namespace
 		if tapParms.RxRingSize != "" {
-			iface.Tap.RxRingSize = strToUInt32(tapParms.RxRingSize)
+			ifaceTap.Tap.RxRingSize = strToUInt32(tapParms.RxRingSize)
 		}
 		if tapParms.TxRingSize != "" {
-			iface.Tap.TxRingSize = strToUInt32(tapParms.TxRingSize)
+			ifaceTap.Tap.TxRingSize = strToUInt32(tapParms.TxRingSize)
 		}
 	}
 
@@ -446,9 +454,9 @@ func ConstructLinuxTapInterface(vppAgent string,
 	hostNameSpace string,
 	microsServiceLabel string) *KVType {
 
-	iface := &linuxIntf.LinuxInterfaces_Interface{
+	iface := &linuxIntf.Interface{
 		Name:        ifname,
-		Type:        linuxIntf.LinuxInterfaces_AUTO_TAP,
+		Type:        linuxIntf.Interface_TAP_TO_VPP,
 		Enabled:     adminStatusStringToBool(adminStatus),
 		PhysAddress: macAddr,
 		IpAddresses: sortedIPAddresses(ipAddresses),
@@ -456,13 +464,13 @@ func ConstructLinuxTapInterface(vppAgent string,
 		HostIfName: hostIfName,
 	}
 
-	ns := &linuxIntf.LinuxInterfaces_Interface_Namespace{}
+	ns := &namespace.NetNamespace{}
 	if hostNameSpace == "" {
-		ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_MICROSERVICE_REF_NS
-		ns.Microservice = microsServiceLabel
+		ns.Type = namespace.NetNamespace_NETNS_REF_MICROSERVICE
+		ns.Reference = microsServiceLabel
 	} else {
-		ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_NAMED_NS
-		ns.Microservice = hostNameSpace
+		ns.Type = namespace.NetNamespace_NETNS_REF_NSID
+		ns.Reference = hostNameSpace
 	}
 	iface.Namespace = ns
 
@@ -488,16 +496,21 @@ func ConstructAFPacketInterface(vppAgent string,
 	rxMode string,
 	hostIfName string) *KVType {
 
-	iface := &interfaces.Interfaces_Interface{
+	ifaceAFP := &interfaces.Interface_Afpacket{
+		Afpacket: &interfaces.AfpacketLink{
+			HostIfName: hostIfName,
+		},
+	}
+
+	iface := &interfaces.Interface{
 		Name:        ifname,
-		Type:        interfaces.InterfaceType_AF_PACKET_INTERFACE,
+		Type:        interfaces.Interface_AF_PACKET,
 		Enabled:     adminStatusStringToBool(adminStatus),
 		PhysAddress: macAddr,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
-		Afpacket: &interfaces.Interfaces_Interface_Afpacket{
-			HostIfName: hostIfName,
-		},
+		Link : ifaceAFP,
+
 	}
 
 	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
@@ -526,38 +539,42 @@ func ConstructVEthInterface(vppAgent string,
 	linuxNamespace *controller.Interface_LinuxNamespace,
 	vnfName string) *KVType {
 
-	ns := &linuxIntf.LinuxInterfaces_Interface_Namespace{}
+	ns := &namespace.NetNamespace{}
 
-	iface := &linuxIntf.LinuxInterfaces_Interface{
+	ifaceVETH := &linuxIntf.Interface_Veth{
+		Veth: &linuxIntf.VethLink{
+			PeerIfName: peerIfName,
+		},
+	}
+
+	iface := &linuxIntf.Interface{
 		Name:        ifname,
-		Type:        linuxIntf.LinuxInterfaces_VETH,
+		Type:        linuxIntf.Interface_VETH,
 		Enabled:     adminStatusStringToBool(adminStatus),
 		PhysAddress: macAddr,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
 		HostIfName:  hostIfName,
-		Veth: &linuxIntf.LinuxInterfaces_Interface_Veth{
-			PeerIfName: peerIfName,
-		},
+		Link:        ifaceVETH,
 	}
 
 	if linuxNamespace == nil {
-		ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_MICROSERVICE_REF_NS
-		ns.Microservice = vnfName
+		ns.Type = namespace.NetNamespace_NETNS_REF_MICROSERVICE
+		ns.Reference = vnfName
 	} else {
 		switch linuxNamespace.Type {
 		case controller.LinuxNamespaceMICROSERVICE:
-			ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_MICROSERVICE_REF_NS
-			ns.Microservice = linuxNamespace.Microservice
+			ns.Type = namespace.NetNamespace_NETNS_REF_MICROSERVICE
+			ns.Reference = linuxNamespace.Microservice
 		case controller.LinuxNamespaceNAMED:
-			ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_NAMED_NS
-			ns.Name = linuxNamespace.Name
+			ns.Type = namespace.NetNamespace_NETNS_REF_NSID
+			ns.Reference = linuxNamespace.Name
 		case controller.LinuxNamespacePID:
-			ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_PID_REF_NS
-			ns.Pid = linuxNamespace.Pid
+			ns.Type = namespace.NetNamespace_NETNS_REF_PID
+			ns.Reference = strconv.Itoa(int(linuxNamespace.Pid))
 		case controller.LinuxNamespaceFILE:
-			ns.Type = linuxIntf.LinuxInterfaces_Interface_Namespace_FILE_REF_NS
-			ns.Filepath = linuxNamespace.Filepath
+			ns.Type = namespace.NetNamespace_NETNS_REF_FD
+			ns.Reference = linuxNamespace.Filepath
 		}
 	}
 	iface.Namespace = ns
@@ -577,17 +594,18 @@ func ConstructVEthInterface(vppAgent string,
 // ConstructStaticRoute returns an KVType
 func ConstructStaticRoute(vppAgent string, l3sr *controller.L3VRFRoute) *KVType {
 
-	sr := &l3.StaticRoutes_Route{
+	sr := &l3.StaticRoute{
 		VrfId:             l3sr.VrfId,
-		Description:       l3sr.Description,
-		DstIpAddr:         l3sr.DstIpAddr,
+		DstNetwork:        l3sr.DstIpAddr,
+		//DstIpAddr:         l3sr.DstIpAddr,
 		NextHopAddr:       StripSlashAndSubnetIPAddress(l3sr.NextHopAddr),
 		Weight:            l3sr.Weight,
 		OutgoingInterface: l3sr.OutgoingInterface,
 		Preference:        l3sr.Preference,
 	}
 
-	destIPAddr, _, _ := addrs.ParseIPWithPrefix(sr.DstIpAddr)
+	//destIPAddr, _, _ := addrs.ParseIPWithPrefix(sr.DstIpAddr)
+	destIPAddr, _, _ := addrs.ParseIPWithPrefix(sr.DstNetwork)
 	key := L3RouteKey(vppAgent, sr.VrfId, destIPAddr, sr.NextHopAddr)
 
 	log.Debugf("ConstructStaticRoute: key='%s', sr='%v", key, sr)
@@ -602,7 +620,7 @@ func ConstructStaticRoute(vppAgent string, l3sr *controller.L3VRFRoute) *KVType 
 
 func ConstructStaticArpEntry(vppAgent string, l3ae *controller.L3ArpEntry) *KVType {
 
-	ae := &l3.ArpTable_ArpEntry{
+	ae := &l3.ARPEntry{
 		Interface:   l3ae.OutgoingInterface,
 		Static:      true,
 		IpAddress:   l3ae.IpAddress,
@@ -620,33 +638,3 @@ func ConstructStaticArpEntry(vppAgent string, l3ae *controller.L3ArpEntry) *KVTy
 	}
 	return kv
 }
-
-// func (vppapi *VppAgentAPIType) createL2FibEntry(etcdPrefix string, bdName string, destMacAddr string,
-// 	outGoingIf string) (*l2.FibTableEntries_FibTableEntry, error) {
-
-// 	l2fib := &l2.FibTableEntries_FibTableEntry{
-// 		BridgeDomain:      bdName,
-// 		PhysAddress:       destMacAddr,
-// 		Action:            l2.FibTableEntries_FibTableEntry_FORWARD,
-// 		OutgoingInterface: outGoingIf,
-// 		StaticConfig:      true,
-// 	}
-
-// 	//if vppapi.reconcileInProgress {
-// 	//	vppapi.reconcileL2FibEntry(etcdPrefix, l2fib)
-// 	//} else {
-
-// 	log.Println(l2fib)
-
-// 	rc := NewRemoteClientTxn(etcdPrefix, vppapi.dbFactory)
-// 	err := rc.Put().BDFIB(l2fib).Send().ReceiveReply()
-
-// 	if err != nil {
-// 		log.Error("createL2Fib: databroker.Store: ", err)
-// 		return nil, err
-
-// 	}
-// 	//}
-
-// 	return l2fib, nil
-// }

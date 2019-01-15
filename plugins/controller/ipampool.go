@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
@@ -521,7 +521,7 @@ func (mgr *IPAMPoolMgr) InitAndRunWatcher() {
 	log.Info("IPAMPoolWatcher: enter ...")
 	defer log.Info("IPAMPoolWatcher: exit ...")
 
-	respChan := make(chan keyval.ProtoWatchResp, 0)
+	respChan := make(chan datasync.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())
 	err := watcher.Watch(keyval.ToChanProto(respChan), make(chan string), "")
 	if err != nil {

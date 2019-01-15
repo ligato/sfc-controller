@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
@@ -31,7 +31,7 @@ import (
 	"github.com/unrolled/render"
 	"strconv"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l2"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
 )
 
 type NetworkServiceMgr struct {
@@ -690,12 +690,12 @@ func (mgr *NetworkServiceMgr) FindInterfaceStatus(podInterfaceName string) *cont
 func (ns *NetworkService) RenderL2BD(
 	conn *controller.Connection, connIndex uint32,
 	nodeName string,
-	l2bdIFs []*l2.BridgeDomains_BridgeDomain_Interfaces) error {
+	l2bdIFs []*l2.BridgeDomain_Interface) error {
 
 	// if using an existing node bridge, we simply add the i/f's to the bridge
 	if conn.UseNodeL2Bd != "" {
 
-		var nodeL2BD *l2.BridgeDomains_BridgeDomain
+		var nodeL2BD *l2.BridgeDomain
 
 		// find the l2db for this node ...
 		nn, nodeL2BD := ctlrPlugin.NetworkNodeMgr.FindVppL2BDForNode(nodeName, conn.UseNodeL2Bd)
@@ -738,7 +738,7 @@ func (ns *NetworkService) RenderNetworkPodL2BD(
 	conn *controller.Connection,
 	connIndex uint32,
 	podName string,
-	l2bdIFs []*l2.BridgeDomains_BridgeDomain_Interfaces) error {
+	l2bdIFs []*l2.BridgeDomain_Interface) error {
 
 	if conn.UseNodeL2Bd != "" {
 		msg := fmt.Sprintf("network-service/connIndex: %s/%d, cannot use a node/l2bd: %s for vnf=%s bridge",
@@ -778,7 +778,7 @@ func (mgr *NetworkServiceMgr) InitAndRunWatcher() {
 	log.Info("NetworkServiceWatcher: enter ...")
 	defer log.Info("NetworkServiceWatcher: exit ...")
 
-	respChan := make(chan keyval.ProtoWatchResp, 0)
+	respChan := make(chan datasync.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(mgr.KeyPrefix())
 	err := watcher.Watch(keyval.ToChanProto(respChan), make(chan string), "")
 	if err != nil {
