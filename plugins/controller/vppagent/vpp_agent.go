@@ -268,6 +268,7 @@ func ConstructMemInterface(vppAgent string,
 	ifaceMemif := &interfaces.Interface_Memif{
 		Memif: &interfaces.MemifLink{
 			Id: memifID,
+			Master: isMaster,
 		},
 	}
 	iface := &interfaces.Interface{
@@ -509,7 +510,7 @@ func ConstructAFPacketInterface(vppAgent string,
 		PhysAddress: macAddr,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
-		Link : ifaceAFP,
+		Link:        ifaceAFP,
 
 	}
 
