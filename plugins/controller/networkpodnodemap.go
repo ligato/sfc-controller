@@ -32,11 +32,11 @@ import (
 )
 
 type NetworkPodToNodeMapMgr struct {
-	networkPodNodeCache map[string]*NetworkPodToNodeMap
+	networkPodNodeCache map[string]*controller.NetworkPodToNodeMap
 }
 
-func (mgr *NetworkPodToNodeMapMgr) ToArray() []*NetworkPodToNodeMap {
-	var array []*NetworkPodToNodeMap
+func (mgr *NetworkPodToNodeMapMgr) ToArray() []*controller.NetworkPodToNodeMap {
+	var array []*controller.NetworkPodToNodeMap
 	for _, p2n := range mgr.networkPodNodeCache {
 		array = append(array, p2n)
 	}
@@ -55,31 +55,28 @@ func (mgr *NetworkPodToNodeMapMgr) AfterInit() {
 	}
 }
 
-// NetworkPodToNodeMap holds all network node specific info
-type NetworkPodToNodeMap struct {
-	controller.NetworkPodToNodeMap
-}
-
 // InitRAMCache create a map for all the entities
 func (mgr *NetworkPodToNodeMapMgr) InitRAMCache() {
 	mgr.networkPodNodeCache = nil // delete old cache for re-init
-	mgr.networkPodNodeCache = make(map[string]*NetworkPodToNodeMap)
+	mgr.networkPodNodeCache = make(map[string]*controller.NetworkPodToNodeMap)
 }
 
 // DumpCache logs all the entries in the map
 func (mgr *NetworkPodToNodeMapMgr) DumpCache() {
 	for _, p2n := range mgr.networkPodNodeCache {
-		p2n.dumpToLog()
+		mgr.dumpToLog(p2n)
 	}
 }
 
-func (p2n *NetworkPodToNodeMap) dumpToLog() {
+func (mgr *NetworkPodToNodeMapMgr) dumpToLog(p2n *controller.NetworkPodToNodeMap) {
 	log.Infof("NetworkPodToNodeMap[%s] = %v", p2n.Pod, p2n)
 }
 
 // ConfigEqual return true if the entities are equal
-func (p2n *NetworkPodToNodeMap) ConfigEqual(_p2n *NetworkPodToNodeMap) bool {
-	if p2n.String() != _p2n.String() {
+func (mgr *NetworkPodToNodeMapMgr) ConfigEqual(
+	p2n_1 *controller.NetworkPodToNodeMap,
+	p2n_2 *controller.NetworkPodToNodeMap) bool {
+	if p2n_1.String() != p2n_2.String() {
 		return false
 	}
 	return true
@@ -88,16 +85,16 @@ func (p2n *NetworkPodToNodeMap) ConfigEqual(_p2n *NetworkPodToNodeMap) bool {
 // HandleCRUDOperationCU add to ram cache and render
 func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationCU(data interface{}) error {
 
-	p2n := data.(*NetworkPodToNodeMap)
+	p2n := data.(*controller.NetworkPodToNodeMap)
 
-	if err := p2n.validate(); err != nil {
+	if err := mgr.validate(p2n); err != nil {
 		return err
 	}
 
 	mgr.networkPodNodeCache[p2n.Pod] = p2n
 	ctlrPlugin.ramCache.NetworkPodToNodeMap[p2n.Pod] = p2n
 
-	if err := p2n.writeToDatastore(); err != nil {
+	if err := mgr.writeToDatastore(p2n); err != nil {
 		return err
 	}
 
@@ -105,7 +102,7 @@ func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationCU(data interface{}) error
 }
 
 // HandleCRUDOperationR finds in ram cache
-func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationR(name string) (*NetworkPodToNodeMap, bool) {
+func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationR(name string) (*controller.NetworkPodToNodeMap, bool) {
 	p2n, exists := mgr.networkPodNodeCache[name]
 	return p2n, exists
 }
@@ -124,38 +121,38 @@ func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationD(data interface{}) error 
 }
 
 // HandleCRUDOperationGetAll returns the map
-func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationGetAll() map[string]*NetworkPodToNodeMap {
+func (mgr *NetworkPodToNodeMapMgr) HandleCRUDOperationGetAll() map[string]*controller.NetworkPodToNodeMap {
 	return mgr.networkPodNodeCache
 }
 
-func (p2n *NetworkPodToNodeMap) writeToDatastore() error {
+func (mgr *NetworkPodToNodeMapMgr) writeToDatastore(p2n *controller.NetworkPodToNodeMap) error {
 	key := ctlrPlugin.NetworkPodNodeMapMgr.NameKey(p2n.Pod)
 	return database.WriteToDatastore(key, p2n)
 }
 
-func (p2n *NetworkPodToNodeMap) deleteFromDatastore() {
+func (mgr *NetworkPodToNodeMapMgr) deleteFromDatastore(p2n *controller.NetworkPodToNodeMap) {
 	key := ctlrPlugin.NetworkPodNodeMapMgr.NameKey(p2n.Pod)
 	database.DeleteFromDatastore(key)
 }
 
 // LoadAllFromDatastoreIntoCache iterates over the etcd set
 func (mgr *NetworkPodToNodeMapMgr) LoadAllFromDatastoreIntoCache() error {
-	log.Debugf("LoadAllFromDatastore: ...")
+	log.Debugf("LoadAllFromDatastoreIntoCache: ...")
 	mgr.loadAllFromDatastore(mgr.KeyPrefix(), ctlrPlugin.ramCache.NetworkPodToNodeMap)
 	return mgr.loadAllFromDatastore(mgr.KeyPrefix(), mgr.networkPodNodeCache)
 }
 
 // loadAllFromDatastore iterates over the etcd set
-func (mgr *NetworkPodToNodeMapMgr) loadAllFromDatastore(prefix string, p2nMap map[string]*NetworkPodToNodeMap) error {
-	var p2n *NetworkPodToNodeMap
+func (mgr *NetworkPodToNodeMapMgr) loadAllFromDatastore(prefix string, p2nMap map[string]*controller.NetworkPodToNodeMap) error {
+	var p2n *controller.NetworkPodToNodeMap
 	return database.ReadIterate(prefix,
 		func() proto.Message {
-			p2n = &NetworkPodToNodeMap{}
+			p2n = &controller.NetworkPodToNodeMap{}
 			return p2n
 		},
 		func(data proto.Message) {
 			p2nMap[p2n.Pod] = p2n
-			//log.Debugf("loadAllFromDatastore: p2n=%v", p2n)
+			log.Debugf("loadAllFromDatastore: p2n=%v", p2n)
 		})
 }
 
@@ -170,7 +167,7 @@ func (mgr *NetworkPodToNodeMapMgr) InitHTTPHandlers() {
 
 	log.Infof("InitHTTPHandlers: registering GET/POST %s", mgr.KeyPrefix())
 	url := fmt.Sprintf(mgr.KeyPrefix()+"{%s}", networkPodName)
-	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, networkPodNodeMapHandler, "GET", "POST", "DELETE")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, mgr.networkPodNodeMapHandler, "GET", "POST", "DELETE")
 	log.Infof("InitHTTPHandlers: registering GET %s", mgr.GetAllURL())
 	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(mgr.GetAllURL(), networkPodNodeMapGetAllHandler, "GET")
 }
@@ -178,7 +175,7 @@ func (mgr *NetworkPodToNodeMapMgr) InitHTTPHandlers() {
 // curl -X GET http://localhost:9191/sfc_controller/v2/config/vnf-to-node-map/<networkPodName>
 // curl -X POST -d '{json payload}' http://localhost:9191/sfc_controller/v2/config/vnf-to-node-map/<networkPodName>
 // curl -X DELETE http://localhost:9191/sfc_controller/v2/config/vnf-to-node-map/<networkPodName>
-func networkPodNodeMapHandler(formatter *render.Render) http.HandlerFunc {
+func (mgr *NetworkPodToNodeMapMgr) networkPodNodeMapHandler(formatter *render.Render) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("networkPodNodeMapHandler: Method %s, URL: %s", req.Method, req.URL)
@@ -192,14 +189,14 @@ func networkPodNodeMapHandler(formatter *render.Render) http.HandlerFunc {
 				formatter.JSON(w, http.StatusNotFound, "not found: "+vars[networkPodName])
 			}
 		case "POST":
-			networkPodNodeMapProcessPost(formatter, w, req)
+			mgr.networkPodNodeMapProcessPost(formatter, w, req)
 		case "DELETE":
 			networkPodNodeMapProcessDelete(formatter, w, req)
 		}
 	}
 }
 
-func networkPodNodeMapProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
+func (mgr *NetworkPodToNodeMapMgr) networkPodNodeMapProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -208,7 +205,7 @@ func networkPodNodeMapProcessPost(formatter *render.Render, w http.ResponseWrite
 		return
 	}
 
-	var p2n NetworkPodToNodeMap
+	var p2n controller.NetworkPodToNodeMap
 	err = json.Unmarshal(body, &p2n)
 	if err != nil {
 		log.Debugf("Can't parse body, error '%s'", err)
@@ -224,7 +221,7 @@ func networkPodNodeMapProcessPost(formatter *render.Render, w http.ResponseWrite
 
 	if existing, exists := ctlrPlugin.NetworkPodNodeMapMgr.HandleCRUDOperationR(vars[networkPodName]); exists {
 		// if nothing has changed, simply return OK and waste no cycles
-		if existing.ConfigEqual(&p2n) {
+		if mgr.ConfigEqual(existing, &p2n) {
 			log.Debugf("processPost: config equal no further processing required")
 			formatter.JSON(w, http.StatusOK, "OK")
 			return
@@ -233,7 +230,7 @@ func networkPodNodeMapProcessPost(formatter *render.Render, w http.ResponseWrite
 		log.Debugf("processPost: new: %v", p2n)
 	}
 
-	if err := p2n.validate(); err != nil {
+	if err := mgr.validate(&p2n); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
@@ -261,7 +258,7 @@ func networkPodNodeMapGetAllHandler(formatter *render.Render) http.HandlerFunc {
 
 		switch req.Method {
 		case "GET":
-			var array = make([]NetworkPodToNodeMap, 0)
+			var array = make([]controller.NetworkPodToNodeMap, 0)
 			for _, n := range ctlrPlugin.NetworkPodNodeMapMgr.HandleCRUDOperationGetAll() {
 				array = append(array, *n)
 			}
@@ -291,7 +288,7 @@ func (mgr *NetworkPodToNodeMapMgr) ContivKsrNetworkPodToNodePrefix() string {
 		"network-pod-to-node-map/"
 }
 
-func (p2n *NetworkPodToNodeMap) validate() error {
+func (mgr *NetworkPodToNodeMapMgr) validate(p2n *controller.NetworkPodToNodeMap) error {
 	log.Debugf("Validating NetworkPodToNodeMap: %v ...", p2n)
 	return nil
 }
@@ -331,18 +328,18 @@ func (mgr *NetworkPodToNodeMapMgr) InitAndRunWatcher() {
 func (mgr *NetworkPodToNodeMapMgr) SyncNetworkPodToNodeMap() bool {
 
 	// load the contiv ksr pod to node map
-	contivNetworkPodToNodeMapMap := make(map[string]*NetworkPodToNodeMap)
+	contivNetworkPodToNodeMapMap := make(map[string]*controller.NetworkPodToNodeMap)
 	mgr.loadAllFromDatastore(mgr.ContivKsrNetworkPodToNodePrefix(), contivNetworkPodToNodeMapMap)
 
     // copy the ram cache into a temp
-	tempNetworkPodToNodeMapMap := make(map[string]*NetworkPodToNodeMap)
+	tempNetworkPodToNodeMapMap := make(map[string]*controller.NetworkPodToNodeMap)
 	for pod, entry := range ctlrPlugin.ramCache.NetworkPodToNodeMap {
 		tempNetworkPodToNodeMapMap[pod] = entry
 	}
 
 	// clear the ram map, put the config cache into it, then put the contiv into it
 	ctlrPlugin.ramCache.NetworkPodToNodeMap = nil
-	ctlrPlugin.ramCache.NetworkPodToNodeMap = make(map[string]*NetworkPodToNodeMap)
+	ctlrPlugin.ramCache.NetworkPodToNodeMap = make(map[string]*controller.NetworkPodToNodeMap)
 
 	for pod, entry := range ctlrPlugin.NetworkPodNodeMapMgr.networkPodNodeCache {
 		ctlrPlugin.ramCache.NetworkPodToNodeMap[pod] = entry
@@ -358,7 +355,7 @@ func (mgr *NetworkPodToNodeMapMgr) SyncNetworkPodToNodeMap() bool {
 	} else {
 		for _, entry := range tempNetworkPodToNodeMapMap {
 			ramEntry, exists := ctlrPlugin.ramCache.NetworkPodToNodeMap[entry.Pod]
-			if !exists || !ramEntry.ConfigEqual(entry) {
+			if !exists || !mgr.ConfigEqual(ramEntry, entry) {
 				log.Debugf("SyncNetworkPodToNodeMap: new config: %v", entry)
 				renderingRequired = true
 			}

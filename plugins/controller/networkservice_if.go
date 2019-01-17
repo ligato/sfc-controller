@@ -22,7 +22,8 @@ import (
 )
 
 // RenderConnInterfacePair renders this interface pair on the vnf and vswitch
-func (ns *NetworkService) RenderConnInterfacePair(
+func (mgr *NetworkServiceMgr) RenderConnInterfacePair(
+	ns *controller.NetworkService,
 	vppAgent string,
 	conn *controller.Connection,
 	netPodInterface *controller.Interface,
@@ -37,18 +38,18 @@ func (ns *NetworkService) RenderConnInterfacePair(
 
 	switch netPodInterface.IfType {
 	case controller.IfTypeMemif:
-		ifName, ifStatus, err = ns.RenderConnMemifPair(vppAgent, conn, netPodInterface, networkPodType)
+		ifName, ifStatus, err = mgr.RenderConnMemifPair(ns, vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeVeth:
-		ifName, ifStatus, err =  ns.RenderConnVethAfpPair(vppAgent, conn, netPodInterface, networkPodType)
+		ifName, ifStatus, err =  mgr.RenderConnVethAfpPair(ns, vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeTap:
-		ifName, ifStatus, err =  ns.RenderConnTapPair(vppAgent, conn, netPodInterface, networkPodType)
+		ifName, ifStatus, err =  mgr.RenderConnTapPair(ns, vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeEthernet:
 		// the ethernet interface is special and has been created by the node already
 		return netPodInterface.Name, nil, nil
 	}
 
 	if err == nil {
-		if err := ns.RenderInterfaceForwarding(netPodInterface); err != nil {
+		if err := mgr.RenderInterfaceForwarding(ns, netPodInterface); err != nil {
 			return "", nil, err
 		}
 	}
@@ -57,7 +58,8 @@ func (ns *NetworkService) RenderConnInterfacePair(
 }
 
 // RenderConnMemifPair renders this vnf/vswitch interface pair
-func (ns *NetworkService) RenderConnMemifPair(
+func (mgr *NetworkServiceMgr) RenderConnMemifPair(
+	ns *controller.NetworkService,
 	vppAgent string,
 	conn *controller.Connection,
 	networkPodInterface *controller.Interface,
@@ -72,7 +74,7 @@ func (ns *NetworkService) RenderConnMemifPair(
 	if err != nil {
 		RemoveInterfaceStatus(ns.Status.Interfaces, connPodName, connInterfaceName)
 		msg := fmt.Sprintf("network pod interface: %s/%s, %s", connPodName, connInterfaceName, err)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return "", nil, err
 	}
 	if ifStatus.MemifID == 0 {
@@ -130,7 +132,8 @@ func (ns *NetworkService) RenderConnMemifPair(
 }
 
 // RenderConnDirectInterPodMemifPair renders this pod-pod interface pair
-func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
+func (mgr *NetworkServiceMgr) RenderConnDirectInterPodMemifPair(
+	ns *controller.NetworkService,
 	networkPodInterfaces []*controller.Interface,
 	networkPodType string) error {
 
@@ -143,7 +146,7 @@ func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
 	if err != nil {
 		RemoveInterfaceStatus(ns.Status.Interfaces, connPodName0, connInterfaceName0)
 		msg := fmt.Sprintf("network pod interface: %s/%s, %s", connPodName0, connInterfaceName0, err)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return err
 	}
 	if if0Status.MemifID == 0 {
@@ -168,7 +171,7 @@ func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
 
-	if err = ns.RenderInterfaceForwarding(networkPodInterfaces[0]); err != nil {
+	if err = mgr.RenderInterfaceForwarding(ns, networkPodInterfaces[0]); err != nil {
 		return err
 	}
 
@@ -179,7 +182,7 @@ func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
 	if err != nil {
 		RemoveInterfaceStatus(ns.Status.Interfaces, connPodName1, connInterfaceName1)
 		msg := fmt.Sprintf("network pod interface: %s/%s, %s", connPodName1, connInterfaceName1, err)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return err
 	}
 	if1Status.MemifID = if0Status.MemifID
@@ -202,7 +205,7 @@ func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
 
-	if err = ns.RenderInterfaceForwarding(networkPodInterfaces[1]); err != nil {
+	if err = mgr.RenderInterfaceForwarding(ns, networkPodInterfaces[1]); err != nil {
 		return err
 	}
 
@@ -213,7 +216,8 @@ func (ns *NetworkService) RenderConnDirectInterPodMemifPair(
 }
 
 // RenderConnTapPair renders this pod/vswitch tap interface pair
-func (ns *NetworkService) RenderConnTapPair(
+func (mgr *NetworkServiceMgr) RenderConnTapPair(
+	ns *controller.NetworkService,
 	vppAgent string,
 	conn *controller.Connection,
 	networkPodInterface *controller.Interface,
@@ -228,7 +232,7 @@ func (ns *NetworkService) RenderConnTapPair(
 	if err != nil {
 		RemoveInterfaceStatus(ns.Status.Interfaces, connPodName, connInterfaceName)
 		msg := fmt.Sprintf("network pod interface: %s/%s, %s", connPodName, connInterfaceName, err)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return "", nil, err
 	}
 
@@ -284,7 +288,8 @@ func (ns *NetworkService) RenderConnTapPair(
 }
 
 // RenderConnVethAfpPair renders this pod/vswitch veth/afp interface pair
-func (ns *NetworkService) RenderConnVethAfpPair(
+func (mgr *NetworkServiceMgr) RenderConnVethAfpPair(
+	ns *controller.NetworkService,
 	vppAgent string,
 	conn *controller.Connection,
 	networkPodInterface *controller.Interface,
@@ -299,7 +304,7 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 	if err != nil {
 		RemoveInterfaceStatus(ns.Status.Interfaces, connPodName, connInterfaceName)
 		msg := fmt.Sprintf("network pod interface: %s/%s, %s", connPodName, connInterfaceName, err)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return "", nil, err
 	}
 
@@ -396,7 +401,8 @@ func (ns *NetworkService) RenderConnVethAfpPair(
 }
 
 // each interface can have a set of fwd-ing instructions so render them against the interface
-func (ns *NetworkService) RenderInterfaceForwarding(
+func (mgr *NetworkServiceMgr) RenderInterfaceForwarding(
+	ns *controller.NetworkService,
 	networkPodInterface *controller.Interface) error {
 
 	log.Debugf("renderInterfaceForwarding: %v", networkPodInterface)

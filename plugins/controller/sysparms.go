@@ -30,7 +30,7 @@ import (
 
 // SystemParametersMgr contains the system parameters for the system
 type SystemParametersMgr struct {
-	sysParmCache *SystemParameters
+	sysParmCache *controller.SystemParameters
 }
 
 // Init initializes the ram cache then pulls in the entries from the db
@@ -47,29 +47,26 @@ func (mgr *SystemParametersMgr) AfterInit() {
 	}
 }
 
-// SystemParameters holds all system parameter specific info
-type SystemParameters struct {
-	controller.SystemParameters
-}
-
 // InitRAMCache create a map for all the entities
 func (mgr *SystemParametersMgr) InitRAMCache() {
 	mgr.sysParmCache = nil // delete old cache for re-init
-	mgr.sysParmCache = &SystemParameters{}
+	mgr.sysParmCache = &controller.SystemParameters{}
 }
 
 // DumpCache logs all the entries in the map
 func (mgr *SystemParametersMgr) DumpCache() {
-	mgr.sysParmCache.dumpToLog()
+	mgr.dumpToLog(mgr.sysParmCache)
 }
 
-func (sp *SystemParameters) dumpToLog() {
+func (mgr *SystemParametersMgr) dumpToLog(sp *controller.SystemParameters) {
 	log.Infof("SystemParameters = %v", sp)
 }
 
 // ConfigEqual return true if the entities are equal
-func (sp *SystemParameters) ConfigEqual(sp2 *SystemParameters) bool {
-	if sp.String() != sp2.String() {
+func (mgr *SystemParametersMgr) ConfigEqual(
+	sp1 *controller.SystemParameters,
+	sp2 *controller.SystemParameters) bool {
+	if sp1.String() != sp2.String() {
 		return false
 	}
 	return true
@@ -101,15 +98,15 @@ func (mgr *SystemParametersMgr) FindL2BDTemplate(templateName string) *controlle
 // HandleCRUDOperationCU add to ram cache and render
 func (mgr *SystemParametersMgr) HandleCRUDOperationCU(data interface{}) error {
 
-	sp := data.(*SystemParameters)
+	sp := data.(*controller.SystemParameters)
 
-	if err := sp.validate(); err != nil {
+	if err := mgr.validate(sp); err != nil {
 		return err
 	}
 
 	mgr.sysParmCache = sp
 
-	if err := sp.writeToDatastore(); err != nil {
+	if err := mgr.writeToDatastore(sp); err != nil {
 		return err
 	}
 
@@ -117,39 +114,39 @@ func (mgr *SystemParametersMgr) HandleCRUDOperationCU(data interface{}) error {
 }
 
 // HandleCRUDOperationR finds in ram cache
-func (mgr *SystemParametersMgr) HandleCRUDOperationR() (*SystemParameters, bool) {
+func (mgr *SystemParametersMgr) HandleCRUDOperationR() (*controller.SystemParameters, bool) {
 	return mgr.sysParmCache, true
 }
 
 // HandleCRUDOperationD finds in ram cache
 func (mgr *SystemParametersMgr) HandleCRUDOperationD(data interface{}) error {
 	log.Debugf("HandleCRUDOperationD: resetting to defaults")
-	mgr.sysParmCache = &SystemParameters{}
+	mgr.sysParmCache = &controller.SystemParameters{}
 	mgr.HandleCRUDOperationCU(mgr.sysParmCache)
 	return nil
 }
 
 // HandleCRUDOperationGetAll returns the map
-func (mgr *SystemParametersMgr) HandleCRUDOperationGetAll() *SystemParameters {
+func (mgr *SystemParametersMgr) HandleCRUDOperationGetAll() *controller.SystemParameters {
 	return mgr.sysParmCache
 }
 
-func (sp *SystemParameters) writeToDatastore() error {
+func (mgr *SystemParametersMgr) writeToDatastore(sp *controller.SystemParameters) error {
 	return database.WriteToDatastore(ctlrPlugin.SysParametersMgr.KeyPrefix(), sp)
 }
 
-func (sp *SystemParameters) deleteFromDatastore() {
+func (mgr *SystemParametersMgr) deleteFromDatastore(sp *controller.SystemParameters) {
 	database.DeleteFromDatastore(ctlrPlugin.SysParametersMgr.KeyPrefix())
 }
 
 // LoadAllFromDatastoreIntoCache iterates over the etcd set
 func (mgr *SystemParametersMgr) LoadAllFromDatastoreIntoCache() error {
-	log.Debugf("LoadAllFromDatastore: ...")
+	log.Debugf("LoadAllFromDatastoreIntoCache: ...")
 	return mgr.loadAllFromDatastore(mgr.sysParmCache)
 }
 
 // loadAllFromDatastore iterates over the etcd set
-func (mgr *SystemParametersMgr) loadAllFromDatastore(sp *SystemParameters) error {
+func (mgr *SystemParametersMgr) loadAllFromDatastore(sp *controller.SystemParameters) error {
 	return database.ReadFromDatastore(ctlrPlugin.SysParametersMgr.KeyPrefix(), sp)
 }
 
@@ -159,12 +156,12 @@ func (mgr *SystemParametersMgr) InitHTTPHandlers() {
 	log.Infof("InitHTTPHandlers: registering ...")
 
 	log.Infof("InitHTTPHandlers: registering GET/POST %s", mgr.KeyPrefix())
-	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(mgr.KeyPrefix(), systemParametersHandler, "GET", "POST")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(mgr.KeyPrefix(), mgr.systemParametersHandler, "GET", "POST")
 }
 
 // curl -X GET http://localhost:9191/sfc_controller/v2/config/system-parameters
 // curl -X POST -d '{json payload}' http://localhost:9191/sfc_controller/v2/config/system-parameters
-func systemParametersHandler(formatter *render.Render) http.HandlerFunc {
+func (mgr *SystemParametersMgr) systemParametersHandler(formatter *render.Render) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("systemParametersHandler: Method %s, URL: %s", req.Method, req.URL)
@@ -176,12 +173,12 @@ func systemParametersHandler(formatter *render.Render) http.HandlerFunc {
 				formatter.JSON(w, http.StatusNotFound, "not found")
 			}
 		case "POST":
-			systemParametersProcessPost(formatter, w, req)
+			mgr.systemParametersProcessPost(formatter, w, req)
 		}
 	}
 }
 
-func systemParametersProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
+func (mgr *SystemParametersMgr) systemParametersProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -190,7 +187,7 @@ func systemParametersProcessPost(formatter *render.Render, w http.ResponseWriter
 		return
 	}
 
-	var sp SystemParameters
+	var sp controller.SystemParameters
 	err = json.Unmarshal(body, &sp)
 	if err != nil {
 		log.Debugf("Can't parse body, error '%s'", err)
@@ -200,7 +197,7 @@ func systemParametersProcessPost(formatter *render.Render, w http.ResponseWriter
 
 	if existing, exists := ctlrPlugin.SysParametersMgr.HandleCRUDOperationR(); exists {
 		// if nothing has changed, simply return OK and waste no cycles
-		if existing.ConfigEqual(&sp) {
+		if mgr.ConfigEqual(existing, &sp) {
 			log.Debugf("processPost: config equal no further processing required")
 			formatter.JSON(w, http.StatusOK, "OK")
 			return
@@ -209,7 +206,7 @@ func systemParametersProcessPost(formatter *render.Render, w http.ResponseWriter
 		log.Debugf("processPost: new: %v", sp)
 	}
 
-	if err := sp.validate(); err != nil {
+	if err := mgr.validate(&sp); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
@@ -224,7 +221,7 @@ func (mgr *SystemParametersMgr) KeyPrefix() string {
 	return controller.SfcControllerConfigPrefix() + "system-parameters"
 }
 
-func (sp *SystemParameters) validate() error {
+func (mgr *SystemParametersMgr) validate(sp *controller.SystemParameters) error {
 	log.Debugf("Validating SystemParameters: %v ...", sp)
 
 	if sp.Mtu == 0 {

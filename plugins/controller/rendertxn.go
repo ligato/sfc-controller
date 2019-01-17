@@ -160,7 +160,7 @@ func RenderTxnConfigEnd() error {
 	// now post process the after cache, write the remaining entries to etcd
 	for key, after := range afterMap[0] {
 		log.Info("ConfigEnd: add key to etcd: ", key, after)
-		err := after.WriteToEtcd(ctlrPlugin.DB)
+		err := after.WriteToKVStore()
 		if err != nil {
 			return err
 		}

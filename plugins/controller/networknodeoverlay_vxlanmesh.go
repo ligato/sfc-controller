@@ -23,12 +23,13 @@ import (
 )
 
 // renderConnL2MPVxlanMesh renders these L2MP tunnels between nodes
-func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
-	ns *NetworkService,
+func (mgr *NetworkNodeOverlayMgr) renderConnL2MPVxlanMesh(
+	nno *controller.NetworkNodeOverlay,
+	ns *controller.NetworkService,
 	conn *controller.Connection,
 	connIndex uint32,
 	vnfInterfaces []*controller.Interface,
-	p2nArray []NetworkPodToNodeMap,
+	p2nArray []controller.NetworkPodToNodeMap,
 	vnfTypes []string,
 	nodeMap map[string]bool,
 	l2bdIFs map[string][]*l2.BridgeDomain_Interface) error {
@@ -45,7 +46,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 			ns.Metadata.Name,
 			connIndex+1,
 			nno.Metadata.Name)
-		ns.AppendStatusMsg(msg)
+		ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 	vni, err := vniAllocator.AllocateVni()
@@ -54,7 +55,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 			ns.Metadata.Name,
 			connIndex+1,
 			nno.Metadata.Name)
-		ns.AppendStatusMsg(msg)
+		ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 
@@ -77,7 +78,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 					ns.Metadata.Name,
 					connIndex+1,
 					nno.Metadata.Name, err)
-				ns.AppendStatusMsg(msg)
+				ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 				return fmt.Errorf(msg)
 			}
 			vxlanIPToAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
@@ -87,7 +88,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 					ns.Metadata.Name,
 					connIndex+1,
 					nno.Metadata.Name, err)
-				ns.AppendStatusMsg(msg)
+				ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 				return fmt.Errorf(msg)
 			}
 
@@ -125,7 +126,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 
 	// create the perNode L2BD's and add the vnf interfaces
 	for nodeName := range nodeMap {
-		if err := ns.RenderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
+		if err := ctlrPlugin.NetworkServiceMgr.RenderL2BD(ns, conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
 			return err
 		}
 	}
@@ -134,12 +135,13 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanMesh(
 }
 
 // renderConnL2PPVxlanMesh renders this L2PP tunnel between nodes
-func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
-	ns *NetworkService,
+func (mgr *NetworkNodeOverlayMgr) renderConnL2PPVxlanMesh(
+	nno *controller.NetworkNodeOverlay,
+	ns *controller.NetworkService,
 	conn *controller.Connection,
 	connIndex uint32,
 	networkPodInterfaces []*controller.Interface,
-	p2nArray [2]NetworkPodToNodeMap,
+	p2nArray [2]controller.NetworkPodToNodeMap,
 	xconn [2][2]string) error {
 
 	// create the vxlan endpoints
@@ -151,7 +153,7 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 			conn.PodInterfaces[0],
 			conn.PodInterfaces[1],
 			nno.Metadata.Name)
-		ns.AppendStatusMsg(msg)
+		ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 	vni, err := vniAllocator.AllocateVni()
@@ -162,7 +164,7 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 			conn.PodInterfaces[0],
 			conn.PodInterfaces[1],
 			nno.Metadata.Name)
-		ns.AppendStatusMsg(msg)
+		ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 
@@ -189,7 +191,7 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 				conn.PodInterfaces[0],
 				conn.PodInterfaces[1],
 				nno.Metadata.Name, err)
-			ns.AppendStatusMsg(msg)
+			ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 		vxlanIPToAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
@@ -202,7 +204,7 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 				conn.PodInterfaces[0],
 				conn.PodInterfaces[1],
 				nno.Metadata.Name, err)
-			ns.AppendStatusMsg(msg)
+			ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 
@@ -243,13 +245,14 @@ func (nno *NetworkNodeOverlay) renderConnL2PPVxlanMesh(
 }
 
 // renderConnL3PPVxlanMesh renders this L3PP tunnel between nodes
-func (nno *NetworkNodeOverlay) renderConnL3PPVxlanMesh(
-	ns *NetworkService,
+func (mgr *NetworkNodeOverlayMgr) renderConnL3PPVxlanMesh(
+	nno *controller.NetworkNodeOverlay,
+	ns *controller.NetworkService,
 	conn *controller.Connection,
 	connIndex uint32,
 	networkPodInterfaces []*controller.Interface,
 	ifStatuses [2]*controller.InterfaceStatus,
-	p2nArray [2]NetworkPodToNodeMap,
+	p2nArray [2]controller.NetworkPodToNodeMap,
 	xconn [2][2]string,
 	l2bdIFs map[string][]*l2.BridgeDomain_Interface) error {
 
@@ -262,7 +265,7 @@ func (nno *NetworkNodeOverlay) renderConnL3PPVxlanMesh(
 			conn.PodInterfaces[0],
 			conn.PodInterfaces[1],
 			nno.Metadata.Name)
-		ns.AppendStatusMsg(msg)
+		ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 	vni, err := vniAllocator.AllocateVni()
@@ -273,7 +276,7 @@ func (nno *NetworkNodeOverlay) renderConnL3PPVxlanMesh(
 			conn.PodInterfaces[0],
 			conn.PodInterfaces[1],
 			nno.Metadata.Name)
-		ns.AppendStatusMsg(msg)
+		ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 
@@ -300,7 +303,7 @@ func (nno *NetworkNodeOverlay) renderConnL3PPVxlanMesh(
 				conn.PodInterfaces[0],
 				conn.PodInterfaces[1],
 				nno.Metadata.Name, err)
-			ns.AppendStatusMsg(msg)
+			ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 		vxlanIPToAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
@@ -313,7 +316,7 @@ func (nno *NetworkNodeOverlay) renderConnL3PPVxlanMesh(
 				conn.PodInterfaces[0],
 				conn.PodInterfaces[1],
 				nno.Metadata.Name, err)
-			ns.AppendStatusMsg(msg)
+			ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 
@@ -373,12 +376,13 @@ func (nno *NetworkNodeOverlay) renderConnL3PPVxlanMesh(
 }
 
 // renderConnL2MPVxlanMesh renders these L2MP tunnels between nodes
-func (nno *NetworkNodeOverlay) renderConnL3MPVxlanMesh(
-	ns *NetworkService,
+func (mgr *NetworkNodeOverlayMgr) renderConnL3MPVxlanMesh(
+	nno *controller.NetworkNodeOverlay,
+	ns *controller.NetworkService,
 	conn *controller.Connection,
 	connIndex uint32,
 	vnfInterfaces []*controller.Interface,
-	p2nArray []NetworkPodToNodeMap,
+	p2nArray []controller.NetworkPodToNodeMap,
 	vnfTypes []string,
 	nodeMap map[string]bool,
 	l3vrfs map[string][]*controller.L3VRFRoute,
@@ -394,7 +398,7 @@ func (nno *NetworkNodeOverlay) renderConnL3MPVxlanMesh(
 			ns.Metadata.Name,
 			connIndex+1,
 			nno.Metadata.Name)
-		ns.AppendStatusMsg(msg)
+		ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 	vni, err := vniAllocator.AllocateVni()
@@ -403,7 +407,7 @@ func (nno *NetworkNodeOverlay) renderConnL3MPVxlanMesh(
 			ns.Metadata.Name,
 			connIndex+1,
 			nno.Metadata.Name)
-		ns.AppendStatusMsg(msg)
+		ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 
@@ -431,7 +435,7 @@ func (nno *NetworkNodeOverlay) renderConnL3MPVxlanMesh(
 					ns.Metadata.Name,
 					connIndex+1,
 					nno.Metadata.Name, err)
-				ns.AppendStatusMsg(msg)
+				ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 				return fmt.Errorf(msg)
 			}
 			vxlanIPToAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
@@ -441,7 +445,7 @@ func (nno *NetworkNodeOverlay) renderConnL3MPVxlanMesh(
 					ns.Metadata.Name,
 					connIndex+1,
 					nno.Metadata.Name, err)
-				ns.AppendStatusMsg(msg)
+				ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 				return fmt.Errorf(msg)
 			}
 
@@ -496,7 +500,7 @@ func (nno *NetworkNodeOverlay) renderConnL3MPVxlanMesh(
 
 	// create the perNode L2BD's and add the vnf interfaces
 	for nodeName := range nodeMap {
-		if err := ns.RenderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
+		if err := ctlrPlugin.NetworkServiceMgr.RenderL2BD(ns, conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
 			return err
 		}
 	}

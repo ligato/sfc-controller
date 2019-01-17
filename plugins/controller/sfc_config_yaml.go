@@ -19,6 +19,7 @@ import (
 	"github.com/ghodss/yaml"
 	"io/ioutil"
 	"time"
+	"github.com/ligato/sfc-controller/plugins/controller/model"
 
 )
 
@@ -26,15 +27,15 @@ const sfcYamlVersion = 2
 
 // SfcConfigYaml is the container struct for the YAML config file
 type SfcConfigYaml struct {
-	Version             int                    `json:"sfc_controller_config_version"`
-	Description         string                 `json:"description"`
-	SysParms            *SystemParameters       `json:"system_parameters"`
-	IPAMPools           []*IPAMPool            `json:"ipam_pools"`
-	NetworkPodToNodeMap []*NetworkPodToNodeMap `json:"network_pod_to_node_map"`
-	NetworkNodeOverlays []*NetworkNodeOverlay  `json:"network_node_overlays"`
-	NetworkNodes        []*NetworkNode         `json:"network_nodes"`
-	NetworkServices     []*NetworkService      `json:"network_services"`
-	RAMCache            *CacheType             `json:"ram_cache"`
+	Version             int                               `json:"sfc_controller_config_version"`
+	Description         string                            `json:"description"`
+	SysParms            *controller.SystemParameters      `json:"system_parameters"`
+	IPAMPools           []*controller.IPAMPool            `json:"ipam_pools"`
+	NetworkPodToNodeMap []*controller.NetworkPodToNodeMap `json:"network_pod_to_node_map"`
+	NetworkNodeOverlays []*controller.NetworkNodeOverlay  `json:"network_node_overlays"`
+	NetworkNodes        []*controller.NetworkNode         `json:"network_nodes"`
+	NetworkServices     []*controller.NetworkService      `json:"network_services"`
+	RAMCache            *CacheType                        `json:"ram_cache"`
 }
 
 // SfcConfigYamlReadFromFile parses the yaml into YamlConfig

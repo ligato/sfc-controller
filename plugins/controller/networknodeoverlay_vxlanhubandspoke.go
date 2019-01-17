@@ -23,12 +23,13 @@ import (
 )
 
 // renderConnL2MPVxlanHubAndSpoke renders these L2MP tunnels between hub and nodes
-func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
-	ns *NetworkService,
+func (mgr *NetworkNodeOverlayMgr) renderConnL2MPVxlanHubAndSpoke(
+	nno *controller.NetworkNodeOverlay,
+	ns *controller.NetworkService,
 	conn *controller.Connection,
 	connIndex uint32,
 	networkPodInterfaces []*controller.Interface,
-	p2nArray []NetworkPodToNodeMap,
+	p2nArray []controller.NetworkPodToNodeMap,
 	vnfTypes []string,
 	spokeNodeMap map[string]bool,
 	l2bdIFs map[string][]*l2.BridgeDomain_Interface) error {
@@ -47,7 +48,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 			connIndex+1,
 			nno.Metadata.Name,
 			hubNodeName)
-		ns.AppendStatusMsg(msg)
+		ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 
@@ -61,7 +62,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 				ns.Metadata.Name,
 				connIndex+1,
 				nno.Metadata.Name, hubNodeName)
-			ns.AppendStatusMsg(msg)
+			ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 
@@ -89,7 +90,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 					ns.Metadata.Name,
 					connIndex+1,
 					nno.Metadata.Name, err)
-				ns.AppendStatusMsg(msg)
+				ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 				return fmt.Errorf(msg)
 			}
 			vxlanIPToAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
@@ -100,7 +101,7 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 					ns.Metadata.Name,
 					connIndex+1,
 					nno.Metadata.Name, err)
-				ns.AppendStatusMsg(msg)
+				ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 				return fmt.Errorf(msg)
 			}
 
@@ -138,12 +139,12 @@ func (nno *NetworkNodeOverlay) renderConnL2MPVxlanHubAndSpoke(
 
 	// create the spoke node l2bd's and add the vnf interfaces and vxlan if's from abve
 	for nodeName := range spokeNodeMap {
-		if err := ns.RenderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
+		if err := ctlrPlugin.NetworkServiceMgr.RenderL2BD(ns, conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
 			return err
 		}
 	}
 	// create the hub l2bd and add the vxaln if's from above
-	if err := ns.RenderL2BD(conn, connIndex, hubNodeName, l2bdIFs[hubNodeName]); err != nil {
+	if err := ctlrPlugin.NetworkServiceMgr.RenderL2BD(ns, conn, connIndex, hubNodeName, l2bdIFs[hubNodeName]); err != nil {
 		return err
 	}
 

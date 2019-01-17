@@ -25,12 +25,13 @@ import (
 // The L3MP topology is rendered in this module for a connection with a vnf-service
 
 // RenderConnL3MP renders this L3MP connection
-func (ns *NetworkService) RenderConnL3MP(
+func (mgr *NetworkServiceMgr) RenderConnL3MP(
+	ns *controller.NetworkService,
 	conn *controller.Connection,
 	connIndex uint32) error {
 
 	// need to order these to match the array of the conn's conn.PodInterfaces
-	var p2nArray []NetworkPodToNodeMap
+	var p2nArray []controller.NetworkPodToNodeMap
 	netPodInterfaces := make([]*controller.Interface, 0)
 	networkPodTypes := make([]string, 0)
 
@@ -51,7 +52,7 @@ func (ns *NetworkService) RenderConnL3MP(
 		if !exists || p2n.Node == "" {
 			msg := fmt.Sprintf("conn: %d: %s, network pod not mapped to a node in network-pod-to-node-map",
 				connIndex+1, connPodInterface)
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			allPodsAssignedToNodes = false
 			continue
 		}
@@ -60,7 +61,7 @@ func (ns *NetworkService) RenderConnL3MP(
 		if !exists {
 			msg := fmt.Sprintf("conn: %d: %s, network pod references non existant host: %s",
 				connIndex+1, connPodInterface, p2n.Node)
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			allPodsAssignedToNodes = false
 			continue
 		}
@@ -70,8 +71,8 @@ func (ns *NetworkService) RenderConnL3MP(
 		// based on the interfaces in the conn, order the interface info accordingly as the set of
 		// interfaces in the pod/interface stanza can be in a different order
 		p2nArray = append(p2nArray, *p2n)
-		netPodInterface, networkPodType := ns.findNetworkPodAndInterfaceInList(connPodName,
-			connInterfaceName, ns.Spec.NetworkPods)
+		netPodInterface, networkPodType := mgr.findNetworkPodAndInterfaceInList(
+			ns, connPodName, connInterfaceName, ns.Spec.NetworkPods)
 		netPodInterface.Parent = connPodName
 		netPodInterfaces = append(netPodInterfaces, netPodInterface)
 		networkPodTypes = append(networkPodTypes, networkPodType)
@@ -83,7 +84,7 @@ func (ns *NetworkService) RenderConnL3MP(
 
 		nodeInterface, nodeIfType := ctlrPlugin.NetworkNodeMgr.FindInterfaceInNode(connNodeName, connInterfaceName)
 		nodeInterface.Parent = connNodeName
-		var p2n NetworkPodToNodeMap
+		var p2n controller.NetworkPodToNodeMap
 		p2n.Node = connNodeName
 		p2n.Pod = connNodeName
 		p2nArray = append(p2nArray, p2n)
@@ -97,7 +98,7 @@ func (ns *NetworkService) RenderConnL3MP(
 	if !allPodsAssignedToNodes {
 		msg := fmt.Sprintf("network-service: %s, not all network pods in this connection are mapped to nodes",
 			ns.Metadata.Name)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 
@@ -105,7 +106,7 @@ func (ns *NetworkService) RenderConnL3MP(
 	// log.Debugf("RenderTopologyL3MP: p2n=%v, vnfI=%v, conn=%v", p2n, netPodInterfaces, conn)
 
 	// if an overlay is specified, see if it exists
-	var nno *NetworkNodeOverlay
+	var nno *controller.NetworkNodeOverlay
 	exists := false
 	if conn.NetworkNodeOverlayName != "" {
 		nno, exists = ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationR(conn.NetworkNodeOverlayName)
@@ -114,7 +115,7 @@ func (ns *NetworkService) RenderConnL3MP(
 				ns.Metadata.Name,
 				connIndex+1,
 				conn.NetworkNodeOverlayName)
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 	}
@@ -124,14 +125,14 @@ func (ns *NetworkService) RenderConnL3MP(
 		if len(nodeMap) == 0 {
 			msg := fmt.Sprintf("network service: %s, no interfaces specified to connect to node interface label",
 				ns.Metadata.Name)
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 
 		if len(nodeMap) != 1 {
 			msg := fmt.Sprintf("network service: %s, all interfaces must be on smae node to connect to node interface label",
 				ns.Metadata.Name)
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 
@@ -139,13 +140,13 @@ func (ns *NetworkService) RenderConnL3MP(
 		if len(nodeInterfaces) == 0 {
 			msg := fmt.Sprintf("network service: %s, nodeLabels %v: must match at least one node interface: incorrect config",
 				ns.Metadata.Name, conn.NodeInterfaceLabels)
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 
 		for _, nodeInterface := range nodeInterfaces {
 			nodeInterface.Parent = p2nArray[0].Node
-			var p2n NetworkPodToNodeMap
+			var p2n controller.NetworkPodToNodeMap
 			p2n.Node = p2nArray[0].Node
 			p2n.Pod = p2nArray[0].Node
 			p2nArray = append(p2nArray, p2n)
@@ -158,29 +159,30 @@ func (ns *NetworkService) RenderConnL3MP(
 
 	// see if the networkPods are on the same node ...
 	if len(nodeMap) == 1 {
-		return ns.renderConnL3MPSameNode(conn, connIndex, netPodInterfaces,
+		return mgr.renderConnL3MPSameNode(ns, conn, connIndex, netPodInterfaces,
 			nno, p2nArray, networkPodTypes)
 	} else if staticNodesInInterfacesSpecified {
 		msg := fmt.Sprintf("network service: %s, nodes %s/%s must be the same",
 			ns.Metadata.Name,
 			p2nArray[0].Node,
 			p2nArray[1].Node)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 
 	// now setup the connection between nodes
-	return ns.renderConnL3MPInterNode(conn, connIndex, netPodInterfaces,
+	return mgr.renderConnL3MPInterNode(ns, conn, connIndex, netPodInterfaces,
 		nno, p2nArray, networkPodTypes, nodeMap)
 }
 
 // renderConnL3MPSameNode renders this L3MP connection set on same node
-func (ns *NetworkService) renderConnL3MPSameNode(
+func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
+	ns *controller.NetworkService,
 	conn *controller.Connection,
 	connIndex uint32,
 	netPodInterfaces []*controller.Interface,
-	nno *NetworkNodeOverlay,
-	p2nArray []NetworkPodToNodeMap,
+	nno *controller.NetworkNodeOverlay,
+	p2nArray []controller.NetworkPodToNodeMap,
 	networkPodTypes []string) error {
 
 	// The interfaces should be created in the vnf and the vswitch then the vswitch
@@ -196,7 +198,7 @@ func (ns *NetworkService) renderConnL3MPSameNode(
 
 	for i := 0; i < len(netPodInterfaces); i++ {
 
-		ifName, ifStatus, err := ns.RenderConnInterfacePair(nodeName, conn, netPodInterfaces[i], networkPodTypes[i])
+		ifName, ifStatus, err := mgr.RenderConnInterfacePair(ns, nodeName, conn, netPodInterfaces[i], networkPodTypes[i])
 		if err != nil {
 			return err
 		}
@@ -242,7 +244,9 @@ func (ns *NetworkService) renderConnL3MPSameNode(
 			singleSpokeMap := make(map[string]bool)
 			singleSpokeMap[nodeName] = true
 
-			return nno.renderConnL2MPVxlanHubAndSpoke(ns,
+			return ctlrPlugin.NetworkNodeOverlayMgr.renderConnL2MPVxlanHubAndSpoke(
+				nno,
+				ns,
 				conn,
 				connIndex,
 				netPodInterfaces,
@@ -257,12 +261,13 @@ func (ns *NetworkService) renderConnL3MPSameNode(
 }
 
 // renderConnL3MPInterNode renders this L3MP connection between nodes
-func (ns *NetworkService) renderConnL3MPInterNode(
+func (mgr *NetworkServiceMgr) renderConnL3MPInterNode(
+	ns *controller.NetworkService,
 	conn *controller.Connection,
 	connIndex uint32,
 	netPodInterfaces []*controller.Interface,
-	nno *NetworkNodeOverlay,
-	p2nArray []NetworkPodToNodeMap,
+	nno *controller.NetworkNodeOverlay,
+	p2nArray []controller.NetworkPodToNodeMap,
 	networkPodTypes []string,
 	nodeMap map[string]bool) error {
 
@@ -284,7 +289,7 @@ func (ns *NetworkService) renderConnL3MPInterNode(
 	// interfaces per node
 	for i := 0; i < len(netPodInterfaces); i++ {
 
-		ifName, ifStatus, err := ns.RenderConnInterfacePair(p2nArray[i].Node, conn, netPodInterfaces[i], networkPodTypes[i])
+		ifName, ifStatus, err := mgr.RenderConnInterfacePair(ns, p2nArray[i].Node, conn, netPodInterfaces[i], networkPodTypes[i])
 		if err != nil {
 			return err
 		}
@@ -327,7 +332,9 @@ func (ns *NetworkService) renderConnL3MPInterNode(
 	case controller.NetworkNodeOverlayConnectionTypeVxlan:
 		switch nno.Spec.ServiceMeshType {
 		case controller.NetworkNodeOverlayTypeMesh:
-			return nno.renderConnL3MPVxlanMesh(ns,
+			return ctlrPlugin.NetworkNodeOverlayMgr.renderConnL3MPVxlanMesh(
+				nno,
+				ns,
 				conn,
 				connIndex,
 				netPodInterfaces,
@@ -337,7 +344,9 @@ func (ns *NetworkService) renderConnL3MPInterNode(
 				l3vrfs,
 				l2bdIFs)
 		case controller.NetworkNodeOverlayTypeHubAndSpoke:
-			return nno.renderConnL2MPVxlanHubAndSpoke(ns,
+			return ctlrPlugin.NetworkNodeOverlayMgr.renderConnL2MPVxlanHubAndSpoke(
+				nno,
+				ns,
 				conn,
 				connIndex,
 				netPodInterfaces,
@@ -351,7 +360,7 @@ func (ns *NetworkService) renderConnL3MPInterNode(
 			ns.Metadata.Name,
 			connIndex+1,
 			nno.Metadata.Name)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 

@@ -35,11 +35,11 @@ import (
 )
 
 type NetworkServiceMgr struct {
-	networkServiceCache map[string]*NetworkService
+	networkServiceCache map[string]*controller.NetworkService
 }
 
-func (mgr *NetworkServiceMgr) ToArray() []*NetworkService {
-	var array []*NetworkService
+func (mgr *NetworkServiceMgr) ToArray() []*controller.NetworkService {
+	var array []*controller.NetworkService
 	for _, ns := range mgr.networkServiceCache {
 		array = append(array, ns)
 	}
@@ -58,34 +58,31 @@ func (mgr *NetworkServiceMgr) AfterInit() {
 	}
 }
 
-// NetworkService holds all network node specific info
-type NetworkService struct {
-	controller.NetworkService
-}
-
 // InitRAMCache create a map for all the entites
 func (mgr *NetworkServiceMgr) InitRAMCache() {
 	mgr.networkServiceCache = nil // delete old cache for re-init
-	mgr.networkServiceCache = make(map[string]*NetworkService)
+	mgr.networkServiceCache = make(map[string]*controller.NetworkService)
 }
 
 // DumpCache logs all the entries in the map
 func (mgr *NetworkServiceMgr) DumpCache() {
 	for _, ns := range mgr.networkServiceCache {
-		ns.dumpToLog()
+		mgr.dumpToLog(ns)
 	}
 }
 
-func (ns *NetworkService) dumpToLog() {
+func (mgr *NetworkServiceMgr) dumpToLog(ns *controller.NetworkService) {
 	log.Infof("NetworkService[%s] = %v", ns.Metadata.Name, ns)
 }
 
 // ConfigEqual return true if the entities are equal
-func (ns *NetworkService) ConfigEqual(ns2 *NetworkService) bool {
-	if ns.Metadata.String() != ns2.Metadata.String() {
+func (mgr *NetworkServiceMgr) ConfigEqual(
+	ns1 *controller.NetworkService,
+	ns2 *controller.NetworkService) bool {
+	if ns1.Metadata.String() != ns2.Metadata.String() {
 		return false
 	}
-	if ns.Spec.String() != ns2.Spec.String() {
+	if ns1.Spec.String() != ns2.Spec.String() {
 		return false
 	}
 	// ignore .Status as just comparing config
@@ -93,16 +90,16 @@ func (ns *NetworkService) ConfigEqual(ns2 *NetworkService) bool {
 }
 
 // AppendStatusMsg adds the message to the status section
-func (ns *NetworkService) AppendStatusMsg(msg string) {
+func (mgr *NetworkServiceMgr) AppendStatusMsg(ns *controller.NetworkService, msg string) {
 	ns.Status.Msg = append(ns.Status.Msg, msg)
 }
 
 // HandleCRUDOperationCU add to ram cache and render
 func (mgr *NetworkServiceMgr) HandleCRUDOperationCU(data interface{}) error {
 
-	_ns := data.(*NetworkService)
+	_ns := data.(*controller.NetworkService)
 
-	ns := &NetworkService{}
+	ns := &controller.NetworkService{}
 	ns.Metadata = _ns.Metadata
 	ns.Spec = _ns.Spec
 
@@ -111,13 +108,13 @@ func (mgr *NetworkServiceMgr) HandleCRUDOperationCU(data interface{}) error {
 			ns.Metadata.Name, _ns.Status)
 	}
 
-	if err := ns.validate(); err != nil {
-		ns.AppendStatusMsg(err.Error())
+	if err := mgr.validate(ns); err != nil {
+		mgr.AppendStatusMsg(ns, err.Error())
 	}
 
 	mgr.networkServiceCache[ns.Metadata.Name] = ns
 
-	if err := ns.writeToDatastore(); err != nil {
+	if err := mgr.writeToDatastore(ns); err != nil {
 		return err
 	}
 
@@ -128,7 +125,7 @@ func (mgr *NetworkServiceMgr) HandleCRUDOperationCU(data interface{}) error {
 }
 
 // HandleCRUDOperationR finds in ram cache
-func (mgr *NetworkServiceMgr) HandleCRUDOperationR(name string) (*NetworkService, bool) {
+func (mgr *NetworkServiceMgr) HandleCRUDOperationR(name string) (*controller.NetworkService, bool) {
 	ns, exists := mgr.networkServiceCache[name]
 	return ns, exists
 }
@@ -141,7 +138,7 @@ func (mgr *NetworkServiceMgr) HandleCRUDOperationD(data interface{}) error {
 	if ns, exists := mgr.networkServiceCache[name]; !exists {
 		return nil
 	} else {
-		ns.renderDelete()
+		mgr.renderDelete(ns)
 	}
 
 	// remove from cache
@@ -157,16 +154,16 @@ func (mgr *NetworkServiceMgr) HandleCRUDOperationD(data interface{}) error {
 }
 
 // HandleCRUDOperationGetAll returns the map
-func (mgr *NetworkServiceMgr) HandleCRUDOperationGetAll() map[string]*NetworkService {
+func (mgr *NetworkServiceMgr) HandleCRUDOperationGetAll() map[string]*controller.NetworkService {
 	return mgr.networkServiceCache
 }
 
-func (ns *NetworkService) writeToDatastore() error {
+func (mgr *NetworkServiceMgr) writeToDatastore(ns *controller.NetworkService) error {
 	key := ctlrPlugin.NetworkServiceMgr.NameKey(ns.Metadata.Name)
 	return database.WriteToDatastore(key, ns)
 }
 
-func (ns *NetworkService) deleteFromDatastore() {
+func (mgr *NetworkServiceMgr) deleteFromDatastore(ns *controller.NetworkService) {
 	key := ctlrPlugin.NetworkServiceMgr.NameKey(ns.Metadata.Name)
 	database.DeleteFromDatastore(key)
 }
@@ -178,16 +175,16 @@ func (mgr *NetworkServiceMgr) LoadAllFromDatastoreIntoCache() error {
 }
 
 // loadAllFromDatastore iterates over the etcd set
-func (mgr *NetworkServiceMgr) loadAllFromDatastore(services map[string]*NetworkService) error {
-	var ns *NetworkService
+func (mgr *NetworkServiceMgr) loadAllFromDatastore(services map[string]*controller.NetworkService) error {
+	var ns *controller.NetworkService
 	return database.ReadIterate(mgr.KeyPrefix(),
 		func() proto.Message {
-			ns = &NetworkService{}
+			ns = &controller.NetworkService{}
 			return ns
 		},
 		func(data proto.Message) {
 			services[ns.Metadata.Name] = ns
-			//log.Debugf("loadAllFromDatastore: %v", ns)
+			log.Debugf("loadAllFromDatastore: %v", ns)
 		})
 }
 
@@ -202,7 +199,7 @@ func (mgr *NetworkServiceMgr) InitHTTPHandlers() {
 
 	log.Infof("InitHTTPHandlers: registering GET/POST %s", mgr.KeyPrefix())
 	url := fmt.Sprintf(mgr.KeyPrefix()+"{%s}", networkServiceName)
-	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, networkServiceHandler, "GET", "POST", "DELETE")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, mgr.networkServiceHandler, "GET", "POST", "DELETE")
 	log.Infof("InitHTTPHandlers: registering GET %s", mgr.GetAllURL())
 	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(mgr.GetAllURL(), networkServiceGetAllHandler, "GET")
 }
@@ -210,7 +207,7 @@ func (mgr *NetworkServiceMgr) InitHTTPHandlers() {
 // curl -X GET http://localhost:9191/sfc_controller/v2/config/network-service/<networkServiceName>
 // curl -X POST -d '{json payload}' http://localhost:9191/sfc_controller/v2/config/network-service/<networkServiceName>
 // curl -X DELETE http://localhost:9191/sfc_controller/v2/config/network-service/<networkServiceName>
-func networkServiceHandler(formatter *render.Render) http.HandlerFunc {
+func (mgr *NetworkServiceMgr) networkServiceHandler(formatter *render.Render) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("networkServiceHandler: Method %s, URL: %s", req.Method, req.URL)
@@ -224,14 +221,14 @@ func networkServiceHandler(formatter *render.Render) http.HandlerFunc {
 				formatter.JSON(w, http.StatusNotFound, "not found: "+vars[networkServiceName])
 			}
 		case "POST":
-			networkServiceProcessPost(formatter, w, req)
+			mgr.networkServiceProcessPost(formatter, w, req)
 		case "DELETE":
 			networkServiceProcessDelete(formatter, w, req)
 		}
 	}
 }
 
-func networkServiceProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
+func (mgr *NetworkServiceMgr) networkServiceProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -240,7 +237,7 @@ func networkServiceProcessPost(formatter *render.Render, w http.ResponseWriter, 
 		return
 	}
 
-	var ns NetworkService
+	var ns controller.NetworkService
 	err = json.Unmarshal(body, &ns)
 	if err != nil {
 		log.Debugf("Can't parse body, error '%s'", err)
@@ -256,7 +253,7 @@ func networkServiceProcessPost(formatter *render.Render, w http.ResponseWriter, 
 
 	if existing, exists := ctlrPlugin.NetworkServiceMgr.HandleCRUDOperationR(vars[networkServiceName]); exists {
 		// if nothing has changed, simply return OK and waste no cycles
-		if existing.ConfigEqual(&ns) {
+		if mgr.ConfigEqual(existing, &ns) {
 			log.Debugf("processPost: config equal no further processing required")
 			formatter.JSON(w, http.StatusOK, "OK")
 			return
@@ -265,7 +262,7 @@ func networkServiceProcessPost(formatter *render.Render, w http.ResponseWriter, 
 		log.Debugf("processPost: new: %v", ns)
 	}
 
-	if err := ns.validate(); err != nil {
+	if err := mgr.validate(&ns); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
@@ -292,7 +289,7 @@ func networkServiceGetAllHandler(formatter *render.Render) http.HandlerFunc {
 
 		switch req.Method {
 		case "GET":
-			var array = make([]NetworkService, 0)
+			var array = make([]controller.NetworkService, 0)
 			for _, ns := range ctlrPlugin.NetworkServiceMgr.HandleCRUDOperationGetAll() {
 				array = append(array, *ns)
 			}
@@ -319,11 +316,11 @@ func (mgr *NetworkServiceMgr) NameKey(name string) string {
 // RenderAll renders all entities in the cache
 func (mgr *NetworkServiceMgr) RenderAll() {
 	for _, ns := range mgr.networkServiceCache {
-		ns.renderConfig()
+		mgr.renderConfig(ns)
 	}
 }
 
-func (ns *NetworkService) renderDelete() error {
+func (mgr *NetworkServiceMgr) renderDelete(ns *controller.NetworkService) error {
 
 	DeleteRenderedVppAgentEntries(ns.Status.RenderedVppAgentEntries)
 	DeleteInterfaceEntries(ns.Status.Interfaces)
@@ -331,14 +328,14 @@ func (ns *NetworkService) renderDelete() error {
 	return nil
 }
 
-func (ns *NetworkService) renderConfig() error {
+func (mgr *NetworkServiceMgr) renderConfig(ns *controller.NetworkService) error {
 
 	RenderTxnConfigEntityStart()
 	defer RenderTxnConfigEntityEnd()
 
 	// first validate the config as it may have come in via a datastore
 	// update from outside rest, startup yaml ... crd?
-	if err := ns.validate(); err != nil {
+	if err := mgr.validate(ns); err != nil {
 		return err
 	}
 
@@ -347,12 +344,12 @@ func (ns *NetworkService) renderConfig() error {
 	ns.Status.RenderedVppAgentEntries = make(map[string]*controller.RenderedVppAgentEntry, 0)
 	ns.Status.Interfaces = make(map[string]*controller.InterfaceStatus, 0)
 
-	defer ns.renderComplete()
+	defer mgr.renderComplete(ns)
 
 	for i, conn := range ns.Spec.Connections {
 		log.Debugf("RenderNetworkService: network-service/conn: ", ns.Metadata.Name, conn)
 
-		if err := ns.renderConnectionSegments(conn, uint32(i)); err != nil {
+		if err := mgr.renderConnectionSegments(ns, conn, uint32(i)); err != nil {
 			return err
 		}
 	}
@@ -362,10 +359,10 @@ func (ns *NetworkService) renderConfig() error {
 	return nil
 }
 
-func (ns *NetworkService) renderComplete() error {
+func (mgr *NetworkServiceMgr) renderComplete(ns *controller.NetworkService) error {
 
 	if len(ns.Status.Msg) == 0 {
-		ns.AppendStatusMsg("OK")
+		mgr.AppendStatusMsg(ns, "OK")
 		ns.Status.OperStatus = controller.OperStatusUp
 	} else {
 		RenderTxnConfigEntityRemoveEntries()
@@ -374,7 +371,7 @@ func (ns *NetworkService) renderComplete() error {
 	}
 
 	// update the status info in the datastore
-	if err := ns.writeToDatastore(); err != nil {
+	if err := mgr.writeToDatastore(ns); err != nil {
 		return err
 	}
 
@@ -384,7 +381,8 @@ func (ns *NetworkService) renderComplete() error {
 }
 
 // RenderConnectionSegments traverses the connections and renders them
-func (ns *NetworkService) renderConnectionSegments(
+func (mgr *NetworkServiceMgr) renderConnectionSegments(
+	ns *controller.NetworkService,
 	conn *controller.Connection,
 	i uint32) error {
 
@@ -392,19 +390,19 @@ func (ns *NetworkService) renderConnectionSegments(
 
 	switch conn.ConnType {
 	case controller.ConnTypeL2PP:
-		if err := ns.RenderConnL2PP(conn, i); err != nil {
+		if err := mgr.RenderConnL2PP(ns, conn, i); err != nil {
 			return err
 		}
 	case controller.ConnTypeL2MP:
-		if err := ns.RenderConnL2MP(conn, i); err != nil {
+		if err := mgr.RenderConnL2MP(ns, conn, i); err != nil {
 			return err
 		}
 	case controller.ConnTypeL3PP:
-		if err := ns.RenderConnL3PP(conn, i); err != nil {
+		if err := mgr.RenderConnL3PP(ns, conn, i); err != nil {
 			return err
 		}
 	case controller.ConnTypeL3MP:
-		if err := ns.RenderConnL3MP(conn, i); err != nil {
+		if err := mgr.RenderConnL3MP(ns, conn, i); err != nil {
 			return err
 		}
 	}
@@ -412,7 +410,7 @@ func (ns *NetworkService) renderConnectionSegments(
 	return nil
 }
 
-func (ns *NetworkService) validate() error {
+func (mgr *NetworkServiceMgr) validate(ns *controller.NetworkService) error {
 
 	log.Debugf("Validating NetworkService: %v", ns)
 
@@ -422,13 +420,13 @@ func (ns *NetworkService) validate() error {
 		return fmt.Errorf(errStr)
 	}
 
-	if err := ns.validateNetworkPods(); err != nil {
+	if err := mgr.validateNetworkPods(ns); err != nil {
 		log.Debugf(err.Error())
 		return err
 	}
 
 	if ns.Spec.Connections != nil {
-		if err := ns.validateConnections(); err != nil {
+		if err := mgr.validateConnections(ns); err != nil {
 			log.Debugf(err.Error())
 			return err
 		}
@@ -438,7 +436,7 @@ func (ns *NetworkService) validate() error {
 }
 
 // validateConnections validates all the fields
-func (ns *NetworkService) validateConnections() error {
+func (mgr *NetworkServiceMgr) validateConnections(ns *controller.NetworkService) error {
 
 	// traverse the connections and for each NetworkPod/interface, it must be in the
 	// list of NetworkPod's
@@ -519,7 +517,7 @@ func (ns *NetworkService) validateConnections() error {
 				return fmt.Errorf("network-service: %s conn: pod/port: %s must be of pod/interface format",
 					ns.Metadata.Name, connPodInterface)
 			}
-			if iface, _ := ns.findNetworkPodAndInterfaceInList(ConnPodName(connPodInterface),
+			if iface, _ := mgr.findNetworkPodAndInterfaceInList(ns, ConnPodName(connPodInterface),
 				ConnInterfaceName(connPodInterface), ns.Spec.NetworkPods); iface == nil {
 				return fmt.Errorf("network-service: %s conn: pod/port: %s not found in NetworkPod interfaces",
 					ns.Metadata.Name, connPodInterface)
@@ -541,14 +539,14 @@ func (ns *NetworkService) validateConnections() error {
 }
 
 // validatenetworkPods validates all the fields
-func (ns *NetworkService) validateNetworkPods() error {
+func (mgr *NetworkServiceMgr) validateNetworkPods(ns *controller.NetworkService) error {
 
 	// traverse the networkPods and for each NetworkPod/interface, it must be in the
 	// list of NetworkPod's
 
 	for _, networkPod := range ns.Spec.NetworkPods {
 
-		if err := ns.validateNetworkPod(networkPod); err != nil {
+		if err := mgr.validateNetworkPod(ns, networkPod); err != nil {
 			return err
 		}
 	}
@@ -556,7 +554,9 @@ func (ns *NetworkService) validateNetworkPods() error {
 	return nil
 }
 
-func (ns *NetworkService) findNetworkPodAndInterfaceInList(networkPodName string,
+func (mgr *NetworkServiceMgr) findNetworkPodAndInterfaceInList(
+	ns *controller.NetworkService,
+	networkPodName string,
 	ifName string,
 	networkPods []*controller.NetworkPod) (*controller.Interface, string) {
 
@@ -570,7 +570,9 @@ func (ns *NetworkService) findNetworkPodAndInterfaceInList(networkPodName string
 	return nil, ""
 }
 
-func (ns *NetworkService) validateNetworkPod(networkPod *controller.NetworkPod) error {
+func (mgr *NetworkServiceMgr) validateNetworkPod(
+	ns *controller.NetworkService,
+	networkPod *controller.NetworkPod) error {
 
 	if networkPod.Metadata == nil || networkPod.Metadata.Name == "" {
 		return fmt.Errorf("ValidatePod: network-service: %s, network-pod is missing metadata or name",
@@ -669,7 +671,9 @@ func (ns *NetworkService) validateNetworkPod(networkPod *controller.NetworkPod) 
 	return nil
 }
 
-func (ns *NetworkService) findInterfaceStatus(podInterfaceName string) (*controller.InterfaceStatus, bool) {
+func (mgr *NetworkServiceMgr) findInterfaceStatus(
+	ns *controller.NetworkService,
+	podInterfaceName string) (*controller.InterfaceStatus, bool) {
 
 	if ns.Status != nil && ns.Status.Interfaces != nil {
 		return RetrieveInterfaceStatusFromRamCache(ns.Status.Interfaces, podInterfaceName)
@@ -680,14 +684,15 @@ func (ns *NetworkService) findInterfaceStatus(podInterfaceName string) (*control
 
 func (mgr *NetworkServiceMgr) FindInterfaceStatus(podInterfaceName string) *controller.InterfaceStatus {
 	for _, ns := range mgr.networkServiceCache {
-		if ifStatus, exists := ns.findInterfaceStatus(podInterfaceName); exists {
+		if ifStatus, exists := mgr.findInterfaceStatus(ns, podInterfaceName); exists {
 			return ifStatus
 		}
 	}
 	return nil
 }
 
-func (ns *NetworkService) RenderL2BD(
+func (mgr *NetworkServiceMgr) RenderL2BD(
+	ns *controller.NetworkService,
 	conn *controller.Connection, connIndex uint32,
 	nodeName string,
 	l2bdIFs []*l2.BridgeDomain_Interface) error {
@@ -702,7 +707,7 @@ func (ns *NetworkService) RenderL2BD(
 		if nodeL2BD == nil {
 			msg := fmt.Sprintf("network-service: %s, referencing a missing node/l2bd: %s/%s",
 				ns.Metadata.Name, nn.Metadata.Name, conn.UseNodeL2Bd)
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 		vppKV := vppagent.AppendInterfacesToL2BD(nodeName, nodeL2BD, l2bdIFs)
@@ -734,7 +739,8 @@ func (ns *NetworkService) RenderL2BD(
 	return nil
 }
 
-func (ns *NetworkService) RenderNetworkPodL2BD(
+func (mgr *NetworkServiceMgr) RenderNetworkPodL2BD(
+	ns *controller.NetworkService,
 	conn *controller.Connection,
 	connIndex uint32,
 	podName string,
@@ -743,11 +749,10 @@ func (ns *NetworkService) RenderNetworkPodL2BD(
 	if conn.UseNodeL2Bd != "" {
 		msg := fmt.Sprintf("network-service/connIndex: %s/%d, cannot use a node/l2bd: %s for vnf=%s bridge",
 			ns.Metadata.Name, connIndex+1, conn.UseNodeL2Bd, podName)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 
 	}
-
 
 	var bdParms *controller.BDParms
 	if conn.L2Bd != nil {

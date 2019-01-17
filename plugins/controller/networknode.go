@@ -34,11 +34,11 @@ import (
 )
 
 type NetworkNodeMgr struct {
-	networkNodeCache map[string]*NetworkNode
+	networkNodeCache map[string]*controller.NetworkNode
 }
 
-func (mgr *NetworkNodeMgr) ToArray() []*NetworkNode {
-	var array []*NetworkNode
+func (mgr *NetworkNodeMgr) ToArray() []*controller.NetworkNode {
+	var array []*controller.NetworkNode
 	for _, nn := range mgr.networkNodeCache {
 		array = append(array, nn)
 	}
@@ -57,42 +57,39 @@ func (mgr *NetworkNodeMgr) AfterInit() {
 	}
 }
 
-// NetworkNode holds all network node specific info
-type NetworkNode struct {
-	controller.NetworkNode
-}
-
 // InitRAMCache create a map for all the entities
 func (mgr *NetworkNodeMgr) InitRAMCache() {
 	mgr.networkNodeCache = nil // delete old cache for re-init
-	mgr.networkNodeCache = make(map[string]*NetworkNode)
+	mgr.networkNodeCache = make(map[string]*controller.NetworkNode)
 }
 
 // DumpCache logs all the entries in the map
 func (mgr *NetworkNodeMgr) DumpCache() {
 	for _, nn := range mgr.networkNodeCache {
-		nn.dumpToLog()
+		mgr.dumpToLog(nn)
 	}
 }
 
-func (nn *NetworkNode) dumpToLog() {
+func (mgr *NetworkNodeMgr) dumpToLog(nn *controller.NetworkNode) {
 	log.Infof("NetworkNode[%s] = %v", nn.Metadata.Name, nn)
 }
 
 // ConfigEqual return true if the entities are equal
-func (nn *NetworkNode) ConfigEqual(n2 *NetworkNode) bool {
-	if nn.Metadata.String() != n2.Metadata.String() {
+func (mgre *NetworkNodeMgr) ConfigEqual(
+	n1 *controller.NetworkNode,
+	n2 *controller.NetworkNode) bool {
+	if n1.Metadata.String() != n2.Metadata.String() {
 		return false
 	}
-	if nn.Spec.String() != n2.Spec.String() {
+	if n1.Spec.String() != n2.Spec.String() {
 		return false
 	}
-	// ignore snn.Status as just comparing status
+	// ignore nn.Status as just comparing status
 	return true
 }
 
 // AppendStatusMsg adds the message to the status section
-func (nn *NetworkNode) AppendStatusMsg(msg string) {
+func (mgr *NetworkNodeMgr) AppendStatusMsg(nn *controller.NetworkNode, msg string) {
 	nn.Status.Msg = append(nn.Status.Msg, msg)
 }
 
@@ -166,9 +163,9 @@ func (mgr *NetworkNodeMgr) FindInterfacesForThisLabelInNode(nodeName string,
 // HandleCRUDOperationCU add to ram cache and render
 func (mgr *NetworkNodeMgr) HandleCRUDOperationCU(data interface{}) error {
 
-	_nn := data.(*NetworkNode)
+	_nn := data.(*controller.NetworkNode)
 
-	nn := &NetworkNode{}
+	nn := &controller.NetworkNode{}
 	nn.Metadata = _nn.Metadata
 	nn.Spec = _nn.Spec
 
@@ -177,14 +174,14 @@ func (mgr *NetworkNodeMgr) HandleCRUDOperationCU(data interface{}) error {
 			_nn.Metadata.Name, _nn.Status)
 	}
 
-	if err := nn.validate(); err != nil {
+	if err := mgr.validate(nn); err != nil {
 		nn.Status = &controller.NetworkNodeStatus{}
-		nn.AppendStatusMsg(err.Error())
+		mgr.AppendStatusMsg(nn, err.Error())
 	}
 
 	mgr.networkNodeCache[_nn.Metadata.Name] = nn
 
-	if err := nn.writeToDatastore(); err != nil {
+	if err := mgr.writeToDatastore(nn); err != nil {
 		return err
 	}
 
@@ -195,7 +192,7 @@ func (mgr *NetworkNodeMgr) HandleCRUDOperationCU(data interface{}) error {
 }
 
 // HandleCRUDOperationR finds in ram cache
-func (mgr *NetworkNodeMgr) HandleCRUDOperationR(name string) (*NetworkNode, bool) {
+func (mgr *NetworkNodeMgr) HandleCRUDOperationR(name string) (*controller.NetworkNode, bool) {
 	n, exists := mgr.networkNodeCache[name]
 	return n, exists
 }
@@ -208,7 +205,7 @@ func (mgr *NetworkNodeMgr) HandleCRUDOperationD(data interface{}) error {
 	if nn, exists := mgr.networkNodeCache[nodeName]; !exists {
 		return nil
 	} else {
-		nn.renderDelete()
+		mgr.renderDelete(nn)
 	}
 
 	// remove from cache
@@ -224,16 +221,16 @@ func (mgr *NetworkNodeMgr) HandleCRUDOperationD(data interface{}) error {
 }
 
 // HandleCRUDOperationGetAll returns the map
-func (mgr *NetworkNodeMgr) HandleCRUDOperationGetAll() map[string]*NetworkNode {
+func (mgr *NetworkNodeMgr) HandleCRUDOperationGetAll() map[string]*controller.NetworkNode {
 	return mgr.networkNodeCache
 }
 
-func (nn *NetworkNode) writeToDatastore() error {
+func (mgr *NetworkNodeMgr) writeToDatastore(nn *controller.NetworkNode) error {
 	key := ctlrPlugin.NetworkNodeMgr.NameKey(nn.Metadata.Name)
 	return database.WriteToDatastore(key, nn)
 }
 
-func (nn *NetworkNode) deleteFromDatastore() {
+func (mgr *NetworkNodeMgr) deleteFromDatastore(nn *controller.NetworkNode) {
 	key := ctlrPlugin.NetworkNodeMgr.NameKey(nn.Metadata.Name)
 	database.DeleteFromDatastore(key)
 }
@@ -245,16 +242,16 @@ func (mgr *NetworkNodeMgr) LoadAllFromDatastoreIntoCache() error {
 }
 
 // loadAllFromDatastore iterates over the etcd set
-func (mgr *NetworkNodeMgr) loadAllFromDatastore(nodes map[string]*NetworkNode) error {
-	var nn *NetworkNode
+func (mgr *NetworkNodeMgr) loadAllFromDatastore(nodes map[string]*controller.NetworkNode) error {
+	var nn *controller.NetworkNode
 	return database.ReadIterate(mgr.KeyPrefix(),
 		func() proto.Message {
-			nn = &NetworkNode{}
+			nn = &controller.NetworkNode{}
 			return nn
 		},
 		func(data proto.Message) {
 			nodes[nn.Metadata.Name] = nn
-			//log.Debugf("loadAllFromDatastore: n=%v", nn)
+			log.Debugf("loadAllFromDatastore: n=%v", nn)
 		})
 }
 
@@ -269,7 +266,7 @@ func (mgr *NetworkNodeMgr) InitHTTPHandlers() {
 
 	log.Infof("InitHTTPHandlers: registering GET/POST %s", mgr.KeyPrefix())
 	url := fmt.Sprintf(mgr.KeyPrefix()+"{%s}", networkNodeName)
-	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, httpNetworkNodeHandler, "GET", "POST", "DELETE")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, mgr.httpNetworkNodeHandler, "GET", "POST", "DELETE")
 	log.Infof("InitHTTPHandlers: registering GET %s", mgr.GetAllURL())
 	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(mgr.GetAllURL(), httpNetworkNodeGetAllHandler, "GET")
 }
@@ -277,7 +274,7 @@ func (mgr *NetworkNodeMgr) InitHTTPHandlers() {
 // curl -X GET http://localhost:9191/sfc_controller/v2/config/network-node/<networkNodeName>
 // curl -X POST -d '{json payload}' http://localhost:9191/sfc_controller/v2/config/network-node/<networkNodeName>
 // curl -X DELETE http://localhost:9191/sfc_controller/v2/config/network-node/<networkNodeName>
-func httpNetworkNodeHandler(formatter *render.Render) http.HandlerFunc {
+func (mgr *NetworkNodeMgr) httpNetworkNodeHandler(formatter *render.Render) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("httpNetworkNodeHandler: Method %s, URL: %s", req.Method, req.URL)
@@ -291,14 +288,14 @@ func httpNetworkNodeHandler(formatter *render.Render) http.HandlerFunc {
 				formatter.JSON(w, http.StatusNotFound, "not found: "+vars[networkNodeName])
 			}
 		case "POST":
-			httpNetworkNodeProcessPost(formatter, w, req)
+			mgr.httpNetworkNodeProcessPost(formatter, w, req)
 		case "DELETE":
-			httpNetworkNodeProcessDelete(formatter, w, req)
+			mgr.httpNetworkNodeProcessDelete(formatter, w, req)
 		}
 	}
 }
 
-func httpNetworkNodeProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
+func (mgr *NetworkNodeMgr) httpNetworkNodeProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -307,7 +304,7 @@ func httpNetworkNodeProcessPost(formatter *render.Render, w http.ResponseWriter,
 		return
 	}
 
-	var nn NetworkNode
+	var nn controller.NetworkNode
 	err = json.Unmarshal(body, &nn)
 	if err != nil {
 		log.Debugf("Can't parse body, error '%s'", err)
@@ -323,8 +320,8 @@ func httpNetworkNodeProcessPost(formatter *render.Render, w http.ResponseWriter,
 
 	if existing, exists := ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationR(vars[networkNodeName]); exists {
 		// if nothing has changed, simply return OK and waste no cycles
-		if err := nn.validate(); err == nil {
-			if existing.ConfigEqual(&nn) {
+		if err := mgr.validate(&nn); err == nil {
+			if mgr.ConfigEqual(existing, &nn) {
 				log.Debugf("processPost: config equal no further processing required")
 				formatter.JSON(w, http.StatusOK, "OK")
 				return
@@ -334,7 +331,7 @@ func httpNetworkNodeProcessPost(formatter *render.Render, w http.ResponseWriter,
 		log.Debugf("processPost: new: %v", nn)
 	}
 
-	if err := nn.validate(); err != nil {
+	if err := mgr.validate(&nn); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
@@ -344,7 +341,7 @@ func httpNetworkNodeProcessPost(formatter *render.Render, w http.ResponseWriter,
 	formatter.JSON(w, http.StatusOK, "OK")
 }
 
-func httpNetworkNodeProcessDelete(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
+func (mgr *NetworkNodeMgr) httpNetworkNodeProcessDelete(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
 	vars := mux.Vars(req)
 
@@ -361,7 +358,7 @@ func httpNetworkNodeGetAllHandler(formatter *render.Render) http.HandlerFunc {
 
 		switch req.Method {
 		case "GET":
-			var array = make([]NetworkNode, 0)
+			var array = make([]controller.NetworkNode, 0)
 			for _, nn := range ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationGetAll() {
 				array = append(array, *nn)
 			}
@@ -385,7 +382,7 @@ func (mgr *NetworkNodeMgr) NameKey(name string) string {
 	return mgr.KeyPrefix() + name
 }
 
-func (nn *NetworkNode) renderDelete() error {
+func (mgr *NetworkNodeMgr) renderDelete(nn *controller.NetworkNode) error {
 
 	DeleteRenderedVppAgentEntries(nn.Status.RenderedVppAgentEntries)
 	DeleteInterfaceEntries(nn.Status.Interfaces)
@@ -393,14 +390,14 @@ func (nn *NetworkNode) renderDelete() error {
 	return nil
 }
 
-func (nn *NetworkNode) renderConfig() error {
+func (mgr *NetworkNodeMgr) renderConfig(nn *controller.NetworkNode) error {
 
 	RenderTxnConfigEntityStart()
 	defer RenderTxnConfigEntityEnd()
 
 	// first validate the config as it may have come in via a DB
 	// update from outside rest, startup yaml ... crd?
-	if err := nn.validate(); err != nil {
+	if err := mgr.validate(nn); err != nil {
 		return err
 	}
 
@@ -410,18 +407,18 @@ func (nn *NetworkNode) renderConfig() error {
 	nn.Status.RenderedVppAgentEntries = make(map[string]*controller.RenderedVppAgentEntry, 0)
 	nn.Status.Interfaces = make(map[string]*controller.InterfaceStatus, 0)
 
-	defer nn.renderComplete()
+	defer mgr.renderComplete(nn)
 
 	// create interfaces in the vswitch
 	if nn.Spec.Interfaces != nil {
-		if err := nn.renderNodeInterfaces(); err != nil {
+		if err := mgr.renderNodeInterfaces(nn); err != nil {
 			return err
 		}
 	}
 
 	// create l2bds
 	if nn.Spec.L2Bds != nil {
-		if err := nn.renderNodeL2BDs(); err != nil {
+		if err := mgr.renderNodeL2BDs(nn); err != nil {
 			return err
 		}
 	}
@@ -433,7 +430,7 @@ func (nn *NetworkNode) renderConfig() error {
 // RenderAll renders all entities in the cache
 func (mgr *NetworkNodeMgr) RenderAll() {
 	for _, nn := range mgr.networkNodeCache {
-		nn.renderConfig()
+		mgr.renderConfig(nn)
 	}
 }
 
@@ -441,7 +438,7 @@ func vppKeyL2BDName(nodeName, l2bdName string) string {
 	return "L2BD_" + nodeName + "_" + l2bdName
 }
 
-func (nn *NetworkNode) renderNodeL2BDs() error {
+func (mgr *NetworkNodeMgr) renderNodeL2BDs(nn *controller.NetworkNode) error {
 
 	var bdParms *controller.BDParms
 
@@ -471,7 +468,7 @@ func (nn *NetworkNode) renderNodeL2BDs() error {
 	return nil
 }
 
-func (nn *NetworkNode) renderNodeInterfaces() error {
+func (mgr *NetworkNodeMgr) renderNodeInterfaces(nn *controller.NetworkNode) error {
 
 	var vppKV *vppagent.KVType
 
@@ -484,7 +481,7 @@ func (nn *NetworkNode) renderNodeInterfaces() error {
 				if err != nil {
 					RemoveInterfaceStatus(nn.Status.Interfaces, iFace.Parent, iFace.Name)
 					msg := fmt.Sprintf("node interface: %s/%s, %s", iFace.Parent, iFace.Name, err)
-					nn.AppendStatusMsg(msg)
+					mgr.AppendStatusMsg(nn, msg)
 					return err
 				}
 				PersistInterfaceStatus(nn.Status.Interfaces, ifStatus, iFace.Parent, iFace.Name)
@@ -510,10 +507,10 @@ func (nn *NetworkNode) renderNodeInterfaces() error {
 	return nil
 }
 
-func (nn *NetworkNode) renderComplete() error {
+func (mgr *NetworkNodeMgr) renderComplete(nn *controller.NetworkNode) error {
 
 	if len(nn.Status.Msg) == 0 {
-		nn.AppendStatusMsg("OK")
+		mgr.AppendStatusMsg(nn,"OK")
 		nn.Status.Status = controller.OperStatusUp
 	} else {
 		RenderTxnConfigEntityRemoveEntries()
@@ -522,7 +519,7 @@ func (nn *NetworkNode) renderComplete() error {
 	}
 
 	// update the status info in the datastore
-	if err := nn.writeToDatastore(); err != nil {
+	if err := mgr.writeToDatastore(nn); err != nil {
 		return err
 	}
 
@@ -547,7 +544,7 @@ func (mgr *NetworkNodeMgr) FindL2BDForNode(nodeName string, l2bdName string) *co
 }
 
 // FindVppL2BDForNode by name
-func (mgr *NetworkNodeMgr) FindVppL2BDForNode(nodeName string, l2bdName string) (*NetworkNode,
+func (mgr *NetworkNodeMgr) FindVppL2BDForNode(nodeName string, l2bdName string) (*controller.NetworkNode,
 	*l2.BridgeDomain) {
 
 	var vppKey *vppagent.KVType
@@ -648,7 +645,7 @@ func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 	return renderedEntries
 }
 
-func (nn *NetworkNode) validate() error {
+func (mgr *NetworkNodeMgr) validate(nn *controller.NetworkNode) error {
 	log.Debugf("Validating NetworkNode: %v ...", nn)
 
 	//if nn.Spec.Interfaces != nil && nn.Vswitches != nil {
@@ -663,7 +660,7 @@ func (nn *NetworkNode) validate() error {
 	//}
 
 	if nn.Spec.Interfaces != nil {
-		if err := nn.nodeValidateInterfaces(nn.Metadata.Name, nn.Spec.Interfaces); err != nil {
+		if err := mgr.nodeValidateInterfaces(nn, nn.Metadata.Name, nn.Spec.Interfaces); err != nil {
 			return err
 		}
 	}
@@ -704,7 +701,8 @@ func (nn *NetworkNode) validate() error {
 	return nil
 }
 
-func (nn *NetworkNode) nodeValidateInterfaces(nodeName string, iFaces []*controller.Interface) error {
+func (mgr *NetworkNodeMgr) nodeValidateInterfaces(nn *controller.NetworkNode,
+	nodeName string, iFaces []*controller.Interface) error {
 
 	for _, iFace := range iFaces {
 		switch iFace.IfType {

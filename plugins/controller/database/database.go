@@ -15,6 +15,7 @@
 package database
 
 import (
+	"fmt"
 	"github.com/gogo/protobuf/proto"
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
@@ -30,10 +31,10 @@ func InitDatabase(p keyval.ProtoBroker, l *logrus.Logger) {
 	log = l
 }
 
-// WriteToDatastore writes the specified entity in the sfc db in etcd
+// WriteToDatastore writes the specified entity to the KVStore
 func WriteToDatastore(key string, data proto.Message) error {
 
-	log.Debugf("WriteToDatastore: key: '%s'", key)
+	log.Debugf("WriteToDatastore: key: '%s', data: '%v'", key, data)
 
 	err := db.Put(key, data)
 	if err != nil {
@@ -49,6 +50,8 @@ func ReadIterate(
 	getDataBuffer func() proto.Message,
 	actionFunc func(data proto.Message)) error {
 
+	log.Debugf("ReadIterate: keyPrefix: %s", keyPrefix)
+
 	kvi, err := db.ListValues(keyPrefix)
 	if err != nil {
 		log.Fatal(err)
@@ -58,10 +61,13 @@ func ReadIterate(
 	for {
 		kv, allReceived := kvi.GetNext()
 		if allReceived {
+			log.Debugf("ReadIterate: allReceived: %v", allReceived)
 			return nil
 		}
 		data := getDataBuffer()
+		log.Debugf("ReadIterate: getDataBuffer data: %v", data)
 		err := kv.GetValue(data)
+		log.Debugf("ReadIterate: GetValue data: %v", data)
 		if err != nil {
 			log.Fatal(err)
 			return nil
@@ -73,19 +79,22 @@ func ReadIterate(
 	}
 }
 
-// ReadFromDatastore reads the specified entity in the sfc db in etcd
+// ReadFromDatastore reads the specified entity from the kv store
 func ReadFromDatastore(key string, data proto.Message) error {
 
 	log.Debugf("ReadFromDatastore: key: '%s'", key)
 
 	found, _, err := db.GetValue(key, data)
-	if found && err == nil {
-		log.Debugf("ReadFromDatastore: data=%v", data)
+	if err != nil {
+		return err
+	}
+	if !found {
+		err = fmt.Errorf("ReadFromDatastore: key not found '%s', key")
 	}
 	return err
 }
 
-// DeleteFromDatastore removes the specified entry fron etcd
+// DeleteFromDatastore removes the specified entry from KVStore etcd
 func DeleteFromDatastore(key string) {
 	log.Debugf("DeleteFromDatastore: key: '%s'", key)
 	db.Delete(key)

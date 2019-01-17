@@ -81,7 +81,7 @@ type CacheType struct {
 	MemifIDAllocator      *idapi.MemifAllocatorType
 	VrfIDAllocator        *idapi.VrfAllocatorType
 	IPAMPoolAllocators    map[string]*ipam.PoolAllocatorType // key[modelType/ipamPoolName]
-	NetworkPodToNodeMap   map[string]*NetworkPodToNodeMap    // key[pod]
+	NetworkPodToNodeMap   map[string]*controller.NetworkPodToNodeMap    // key[pod]
 }
 
 // Plugin contains the controllers information
@@ -251,7 +251,7 @@ func (s *Plugin) InitRAMCache() {
 	}
 
 	// ksr state updates are stored here
-	s.ramCache.NetworkPodToNodeMap = make(map[string]*NetworkPodToNodeMap, 0)
+	s.ramCache.NetworkPodToNodeMap = make(map[string]*controller.NetworkPodToNodeMap, 0)
 }
 
 // Close performs close down procedures
@@ -391,14 +391,12 @@ func (s *Plugin) LoadVppAgentEntriesFromRenderedVppAgentEntries(
 	for _, vppAgentEntry := range vppAgentEntries {
 
 		vppKVEntry := vppagent.NewKVEntry(vppAgentEntry.VppAgentKey, vppAgentEntry.VppAgentType)
-		found, err := vppKVEntry.ReadFromEtcd(s.DB)
+		err := vppKVEntry.ReadFromKVStore()
 		if err != nil {
 			return err
 		}
-		if found {
-			// add ref to VppEntries indexed by the vppKey
-			s.ramCache.VppEntries[vppKVEntry.VppKey] = vppKVEntry
-		}
+		// add ref to VppEntries indexed by the vppKey
+		s.ramCache.VppEntries[vppKVEntry.VppKey] = vppKVEntry
 	}
 
 	return nil

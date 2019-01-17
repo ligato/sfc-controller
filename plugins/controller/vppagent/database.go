@@ -16,12 +16,11 @@ package vppagent
 
 import (
 	"fmt"
-	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/sfc-controller/plugins/controller/database"
+	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxv2/model/interfaces"
 	"github.com/ligato/vpp-agent/plugins/vppv2/model/interfaces"
 	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
 	"github.com/ligato/vpp-agent/plugins/vppv2/model/l3"
-	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxv2/model/interfaces"
 )
 
 // Types in the model were defined as strings for readability not enums with
@@ -131,8 +130,8 @@ func (kv *KVType) Equal(kv2 *KVType) bool {
 	return true
 }
 
-// WriteToEtcd puts the vppkey and value into etcd
-func (kv *KVType) WriteToEtcd(db keyval.ProtoBroker) error {
+// WriteToKVStore puts the vppkey and value into KV store
+func (kv *KVType) WriteToKVStore() error {
 
 	var err error
 	switch kv.VppEntryType {
@@ -156,52 +155,51 @@ func (kv *KVType) WriteToEtcd(db keyval.ProtoBroker) error {
 	return err
 }
 
-// ReadFromEtcd gets the vppkey and value into etcd
-func (kv *KVType) ReadFromEtcd(db keyval.ProtoBroker) (bool, error) {
+// ReadFromKVStore gets the vppkey and value from KVStore
+func (kv *KVType) ReadFromKVStore() error {
 
 	var err error
-	var found bool
 
 	switch kv.VppEntryType {
 	case VppEntryTypeInterface:
 		iface := &interfaces.Interface{}
-		found, _, err = db.GetValue(kv.VppKey, iface)
-		if found && err == nil {
+		err = database.ReadFromDatastore(kv.VppKey, iface)
+		if err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, iface)
 			kv.InterfaceSet(iface)
 		}
 	case VppEntryTypeLinuxInterface:
 		iface := &linuxIntf.Interface{}
-		found, _, err = db.GetValue(kv.VppKey, iface)
-		if found && err == nil {
+		err = database.ReadFromDatastore(kv.VppKey, iface)
+		if err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, iface)
 			kv.LinuxInterfaceSet(iface)
 		}
 	case VppEntryTypeL2BD:
 		l2bd := &l2.BridgeDomain{}
-		found, _, err = db.GetValue(kv.VppKey, l2bd)
-		if found && err == nil {
+		err = database.ReadFromDatastore(kv.VppKey, l2bd)
+		if err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, l2bd)
 			kv.L2BDSet(l2bd)
 		}
 	case VppEntryTypeL2XC:
 		l2xc := &l2.XConnectPair{}
-		found, _, err = db.GetValue(kv.VppKey, l2xc)
-		if found && err == nil {
+		err = database.ReadFromDatastore(kv.VppKey, l2xc)
+		if err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, l2xc)
 			kv.L2XCSet(l2xc)
 		}
 	case VppEntryTypeL3Route:
 		l3sr := &l3.StaticRoute{}
-		found, _, err = db.GetValue(kv.VppKey, l3sr)
-		if found && err == nil {
+		err = database.ReadFromDatastore(kv.VppKey, l3sr)
+		if err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, l3sr)
 			kv.L3StaticRouteSet(l3sr)
 		}
 	case VppEntryTypeArp:
 		ae := &l3.ARPEntry{}
-		found, _, err = db.GetValue(kv.VppKey, ae)
-		if found && err == nil {
+		err = database.ReadFromDatastore(kv.VppKey, ae)
+		if err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, ae)
 			kv.ArpEntrySet(ae)
 		}
@@ -210,7 +208,7 @@ func (kv *KVType) ReadFromEtcd(db keyval.ProtoBroker) (bool, error) {
 		log.Errorf(msg)
 		err = fmt.Errorf(msg)
 	}
-	return found, err
+	return err
 }
 
 // DeleteFromDatastore removes the specified entry fron etcd

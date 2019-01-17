@@ -32,13 +32,13 @@ import (
 )
 
 type NetworkNodeOverlayMgr struct {
-	networkNodeOverlayCache map[string]*NetworkNodeOverlay
+	networkNodeOverlayCache map[string]*controller.NetworkNodeOverlay
 	vniAllocators           map[string]*idapi.VxlanVniAllocatorType
 	vxLanAddresses          map[string]string
 }
 
-func (mgr *NetworkNodeOverlayMgr) ToArray() []*NetworkNodeOverlay {
-	var array []*NetworkNodeOverlay
+func (mgr *NetworkNodeOverlayMgr) ToArray() []*controller.NetworkNodeOverlay {
+	var array []*controller.NetworkNodeOverlay
 	for _, nno := range mgr.networkNodeOverlayCache {
 		array = append(array, nno)
 	}
@@ -57,15 +57,10 @@ func (mgr *NetworkNodeOverlayMgr) AfterInit() {
 	}
 }
 
-// NetworkNodeOverlay holds all network node specific info
-type NetworkNodeOverlay struct {
-	controller.NetworkNodeOverlay
-}
-
 // InitRAMCache create a map for all the entities
 func (mgr *NetworkNodeOverlayMgr) InitRAMCache() {
 	mgr.networkNodeOverlayCache = nil // delete old cache for re-init
-	mgr.networkNodeOverlayCache = make(map[string]*NetworkNodeOverlay)
+	mgr.networkNodeOverlayCache = make(map[string]*controller.NetworkNodeOverlay)
 	mgr.vniAllocators = nil
 	mgr.vniAllocators = make(map[string]*idapi.VxlanVniAllocatorType)
 	mgr.vxLanAddresses = nil
@@ -75,20 +70,22 @@ func (mgr *NetworkNodeOverlayMgr) InitRAMCache() {
 // DumpCache logs all the entries in the map
 func (mgr *NetworkNodeOverlayMgr) DumpCache() {
 	for _, nno := range mgr.networkNodeOverlayCache {
-		nno.dumpToLog()
+		mgr.dumpToLog(nno)
 	}
 }
 
-func (nno *NetworkNodeOverlay) dumpToLog() {
+func (mgr *NetworkNodeOverlayMgr) dumpToLog(nno *controller.NetworkNodeOverlay) {
 	log.Infof("networkNodeOverlay[%s] = %v", nno.Metadata.Name, nno)
 }
 
 // ConfigEqual return true if the entities are equal
-func (nno *NetworkNodeOverlay) ConfigEqual(n2 *NetworkNodeOverlay) bool {
-	if nno.Metadata.String() != n2.Metadata.String() {
+func (mgr *NetworkNodeOverlayMgr) ConfigEqual(
+	n1 *controller.NetworkNodeOverlay,
+	n2 *controller.NetworkNodeOverlay) bool {
+	if n1.Metadata.String() != n2.Metadata.String() {
 		return false
 	}
-	if nno.Spec.String() != n2.Spec.String() {
+	if n1.Spec.String() != n2.Spec.String() {
 		return false
 	}
 	// ignore nno.Status as just comparing config
@@ -96,7 +93,8 @@ func (nno *NetworkNodeOverlay) ConfigEqual(n2 *NetworkNodeOverlay) bool {
 }
 
 // AppendStatusMsg adds the message to the status section
-func (nno *NetworkNodeOverlay) AppendStatusMsg(msg string) {
+func (mgr *NetworkNodeOverlayMgr) AppendStatusMsg(nno *controller.NetworkNodeOverlay,
+	msg string) {
 	nno.Status = &controller.NetworkNodeOverlayStatus{}
 	nno.Status.Msg = append(nno.Status.Msg, msg)
 }
@@ -142,9 +140,9 @@ func (mgr *NetworkNodeOverlayMgr) AllocateVxlanAddress(poolName string, nodeName
 // HandleCRUDOperationCU add to ram cache and render
 func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationCU(data interface{}) error {
 
-	_nno := data.(*NetworkNodeOverlay)
+	_nno := data.(*controller.NetworkNodeOverlay)
 
-	nno := &NetworkNodeOverlay{}
+	nno := &controller.NetworkNodeOverlay{}
 	nno.Metadata = _nno.Metadata
 	nno.Spec = _nno.Spec
 
@@ -153,8 +151,8 @@ func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationCU(data interface{}) error 
 			_nno.Metadata.Name, _nno.Status)
 	}
 
-	if err := nno.validate(); err != nil {
-		nno.AppendStatusMsg(err.Error())
+	if err := mgr.validate(nno); err != nil {
+		mgr.AppendStatusMsg(nno, err.Error())
 	}
 
 	mgr.networkNodeOverlayCache[_nno.Metadata.Name] = nno
@@ -170,7 +168,7 @@ func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationCU(data interface{}) error 
 		}
 	}
 
-	if err := nno.writeToDatastore(); err != nil {
+	if err := mgr.writeToDatastore(nno); err != nil {
 		return err
 	}
 
@@ -178,7 +176,7 @@ func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationCU(data interface{}) error 
 }
 
 // HandleCRUDOperationR finds in ram cache
-func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationR(name string) (*NetworkNodeOverlay, bool) {
+func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationR(name string) (*controller.NetworkNodeOverlay, bool) {
 	nno, exists := mgr.networkNodeOverlayCache[name]
 	return nno, exists
 }
@@ -204,37 +202,37 @@ func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationD(data interface{}) error {
 }
 
 // HandleCRUDOperationGetAll returns the map
-func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationGetAll() map[string]*NetworkNodeOverlay {
+func (mgr *NetworkNodeOverlayMgr) HandleCRUDOperationGetAll() map[string]*controller.NetworkNodeOverlay {
 	return mgr.networkNodeOverlayCache
 }
 
-func (nno *NetworkNodeOverlay) writeToDatastore() error {
+func (mgr *NetworkNodeOverlayMgr) writeToDatastore(nno *controller.NetworkNodeOverlay) error {
 	key := ctlrPlugin.NetworkNodeOverlayMgr.NameKey(nno.Metadata.Name)
 	return database.WriteToDatastore(key, nno)
 }
 
-func (nno *NetworkNodeOverlay) deleteFromDatastore() {
+func (mgr *NetworkNodeOverlayMgr) deleteFromDatastore(nno *controller.NetworkNodeOverlay) {
 	key := ctlrPlugin.NetworkNodeOverlayMgr.NameKey(nno.Metadata.Name)
 	database.DeleteFromDatastore(key)
 }
 
 // LoadAllFromDatastoreIntoCache iterates over the etcd set
 func (mgr *NetworkNodeOverlayMgr) LoadAllFromDatastoreIntoCache() error {
-	log.Debugf("LoadAllFromDatastore: ...")
+	log.Debugf("LoadAllFromDatastoreIntoCache: ...")
 	return mgr.loadAllFromDatastore(mgr.networkNodeOverlayCache)
 }
 
 // loadAllFromDatastore iterates over the etcd set
-func (mgr *NetworkNodeOverlayMgr) loadAllFromDatastore(nodes map[string]*NetworkNodeOverlay) error {
-	var nno *NetworkNodeOverlay
+func (mgr *NetworkNodeOverlayMgr) loadAllFromDatastore(nodes map[string]*controller.NetworkNodeOverlay) error {
+	var nno *controller.NetworkNodeOverlay
 	return database.ReadIterate(mgr.KeyPrefix(),
 		func() proto.Message {
-			nno = &NetworkNodeOverlay{}
+			nno = &controller.NetworkNodeOverlay{}
 			return nno
 		},
 		func(data proto.Message) {
 			nodes[nno.Metadata.Name] = nno
-			//log.Debugf("loadAllFromDatastore: n=%v", nno)
+			log.Debugf("loadAllFromDatastore: n=%v", nno)
 		})
 }
 
@@ -249,7 +247,7 @@ func (mgr *NetworkNodeOverlayMgr) InitHTTPHandlers() {
 
 	log.Infof("InitHTTPHandlers: registering GET/POST %s", mgr.KeyPrefix())
 	url := fmt.Sprintf(mgr.KeyPrefix()+"{%s}", networkNodeOverlayName)
-	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, networkNodeOverlayHandler, "GET", "POST", "DELETE")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, mgr.networkNodeOverlayHandler, "GET", "POST", "DELETE")
 	log.Infof("InitHTTPHandlers: registering GET %s", mgr.GetAllURL())
 	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(mgr.GetAllURL(), networkNodeOverlayGetAllHandler, "GET")
 }
@@ -257,7 +255,7 @@ func (mgr *NetworkNodeOverlayMgr) InitHTTPHandlers() {
 // curl -X GET http://localhost:9191/sfc_controller/v2/config/network-service-mesh/<networkNodeOverlayName>
 // curl -X POST -d '{json payload}' http://localhost:9191/sfc_controller/v2/config/network-service-mesh/<networkNodeOverlayName>
 // curl -X DELETE http://localhost:9191/sfc_controller/v2/config/network-service-mesh/<networkNodeOverlayName>
-func networkNodeOverlayHandler(formatter *render.Render) http.HandlerFunc {
+func (mgr *NetworkNodeOverlayMgr) networkNodeOverlayHandler(formatter *render.Render) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("networkNodeOverlayHandler: Method %s, URL: %s", req.Method, req.URL)
@@ -271,14 +269,14 @@ func networkNodeOverlayHandler(formatter *render.Render) http.HandlerFunc {
 				formatter.JSON(w, http.StatusNotFound, "not found: "+vars[networkNodeOverlayName])
 			}
 		case "POST":
-			networkNodeOverlayProcessPost(formatter, w, req)
+			mgr.networkNodeOverlayProcessPost(formatter, w, req)
 		case "DELETE":
 			networkNodeOverlayProcessDelete(formatter, w, req)
 		}
 	}
 }
 
-func networkNodeOverlayProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
+func (mgr *NetworkNodeOverlayMgr) networkNodeOverlayProcessPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -287,7 +285,7 @@ func networkNodeOverlayProcessPost(formatter *render.Render, w http.ResponseWrit
 		return
 	}
 
-	var nno NetworkNodeOverlay
+	var nno controller.NetworkNodeOverlay
 	err = json.Unmarshal(body, &nno)
 	if err != nil {
 		log.Debugf("Can't parse body, error '%s'", err)
@@ -303,13 +301,13 @@ func networkNodeOverlayProcessPost(formatter *render.Render, w http.ResponseWrit
 
 	if existing, exists := ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationR(vars[networkNodeOverlayName]); exists {
 		// if nothing has changed, simply return OK and waste no cycles
-		if existing.ConfigEqual(&nno) {
+		if mgr.ConfigEqual(existing, &nno) {
 			formatter.JSON(w, http.StatusOK, "OK")
 			return
 		}
 	}
 
-	if err := nno.validate(); err != nil {
+	if err := mgr.validate(&nno); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
@@ -337,7 +335,7 @@ func networkNodeOverlayGetAllHandler(formatter *render.Render) http.HandlerFunc 
 
 		switch req.Method {
 		case "GET":
-			var array = make([]NetworkNodeOverlay, 0)
+			var array = make([]controller.NetworkNodeOverlay, 0)
 			for _, nno := range ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationGetAll() {
 				array = append(array, *nno)
 			}
@@ -366,7 +364,7 @@ func (mgr *NetworkNodeOverlayMgr) NameKey(name string) string {
 	return mgr.KeyPrefix() + name
 }
 
-func (nno *NetworkNodeOverlay) validate() error {
+func (mgr *NetworkNodeOverlayMgr) validate(nno *controller.NetworkNodeOverlay) error {
 
 	log.Debugf("Validating networkNodeOverlay: %v ...", nno)
 

@@ -23,11 +23,12 @@ import (
 // The L2PP topology is rendered in this module for a connection with a vnf-service
 
 // RenderConnL2PP renders this L2PP connection
-func (ns *NetworkService) RenderConnL2PP(
+func (mgr *NetworkServiceMgr) RenderConnL2PP(
+	ns *controller.NetworkService,
 	conn *controller.Connection,
 	connIndex uint32) error {
 
-	var p2nArray [2]NetworkPodToNodeMap
+	var p2nArray [2]controller.NetworkPodToNodeMap
 	netPodInterfaces := make([]*controller.Interface, 2)
 	networkPodTypes := make([]string, 2)
 
@@ -45,7 +46,7 @@ func (ns *NetworkService) RenderConnL2PP(
 
 		if ifIndex >= 2 {
 			msg := fmt.Sprintf("Too many connection segments specified for a l2pp connection")
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 
@@ -55,7 +56,7 @@ func (ns *NetworkService) RenderConnL2PP(
 		if !exists || p2n.Node == "" {
 			msg := fmt.Sprintf("connection segment %d: %s, network pod not mapped to a node in network_pod_to_node_map",
 				i, connPodInterface)
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			allPodsAssignedToNodes = false
 			continue
 		}
@@ -63,14 +64,14 @@ func (ns *NetworkService) RenderConnL2PP(
 		if !exists {
 			msg := fmt.Sprintf("connection segment %d: %s, network pod references non existant host: %s",
 				i, connPodInterface, p2n.Node)
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			allPodsAssignedToNodes = false
 			continue
 		}
 
 		p2nArray[ifIndex] = *p2n
-		netPodInterface, networkPodType := ns.findNetworkPodAndInterfaceInList(connPodName,
-			connInterfaceName, ns.Spec.NetworkPods)
+		netPodInterface, networkPodType := mgr.findNetworkPodAndInterfaceInList(
+			ns, connPodName, connInterfaceName, ns.Spec.NetworkPods)
 		netPodInterfaces[ifIndex] = netPodInterface
 		netPodInterfaces[ifIndex].Parent = connPodName
 		networkPodTypes[ifIndex] = networkPodType
@@ -82,7 +83,7 @@ func (ns *NetworkService) RenderConnL2PP(
 
 		if ifIndex >= 2 {
 			msg := fmt.Sprintf("Too many connection segments specified for a l2pp connection")
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 
@@ -102,7 +103,7 @@ func (ns *NetworkService) RenderConnL2PP(
 	if !allPodsAssignedToNodes {
 		msg := fmt.Sprintf("network-service: %s, not all pods in this connection are mapped to nodes",
 			ns.Metadata.Name)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 
@@ -110,14 +111,14 @@ func (ns *NetworkService) RenderConnL2PP(
 
 		if ifIndex >= 2 {
 			msg := fmt.Sprintf("Too many connection segments specified for a l2pp connection")
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 
 		if ifIndex != 1 || len(conn.NodeInterfaceLabels) != 1 {
 			msg := fmt.Sprintf("network service: %s, need 1 interface in conn and  1 nodeInterface label: incorrect config",
 				ns.Metadata.Name)
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 
@@ -125,7 +126,7 @@ func (ns *NetworkService) RenderConnL2PP(
 		if len(nodeInterfaces) != 1 {
 			msg := fmt.Sprintf("network service: %s, nodeLabels %v: must match only 1 node interface: incorrect config",
 				ns.Metadata.Name, conn.NodeInterfaceLabels)
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 
@@ -140,13 +141,13 @@ func (ns *NetworkService) RenderConnL2PP(
 
 	// see if the vnfs are on the same node ...
 	if p2nArray[0].Node == p2nArray[1].Node {
-		return ns.renderConnL2PPSameNode(p2nArray[0].Node, conn, netPodInterfaces, networkPodTypes)
+		return mgr.renderConnL2PPSameNode(ns, p2nArray[0].Node, conn, netPodInterfaces, networkPodTypes)
 	} else if staticNodesInInterfacesSpecified {
 		msg := fmt.Sprintf("netwrok service: %s, nodes %s/%s must be the same",
 			ns.Metadata.Name,
 			p2nArray[0].Node,
 			p2nArray[1].Node)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 
@@ -156,7 +157,7 @@ func (ns *NetworkService) RenderConnL2PP(
 			ns.Metadata.Name,
 			netPodInterfaces[0].Parent, netPodInterfaces[0].Name,
 			netPodInterfaces[1].Parent, netPodInterfaces[1].Name)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 
@@ -168,17 +169,18 @@ func (ns *NetworkService) RenderConnL2PP(
 			netPodInterfaces[0].Parent, netPodInterfaces[0].Name,
 			netPodInterfaces[1].Parent, netPodInterfaces[1].Name,
 			conn.NetworkNodeOverlayName)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 
 	// now setup the connection between nodes
-	return ns.renderConnL2PPInterNode(conn, connIndex, netPodInterfaces,
+	return mgr.renderConnL2PPInterNode(ns, conn, connIndex, netPodInterfaces,
 		nno, p2nArray, networkPodTypes)
 }
 
 // renderConnL2PPSameVnf renders this L2PP connection on same vnf
-func (ns *NetworkService) renderConnL2PPSameVnf(
+func (mgr *NetworkServiceMgr) renderConnL2PPSameVnf(
+	ns *controller.NetworkService,
 	networkPodInterfaces []*controller.Interface) error {
 
 	for i := 0; i < 2; i++ {
@@ -193,7 +195,8 @@ func (ns *NetworkService) renderConnL2PPSameVnf(
 }
 
 // renderConnL2PPSameNode renders this L2PP connection on same node
-func (ns *NetworkService) renderConnL2PPSameNode(
+func (mgr *NetworkServiceMgr) renderConnL2PPSameNode(
+	ns *controller.NetworkService,
 	vppAgent string,
 	conn *controller.Connection,
 	networkPodInterfaces []*controller.Interface,
@@ -202,7 +205,7 @@ func (ns *NetworkService) renderConnL2PPSameNode(
 	// there is a connection "hack" where it is possible to l2x 2 ports together in the same vnf
 	if networkPodInterfaces[0].Parent == networkPodInterfaces[1].Parent &&
 		networkPodInterfaces[0].Name != networkPodInterfaces[1].Name {
-		return ns.renderConnL2PPSameVnf(networkPodInterfaces)
+		return mgr.renderConnL2PPSameVnf(ns, networkPodInterfaces)
 	}
 
 	// if both interfaces are memIf's, we can do a direct inter-vnf memif
@@ -220,7 +223,7 @@ func (ns *NetworkService) renderConnL2PPSameNode(
 		networkPodInterfaces[0].IfType == controller.IfTypeMemif &&
 		memifConnType == controller.ConnMethodDirect {
 
-		err := ns.RenderConnDirectInterPodMemifPair(networkPodInterfaces, controller.IfTypeMemif)
+		err := mgr.RenderConnDirectInterPodMemifPair(ns, networkPodInterfaces, controller.IfTypeMemif)
 		if err != nil {
 			return err
 		}
@@ -253,7 +256,7 @@ func (ns *NetworkService) renderConnL2PPSameNode(
 		// render the if's, and then l2xc them
 		for i := 0; i < 2; i++ {
 
-			ifName, _, err := ns.RenderConnInterfacePair(vppAgent, conn, networkPodInterfaces[i], networkPodTypes[i])
+			ifName, _, err := mgr.RenderConnInterfacePair(ns, vppAgent, conn, networkPodInterfaces[i], networkPodTypes[i])
 			if err != nil {
 				return err
 			}
@@ -273,12 +276,13 @@ func (ns *NetworkService) renderConnL2PPSameNode(
 }
 
 // renderConnL2PPInterNode renders this L2PP connection between nodes
-func (ns *NetworkService) renderConnL2PPInterNode(
+func (mgr *NetworkServiceMgr) renderConnL2PPInterNode(
+	ns *controller.NetworkService,
 	conn *controller.Connection,
 	connIndex uint32,
 	networkPodInterfaces []*controller.Interface,
-	nno *NetworkNodeOverlay,
-	p2nArray [2]NetworkPodToNodeMap,
+	nno *controller.NetworkNodeOverlay,
+	p2nArray [2]controller.NetworkPodToNodeMap,
 	networkPodTypes []string) error {
 
 	var xconn [2][2]string // [0][i] for vnf interfaces [1][i] for vxlan
@@ -286,7 +290,7 @@ func (ns *NetworkService) renderConnL2PPInterNode(
 	// create the interfaces in the containers and vswitch on each node
 	for i := 0; i < 2; i++ {
 
-		ifName, _, err := ns.RenderConnInterfacePair(p2nArray[i].Node, conn, networkPodInterfaces[i], networkPodTypes[i])
+		ifName, _, err := mgr.RenderConnInterfacePair(ns, p2nArray[i].Node, conn, networkPodInterfaces[i], networkPodTypes[i])
 		if err != nil {
 			return err
 		}
@@ -297,7 +301,9 @@ func (ns *NetworkService) renderConnL2PPInterNode(
 	case controller.NetworkNodeOverlayConnectionTypeVxlan:
 		switch nno.Spec.ServiceMeshType {
 		case controller.NetworkNodeOverlayTypeMesh:
-			return nno.renderConnL2PPVxlanMesh(ns,
+			return ctlrPlugin.NetworkNodeOverlayMgr.renderConnL2PPVxlanMesh(
+				nno,
+				ns,
 				conn,
 				connIndex,
 				networkPodInterfaces,
@@ -310,7 +316,7 @@ func (ns *NetworkService) renderConnL2PPInterNode(
 				conn.PodInterfaces[0],
 				conn.PodInterfaces[1],
 				nno.Metadata.Name)
-			ns.AppendStatusMsg(msg)
+			mgr.AppendStatusMsg(ns, msg)
 			return fmt.Errorf(msg)
 		}
 	default:
@@ -320,7 +326,7 @@ func (ns *NetworkService) renderConnL2PPInterNode(
 			conn.PodInterfaces[0],
 			conn.PodInterfaces[1],
 			nno.Metadata.Name)
-		ns.AppendStatusMsg(msg)
+		mgr.AppendStatusMsg(ns, msg)
 		return fmt.Errorf(msg)
 	}
 

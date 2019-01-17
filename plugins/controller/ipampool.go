@@ -33,11 +33,11 @@ import (
 )
 
 type IPAMPoolMgr struct {
-	ipamPoolCache map[string]*IPAMPool
+	ipamPoolCache map[string]*controller.IPAMPool
 }
 
-func (mgr *IPAMPoolMgr) ToArray() []*IPAMPool {
-	var array []*IPAMPool
+func (mgr *IPAMPoolMgr) ToArray() []*controller.IPAMPool {
+	var array []*controller.IPAMPool
 	for _, ipamPool := range mgr.ipamPoolCache {
 		array = append(array, ipamPool)
 	}
@@ -56,34 +56,31 @@ func (mgr *IPAMPoolMgr) AfterInit() {
 	}
 }
 
-// IPAMPool holds all network node specific info
-type IPAMPool struct {
-	controller.IPAMPool
-}
-
 // InitRAMCache create a map for all the entites
 func (mgr *IPAMPoolMgr) InitRAMCache() {
 	mgr.ipamPoolCache = nil // delete old cache for re-init
-	mgr.ipamPoolCache = make(map[string]*IPAMPool)
+	mgr.ipamPoolCache = make(map[string]*controller.IPAMPool)
 }
 
 // DumpCache logs all the entries in the map
 func (mgr *IPAMPoolMgr) DumpCache() {
 	for _, ipamPool := range mgr.ipamPoolCache {
-		ipamPool.dumpToLog()
+		mgr.dumpToLog(ipamPool)
 	}
 }
 
-func (ip *IPAMPool) dumpToLog() {
+func (mgr *IPAMPoolMgr) dumpToLog(ip *controller.IPAMPool) {
 	log.Infof("IPAMPool[%s] = %v", ip.Metadata.Name, ip)
 }
 
 // ConfigEqual return true if the entities are equal
-func (ipamPool *IPAMPool) ConfigEqual(ipamPool2 *IPAMPool) bool {
-	if ipamPool.Metadata.String() != ipamPool2.Metadata.String() {
+func (mgr *IPAMPoolMgr) ConfigEqual(
+	ipamPool1 *controller.IPAMPool,
+	ipamPool2 *controller.IPAMPool) bool {
+	if ipamPool1.Metadata.String() != ipamPool2.Metadata.String() {
 		return false
 	}
-	if ipamPool.Spec.String() != ipamPool2.Spec.String() {
+	if ipamPool1.Spec.String() != ipamPool2.Spec.String() {
 		return false
 	}
 	// ignore Status as just comparing config
@@ -192,7 +189,7 @@ func (mgr *IPAMPoolMgr) SetAddressIfInPool(poolName string, nodeName string, vsN
 	ipamPool.Status.Addresses[allocatorPool.Name] = allocatorPool.GetAllocatedAddressesStatus()
 }
 
-func contructAllocatorName(ipamPool *IPAMPool, entityName string) string {
+func contructAllocatorName(ipamPool *controller.IPAMPool, entityName string) string {
 	switch ipamPool.Spec.Scope {
 	case controller.IPAMPoolScopeSystem:
 		return fmt.Sprintf("/%s/%s", ipamPool.Spec.Scope, ipamPool.Metadata.Name)
@@ -240,9 +237,9 @@ func (mgr *IPAMPoolMgr) EntityDelete(entityName string, scope string) {
 // HandleCRUDOperationCU add to ram cache and render
 func (mgr *IPAMPoolMgr) HandleCRUDOperationCU(data interface{}) error {
 
-	_ipamPool := data.(*IPAMPool)
+	_ipamPool := data.(*controller.IPAMPool)
 
-	ipamPool := &IPAMPool{}
+	ipamPool := &controller.IPAMPool{}
 	ipamPool.Metadata = _ipamPool.Metadata
 	ipamPool.Spec = _ipamPool.Spec
 
@@ -271,7 +268,7 @@ func (mgr *IPAMPoolMgr) HandleCRUDOperationCU(data interface{}) error {
 		Addresses: make(map[string]string, 0),
 	}
 
-	if err := ipamPool.writeToDatastore(); err != nil {
+	if err := mgr.writeToDatastore(ipamPool); err != nil {
 		return err
 	}
 
@@ -279,7 +276,7 @@ func (mgr *IPAMPoolMgr) HandleCRUDOperationCU(data interface{}) error {
 }
 
 // HandleCRUDOperationR finds in ram cache
-func (mgr *IPAMPoolMgr) HandleCRUDOperationR(name string) (*IPAMPool, bool) {
+func (mgr *IPAMPoolMgr) HandleCRUDOperationR(name string) (*controller.IPAMPool, bool) {
 	ipamPool, exists := mgr.ipamPoolCache[name]
 	return ipamPool, exists
 }
@@ -306,37 +303,37 @@ func (mgr *IPAMPoolMgr) HandleCRUDOperationD(data interface{}) error {
 }
 
 // HandleCRUDOperationGetAll returns the map
-func (mgr *IPAMPoolMgr) HandleCRUDOperationGetAll() map[string]*IPAMPool {
+func (mgr *IPAMPoolMgr) HandleCRUDOperationGetAll() map[string]*controller.IPAMPool {
 	return mgr.ipamPoolCache
 }
 
-func (ip *IPAMPool) writeToDatastore() error {
+func (mgr *IPAMPoolMgr) writeToDatastore(ip *controller.IPAMPool) error {
 	key := ctlrPlugin.IpamPoolMgr.NameKey(ip.Metadata.Name)
 	return database.WriteToDatastore(key, ip)
 }
 
-func (ip *IPAMPool) deleteFromDatastore() {
+func (mgr *IPAMPoolMgr) deleteFromDatastore(ip *controller.IPAMPool) {
 	key := ctlrPlugin.IpamPoolMgr.NameKey(ip.Metadata.Name)
 	database.DeleteFromDatastore(key)
 }
 
 // LoadAllFromDatastoreIntoCache iterates over the etcd set
 func (mgr *IPAMPoolMgr) LoadAllFromDatastoreIntoCache() error {
-	log.Debugf("LoadAllFromDatastore: ...")
+	log.Debugf("LoadAllFromDatastoreIntoCache: ...")
 	return mgr.loadAllFromDatastore(mgr.ipamPoolCache)
 }
 
 // loadAllFromDatastore iterates over the etcd set
-func (mgr *IPAMPoolMgr) loadAllFromDatastore(pools map[string]*IPAMPool) error {
-	var ip *IPAMPool
+func (mgr *IPAMPoolMgr) loadAllFromDatastore(pools map[string]*controller.IPAMPool) error {
+	var ip *controller.IPAMPool
 	return database.ReadIterate(mgr.KeyPrefix(),
 		func() proto.Message {
-			ip = &IPAMPool{}
+			ip = &controller.IPAMPool{}
 			return ip
 		},
 		func(data proto.Message) {
+			log.Debugf("loadAllFromDatastore: n=%v", ip)
 			pools[ip.Metadata.Name] = ip
-			//log.Debugf("loadAllFromDatastore: n=%v", ip)
 		})
 }
 
@@ -351,7 +348,7 @@ func (mgr *IPAMPoolMgr) InitHTTPHandlers() {
 
 	log.Infof("InitHTTPHandlers: registering GET/POST %s", mgr.KeyPrefix())
 	url := fmt.Sprintf(mgr.KeyPrefix()+"{%s}", entityName)
-	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, entityHandler, "GET", "POST", "DELETE")
+	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(url, mgr.entityHandler, "GET", "POST", "DELETE")
 	log.Infof("InitHTTPHandlers: registering GET %s", mgr.GetAllURL())
 	ctlrPlugin.HTTPHandlers.RegisterHTTPHandler(mgr.GetAllURL(), getAllHandler, "GET")
 }
@@ -359,7 +356,7 @@ func (mgr *IPAMPoolMgr) InitHTTPHandlers() {
 // curl -X GET http://localhost:9191/sfc_controller/v2/config/ipam-pool/<entityName>
 // curl -X POST -d '{json payload}' http://localhost:9191/sfc_controller/v2/config/ipam-pool/<entityName>
 // curl -X DELETE http://localhost:9191/sfc_controller/v2/config/ipam-pool/<entityName>
-func entityHandler(formatter *render.Render) http.HandlerFunc {
+func (mgr *IPAMPoolMgr) entityHandler(formatter *render.Render) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Debugf("entityHandler: Method %s, URL: %s", req.Method, req.URL)
@@ -373,14 +370,14 @@ func entityHandler(formatter *render.Render) http.HandlerFunc {
 				formatter.JSON(w, http.StatusNotFound, "not found: "+vars[entityName])
 			}
 		case "POST":
-			processPost(formatter, w, req)
+			mgr.processPost(formatter, w, req)
 		case "DELETE":
 			processDelete(formatter, w, req)
 		}
 	}
 }
 
-func processPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
+func (mgr *IPAMPoolMgr) processPost(formatter *render.Render, w http.ResponseWriter, req *http.Request) {
 
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
@@ -389,7 +386,7 @@ func processPost(formatter *render.Render, w http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	var ipamPool IPAMPool
+	var ipamPool controller.IPAMPool
 	err = json.Unmarshal(body, &ipamPool)
 	if err != nil {
 		log.Debugf("Can't parse body, error '%s'", err)
@@ -405,7 +402,7 @@ func processPost(formatter *render.Render, w http.ResponseWriter, req *http.Requ
 
 	if existing, exists := ctlrPlugin.IpamPoolMgr.HandleCRUDOperationR(vars[entityName]); exists {
 		// if nothing has changed, simply return OK and waste no cycles
-		if existing.ConfigEqual(&ipamPool) {
+		if mgr.ConfigEqual(existing, &ipamPool) {
 			log.Debugf("processPost: config equal no further processing required")
 			formatter.JSON(w, http.StatusOK, "OK")
 			return
@@ -414,7 +411,7 @@ func processPost(formatter *render.Render, w http.ResponseWriter, req *http.Requ
 		log.Debugf("processPost: new: %v", ipamPool)
 	}
 
-	if err := ipamPool.validate(); err != nil {
+	if err := mgr.validate(&ipamPool); err != nil {
 		formatter.JSON(w, http.StatusBadRequest, struct{ Error string }{err.Error()})
 		return
 	}
@@ -441,7 +438,7 @@ func getAllHandler(formatter *render.Render) http.HandlerFunc {
 
 		switch req.Method {
 		case "GET":
-			var array = make([]IPAMPool, 0)
+			var array = make([]controller.IPAMPool, 0)
 			for _, ip := range ctlrPlugin.IpamPoolMgr.HandleCRUDOperationGetAll() {
 				array = append(array, *ip)
 			}
@@ -465,7 +462,7 @@ func (mgr *IPAMPoolMgr) NameKey(name string) string {
 	return mgr.KeyPrefix() + name
 }
 
-func (ip *IPAMPool) validate() error {
+func (mgr *IPAMPoolMgr) validate(ip *controller.IPAMPool) error {
 
 	log.Debugf("Validating IPAMPool: %v ...", ip)
 
