@@ -51,13 +51,13 @@ func (mgr *CRDNetworkNodeMgr) DumpCache() {
 	}
 }
 
-func (mgr *CRDNetworkNodeMgr) CrdToSfcNetworkNode(crdNN crd.NetworkNode) (sfcNN controller.NetworkNode, err error) {
-	sfcNN = controller.NetworkNode{}
+func (mgr *CRDNetworkNodeMgr) CrdToSfcNetworkNode(crdNN crd.NetworkNode) (sfcNN model.NetworkNode, err error) {
+	sfcNN = model.NetworkNode{}
 	sfcNN.Metadata = &model.MetaDataType{}
 	sfcNN.Metadata.Name = crdNN.Name
 	sfcNN.Metadata.Labels = crdNN.Labels
-	sfcNN.NetworkNode.Spec = &crdNN.NetworkNodeSpec
-	sfcNN.NetworkNode.Status = &crdNN.NetworkNodeStatus
+	sfcNN.Spec = &crdNN.NetworkNodeSpec
+	sfcNN.Status = &crdNN.NetworkNodeStatus
 	return sfcNN, nil
 }
 
@@ -75,7 +75,7 @@ func (mgr *CRDNetworkNodeMgr) HandleCRDSync(crdNN crd.NetworkNode) {
 	opStr := "created"
 	if existing, exists := ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationR(crdNN.Name); exists {
 		opStr = "updated"
-		if existing.ConfigEqual(&nn) {
+		if ctlrPlugin.NetworkNodeMgr.ConfigEqual(existing, &nn) {
 			log.Infof("crdNN %s has not changed.", crdNN.Name)
 			return
 		}
@@ -93,7 +93,7 @@ func (mgr *CRDNetworkNodeMgr) InitAndRunWatcher() {
 	log.Info("CRD NetworkNodeWatcher: enter ...")
 	defer log.Info("CRD NetworkNodeWatcher: exit ...")
 
-	respChan := make(chan keyval.ProtoWatchResp, 0)
+	respChan := make(chan datasync.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(ctlrPlugin.NetworkNodeMgr.KeyPrefix())
 	err := watcher.Watch(keyval.ToChanProto(respChan), make(chan string), "")
 	if err != nil {
@@ -108,7 +108,7 @@ func (mgr *CRDNetworkNodeMgr) InitAndRunWatcher() {
 
 			switch resp.GetChangeType() {
 			case datasync.Put:
-				dbEntry := &controller.NetworkNode{}
+				dbEntry := &model.NetworkNode{}
 				if err := resp.GetValue(dbEntry); err == nil {
 					// status might have changed ...
 					log.Infof("CRD NetworkNodeWatcher: PUT detected: NetworkNode: %s",
@@ -125,7 +125,7 @@ func (mgr *CRDNetworkNodeMgr) InitAndRunWatcher() {
 }
 
 // updates the CRD status in Kubernetes with the current status from the sfc-controller
-func (mgr *CRDNetworkNodeMgr) updateStatus(sfcNetworkNode controller.NetworkNode) error {
+func (mgr *CRDNetworkNodeMgr) updateStatus(sfcNetworkNode model.NetworkNode) error {
 	// Fetch crdNetworkNode from K8s cache
 	// The name in sfc is the namespace/name, which is the "namespace key". Split it out.
 	key := sfcNetworkNode.Metadata.Name

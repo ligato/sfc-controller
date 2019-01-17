@@ -51,13 +51,13 @@ func (mgr *CRDNetworkNodeOverlayMgr) DumpCache() {
 	}
 }
 
-func (mgr *CRDNetworkNodeOverlayMgr) CrdToSfcNetworkNodeOverlay(crdNNO crd.NetworkNodeOverlay) (sfcNNO controller.NetworkNodeOverlay, err error) {
-	sfcNNO = controller.NetworkNodeOverlay{}
+func (mgr *CRDNetworkNodeOverlayMgr) CrdToSfcNetworkNodeOverlay(crdNNO crd.NetworkNodeOverlay) (sfcNNO model.NetworkNodeOverlay, err error) {
+	sfcNNO = model.NetworkNodeOverlay{}
 	sfcNNO.Metadata = &model.MetaDataType{}
 	sfcNNO.Metadata.Name = crdNNO.Name
 	sfcNNO.Metadata.Labels = crdNNO.Labels
-	sfcNNO.NetworkNodeOverlay.Spec = &crdNNO.NetworkNodeOverlaySpec
-	sfcNNO.NetworkNodeOverlay.Status = &crdNNO.NetworkNodeOverlayStatus
+	sfcNNO.Spec = &crdNNO.NetworkNodeOverlaySpec
+	sfcNNO.Status = &crdNNO.NetworkNodeOverlayStatus
 	return sfcNNO, nil
 }
 
@@ -75,7 +75,7 @@ func (mgr *CRDNetworkNodeOverlayMgr) HandleCRDSync(crdNNO crd.NetworkNodeOverlay
 	opStr := "created"
 	if existing, exists := ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationR(crdNNO.Name); exists {
 		opStr = "updated"
-		if existing.ConfigEqual(&nno) {
+		if ctlrPlugin.NetworkNodeOverlayMgr.ConfigEqual(existing, &nno) {
 			log.Infof("crdNNO %s has not changed.", crdNNO.Name)
 			return
 		}
@@ -93,7 +93,7 @@ func (mgr *CRDNetworkNodeOverlayMgr) InitAndRunWatcher() {
 	log.Info("CRD NetworkNodeOverlayWatcher: enter ...")
 	defer log.Info("CRD NetworkNodeOverlayWatcher: exit ...")
 
-	respChan := make(chan keyval.ProtoWatchResp, 0)
+	respChan := make(chan datasync.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(ctlrPlugin.NetworkNodeOverlayMgr.KeyPrefix())
 	err := watcher.Watch(keyval.ToChanProto(respChan), make(chan string), "")
 	if err != nil {
@@ -108,7 +108,7 @@ func (mgr *CRDNetworkNodeOverlayMgr) InitAndRunWatcher() {
 
 			switch resp.GetChangeType() {
 			case datasync.Put:
-				dbEntry := &controller.NetworkNodeOverlay{}
+				dbEntry := &model.NetworkNodeOverlay{}
 				if err := resp.GetValue(dbEntry); err == nil {
 					// config and status might have changed ...
 					log.Infof("CRD NetworkNodeOverlayWatcher: PUT detected: NetworkNodeOverlay: %s",
@@ -125,7 +125,7 @@ func (mgr *CRDNetworkNodeOverlayMgr) InitAndRunWatcher() {
 }
 
 // updates the CRD status in Kubernetes with the current status from the sfc-controller
-func (mgr *CRDNetworkNodeOverlayMgr) updateStatus(sfcNetworkNodeOverlay controller.NetworkNodeOverlay) error {
+func (mgr *CRDNetworkNodeOverlayMgr) updateStatus(sfcNetworkNodeOverlay model.NetworkNodeOverlay) error {
 	// Fetch crdNetworkNodeOverlay from K8s cache
 	// The name in sfc is the namespace/name, which is the "namespace key". Split it out.
 	key := sfcNetworkNodeOverlay.Metadata.Name

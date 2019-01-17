@@ -51,13 +51,13 @@ func (mgr *CRDIpamPoolMgr) DumpCache() {
 	}
 }
 
-func (mgr *CRDIpamPoolMgr) CrdToSfcIpamPool(crdIP crd.IpamPool) (sfcIP controller.IPAMPool, err error) {
-	sfcIP = controller.IPAMPool{}
+func (mgr *CRDIpamPoolMgr) CrdToSfcIpamPool(crdIP crd.IpamPool) (sfcIP model.IPAMPool, err error) {
+	sfcIP = model.IPAMPool{}
 	sfcIP.Metadata = &model.MetaDataType{}
 	sfcIP.Metadata.Name = crdIP.Name
 	sfcIP.Metadata.Labels = crdIP.Labels
-	sfcIP.IPAMPool.Spec = &crdIP.IPAMPoolSpec
-	sfcIP.IPAMPool.Status = &crdIP.IPAMPoolStatus
+	sfcIP.Spec = &crdIP.IPAMPoolSpec
+	sfcIP.Status = &crdIP.IPAMPoolStatus
 	return sfcIP, nil
 }
 
@@ -75,7 +75,7 @@ func (mgr *CRDIpamPoolMgr) HandleCRDSync(crdIP crd.IpamPool) {
 	opStr := "created"
 	if existing, exists := ctlrPlugin.IpamPoolMgr.HandleCRUDOperationR(crdIP.Name); exists {
 		opStr = "updated"
-		if existing.ConfigEqual(&ip) {
+		if ctlrPlugin.IpamPoolMgr.ConfigEqual(existing, &ip) {
 			log.Infof("crdIP %s has not changed.", crdIP.Name)
 			return
 		}
@@ -93,7 +93,7 @@ func (mgr *CRDIpamPoolMgr) InitAndRunWatcher() {
 	log.Info("CRD IpamPoolWatcher: enter ...")
 	defer log.Info("CRD IpamPoolWatcher: exit ...")
 
-	respChan := make(chan keyval.ProtoWatchResp, 0)
+	respChan := make(chan datasync.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(ctlrPlugin.IpamPoolMgr.KeyPrefix())
 	err := watcher.Watch(keyval.ToChanProto(respChan), make(chan string), "")
 	if err != nil {
@@ -108,7 +108,7 @@ func (mgr *CRDIpamPoolMgr) InitAndRunWatcher() {
 
 			switch resp.GetChangeType() {
 			case datasync.Put:
-				dbEntry := &controller.IPAMPool{}
+				dbEntry := &model.IPAMPool{}
 				if err := resp.GetValue(dbEntry); err == nil {
 					// config and status might have changed ...
 					log.Infof("CRD IpamPoolWatcher: PUT detected: IpamPool: %s",
@@ -125,7 +125,7 @@ func (mgr *CRDIpamPoolMgr) InitAndRunWatcher() {
 }
 
 // updates the CRD status in Kubernetes with the current status from the sfc-controller
-func (mgr *CRDIpamPoolMgr) updateStatus(sfcIpamPool controller.IPAMPool) error {
+func (mgr *CRDIpamPoolMgr) updateStatus(sfcIpamPool model.IPAMPool) error {
 	// Fetch crdIpamPool from K8s cache
 	// The name in sfc is the namespace/name, which is the "namespace key". Split it out.
 	key := sfcIpamPool.Metadata.Name

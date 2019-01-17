@@ -51,13 +51,13 @@ func (mgr *CRDNetworkServiceMgr) DumpCache() {
 	}
 }
 
-func (mgr *CRDNetworkServiceMgr) CrdToSfcNetworkService(crdNS crd.NetworkService) (sfcNS controller.NetworkService, err error) {
-	sfcNS = controller.NetworkService{}
+func (mgr *CRDNetworkServiceMgr) CrdToSfcNetworkService(crdNS crd.NetworkService) (sfcNS model.NetworkService, err error) {
+	sfcNS = model.NetworkService{}
 	sfcNS.Metadata = &model.MetaDataType{}
 	sfcNS.Metadata.Name = crdNS.Name
 	sfcNS.Metadata.Labels = crdNS.Labels
-	sfcNS.NetworkService.Spec = &crdNS.NetworkServiceSpec
-	sfcNS.NetworkService.Status = &crdNS.NetworkServiceStatus
+	sfcNS.Spec = &crdNS.NetworkServiceSpec
+	sfcNS.Status = &crdNS.NetworkServiceStatus
 	return sfcNS, nil
 }
 
@@ -75,7 +75,7 @@ func (mgr *CRDNetworkServiceMgr) HandleCRDSync(crdNS crd.NetworkService) {
 	opStr := "created"
 	if existing, exists := ctlrPlugin.NetworkServiceMgr.HandleCRUDOperationR(crdNS.Name); exists {
 		opStr = "updated"
-		if existing.ConfigEqual(&ns) {
+		if ctlrPlugin.NetworkServiceMgr.ConfigEqual(existing, &ns) {
 			log.Infof("crdNN %s has not changed.", crdNS.Name)
 			return
 		}
@@ -93,7 +93,7 @@ func (mgr *CRDNetworkServiceMgr) InitAndRunWatcher() {
 	log.Info("CRD NetworkServiceWatcher: enter ...")
 	defer log.Info("CRD NetworkServiceWatcher: exit ...")
 
-	respChan := make(chan keyval.ProtoWatchResp, 0)
+	respChan := make(chan datasync.ProtoWatchResp, 0)
 	watcher := ctlrPlugin.Etcd.NewWatcher(ctlrPlugin.NetworkServiceMgr.KeyPrefix())
 	err := watcher.Watch(keyval.ToChanProto(respChan), make(chan string), "")
 	if err != nil {
@@ -108,7 +108,7 @@ func (mgr *CRDNetworkServiceMgr) InitAndRunWatcher() {
 
 			switch resp.GetChangeType() {
 			case datasync.Put:
-				dbEntry := &controller.NetworkService{}
+				dbEntry := &model.NetworkService{}
 				if err := resp.GetValue(dbEntry); err == nil {
 					// config and status might have changed ...
 					log.Infof("CRD NetworkServiceWatcher: PUT detected: NetworkService: %s",
@@ -125,7 +125,7 @@ func (mgr *CRDNetworkServiceMgr) InitAndRunWatcher() {
 }
 
 // updates the CRD status in Kubernetes with the current status from the sfc-controller
-func (mgr *CRDNetworkServiceMgr) updateStatus(sfcNetworkService controller.NetworkService) error {
+func (mgr *CRDNetworkServiceMgr) updateStatus(sfcNetworkService model.NetworkService) error {
 	// Fetch crdNetworkService from K8s cache
 	// The name in sfc is the namespace/name, which is the "namespace key". Split it out.
 	key := sfcNetworkService.Metadata.Name
