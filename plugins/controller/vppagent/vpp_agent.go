@@ -25,11 +25,11 @@ import (
 	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/ligato/cn-infra/utils/addrs"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
-	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxv2/model/interfaces"
-	namespace "github.com/ligato/vpp-agent/plugins/linuxv2/model/namespace"
-	"github.com/ligato/vpp-agent/plugins/vppv2/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
-	"github.com/ligato/vpp-agent/plugins/vppv2/model/l3"
+	linuxIntf "github.com/ligato/vpp-agent/api/models/linux/interfaces"
+	namespace "github.com/ligato/vpp-agent/api/models/linux/namespace"
+	interfaces "github.com/ligato/vpp-agent/api/models/vpp/interfaces"
+	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
+	l3 "github.com/ligato/vpp-agent/api/models/vpp/l3"
 	"strconv"
 )
 
@@ -467,10 +467,10 @@ func ConstructLinuxTapInterface(vppAgent string,
 
 	ns := &namespace.NetNamespace{}
 	if hostNameSpace == "" {
-		ns.Type = namespace.NetNamespace_NETNS_REF_MICROSERVICE
+		ns.Type = namespace.NetNamespace_MICROSERVICE
 		ns.Reference = microsServiceLabel
 	} else {
-		ns.Type = namespace.NetNamespace_NETNS_REF_NSID
+		ns.Type = namespace.NetNamespace_NSID
 		ns.Reference = hostNameSpace
 	}
 	iface.Namespace = ns
@@ -560,21 +560,21 @@ func ConstructVEthInterface(vppAgent string,
 	}
 
 	if linuxNamespace == nil {
-		ns.Type = namespace.NetNamespace_NETNS_REF_MICROSERVICE
+		ns.Type = namespace.NetNamespace_MICROSERVICE
 		ns.Reference = vnfName
 	} else {
 		switch linuxNamespace.Type {
 		case controller.LinuxNamespaceMICROSERVICE:
-			ns.Type = namespace.NetNamespace_NETNS_REF_MICROSERVICE
+			ns.Type = namespace.NetNamespace_MICROSERVICE
 			ns.Reference = linuxNamespace.Microservice
 		case controller.LinuxNamespaceNAMED:
-			ns.Type = namespace.NetNamespace_NETNS_REF_NSID
+			ns.Type = namespace.NetNamespace_NSID
 			ns.Reference = linuxNamespace.Name
 		case controller.LinuxNamespacePID:
-			ns.Type = namespace.NetNamespace_NETNS_REF_PID
+			ns.Type = namespace.NetNamespace_PID
 			ns.Reference = strconv.Itoa(int(linuxNamespace.Pid))
 		case controller.LinuxNamespaceFILE:
-			ns.Type = namespace.NetNamespace_NETNS_REF_FD
+			ns.Type = namespace.NetNamespace_FD
 			ns.Reference = linuxNamespace.Filepath
 		}
 	}
@@ -595,7 +595,7 @@ func ConstructVEthInterface(vppAgent string,
 // ConstructStaticRoute returns an KVType
 func ConstructStaticRoute(vppAgent string, l3sr *controller.L3VRFRoute) *KVType {
 
-	sr := &l3.StaticRoute{
+	sr := &l3.Route{
 		VrfId:             l3sr.VrfId,
 		DstNetwork:        l3sr.DstIpAddr,
 		//DstIpAddr:         l3sr.DstIpAddr,

@@ -16,49 +16,20 @@ package vppagent
 
 import (
 	"net"
-	"strings"
-
-	linux "github.com/ligato/vpp-agent/plugins/linuxv2/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/vppv2/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
-	"github.com/ligato/vpp-agent/plugins/vppv2/model/l3"
+	linux "github.com/ligato/vpp-agent/api/models/linux/interfaces"
+	interfaces "github.com/ligato/vpp-agent/api/models/vpp/interfaces"
+	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
+	l3 "github.com/ligato/vpp-agent/api/models/vpp/l3"
 )
 
 // this must match what utils the vpp-agent uses
 var agentPrefix = "/vnf-agent/"
-
-// GetVppEtcdlabel extracts from db key VppEtcd label
-func GetVppEtcdlabel(key string) string {
-	strs := strings.Split(key, "/")
-	if len(strs) < 3 {
-		return ""
-	}
-	return strs[2]
-}
-
-// GetVppAgentPrefix provides vpp agent prefix for db keys
-func GetVppAgentPrefix() string {
-	return agentPrefix
-}
-
-// InterfaceStateKey constructs interface state db key
-func InterfaceStateKey(vppLabel string, ifaceLabel string) string {
-	return agentPrefix + vppLabel + "/" + interfaces.InterfaceStateKey(ifaceLabel)
-}
-
-// InterfaceStatePrefixKey constructs interface state prefix db key
-func InterfaceStatePrefixKey(vppLabel string) string {
-	return agentPrefix + vppLabel + "/" + interfaces.Prefix
-}
+var ifPrefix = "/vpp/config/v2/interface/"
+var linuxIfPrefix = "/vpp/config/v2/interface/"
 
 // InterfaceKey constructs interface db key
 func InterfaceKey(vppLabel string, ifaceLabel string) string {
 	return agentPrefix + vppLabel + "/" + interfaces.InterfaceKey(ifaceLabel)
-}
-
-// InterfacePrefixKey constructs interface prefix db key
-func InterfacePrefixKey(vppLabel string) string {
-	return agentPrefix + vppLabel + "/" + interfaces.Prefix
 }
 
 // LinuxInterfaceKey constructs Linux interface db key
@@ -66,31 +37,15 @@ func LinuxInterfaceKey(vppLabel string, ifaceLabel string) string {
 	return agentPrefix + vppLabel + "/" + linux.InterfaceKey(ifaceLabel)
 }
 
-// LinuxInterfacePrefixKey constructs Linux interface prefix db key
-func LinuxInterfacePrefixKey(vppLabel string) string {
-	return agentPrefix + vppLabel + "/" + linux.InterfaceKeyPrefix
-}
-
 // L2BridgeDomainKey constructs L2 bridge domain db key
 func L2BridgeDomainKey(vppLabel string, bdName string) string {
 	return agentPrefix + vppLabel + "/" + l2.BridgeDomainKey(bdName)
-}
-
-// L2BridgeDomainKeyPrefix constructs L2 bridge domain db key prefix
-func L2BridgeDomainKeyPrefix(vppLabel string) string {
-	return agentPrefix + vppLabel + "/" + l2.BDPrefix
 }
 
 // L2XConnectKey constructs L2 XConnect db key
 func L2XConnectKey(vppLabel string, rxIf string) string {
 	return agentPrefix + vppLabel + "/" + l2.XConnectKey(rxIf)
 }
-
-//// L3RouteKeyPrefix constructs L3 route db key prefix
-//func L3RouteKeyPrefix(vppLabel string) string {
-//	//return agentPrefix + vppLabel + "/" + l3.RouteKeyPrefix()
-//	return agentPrefix + vppLabel + "/" + l3.VRFPrefix
-//}
 
 // L3RouteKey constructs L3 route db key
 func L3RouteKey(vppLabel string, vrf uint32, destNet *net.IPNet, nextHop string) string {

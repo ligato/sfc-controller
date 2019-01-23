@@ -31,7 +31,7 @@ import (
 	"github.com/unrolled/render"
 	"strconv"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
+	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
 )
 
 type NetworkServiceMgr struct {

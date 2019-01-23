@@ -17,10 +17,10 @@ package vppagent
 import (
 	"fmt"
 	"github.com/ligato/sfc-controller/plugins/controller/database"
-	linuxIntf "github.com/ligato/vpp-agent/plugins/linuxv2/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/vppv2/model/interfaces"
-	"github.com/ligato/vpp-agent/plugins/vppv2/model/l2"
-	"github.com/ligato/vpp-agent/plugins/vppv2/model/l3"
+	linuxIntf "github.com/ligato/vpp-agent/api/models/linux/interfaces"
+	interfaces "github.com/ligato/vpp-agent/api/models/vpp/interfaces"
+	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
+	l3 "github.com/ligato/vpp-agent/api/models/vpp/l3"
 )
 
 // Types in the model were defined as strings for readability not enums with
@@ -41,7 +41,7 @@ type KVType struct {
 	VppEntryType string
 	IFace        *interfaces.Interface     `json:"IFace,omitempty"`
 	L2BD         *l2.BridgeDomain       `json:"L2BD,omitempty"`
-	L3Route      *l3.StaticRoute               `json:"L3Route,omitempty"`
+	L3Route      *l3.Route               `json:"L3Route,omitempty"`
 	XConn        *l2.XConnectPair       `json:"XConn,omitempty"`
 	LinuxIFace   *linuxIntf.Interface `json:"LinuxIFace,omitempty"`
 	ArpEntry     *l3.ARPEntry                `json:"ArpEntry,omitempty"`
@@ -62,7 +62,7 @@ func (kv *KVType) InterfaceSet(iface *interfaces.Interface) {
 }
 
 // L3StaticRouteSet updates the static route
-func (kv *KVType) L3StaticRouteSet(l3sr *l3.StaticRoute) {
+func (kv *KVType) L3StaticRouteSet(l3sr *l3.Route) {
 	kv.L3Route = l3sr
 }
 
@@ -190,7 +190,7 @@ func (kv *KVType) ReadFromKVStore() error {
 			kv.L2XCSet(l2xc)
 		}
 	case VppEntryTypeL3Route:
-		l3sr := &l3.StaticRoute{}
+		l3sr := &l3.Route{}
 		err = database.ReadFromDatastore(kv.VppKey, l3sr)
 		if err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, l3sr)

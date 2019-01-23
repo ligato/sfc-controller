@@ -259,17 +259,19 @@
 
 [[projects]]
   branch = "dev"
-  digest = "1:fd9dfb646d5be327282a7e88ee564247eb3cbe30a7fae713cef10eb5d1f15f6d"
+  digest = "1:4ae80ddc7b3882af71d0a29e7751dcaff538ba104e57ab508e590bd7fc77d7e9"
   name = "github.com/ligato/vpp-agent"
   packages = [
-    "plugins/linuxv2/model/interfaces",
-    "plugins/linuxv2/model/namespace",
-    "plugins/vppv2/model/interfaces",
-    "plugins/vppv2/model/l2",
-    "plugins/vppv2/model/l3",
+    "api/genericmanager",
+    "api/models/linux/interfaces",
+    "api/models/linux/namespace",
+    "api/models/vpp/interfaces",
+    "api/models/vpp/l2",
+    "api/models/vpp/l3",
+    "pkg/models",
   ]
   pruneopts = "UT"
-  revision = "fb7f8cda15d3a3bd3a46a5215be2d13b89f2003a"
+  revision = "b052e1e4f4391514e04a08839f3dc7e336769488"
 
 [[projects]]
   digest = "1:ff5ebae34cfbf047d505ee150de27e60570e8c394b3b8fdbb720ff6ac71985fc"
@@ -822,11 +824,11 @@
     "github.com/ligato/cn-infra/logging/logrus",
     "github.com/ligato/cn-infra/rpc/rest",
     "github.com/ligato/cn-infra/utils/addrs",
-    "github.com/ligato/vpp-agent/plugins/linuxv2/model/interfaces",
-    "github.com/ligato/vpp-agent/plugins/linuxv2/model/namespace",
-    "github.com/ligato/vpp-agent/plugins/vppv2/model/interfaces",
-    "github.com/ligato/vpp-agent/plugins/vppv2/model/l2",
-    "github.com/ligato/vpp-agent/plugins/vppv2/model/l3",
+    "github.com/ligato/vpp-agent/api/models/linux/interfaces",
+    "github.com/ligato/vpp-agent/api/models/linux/namespace",
+    "github.com/ligato/vpp-agent/api/models/vpp/interfaces",
+    "github.com/ligato/vpp-agent/api/models/vpp/l2",
+    "github.com/ligato/vpp-agent/api/models/vpp/l3",
     "github.com/namsral/flag",
     "github.com/unrolled/render",
     "k8s.io/api/core/v1",
