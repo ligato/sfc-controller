@@ -15,6 +15,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/ghodss/yaml"
 	"io/ioutil"
@@ -48,10 +49,23 @@ func (s *Plugin) SfcConfigYamlReadFromFile(fpath string) (*SfcConfigYaml, error)
 
 	yamlConfig := &SfcConfigYaml{}
 
-	if err := yaml.Unmarshal(b, yamlConfig); err != nil {
+	log.Infof("SfcConfigYamlReadFromFile: yaml.YAMLToJSON ...")
+	jb, err := yaml.YAMLToJSON(b)
+	if err != nil {
+		log.Infof("SfcConfigYamlReadFromFile: yaml=%s ...", string(b))
+		return nil, err
+	}
+	log.Infof("SfcConfigYamlReadFromFile: json.Unmarshal ...")
+	if err = json.Unmarshal(jb, yamlConfig); err != nil {
+		log.Infof("SfcConfigYamlReadFromFile: json=%s ...", string(jb))
 		return nil, err
 	}
 
+	log.Infof("SfcConfigYamlReadFromFile: ok, gostruct=%v ...", yamlConfig)
+
+	//if err := yaml.Unmarshal(b, yamlConfig); err != nil {
+	//	return nil, err
+	//}
 
 	return yamlConfig, nil
 }

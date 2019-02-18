@@ -29,7 +29,7 @@ func (mgr *NetworkServiceMgr) RenderConnInterfacePair(
 	netPodInterface *controller.Interface,
 	networkPodType string) (string, *controller.InterfaceStatus, error) {
 
-	// The interface should be created in the vnf and the vswitch then the nsitch
+	// The interface should be created in the vnf and the vswitch then the
 	// interfaces will be added to the bridge.
 
 	var ifName string
@@ -247,7 +247,6 @@ func (mgr *NetworkServiceMgr) RenderConnTapPair(
 	ifStatus.HostPortLabel = hostPortLabel
 	PersistInterfaceStatus(ns.Status.Interfaces, ifStatus, connPodName, connInterfaceName)
 
-	microServiceLabel := connPodName
 	hostNameSpace := ""
 	if networkPodInterface.TapParms != nil {
 		hostNameSpace = networkPodInterface.TapParms.Namespace
@@ -259,9 +258,10 @@ func (mgr *NetworkServiceMgr) RenderConnTapPair(
 		ifStatus.MacAddress,
 		ctlrPlugin.SysParametersMgr.ResolveMtu(networkPodInterface.Mtu),
 		networkPodInterface.AdminStatus,
-		hostPortLabel,
+		connInterfaceName,
+		tapIfName,//hostPortLabel,
 		hostNameSpace,
-		microServiceLabel)
+		connPodName)
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
@@ -331,6 +331,9 @@ func (mgr *NetworkServiceMgr) RenderConnVethAfpPair(
 	if networkPodType == controller.NetworkPodTypeVPPContainer {
 		vethIPAddresses = []string{}
 	}
+
+	nsType, nsValue := LinuxNameSpaceTypeValue(networkPodInterface.LinuxNamespace)
+
 	// Configure the VETH interface for the VNF end
 	vppKV := vppagent.ConstructVEthInterface(vppAgent,
 		veth1Name,
@@ -340,8 +343,10 @@ func (mgr *NetworkServiceMgr) RenderConnVethAfpPair(
 		networkPodInterface.AdminStatus,
 		host1Name,
 		veth2Name,
-		networkPodInterface.LinuxNamespace,
-		connPodName)
+		nsType,
+		nsValue,
+		connPodName,
+		networkPodInterface.TcpChecksumOffloadDisabled)
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
@@ -356,8 +361,10 @@ func (mgr *NetworkServiceMgr) RenderConnVethAfpPair(
 		networkPodInterface.AdminStatus,
 		host2Name,
 		veth1Name,
-		networkPodInterface.LinuxNamespace,
-		vppAgent)
+		nsType,
+		nsValue,
+		vppAgent,
+		false)
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,

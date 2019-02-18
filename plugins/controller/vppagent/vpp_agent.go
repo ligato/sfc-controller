@@ -402,11 +402,11 @@ func ConstructTapInterface(vppAgent string,
 	adminStatus string,
 	rxMode string,
 	tapParms *controller.Interface_TapParms,
-	hostIfName string) *KVType {
+	hostPortLabel string) *KVType {
 
 	ifaceTap := &interfaces.Interface_Tap{
 		Tap: &interfaces.TapLink{
-			HostIfName: hostIfName,
+			//HostIfName: hostPortLabel,
 			Version:    2,
 		},
 	}
@@ -423,7 +423,7 @@ func ConstructTapInterface(vppAgent string,
 	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
 
 	if tapParms != nil {
-		ifaceTap.Tap.ToMicroservice = tapParms.Namespace
+		//ifaceTap.Tap.ToMicroservice = tapParms.Namespace
 		if tapParms.RxRingSize != "" {
 			ifaceTap.Tap.RxRingSize = strToUInt32(tapParms.RxRingSize)
 		}
@@ -452,8 +452,15 @@ func ConstructLinuxTapInterface(vppAgent string,
 	mtu uint32,
 	adminStatus string,
 	hostIfName string,
+	vppSideTapName string,
 	hostNameSpace string,
 	microsServiceLabel string) *KVType {
+
+	linTapIf := &linuxIntf.Interface_Tap{
+		Tap: &linuxIntf.TapLink{
+			VppTapIfName: vppSideTapName,
+		},
+	}
 
 	iface := &linuxIntf.Interface{
 		Name:        ifname,
@@ -462,7 +469,8 @@ func ConstructLinuxTapInterface(vppAgent string,
 		PhysAddress: macAddr,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
-		HostIfName: hostIfName,
+		//HostIfName: hostIfName,
+		Link: linTapIf,
 	}
 
 	ns := &namespace.NetNamespace{}
@@ -537,8 +545,10 @@ func ConstructVEthInterface(vppAgent string,
 	adminStatus string,
 	hostIfName string,
 	peerIfName string,
-	linuxNamespace *controller.Interface_LinuxNamespace,
-	vnfName string) *KVType {
+	linuxNamespaceType string,
+	linuxNamespaceValue string,
+	vnfName string,
+	tcpOffloadDisabled bool) *KVType {
 
 	ns := &namespace.NetNamespace{}
 
@@ -546,6 +556,11 @@ func ConstructVEthInterface(vppAgent string,
 		Veth: &linuxIntf.VethLink{
 			PeerIfName: peerIfName,
 		},
+	}
+
+	if tcpOffloadDisabled {
+		ifaceVETH.Veth.RxChecksumOffloading = linuxIntf.VethLink_CHKSM_OFFLOAD_DISABLED
+		ifaceVETH.Veth.TxChecksumOffloading = linuxIntf.VethLink_CHKSM_OFFLOAD_DISABLED
 	}
 
 	iface := &linuxIntf.Interface{
@@ -559,23 +574,23 @@ func ConstructVEthInterface(vppAgent string,
 		Link:        ifaceVETH,
 	}
 
-	if linuxNamespace == nil {
+	if linuxNamespaceType == "" {
 		ns.Type = namespace.NetNamespace_MICROSERVICE
 		ns.Reference = vnfName
 	} else {
-		switch linuxNamespace.Type {
+		switch linuxNamespaceType {
 		case controller.LinuxNamespaceMICROSERVICE:
 			ns.Type = namespace.NetNamespace_MICROSERVICE
-			ns.Reference = linuxNamespace.Microservice
-		case controller.LinuxNamespaceNAMED:
+			ns.Reference = linuxNamespaceValue
+		case controller.LinuxNamespaceNAME:
 			ns.Type = namespace.NetNamespace_NSID
-			ns.Reference = linuxNamespace.Name
+			ns.Reference = linuxNamespaceValue
 		case controller.LinuxNamespacePID:
 			ns.Type = namespace.NetNamespace_PID
-			ns.Reference = strconv.Itoa(int(linuxNamespace.Pid))
+			ns.Reference = linuxNamespaceValue
 		case controller.LinuxNamespaceFILE:
 			ns.Type = namespace.NetNamespace_FD
-			ns.Reference = linuxNamespace.Filepath
+			ns.Reference = linuxNamespaceValue
 		}
 	}
 	iface.Namespace = ns

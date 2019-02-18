@@ -91,6 +91,9 @@ func (mgr *NetworkServiceMgr) ConfigEqual(
 
 // AppendStatusMsg adds the message to the status section
 func (mgr *NetworkServiceMgr) AppendStatusMsg(ns *controller.NetworkService, msg string) {
+	if ns.Status == nil {
+		ns.Status = &controller.NetworkServiceStatus{}
+	}
 	ns.Status.Msg = append(ns.Status.Msg, msg)
 }
 
@@ -665,6 +668,34 @@ func (mgr *NetworkServiceMgr) validateNetworkPod(
 						ns.Metadata.Name, iFace.Name, iFace.TapParms.TxRingSize)
 				}
 			}
+		}
+		if iFace.LinuxNamespace != "" {
+          nsType, nsValue := LinuxNameSpaceTypeValue(iFace.LinuxNamespace)
+          switch nsType {
+		  case controller.LinuxNamespaceNAME:
+		  	if nsValue == "" {
+				return fmt.Errorf("network-service/if: %s/%s, linux name space type=%s, INVALID value: =%s",
+					ns.Metadata.Name, iFace.Name, nsType, nsValue)
+			}
+		  case controller.LinuxNamespaceFILE:
+			  if nsValue == "" {
+				  return fmt.Errorf("network-service/if: %s/%s, linux name space type=%s, INVALID value: =%s",
+					  ns.Metadata.Name, iFace.Name, nsType, nsValue)
+			  }
+		  case controller.LinuxNamespaceMICROSERVICE:
+			  if nsValue == "" {
+				  return fmt.Errorf("network-service/if: %s/%s, linux name space type=%s, INVALID value: =%s",
+					  ns.Metadata.Name, iFace.Name, nsType, nsValue)
+			  }
+		  case controller.LinuxNamespacePID:
+			  if _, err := strconv.Atoi(nsValue); err != nil {
+				  return fmt.Errorf("network-service/if: %s/%s, linux name space type=%s, INVALID value: =%s",
+					  ns.Metadata.Name, iFace.Name, nsType, nsValue)
+			  }
+		  default:
+			  return fmt.Errorf("network-service/if: %s/%s, unsupported linux namespace type=%s",
+				  ns.Metadata.Name, iFace.Name, nsType)
+		  }
 		}
 	}
 

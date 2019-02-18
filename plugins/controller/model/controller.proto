@@ -151,20 +151,15 @@ message Interface {
       repeated L2FIBEntry l2_fib = 3;
     }
     Forwarding fwd = 16;
-    message LinuxNamespace {                 /* Linux network namespace to attach the interface into. */
-        string type = 1;
-        uint32 pid = 2;
-        string microservice = 3;
-        string name = 4;
-        string filepath = 5;
-    }
-    LinuxNamespace linux_namespace = 17;
+    string linux_namespace = 17; // one of "pid/<pid>|microservice/<microservice>|name/<name>|filepath/<filepath"
+                                 // if emptry ... will be set to microservice/<MICROSERVICE_LABEL>, i.e. the vnf name
     message RxPlacementSettings {
         uint32 queue = 1;
         uint32 worker = 2;
         bool is_main = 3;
     }
     RxPlacementSettings rx_placement_settings = 18;
+    bool tcp_checksum_offload_disabled = 19;
 }
 
 message NetworkPodSpec {

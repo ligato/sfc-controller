@@ -90,6 +90,9 @@ func (mgre *NetworkNodeMgr) ConfigEqual(
 
 // AppendStatusMsg adds the message to the status section
 func (mgr *NetworkNodeMgr) AppendStatusMsg(nn *controller.NetworkNode, msg string) {
+	if nn.Status == nil {
+		nn.Status = &controller.NetworkNodeStatus{}
+	}
 	nn.Status.Msg = append(nn.Status.Msg, msg)
 }
 

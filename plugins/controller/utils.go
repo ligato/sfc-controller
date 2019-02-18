@@ -22,6 +22,15 @@ import (
 	"fmt"
 )
 
+// LinuxNameSpaceTypeValue extracts the type and value
+func LinuxNameSpaceTypeValue(typeValueString string) (string, string) {
+	n := strings.Index(typeValueString, "/")
+	if n == -1 {
+		return "", ""
+	}
+	return typeValueString[0:n], typeValueString[n+1:]
+}
+
 // ConnPodName extracts the pod name from the pod/interface string
 func ConnPodName(connPodInterfaceString string) string {
 	n := strings.Index(connPodInterfaceString, "/")
