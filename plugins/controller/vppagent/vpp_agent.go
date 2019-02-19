@@ -402,7 +402,7 @@ func ConstructTapInterface(vppAgent string,
 	adminStatus string,
 	rxMode string,
 	tapParms *controller.Interface_TapParms,
-	hostPortLabel string) *KVType {
+	namespace string) *KVType {
 
 	ifaceTap := &interfaces.Interface_Tap{
 		Tap: &interfaces.TapLink{
@@ -423,7 +423,7 @@ func ConstructTapInterface(vppAgent string,
 	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
 
 	if tapParms != nil {
-		//ifaceTap.Tap.ToMicroservice = tapParms.Namespace
+		ifaceTap.Tap.ToMicroservice = namespace
 		if tapParms.RxRingSize != "" {
 			ifaceTap.Tap.RxRingSize = strToUInt32(tapParms.RxRingSize)
 		}
@@ -469,7 +469,7 @@ func ConstructLinuxTapInterface(vppAgent string,
 		PhysAddress: macAddr,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
-		//HostIfName: hostIfName,
+		HostIfName: hostIfName,
 		Link: linTapIf,
 	}
 

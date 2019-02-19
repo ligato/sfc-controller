@@ -223,8 +223,6 @@ func (mgr *NetworkServiceMgr) RenderConnTapPair(
 	networkPodInterface *controller.Interface,
 	networkPodType string) (string, *controller.InterfaceStatus, error) {
 
-	var ifName string
-
 	connPodName := networkPodInterface.Parent
 	connInterfaceName := networkPodInterface.Name
 
@@ -250,6 +248,8 @@ func (mgr *NetworkServiceMgr) RenderConnTapPair(
 	hostNameSpace := ""
 	if networkPodInterface.TapParms != nil {
 		hostNameSpace = networkPodInterface.TapParms.Namespace
+	} else {
+		hostNameSpace = connPodName
 	}
 	// Configure the linux tap interface for the VNF end
 	vppKV := vppagent.ConstructLinuxTapInterface(vppAgent,
@@ -276,7 +276,7 @@ func (mgr *NetworkServiceMgr) RenderConnTapPair(
 		networkPodInterface.AdminStatus,
 		ctlrPlugin.SysParametersMgr.ResolveRxMode(networkPodInterface.RxMode),
 		networkPodInterface.TapParms,
-		hostPortLabel)
+		hostNameSpace)
 
 	vppKV.IFace.Vrf = conn.VrfId
 
@@ -284,7 +284,7 @@ func (mgr *NetworkServiceMgr) RenderConnTapPair(
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
 
-	return ifName, ifStatus, nil
+	return tapIfName, ifStatus, nil
 }
 
 // RenderConnVethAfpPair renders this pod/vswitch veth/afp interface pair
