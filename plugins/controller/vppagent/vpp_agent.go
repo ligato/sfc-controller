@@ -430,6 +430,8 @@ func ConstructTapInterface(vppAgent string,
 		if tapParms.TxRingSize != "" {
 			ifaceTap.Tap.TxRingSize = strToUInt32(tapParms.TxRingSize)
 		}
+	} else {
+		ifaceTap.Tap.ToMicroservice = namespace
 	}
 
 	key := InterfaceKey(vppAgent, iface.Name)

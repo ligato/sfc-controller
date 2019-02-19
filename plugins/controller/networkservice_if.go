@@ -248,8 +248,6 @@ func (mgr *NetworkServiceMgr) RenderConnTapPair(
 	hostNameSpace := ""
 	if networkPodInterface.TapParms != nil {
 		hostNameSpace = networkPodInterface.TapParms.Namespace
-	} else {
-		hostNameSpace = connPodName
 	}
 	// Configure the linux tap interface for the VNF end
 	vppKV := vppagent.ConstructLinuxTapInterface(vppAgent,
@@ -266,6 +264,10 @@ func (mgr *NetworkServiceMgr) RenderConnTapPair(
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
+
+	if hostNameSpace == "" {
+		hostNameSpace = connPodName
+	}
 
 	// Configure the tap interface for the VSWITCH end
 	vppKV = vppagent.ConstructTapInterface(vppAgent,
