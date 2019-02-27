@@ -258,20 +258,21 @@
   revision = "baf4f60d8a6792fd6ade9f93a4227f391b4d5ead"
 
 [[projects]]
-  branch = "master"
-  digest = "1:b9e301be4df16e82c23c4c18c4e4e0d7f7ca485a9093cb76812f2850a25fb97a"
+  branch = "dev"
+  digest = "1:d420eb1ca7c5fb714c727acd2448db5036a25e3999bea5eac7c095e039062615"
   name = "github.com/ligato/vpp-agent"
   packages = [
     "api/genericmanager",
     "api/models/linux/interfaces",
     "api/models/linux/namespace",
     "api/models/vpp/interfaces",
+    "api/models/vpp/ipsec",
     "api/models/vpp/l2",
     "api/models/vpp/l3",
     "pkg/models",
   ]
   pruneopts = "UT"
-  revision = "b4c1cada39defe1f1ec9b5aa23fbc5a2a87a9946"
+  revision = "8d496e5029abd8cd744a9c998a0ec506344547ec"
 
 [[projects]]
   digest = "1:ff5ebae34cfbf047d505ee150de27e60570e8c394b3b8fdbb720ff6ac71985fc"

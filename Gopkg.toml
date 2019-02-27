@@ -51,7 +51,7 @@ required = [
 
 [[constraint]]
   name = "github.com/ligato/vpp-agent"
-  branch = "master"
+  branch = "dev"
 
 [[constraint]]
   name = "github.com/ligato/cn-infra"
