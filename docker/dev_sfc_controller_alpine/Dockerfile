@@ -1,4 +1,4 @@
-FROM golang:1.9-alpine3.6
+FROM golang:1.11-alpine3.9
 
 #RUN apk info
 #RUN apk update
@@ -25,8 +25,11 @@ RUN cd protobuf && make install
 RUN cd protobuf && ls
 RUN rm -rf protobuf
 
-COPY docker/dev_sfc_controller_alpine/build-glide.sh .
-RUN ./build-glide.sh
+#COPY docker/dev_sfc_controller_alpine/build-glide.sh .
+#RUN ./build-glide.sh
+RUN mkdir $GOPATH/src/github.com && mkdir $GOPATH/src/github.com/Masterminds
+RUN cd $GOPATH/src/github.com/Masterminds && git clone https://github.com/Masterminds/glide.git
+RUN cd $GOPATH/src/github.com/Masterminds/glide && make install
 
 COPY / /root/go/src/github.com/ligato/sfc-controller/
 COPY docker/dev_sfc_controller_alpine/build-controller.sh .
