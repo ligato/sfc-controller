@@ -1,4 +1,4 @@
-FROM alpine:3.6
+FROM alpine:3.9
 
 # use /opt/vnf-agent/dev as the working directory
 RUN mkdir -p /opt/sfc-controller/dev
