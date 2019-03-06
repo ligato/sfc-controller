@@ -1,4 +1,4 @@
-FROM golang:1.9-alpine3.6
+FROM golang:1.12-alpine3.9
 
 #RUN apk info
 #RUN apk update
