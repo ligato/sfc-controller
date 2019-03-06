@@ -13,4 +13,17 @@ mkdir -p $GOPATH
 # install golint, gvt & Glide
 go get -u github.com/golang/lint/golint
 go get -u github.com/FiloSottile/gvt
-curl https://glide.sh/get | sh
+BUILDARCH=`uname -m`
+case "$BUILDARCH" in
+  "aarch64" )
+    go get github.com/Masterminds/glide
+    ;;
+
+  "x86_64" )
+    curl https://glide.sh/get | sh
+    ;;
+  * )
+    echo "Architecture ${BUILDARCH} is not supported."
+    exit
+    ;;
+esac
