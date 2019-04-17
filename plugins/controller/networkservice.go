@@ -32,6 +32,7 @@ import (
 	"strconv"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
+	ipsec "github.com/ligato/vpp-agent/api/models/vpp/ipsec"
 )
 
 type NetworkServiceMgr struct {
@@ -696,6 +697,19 @@ func (mgr *NetworkServiceMgr) validateNetworkPod(
 			  return fmt.Errorf("network-service/if: %s/%s, unsupported linux namespace type=%s",
 				  ns.Metadata.Name, iFace.Name, nsType)
 		  }
+		}
+
+		for _, ipsecTunnel := range iFace.IpsecTunnels {
+			_, exists := ipsec.CryptoAlg_value[ipsecTunnel.CryptoAlg]
+			if !exists {
+				return fmt.Errorf("network-service/if: %s/%s, unsupported cryto algo for ipsec tunnel %s, val=%s",
+					ns.Metadata.Name, iFace.Name, ipsecTunnel.Name, ipsecTunnel.CryptoAlg)
+			}
+			_, exists = ipsec.IntegAlg_value[ipsecTunnel.IntegAlg]
+			if !exists {
+				return fmt.Errorf("network-service/if: %s/%s, unsupported integ algo for ipsec tunnel %s, val=%s",
+					ns.Metadata.Name, iFace.Name, ipsecTunnel.Name, ipsecTunnel.IntegAlg)
+			}
 		}
 	}
 

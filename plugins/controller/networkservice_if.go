@@ -48,8 +48,14 @@ func (mgr *NetworkServiceMgr) RenderConnInterfacePair(
 		return netPodInterface.Name, nil, nil
 	}
 
-	if err == nil {
+	if err == nil && netPodInterface.Fwd != nil {
 		if err := mgr.RenderInterfaceForwarding(ns, netPodInterface); err != nil {
+			return "", nil, err
+		}
+	}
+
+	if err == nil && netPodInterface.IpsecTunnels != nil {
+		if err := mgr.RenderInterfaceIPSecTunnels(ns, netPodInterface, ifStatus); err != nil {
 			return "", nil, err
 		}
 	}
@@ -171,8 +177,15 @@ func (mgr *NetworkServiceMgr) RenderConnDirectInterPodMemifPair(
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
 
-	if err = mgr.RenderInterfaceForwarding(ns, networkPodInterfaces[0]); err != nil {
-		return err
+	if networkPodInterfaces[0].Fwd != nil {
+		if err = mgr.RenderInterfaceForwarding(ns, networkPodInterfaces[0]); err != nil {
+			return err
+		}
+	}
+	if networkPodInterfaces[0].IpsecTunnels != nil {
+		if err = mgr.RenderInterfaceIPSecTunnels(ns, networkPodInterfaces[0], if0Status); err != nil {
+			return err
+		}
 	}
 
 	log.Debugf("RenderToplogyDirectInterVnfMemifPair: ifName0: %s/%s, %v",
@@ -205,8 +218,15 @@ func (mgr *NetworkServiceMgr) RenderConnDirectInterPodMemifPair(
 		ModelTypeNetworkService + "/" + ns.Metadata.Name,
 		vppKV)
 
-	if err = mgr.RenderInterfaceForwarding(ns, networkPodInterfaces[1]); err != nil {
-		return err
+	if networkPodInterfaces[1].Fwd != nil {
+		if err = mgr.RenderInterfaceForwarding(ns, networkPodInterfaces[1]); err != nil {
+			return err
+		}
+	}
+	if networkPodInterfaces[0].IpsecTunnels != nil {
+		if err = mgr.RenderInterfaceIPSecTunnels(ns, networkPodInterfaces[1], if1Status); err != nil {
+			return err
+		}
 	}
 
 	log.Debugf("RenderToplogyDirectInterVnfMemifPair: ifName1: %s/%s, %v",
@@ -444,6 +464,30 @@ func (mgr *NetworkServiceMgr) RenderInterfaceForwarding(
 			OutgoingInterface: networkPodInterface.Name,
 		}
 		vppKV := vppagent.ConstructStaticArpEntry(vppAgent, ae)
+		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService + "/" + ns.Metadata.Name,
+			vppKV)
+	}
+
+	return nil
+}
+
+// each interface can have a set of ipsec tunnels assoc-ed with it
+func (mgr *NetworkServiceMgr) RenderInterfaceIPSecTunnels(
+	ns *controller.NetworkService,
+	networkPodInterface *controller.Interface,
+	ifStatus *controller.InterfaceStatus) error {
+
+	log.Debugf("RenderInterfaceIpsecTunnels: %v", networkPodInterface)
+
+	if 	networkPodInterface.IpsecTunnels == nil {
+		return nil
+	}
+
+	vppAgent := networkPodInterface.Parent
+
+	for _, sfcIpsecTunnel := range networkPodInterface.IpsecTunnels {
+		vppKV := vppagent.ConstructIPSecTunnel(vppAgent, sfcIpsecTunnel, networkPodInterface.Name)
 		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 			ModelTypeNetworkService + "/" + ns.Metadata.Name,
 			vppKV)

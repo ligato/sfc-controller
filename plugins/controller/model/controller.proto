@@ -16,6 +16,27 @@ syntax = "proto3";
 
 package controller;
 
+message IPSecTunnel {
+    string name = 1;
+    bool esn = 2;                       /* Extended sequence number */
+    bool anti_replay = 3;               /* Anti replay option */
+    string local_ip = 4;                /* Local IP address */
+    string remote_ip = 5;               /* Remote IP address */
+    uint32 local_spi = 6;               /* Local security parameter index */
+    uint32 remote_spi = 7;              /* Remote security parameter index */
+
+    string crypto_alg = 8;     /* Cryptographic algorithm for encryption */
+    string local_crypto_key = 9;
+    string remote_crypto_key = 10;
+
+    string integ_alg = 11;      /* Cryptographic algorithm for authentication */
+    string local_integ_key = 12;
+    string remote_integ_key = 13;
+
+    bool enable_udp_encap = 14;         /* Enable UDP encapsulation */
+    uint32 mtu = 15; /* 9000 default, voerride here if need to */
+}
+
 message L3VRFRoute {
     uint32 vrf_id = 1;                   /* optional: 0 by default */
     string description = 2;              /* optional description */
@@ -160,6 +181,7 @@ message Interface {
     }
     RxPlacementSettings rx_placement_settings = 18;
     bool tcp_checksum_offload_disabled = 19;
+    repeated IPSecTunnel ipsec_tunnels = 20;
 }
 
 message NetworkPodSpec {

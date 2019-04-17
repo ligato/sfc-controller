@@ -26,6 +26,7 @@ import (
 	"github.com/ligato/cn-infra/utils/addrs"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
 	linuxIntf "github.com/ligato/vpp-agent/api/models/linux/interfaces"
+	ipsec "github.com/ligato/vpp-agent/api/models/vpp/ipsec"
 	namespace "github.com/ligato/vpp-agent/api/models/linux/namespace"
 	interfaces "github.com/ligato/vpp-agent/api/models/vpp/interfaces"
 	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
@@ -633,6 +634,56 @@ func ConstructStaticRoute(vppAgent string, l3sr *controller.L3VRFRoute) *KVType 
 		VppEntryType: VppEntryTypeL3Route,
 		L3Route:      sr,
 	}
+	return kv
+}
+
+// ConstructIPSecTunnel returns an KVType
+func ConstructIPSecTunnel(vppAgent string, sfcIpsecTunnel *controller.IPSecTunnel, ifname string) *KVType {
+
+	mtu := uint32(9000)
+	if sfcIpsecTunnel.Mtu != 0 {
+		mtu = sfcIpsecTunnel.Mtu
+	}
+
+	ipsecTunnel := &interfaces.Interface_Ipsec{
+		Ipsec: &interfaces.IPSecLink{
+			Esn: sfcIpsecTunnel.Esn,
+			AntiReplay: sfcIpsecTunnel.AntiReplay,
+			LocalIp: sfcIpsecTunnel.LocalIp,
+			RemoteIp: sfcIpsecTunnel.RemoteIp,
+			LocalSpi: sfcIpsecTunnel.LocalSpi,
+			RemoteSpi: sfcIpsecTunnel.RemoteSpi,
+			CryptoAlg: ipsec.CryptoAlg(ipsec.CryptoAlg_value[sfcIpsecTunnel.CryptoAlg]),
+			LocalCryptoKey: sfcIpsecTunnel.LocalCryptoKey,
+			RemoteCryptoKey: sfcIpsecTunnel.RemoteCryptoKey,
+			IntegAlg: ipsec.IntegAlg(ipsec.IntegAlg_value[sfcIpsecTunnel.IntegAlg]),
+			LocalIntegKey: sfcIpsecTunnel.LocalIntegKey,
+			RemoteIntegKey: sfcIpsecTunnel.RemoteIntegKey,
+			EnableUdpEncap: sfcIpsecTunnel.EnableUdpEncap,
+		},
+	}
+
+	iface := &interfaces.Interface{
+		Name:        sfcIpsecTunnel.Name,
+		Type:        interfaces.Interface_IPSEC_TUNNEL,
+		Enabled:     true,
+		Unnumbered: &interfaces.Interface_Unnumbered{
+			InterfaceWithIp: ifname,
+		},
+		Mtu:         mtu,
+		Link:        ipsecTunnel,
+	}
+
+	key := InterfaceKey(vppAgent, iface.Name)
+
+	log.Debugf("ConstructIPSecTunnel: key='%s', iface='%v", key, iface)
+
+	kv := &KVType{
+		VppKey:       key,
+		VppEntryType: VppEntryTypeInterface,
+		IFace:        iface,
+	}
+	return kv
 	return kv
 }
 

@@ -14,7 +14,10 @@
 
 package controller
 
-import "time"
+import (
+	"os"
+	"time"
+)
 
 const (
 	ModelTypeSysParameters      = "system-parameters"
@@ -83,6 +86,7 @@ const (
 	OperationalMsgOpCodeCreateUpdate
 	OperationalMsgOpCodeDelete
 	OperationalMsgOpCodeResyncContivNetworkPodMap
+	OperationalMsgOpCodeExitSystem
 )
 
 type OperationalMsg struct {
@@ -129,6 +133,9 @@ func (s *Plugin) ProcessOperationalMessages() {
 			if s.NetworkPodNodeMapMgr.SyncNetworkPodToNodeMap() {
 				isRenderingPending = true
 			}
+		case OperationalMsgOpCodeExitSystem:
+			log.Infof("Exiting system: not in server mode")
+			os.Exit(0)
 		}
 
 		if isRenderingEnabled && isRenderingPending {

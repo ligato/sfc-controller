@@ -44,6 +44,7 @@ const PluginID infra.PluginName = "Controller"
 var (
 	sfcConfigFile               string // cli flag - see RegisterFlags
 	CleanDatastore              bool
+	ServerMode              bool
 	BypassModelTypeHttpHandlers bool
 	log                         = logrus.NewLogger("Controller")
 	ctlrPlugin                  *Plugin
@@ -55,6 +56,8 @@ func RegisterFlags() {
 		"Name of a sfc config (yaml) file to load at startup")
 	flag.BoolVar(&CleanDatastore, "clean", false,
 		"Clean the controller datastore entries")
+	flag.BoolVar(&ServerMode, "server-mode", true,
+		"Run as a server after processing the sfc-config file")
 	flag.BoolVar(&BypassModelTypeHttpHandlers, "bypass-rest-for-model-objects", false,
 		"Disable HTTP handling for controller objects")
 }
@@ -211,6 +214,10 @@ func (s *Plugin) AfterInit() error {
 	ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeResyncContivNetworkPodMap, nil)
 
 	s.AddOperationMsgToQueue("", OperationalMsgOpCodeRender, nil)
+
+	if !ServerMode {
+		ctlrPlugin.AddOperationMsgToQueue("", OperationalMsgOpCodeExitSystem, nil)
+	}
 
 	s.StatusCheck.ReportStateChange(PluginID, statuscheck.OK, nil)
 
