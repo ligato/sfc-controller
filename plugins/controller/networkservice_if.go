@@ -496,6 +496,41 @@ func (mgr *NetworkServiceMgr) RenderInterfaceIPSecTunnels(
 	return nil
 }
 
+// RenderLoopbackInterface renders this interface
+func (mgr *NetworkServiceMgr) RenderLoopbackInterface(
+	ns *controller.NetworkService,
+	podName string,
+	networkPodInterface *controller.Interface) error {
+
+	interfaceName := networkPodInterface.Name
+
+	ifStatus, err := InitInterfaceStatus(ns.Metadata.Name, podName, networkPodInterface)
+	if err != nil {
+		RemoveInterfaceStatus(ns.Status.Interfaces, podName, interfaceName)
+		msg := fmt.Sprintf("network pod interface: %s/%s, %s", podName, interfaceName, err)
+		mgr.AppendStatusMsg(ns, msg)
+		return err
+	}
+	PersistInterfaceStatus(ns.Status.Interfaces, ifStatus, podName, interfaceName)
+
+	vppKV := vppagent.ConstructLoopbackInterface(
+		podName,
+		interfaceName,
+		ifStatus.IpAddresses,
+		ifStatus.MacAddress,
+		ctlrPlugin.SysParametersMgr.ResolveMtu(networkPodInterface.Mtu),
+		networkPodInterface.AdminStatus,
+		ctlrPlugin.SysParametersMgr.ResolveRxMode(networkPodInterface.RxMode))
+
+	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+		ModelTypeNetworkService + "/" + ns.Metadata.Name,
+		vppKV)
+
+	log.Debugf("RenderLoopbackInterface: ifName: %s, %v", interfaceName, vppKV)
+
+	return nil
+}
+
 func stringFirstNLastM(n int, m int, str string) string {
 	if len(str) <= n+m {
 		return str

@@ -350,6 +350,20 @@ func (mgr *NetworkServiceMgr) renderConfig(ns *controller.NetworkService) error 
 
 	defer mgr.renderComplete(ns)
 
+	// there is a special case where loopbacks are not really part of connections but is
+	// desirable to be created in the pod, so find them and render them, the connection
+	// related interfaces (vnf-vswitch pairs), get rendered in renderConnectionSegments below
+	for _, networkPod := range ns.Spec.NetworkPods {
+		for _, iface := range networkPod.Spec.Interfaces {
+			if iface.IfType == controller.IfTypeLoopBack {
+				if err := mgr.RenderLoopbackInterface(ns, networkPod.Metadata.Name, iface); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// render the interface pairs involved based on the connection type required
 	for i, conn := range ns.Spec.Connections {
 		log.Debugf("RenderNetworkService: network-service/conn: ", ns.Metadata.Name, conn)
 
@@ -605,6 +619,7 @@ func (mgr *NetworkServiceMgr) validateNetworkPod(
 		case controller.IfTypeMemif:
 		case controller.IfTypeEthernet:
 		case controller.IfTypeVeth:
+		case controller.IfTypeLoopBack:
 		case controller.IfTypeTap:
 		default:
 			return fmt.Errorf("network-service/pod: %s/%s has invalid if type '%s'",
