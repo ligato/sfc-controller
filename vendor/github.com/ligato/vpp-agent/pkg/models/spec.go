@@ -206,7 +206,13 @@ func NameTemplate(t string) NameFunc {
 
 var funcMap = template.FuncMap{
 	"ipnet": func(s string) map[string]interface{} {
-		_, ipNet, _ := net.ParseCIDR(s)
+		_, ipNet, err := net.ParseCIDR(s)
+		if err != nil {
+			return map[string]interface{}{
+				"IP":       "<invalid>",
+				"MaskSize": 0,
+			}
+		}
 		maskSize, _ := ipNet.Mask.Size()
 		return map[string]interface{}{
 			"IP":       ipNet.IP.String(),

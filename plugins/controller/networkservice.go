@@ -28,11 +28,11 @@ import (
 	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/sfc-controller/plugins/controller/database"
 	"github.com/ligato/sfc-controller/plugins/controller/model"
+	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
+	ipsec "github.com/ligato/vpp-agent/api/models/vpp/ipsec"
+	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
 	"github.com/unrolled/render"
 	"strconv"
-	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
-	ipsec "github.com/ligato/vpp-agent/api/models/vpp/ipsec"
 )
 
 type NetworkServiceMgr struct {
@@ -365,7 +365,7 @@ func (mgr *NetworkServiceMgr) renderConfig(ns *controller.NetworkService) error 
 
 	// render the interface pairs involved based on the connection type required
 	for i, conn := range ns.Spec.Connections {
-		log.Debugf("RenderNetworkService: network-service/conn: ", ns.Metadata.Name, conn)
+		log.Debugf("RenderNetworkService: %v network-service/conn: %v ", ns.Metadata.Name, conn)
 
 		if err := mgr.renderConnectionSegments(ns, conn, uint32(i)); err != nil {
 			return err
@@ -686,32 +686,32 @@ func (mgr *NetworkServiceMgr) validateNetworkPod(
 			}
 		}
 		if iFace.LinuxNamespace != "" {
-          nsType, nsValue := LinuxNameSpaceTypeValue(iFace.LinuxNamespace)
-          switch nsType {
-		  case controller.LinuxNamespaceNAME:
-		  	if nsValue == "" {
-				return fmt.Errorf("network-service/if: %s/%s, linux name space type=%s, INVALID value: =%s",
-					ns.Metadata.Name, iFace.Name, nsType, nsValue)
+			nsType, nsValue := LinuxNameSpaceTypeValue(iFace.LinuxNamespace)
+			switch nsType {
+			case controller.LinuxNamespaceNAME:
+				if nsValue == "" {
+					return fmt.Errorf("network-service/if: %s/%s, linux name space type=%s, INVALID value: =%s",
+						ns.Metadata.Name, iFace.Name, nsType, nsValue)
+				}
+			case controller.LinuxNamespaceFILE:
+				if nsValue == "" {
+					return fmt.Errorf("network-service/if: %s/%s, linux name space type=%s, INVALID value: =%s",
+						ns.Metadata.Name, iFace.Name, nsType, nsValue)
+				}
+			case controller.LinuxNamespaceMICROSERVICE:
+				if nsValue == "" {
+					return fmt.Errorf("network-service/if: %s/%s, linux name space type=%s, INVALID value: =%s",
+						ns.Metadata.Name, iFace.Name, nsType, nsValue)
+				}
+			case controller.LinuxNamespacePID:
+				if _, err := strconv.Atoi(nsValue); err != nil {
+					return fmt.Errorf("network-service/if: %s/%s, linux name space type=%s, INVALID value: =%s",
+						ns.Metadata.Name, iFace.Name, nsType, nsValue)
+				}
+			default:
+				return fmt.Errorf("network-service/if: %s/%s, unsupported linux namespace type=%s",
+					ns.Metadata.Name, iFace.Name, nsType)
 			}
-		  case controller.LinuxNamespaceFILE:
-			  if nsValue == "" {
-				  return fmt.Errorf("network-service/if: %s/%s, linux name space type=%s, INVALID value: =%s",
-					  ns.Metadata.Name, iFace.Name, nsType, nsValue)
-			  }
-		  case controller.LinuxNamespaceMICROSERVICE:
-			  if nsValue == "" {
-				  return fmt.Errorf("network-service/if: %s/%s, linux name space type=%s, INVALID value: =%s",
-					  ns.Metadata.Name, iFace.Name, nsType, nsValue)
-			  }
-		  case controller.LinuxNamespacePID:
-			  if _, err := strconv.Atoi(nsValue); err != nil {
-				  return fmt.Errorf("network-service/if: %s/%s, linux name space type=%s, INVALID value: =%s",
-					  ns.Metadata.Name, iFace.Name, nsType, nsValue)
-			  }
-		  default:
-			  return fmt.Errorf("network-service/if: %s/%s, unsupported linux namespace type=%s",
-				  ns.Metadata.Name, iFace.Name, nsType)
-		  }
 		}
 
 		for _, ipsecTunnel := range iFace.IpsecTunnels {

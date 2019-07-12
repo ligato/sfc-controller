@@ -32,9 +32,9 @@ func InitInterfaceStatus(
 	ifStatus, exists := ctlrPlugin.ramCache.InterfaceStates[entityInterfaceName]
 	if !exists {
 		ifStatus = &controller.InterfaceStatus{
-			Name: entityInterfaceName,
-			Node: vppAgent,
-			IpamPoolNums: make(map[string]uint32,0),
+			Name:         entityInterfaceName,
+			Node:         vppAgent,
+			IpamPoolNums: make(map[string]uint32, 0),
 		}
 	}
 
@@ -91,7 +91,7 @@ func PersistInterfaceStatus(
 	ifStatus *controller.InterfaceStatus,
 	podName string, ifName string) {
 
-	entityInterfaceName := 	podName + "/" + ifName
+	entityInterfaceName := podName + "/" + ifName
 	interfaceKey := InterfaceStatusKeyPrefix() + entityInterfaceName
 
 	interfaces[entityInterfaceName] = ifStatus
@@ -106,9 +106,9 @@ func RetrieveInterfaceStatusFromRamCache(
 	interfaces map[string]*controller.InterfaceStatus,
 	podInterfaceName string) (*controller.InterfaceStatus, bool) {
 
-	ifStatus ,exists := interfaces[podInterfaceName]
+	ifStatus, exists := interfaces[podInterfaceName]
 
-	log.Debugf("RetrieveInterfaceStatusFromRamCache: podInterfaceName: %s, value: %v, exists: %b",
+	log.Debugf("RetrieveInterfaceStatusFromRamCache: podInterfaceName: %s, value: %v, exists: %v",
 		podInterfaceName, ifStatus, exists)
 
 	return ifStatus, exists
@@ -119,14 +119,14 @@ func RemoveInterfaceStatus(
 	interfaces map[string]*controller.InterfaceStatus,
 	podName string, ifName string) {
 
-	entityInterfaceName := 	podName + "/" + ifName
+	entityInterfaceName := podName + "/" + ifName
 	interfaceKey := InterfaceStatusKeyPrefix() + entityInterfaceName
 
 	delete(interfaces, entityInterfaceName)
 	delete(ctlrPlugin.ramCache.InterfaceStates, entityInterfaceName)
 	database.DeleteFromDatastore(interfaceKey)
 
-	log.Debugf("RemoveInterfaceStatus: entityInterfaceName: %s, %v", entityInterfaceName)
+	log.Debugf("RemoveInterfaceStatus: entityInterfaceName: %v", entityInterfaceName)
 }
 
 func UpdateRamCacheAllocatorsForInterfaceStatus(

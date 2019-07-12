@@ -89,7 +89,7 @@ func ReadFromDatastore(key string, data proto.Message) error {
 		return err
 	}
 	if !found {
-		err = fmt.Errorf("ReadFromDatastore: key not found '%s', key")
+		err = fmt.Errorf("ReadFromDatastore: key not found '%s', key", key)
 	}
 	return err
 }
@@ -97,11 +97,15 @@ func ReadFromDatastore(key string, data proto.Message) error {
 // DeleteFromDatastore removes the specified entry from KVStore etcd
 func DeleteFromDatastore(key string) {
 	log.Debugf("DeleteFromDatastore: key: '%s'", key)
-	db.Delete(key)
+	if _, err := db.Delete(key); err != nil {
+		log.Errorf("DeleteFromDatastore failed: %v", err)
+	}
 }
 
 // CleanDatastore removes all entries from /sfc-controller and below
 func CleanDatastore(treePrefix string) {
-	db.Delete(treePrefix, datasync.WithPrefix())
 	log.Debugf("CleanDatastore: clearing etc tree")
+	if _, err := db.Delete(treePrefix, datasync.WithPrefix()); err != nil {
+		log.Errorf("CleanDatastore failed: %v", err)
+	}
 }

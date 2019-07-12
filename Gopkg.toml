@@ -37,13 +37,8 @@ required = [
   version = "1.0.0"
 
 [[constraint]]
-  name = "github.com/golang/protobuf"
-  branch = "master"
-
-[[constraint]]
   name = "github.com/gogo/protobuf"
   version = "1.2.0"
-
 
 [[constraint]]
   name = "github.com/gorilla/mux"
@@ -51,27 +46,15 @@ required = [
 
 [[constraint]]
   name = "github.com/ligato/vpp-agent"
-  release = "2.0.1"
+  branch = "vpp1908"
 
 [[constraint]]
   name = "github.com/namsral/flag"
   version = "1.7.4-pre"
 
 [[constraint]]
-  name = "github.com/onsi/gomega"
-  version = "1.3.0"
-
-[[constraint]]
   branch = "master"
   name = "github.com/unrolled/render"
-
-[[constraint]]
-  name = "golang.org/x/crypto"
-  source = "https://github.com/golang/crypto.git"
-
-[[constraint]]
-  name = "google.golang.org/grpc"
-  version = "1.14.0"
 
 [[constraint]]
   name = "k8s.io/api"

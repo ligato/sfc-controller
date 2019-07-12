@@ -18,10 +18,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ghodss/yaml"
+	"github.com/ligato/sfc-controller/plugins/controller/model"
 	"io/ioutil"
 	"time"
-	"github.com/ligato/sfc-controller/plugins/controller/model"
-
 )
 
 const sfcYamlVersion = 2
@@ -70,7 +69,6 @@ func (s *Plugin) SfcConfigYamlReadFromFile(fpath string) (*SfcConfigYaml, error)
 	return yamlConfig, nil
 }
 
-
 // SfcSystemCacheToYaml is used by http to return the whole system config in YAML format
 func (s *Plugin) SfcSystemCacheToYaml() ([]byte, error) {
 	yamlConfig := &SfcConfigYaml{}
@@ -101,13 +99,13 @@ func (s *Plugin) SfcConfigYamlProcessConfig(y *SfcConfigYaml) error {
 	}
 
 	if y.SysParms != nil {
-		log.Debugf("SfcConfigYamlProcessConfig: system parameters: ", y.SysParms)
+		log.Debugf("SfcConfigYamlProcessConfig: system parameters: %v", y.SysParms)
 		if err := ctlrPlugin.SysParametersMgr.HandleCRUDOperationCU(y.SysParms); err != nil {
 			return err
 		}
 	}
 
-	log.Debugf("SfcConfigYamlProcessConfig: ipam pools: ", y.IPAMPools)
+	log.Debugf("SfcConfigYamlProcessConfig: ipam pools: %v", y.IPAMPools)
 	for _, ipamPool := range y.IPAMPools {
 		if err := ctlrPlugin.IpamPoolMgr.HandleCRUDOperationCU(ipamPool); err != nil {
 			return err
@@ -115,27 +113,27 @@ func (s *Plugin) SfcConfigYamlProcessConfig(y *SfcConfigYaml) error {
 	}
 
 	for _, nn := range y.NetworkNodes {
-		log.Debugf("SfcConfigYamlProcessConfig: network node: ", nn)
+		log.Debugf("SfcConfigYamlProcessConfig: network node: %v", nn)
 		if err := ctlrPlugin.NetworkNodeMgr.HandleCRUDOperationCU(nn); err != nil {
 			return err
 		}
 	}
 
 	for _, ns := range y.NetworkServices {
-		log.Debugf("SfcConfigYamlProcessConfig: network-service: ", ns)
+		log.Debugf("SfcConfigYamlProcessConfig: network-service: %v", ns)
 		if err := ctlrPlugin.NetworkServiceMgr.HandleCRUDOperationCU(ns); err != nil {
 			return err
 		}
 	}
 
 	for _, p2n := range y.NetworkPodToNodeMap {
-		log.Debugf("SfcConfigYamlProcessConfig: network-pod-to-node-map: ", p2n)
+		log.Debugf("SfcConfigYamlProcessConfig: network-pod-to-node-map: %v", p2n)
 		if err := ctlrPlugin.NetworkPodNodeMapMgr.HandleCRUDOperationCU(p2n); err != nil {
 			return err
 		}
 	}
 
-	log.Debugf("SfcConfigYamlProcessConfig: network-node-overlays: ", y.NetworkNodeOverlays)
+	log.Debugf("SfcConfigYamlProcessConfig: network-node-overlays: %v", y.NetworkNodeOverlays)
 	for _, nno := range y.NetworkNodeOverlays {
 		if err := ctlrPlugin.NetworkNodeOverlayMgr.HandleCRUDOperationCU(nno); err != nil {
 			return err

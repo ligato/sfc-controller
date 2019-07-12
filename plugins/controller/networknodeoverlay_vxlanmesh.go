@@ -104,7 +104,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL2MPVxlanMesh(
 				vppKV)
 
 			l2bdIF := &l2.BridgeDomain_Interface{
-				Name: ifName,
+				Name:                    ifName,
 				BridgedVirtualInterface: false,
 				SplitHorizonGroup:       1,
 			}
@@ -158,7 +158,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL2PPVxlanMesh(
 	}
 	vni, err := vniAllocator.AllocateVni()
 	if err != nil {
-		msg := fmt.Sprintf("network service: %s, conn: %d, %s/%s to %s/%s overlay: %s out of vni's",
+		msg := fmt.Sprintf("network service: %s, conn: %d, %s/%s overlay: %s out of vni's",
 			ns.Metadata.Name,
 			connIndex+1,
 			conn.PodInterfaces[0],
@@ -270,7 +270,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL3PPVxlanMesh(
 	}
 	vni, err := vniAllocator.AllocateVni()
 	if err != nil {
-		msg := fmt.Sprintf("network service: %s, conn: %d, %s/%s to %s/%s overlay: %s out of vni's",
+		msg := fmt.Sprintf("network service: %s, conn: %d, %s/%s overlay: %s out of vni's",
 			ns.Metadata.Name,
 			connIndex+1,
 			conn.PodInterfaces[0],
@@ -366,7 +366,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL3PPVxlanMesh(
 			}
 			vppKV := vppagent.ConstructStaticRoute(p2nArray[from].Node, l3sr)
 			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-				ModelTypeNetworkService + "/" + ns.Metadata.Name,
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
 				vppKV)
 		}
 
@@ -426,7 +426,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL3MPVxlanMesh(
 			ifName := fmt.Sprintf("IF_VXLAN_MESH_NET_SRVC_%s_CONN_%d_FROM_%s_TO_%s_VNI_%d",
 				ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 
-			tunnelMeshMap[fromNode + "/" + toNode] = ifName
+			tunnelMeshMap[fromNode+"/"+toNode] = ifName
 
 			vxlanIPFromAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
 				nno.Spec.VxlanMeshParms.LoopbackIpamPoolName, fromNode, nno.Spec.VxlanMeshParms.NetworkNodeInterfaceLabel)
@@ -478,19 +478,19 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL3MPVxlanMesh(
 			// outgoing tunnel from the fromNode to the toNode
 			for _, toNodel3Vrf := range l3vrfs[toNode] {
 				l3sr := &controller.L3VRFRoute{
-					VrfId: toNodel3Vrf.VrfId,
-					DstIpAddr: toNodel3Vrf.DstIpAddr,
+					VrfId:             toNodel3Vrf.VrfId,
+					DstIpAddr:         toNodel3Vrf.DstIpAddr,
 					OutgoingInterface: ifName,
-					Description: toNodel3Vrf.Description,
+					Description:       toNodel3Vrf.Description,
 				}
 				vppKV := vppagent.ConstructStaticRoute(fromNode, l3sr)
 				RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-					ModelTypeNetworkService + "/" + ns.Metadata.Name,
+					ModelTypeNetworkService+"/"+ns.Metadata.Name,
 					vppKV)
 			}
 
 			l2bdIF := &l2.BridgeDomain_Interface{
-				Name: ifName,
+				Name:                    ifName,
 				BridgedVirtualInterface: false,
 				SplitHorizonGroup:       1,
 			}

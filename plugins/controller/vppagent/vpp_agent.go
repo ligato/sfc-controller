@@ -20,18 +20,18 @@ package vppagent
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/ligato/cn-infra/logging/logrus"
-	"github.com/ligato/cn-infra/utils/addrs"
-	"github.com/ligato/sfc-controller/plugins/controller/model"
 	linuxIntf "github.com/ligato/vpp-agent/api/models/linux/interfaces"
-	ipsec "github.com/ligato/vpp-agent/api/models/vpp/ipsec"
 	namespace "github.com/ligato/vpp-agent/api/models/linux/namespace"
 	interfaces "github.com/ligato/vpp-agent/api/models/vpp/interfaces"
+	ipsec "github.com/ligato/vpp-agent/api/models/vpp/ipsec"
 	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
 	l3 "github.com/ligato/vpp-agent/api/models/vpp/l3"
-	"strconv"
+
+	"github.com/ligato/sfc-controller/plugins/controller/model"
 )
 
 var (
@@ -268,7 +268,7 @@ func ConstructMemInterface(vppAgent string,
 
 	ifaceMemif := &interfaces.Interface_Memif{
 		Memif: &interfaces.MemifLink{
-			Id: memifID,
+			Id:     memifID,
 			Master: isMaster,
 		},
 	}
@@ -279,7 +279,7 @@ func ConstructMemInterface(vppAgent string,
 		PhysAddress: macAddr,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
-		Link: ifaceMemif,
+		Link:        ifaceMemif,
 	}
 
 	if memifParms != nil {
@@ -408,7 +408,7 @@ func ConstructTapInterface(vppAgent string,
 	ifaceTap := &interfaces.Interface_Tap{
 		Tap: &interfaces.TapLink{
 			//HostIfName: hostPortLabel,
-			Version:    2,
+			Version: 2,
 		},
 	}
 	iface := &interfaces.Interface{
@@ -418,7 +418,7 @@ func ConstructTapInterface(vppAgent string,
 		PhysAddress: macAddr,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
-		Link: 		 ifaceTap,
+		Link:        ifaceTap,
 	}
 
 	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
@@ -472,8 +472,8 @@ func ConstructLinuxTapInterface(vppAgent string,
 		PhysAddress: macAddr,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
-		HostIfName: hostIfName,
-		Link: linTapIf,
+		HostIfName:  hostIfName,
+		Link:        linTapIf,
 	}
 
 	ns := &namespace.NetNamespace{}
@@ -522,7 +522,6 @@ func ConstructAFPacketInterface(vppAgent string,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
 		Link:        ifaceAFP,
-
 	}
 
 	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
@@ -616,18 +615,15 @@ func ConstructStaticRoute(vppAgent string, l3sr *controller.L3VRFRoute) *KVType 
 	sr := &l3.Route{
 		VrfId:             l3sr.VrfId,
 		DstNetwork:        l3sr.DstIpAddr,
-		//DstIpAddr:         l3sr.DstIpAddr,
 		NextHopAddr:       StripSlashAndSubnetIPAddress(l3sr.NextHopAddr),
 		Weight:            l3sr.Weight,
 		OutgoingInterface: l3sr.OutgoingInterface,
 		Preference:        l3sr.Preference,
 	}
 
-	//destIPAddr, _, _ := addrs.ParseIPWithPrefix(sr.DstIpAddr)
-	destIPAddr, _, _ := addrs.ParseIPWithPrefix(sr.DstNetwork)
-	key := L3RouteKey(vppAgent, sr.VrfId, destIPAddr, sr.NextHopAddr)
+	key := L3RouteKey(vppAgent, sr)
 
-	log.Debugf("ConstructStaticRoute: key='%s', sr='%v", key, sr)
+	log.Debugf("ConstructStaticRoute: key='%s', sr='%+v", key, sr)
 
 	kv := &KVType{
 		VppKey:       key,
@@ -647,31 +643,31 @@ func ConstructIPSecTunnel(vppAgent string, sfcIpsecTunnel *controller.IPSecTunne
 
 	ipsecTunnel := &interfaces.Interface_Ipsec{
 		Ipsec: &interfaces.IPSecLink{
-			Esn: sfcIpsecTunnel.Esn,
-			AntiReplay: sfcIpsecTunnel.AntiReplay,
-			LocalIp: sfcIpsecTunnel.LocalIp,
-			RemoteIp: sfcIpsecTunnel.RemoteIp,
-			LocalSpi: sfcIpsecTunnel.LocalSpi,
-			RemoteSpi: sfcIpsecTunnel.RemoteSpi,
-			CryptoAlg: ipsec.CryptoAlg(ipsec.CryptoAlg_value[sfcIpsecTunnel.CryptoAlg]),
-			LocalCryptoKey: sfcIpsecTunnel.LocalCryptoKey,
+			Esn:             sfcIpsecTunnel.Esn,
+			AntiReplay:      sfcIpsecTunnel.AntiReplay,
+			LocalIp:         sfcIpsecTunnel.LocalIp,
+			RemoteIp:        sfcIpsecTunnel.RemoteIp,
+			LocalSpi:        sfcIpsecTunnel.LocalSpi,
+			RemoteSpi:       sfcIpsecTunnel.RemoteSpi,
+			CryptoAlg:       ipsec.CryptoAlg(ipsec.CryptoAlg_value[sfcIpsecTunnel.CryptoAlg]),
+			LocalCryptoKey:  sfcIpsecTunnel.LocalCryptoKey,
 			RemoteCryptoKey: sfcIpsecTunnel.RemoteCryptoKey,
-			IntegAlg: ipsec.IntegAlg(ipsec.IntegAlg_value[sfcIpsecTunnel.IntegAlg]),
-			LocalIntegKey: sfcIpsecTunnel.LocalIntegKey,
-			RemoteIntegKey: sfcIpsecTunnel.RemoteIntegKey,
-			EnableUdpEncap: sfcIpsecTunnel.EnableUdpEncap,
+			IntegAlg:        ipsec.IntegAlg(ipsec.IntegAlg_value[sfcIpsecTunnel.IntegAlg]),
+			LocalIntegKey:   sfcIpsecTunnel.LocalIntegKey,
+			RemoteIntegKey:  sfcIpsecTunnel.RemoteIntegKey,
+			EnableUdpEncap:  sfcIpsecTunnel.EnableUdpEncap,
 		},
 	}
 
 	iface := &interfaces.Interface{
-		Name:        sfcIpsecTunnel.Name,
-		Type:        interfaces.Interface_IPSEC_TUNNEL,
-		Enabled:     true,
+		Name:    sfcIpsecTunnel.Name,
+		Type:    interfaces.Interface_IPSEC_TUNNEL,
+		Enabled: true,
 		Unnumbered: &interfaces.Interface_Unnumbered{
 			InterfaceWithIp: ifname,
 		},
-		Mtu:         mtu,
-		Link:        ipsecTunnel,
+		Mtu:  mtu,
+		Link: ipsecTunnel,
 	}
 
 	key := InterfaceKey(vppAgent, iface.Name)
@@ -703,7 +699,7 @@ func ConstructStaticArpEntry(vppAgent string, l3ae *controller.L3ArpEntry) *KVTy
 	kv := &KVType{
 		VppKey:       key,
 		VppEntryType: VppEntryTypeArp,
-		ArpEntry:      ae,
+		ArpEntry:     ae,
 	}
 	return kv
 }

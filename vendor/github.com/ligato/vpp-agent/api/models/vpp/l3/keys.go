@@ -39,7 +39,10 @@ var (
 		Type:    "route",
 		Version: "v2",
 	}, models.WithNameTemplate(
-		`vrf/{{.VrfId}}/dst/{{with ipnet .DstNetwork}}{{printf "%s/%d" .IP .MaskSize}}{{end}}/gw/{{.NextHopAddr}}`,
+		`{{if .OutgoingInterface}}{{printf "if/%s/" .OutgoingInterface}}{{end}}`+
+			`vrf/{{.VrfId}}/`+
+			`{{with ipnet .DstNetwork}}{{printf "dst/%s/%d/" .IP .MaskSize}}{{end}}`+
+			`{{if .NextHopAddr}}gw/{{.NextHopAddr}}{{end}}`,
 	))
 
 	ModelProxyARP = models.Register(&ProxyARP{}, models.Spec{
@@ -53,6 +56,14 @@ var (
 		Type:    "ipscanneigh-global",
 		Version: "v2",
 	})
+
+	ModelVrfTable = models.Register(&VrfTable{}, models.Spec{
+		Module:  ModuleName,
+		Type:    "vrf-table",
+		Version: "v2",
+	}, models.WithNameTemplate(
+		`id/{{.Id}}/protocol/{{.Protocol}}`,
+	))
 )
 
 // ProxyARPKey is key for global proxy arp
@@ -66,11 +77,12 @@ func IPScanNeighborKey() string {
 }
 
 // RouteKey returns the key used in ETCD to store vpp route for vpp instance.
-func RouteKey(vrf uint32, dstNet string, nextHopAddr string) string {
+func RouteKey(iface string, vrf uint32, dstNet string, nextHopAddr string) string {
 	return models.Key(&Route{
-		VrfId:       vrf,
-		DstNetwork:  dstNet,
-		NextHopAddr: nextHopAddr,
+		OutgoingInterface: iface,
+		VrfId:             vrf,
+		DstNetwork:        dstNet,
+		NextHopAddr:       nextHopAddr,
 	})
 }
 
@@ -79,6 +91,14 @@ func ArpEntryKey(iface, ipAddr string) string {
 	return models.Key(&ARPEntry{
 		Interface: iface,
 		IpAddress: ipAddr,
+	})
+}
+
+// VrfTableKey returns the key used to represent configuration for VPP VRF table.
+func VrfTableKey(id uint32, protocol VrfTable_Protocol) string {
+	return models.Key(&VrfTable{
+		Id:       id,
+		Protocol: protocol,
 	})
 }
 

@@ -18,11 +18,12 @@
   version = "v0.4.1"
 
 [[projects]]
-  digest = "1:7ae4616edd396840ccc1506d287211ef883d3e93604dde0c9d1dd5721bb449d5"
+  digest = "1:ea99507d649edfc9d5cfb1ceaf680545cfb4836a88d80f0de1a2f3781ff1765e"
   name = "github.com/coreos/etcd"
   packages = [
     "auth/authpb",
     "clientv3",
+    "clientv3/concurrency",
     "clientv3/namespace",
     "etcdserver/api/v3rpc/rpctypes",
     "etcdserver/etcdserverpb",
@@ -225,8 +226,7 @@
   version = "v1.0.2"
 
 [[projects]]
-  branch = "master"
-  digest = "1:bd8efc3580f0c3ad0bb8939a4656792086cf57b89668b4b55feb62815565f1f8"
+  digest = "1:1de75c2173c071ff8a654a7d652fe20591b55fd1fb0e2955270b170b0dbfcc58"
   name = "github.com/ligato/cn-infra"
   packages = [
     "agent",
@@ -250,15 +250,16 @@
     "rpc/rest/security",
     "rpc/rest/security/model/access-security",
     "servicelabel",
-    "utils/addrs",
     "utils/once",
     "utils/safeclose",
   ]
   pruneopts = "UT"
-  revision = "1009a1eda9ba369c0aea207b8ecea13cd109f350"
+  revision = "ceaf6f4fe9f9fa6aa0629edc20156a969928f0e5"
+  version = "v2.1.0"
 
 [[projects]]
-  digest = "1:61c0ec5c4e015805f9979ee8ddd5f6b2dd2a31cf19fc7abdb6ee84bb95352f1e"
+  branch = "vpp1908"
+  digest = "1:4d43fa8bb0c7ae7251c93120800810d1b6154ce1ea8af72ae4d65e7dd2f79ad6"
   name = "github.com/ligato/vpp-agent"
   packages = [
     "api/genericmanager",
@@ -271,8 +272,7 @@
     "pkg/models",
   ]
   pruneopts = "UT"
-  revision = "8b9cbb72c6dd2a8d2096f1d003b2f67b70f36214"
-  version = "v2.0.1"
+  revision = "75e002d55662118dbda0d6a6d19280edeecba113"
 
 [[projects]]
   digest = "1:ff5ebae34cfbf047d505ee150de27e60570e8c394b3b8fdbb720ff6ac71985fc"
@@ -820,13 +820,13 @@
     "github.com/ligato/cn-infra/logging/logmanager",
     "github.com/ligato/cn-infra/logging/logrus",
     "github.com/ligato/cn-infra/rpc/rest",
-    "github.com/ligato/cn-infra/utils/addrs",
     "github.com/ligato/vpp-agent/api/models/linux/interfaces",
     "github.com/ligato/vpp-agent/api/models/linux/namespace",
     "github.com/ligato/vpp-agent/api/models/vpp/interfaces",
     "github.com/ligato/vpp-agent/api/models/vpp/ipsec",
     "github.com/ligato/vpp-agent/api/models/vpp/l2",
     "github.com/ligato/vpp-agent/api/models/vpp/l3",
+    "github.com/ligato/vpp-agent/pkg/models",
     "github.com/namsral/flag",
     "github.com/unrolled/render",
     "k8s.io/api/core/v1",

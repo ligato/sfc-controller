@@ -16,6 +16,7 @@ package vpp_interfaces
 
 import (
 	"net"
+	"strconv"
 	"strings"
 
 	"github.com/gogo/protobuf/jsonpb"
@@ -56,13 +57,31 @@ const (
 
 /* Interface Address (derived) */
 const (
-	// AddressKeyPrefix is used as a common prefix for keys derived from
-	// interfaces to represent assigned IP addresses.
-	AddressKeyPrefix = "vpp/interface/address/"
+	// addressKeyTemplate is a template for (derived) key representing assigned
+	// IP addresses to an interface.
+	addressKeyTemplate = "vpp/interface/{iface}/address/{address}"
+)
 
-	// addressKeyTemplate is a template for (derived) key representing IP address
-	// (incl. mask) assigned to a VPP interface.
-	addressKeyTemplate = AddressKeyPrefix + "{iface}/{addr}/{mask}"
+/* Interface VRF (derived) */
+const (
+	// vrfTKeyTemplatePrefix is a prefix of the template used to construct
+	// key representing assignment of an interface into a VRF table.
+	// The prefix includes the source interface name, but not details about the
+	// target VRF.
+	vrfTKeyTemplatePrefix = "vpp/interface/{iface}/vrf/"
+
+	// vrfKeyTemplate is a template for (derived) key representing assignment
+	// of a VPP interface into a VRF table.
+	vrfKeyTemplate = vrfTKeyTemplatePrefix + "{vrf}/ip-version/{ip-version}"
+
+	// inheritedVrfKeyTemplate is a template for (derived) key representing
+	// assignment of an (unnumbered) VPP interface into a VRF table, ID of which
+	// is given by the configuration of a referenced (numbered) interface.
+	inheritedVrfKeyTemplate = vrfTKeyTemplatePrefix + "from-interface/{from-iface}"
+
+	vrfIPv4 = "v4"
+	vrfIPv6 = "v6"
+	vrfBoth = "both"
 )
 
 /* Unnumbered interface (derived) */
@@ -88,6 +107,39 @@ const (
 	// DHCPLeaseKeyPrefix is used as a common prefix for keys representing
 	// notifications with DHCP leases.
 	DHCPLeaseKeyPrefix = "vpp/interface/dhcp-lease/"
+)
+
+/* Interface Link State */
+
+const (
+	// interface link states as described in the keys
+	linkUpState   = "UP"
+	linkDownState = "DOWN"
+
+	// linkStateKeyTemplate is a template for keys representing
+	// the link state of VPP interfaces (up/down).
+	linkStateKeyTemplate = "vpp/interface/{ifName}/link-state/{linkState}"
+)
+
+/* Interface Rx-placement (derived) */
+const (
+	// rxPlacementKeyTemplate is a template for (derived) key representing
+	// rx-placement configured for a given interface queue.
+	rxPlacementKeyTemplate = "vpp/interface/{iface}/rx-placement/queue/{queue}"
+)
+
+/* Interface Rx-modes (derived) */
+const (
+	// rxModeKeyTemplate is a template for (derived) key representing
+	// rx-mode configuration for all queues of a given interface.
+	rxModesKeyTemplate = "vpp/interface/{iface}/rx-modes"
+)
+
+/* Interface with IP address (derived, property) */
+const (
+	// interfaceWithIPKeyTemplate is a template for keys derived from all interfaces
+	// but created only after at least one IP address is assigned.
+	interfaceWithIPKeyTemplate = "vpp/interface/{iface}/has-IP-address"
 )
 
 const (
@@ -121,10 +173,7 @@ func InterfaceStateKey(iface string) string {
 // InterfaceAddressPrefix returns longest-common prefix of keys representing
 // assigned IP addresses to a specific VPP interface.
 func InterfaceAddressPrefix(iface string) string {
-	if iface == "" {
-		iface = InvalidKeyPart
-	}
-	return AddressKeyPrefix + iface + "/"
+	return InterfaceAddressKey(iface, "")
 }
 
 // InterfaceAddressKey returns key representing IP address assigned to VPP interface.
@@ -133,46 +182,176 @@ func InterfaceAddressKey(iface string, address string) string {
 		iface = InvalidKeyPart
 	}
 
-	// parse address
-	ipAddr, addrNet, err := net.ParseCIDR(address)
-	if err != nil {
-		address = InvalidKeyPart + "/" + InvalidKeyPart
-	} else {
-		addrNet.IP = ipAddr
-		address = addrNet.String()
-	}
-
+	// construct key without validating the IP address
 	key := strings.Replace(addressKeyTemplate, "{iface}", iface, 1)
-	key = strings.Replace(key, "{addr}/{mask}", address, 1)
-
+	key = strings.Replace(key, "{address}", address, 1)
 	return key
 }
 
 // ParseInterfaceAddressKey parses interface address from key derived
 // from interface by InterfaceAddressKey().
-func ParseInterfaceAddressKey(key string) (iface string, ipAddr net.IP, ipAddrNet *net.IPNet, isAddrKey bool) {
-	if suffix := strings.TrimPrefix(key, AddressKeyPrefix); suffix != key {
-		parts := strings.Split(suffix, "/")
+func ParseInterfaceAddressKey(key string) (iface string, ipAddr net.IP, ipAddrNet *net.IPNet, invalidIP, isAddrKey bool) {
+	parts := strings.Split(key, "/")
+	if len(parts) < 4 || parts[0] != "vpp" || parts[1] != "interface" {
+		return
+	}
 
-		// beware: interface name may contain forward slashes (e.g. ETHERNET_CSMACD)
-		if len(parts) < 3 {
-			return "", nil, nil, false
+	addrIdx := -1
+	for idx, part := range parts {
+		if part == "address" {
+			addrIdx = idx
+			break
 		}
+	}
+	if addrIdx == -1 {
+		return
+	}
+	isAddrKey = true
 
-		// parse IP address
-		lastIdx := len(parts) - 1
-		var err error
-		ipAddr, ipAddrNet, err = net.ParseCIDR(parts[lastIdx-1] + "/" + parts[lastIdx])
-		if err != nil {
-			return "", nil, nil, false
-		}
+	// parse interface name
+	iface = strings.Join(parts[2:addrIdx], "/")
+	if iface == "" {
+		iface = InvalidKeyPart
+	}
 
-		// parse interface name
-		iface = strings.Join(parts[:lastIdx-1], "/")
-		if iface == "" {
-			return "", nil, nil, false
+	// parse IP address
+	var err error
+	ipAddr, ipAddrNet, err = net.ParseCIDR(strings.Join(parts[addrIdx+1:], "/"))
+	if err != nil {
+		invalidIP = true
+	}
+
+	return
+}
+
+/* Interface VRF (derived) */
+
+// InterfaceVrfKeyPrefix returns prefix of the key representing assignment
+// of the given interface into unspecified VRF table.
+func InterfaceVrfKeyPrefix(iface string) string {
+	return strings.Replace(vrfTKeyTemplatePrefix, "{iface}", iface, 1)
+}
+
+// InterfaceVrfKey returns key representing assignment of the given interface
+// into the given VRF.
+func InterfaceVrfKey(iface string, vrf int, ipv4, ipv6 bool) string {
+	if iface == "" {
+		iface = InvalidKeyPart
+	}
+	ipVer := InvalidKeyPart
+	if ipv4 && ipv6 {
+		ipVer = vrfBoth
+	} else if ipv4 {
+		ipVer = vrfIPv4
+	} else if ipv6 {
+		ipVer = vrfIPv6
+	}
+
+	vrfTableID := InvalidKeyPart
+	if vrf >= 0 {
+		vrfTableID = strconv.Itoa(vrf)
+	}
+
+	key := strings.Replace(vrfKeyTemplate, "{iface}", iface, 1)
+	key = strings.Replace(key, "{vrf}", vrfTableID, 1)
+	key = strings.Replace(key, "{ip-version}", ipVer, 1)
+	return key
+}
+
+// ParseInterfaceVrfKey parses details from key derived from interface by
+// InterfaceVrfKey().
+func ParseInterfaceVrfKey(key string) (iface string, vrf int, ipv4, ipv6, isIfaceVrfKey bool) {
+	parts := strings.Split(key, "/")
+	if len(parts) < 7 || parts[0] != "vpp" || parts[1] != "interface" {
+		return
+	}
+
+	vrfIdx := -1
+	ipVerIdx := -1
+	for idx, part := range parts {
+		if part == "vrf" {
+			vrfIdx = idx
 		}
-		return iface, ipAddr, ipAddrNet, true
+		if part == "ip-version" {
+			ipVerIdx = idx
+		}
+	}
+	if vrfIdx == -1 || ipVerIdx != len(parts)-2 {
+		return
+	}
+	isIfaceVrfKey = true
+
+	// parse interface name
+	iface = strings.Join(parts[2:vrfIdx], "/")
+	if iface == "" {
+		iface = InvalidKeyPart
+	}
+
+	// parse VRF table ID
+	var err error
+	vrf, err = strconv.Atoi(parts[vrfIdx+1])
+	if err != nil {
+		vrf = -1
+	}
+
+	// parse IP version
+	switch parts[ipVerIdx+1] {
+	case vrfBoth:
+		ipv4 = true
+		ipv6 = true
+	case vrfIPv4:
+		ipv4 = true
+	case vrfIPv6:
+		ipv6 = true
+	}
+	return
+}
+
+// InterfaceInheritedVrfKey returns key representing assignment of the given
+// interface into a VRF inherited from another interface.
+// Used by unnumbered interfaces.
+func InterfaceInheritedVrfKey(iface string, fromIface string) string {
+	if iface == "" {
+		iface = InvalidKeyPart
+	}
+	if fromIface == "" {
+		fromIface = InvalidKeyPart
+	}
+	key := strings.Replace(inheritedVrfKeyTemplate, "{iface}", iface, 1)
+	key = strings.Replace(key, "{from-iface}", fromIface, 1)
+	return key
+}
+
+// ParseInterfaceInheritedVrfKey parses details from key derived from interface by
+// InterfaceInheritedVrfKey().
+func ParseInterfaceInheritedVrfKey(key string) (iface, fromIface string, isIfaceInherVrfKey bool) {
+	parts := strings.Split(key, "/")
+	if len(parts) < 6 || parts[0] != "vpp" || parts[1] != "interface" {
+		return
+	}
+
+	vrfIdx := -1
+	for idx, part := range parts {
+		if part == "vrf" {
+			vrfIdx = idx
+			break
+		}
+	}
+	if vrfIdx == -1 || vrfIdx+2 >= len(parts) || parts[vrfIdx+1] != "from-interface" {
+		return
+	}
+	isIfaceInherVrfKey = true
+
+	// parse interface name
+	iface = strings.Join(parts[2:vrfIdx], "/")
+	if iface == "" {
+		iface = InvalidKeyPart
+	}
+
+	// parse from-interface name
+	fromIface = strings.Join(parts[vrfIdx+2:], "/")
+	if fromIface == "" {
+		fromIface = InvalidKeyPart
 	}
 	return
 }
@@ -251,6 +430,163 @@ func DHCPLeaseKey(iface string) string {
 func ParseNameFromDHCPLeaseKey(key string) (iface string, isDHCPLeaseKey bool) {
 	if suffix := strings.TrimPrefix(key, DHCPLeaseKeyPrefix); suffix != key && suffix != "" {
 		return suffix, true
+	}
+	return
+}
+
+/* Link State (notification) */
+
+// LinkStateKey returns key representing link state of a VPP interface.
+func LinkStateKey(ifaceName string, linkIsUp bool) string {
+	if ifaceName == "" {
+		ifaceName = InvalidKeyPart
+	}
+	linkState := linkDownState
+	if linkIsUp {
+		linkState = linkUpState
+	}
+	key := strings.Replace(linkStateKeyTemplate, "{ifName}", ifaceName, 1)
+	key = strings.Replace(key, "{linkState}", linkState, 1)
+	return key
+}
+
+// ParseLinkStateKey parses key representing link state of a VPP interface.
+func ParseLinkStateKey(key string) (ifaceName string, isLinkUp bool, isLinkStateKey bool) {
+	if suffix := strings.TrimPrefix(key, "vpp/interface/"); suffix != key {
+		parts := strings.Split(suffix, "/")
+		linkState := -1
+		for i, part := range parts {
+			if part == "link-state" {
+				linkState = i
+			}
+		}
+		if linkState != len(parts)-2 {
+			return
+		}
+
+		switch parts[len(parts)-1] {
+		case linkDownState:
+		case linkUpState:
+			isLinkUp = true
+		default:
+			return
+		}
+
+		// beware: interface name may contain forward slashes
+		ifaceName = strings.Join(parts[:linkState], "/")
+		if ifaceName == InvalidKeyPart {
+			isLinkUp = false
+			ifaceName = ""
+			return
+		}
+		isLinkStateKey = true
+	}
+	return
+}
+
+/* Interface with IP address (derived property) */
+
+// InterfaceWithIPKey returns key derived from every VPP interface but created only
+// after at least one IP address was assigned to it.
+func InterfaceWithIPKey(ifaceName string) string {
+	if ifaceName == "" {
+		ifaceName = InvalidKeyPart
+	}
+	return strings.Replace(interfaceWithIPKeyTemplate, "{iface}", ifaceName, 1)
+}
+
+// ParseInterfaceWithIPKey parses key derived from every VPP interface but created only
+// after at least one IP address was assigned to it
+func ParseInterfaceWithIPKey(key string) (ifaceName string, isInterfaceWithIPKey bool) {
+	if suffix := strings.TrimPrefix(key, "vpp/interface/"); suffix != key {
+		if prefix := strings.TrimSuffix(suffix, "/has-IP-address"); prefix != suffix {
+			if prefix != InvalidKeyPart {
+				ifaceName = prefix
+				isInterfaceWithIPKey = true
+			}
+		}
+	}
+	return
+}
+
+/* Rx placement (derived) */
+
+// RxPlacementKey returns a key representing rx-placement configured for a given
+// interface queue.
+func RxPlacementKey(ifaceName string, queue uint32) string {
+	if ifaceName == "" {
+		ifaceName = InvalidKeyPart
+	}
+	key := strings.Replace(rxPlacementKeyTemplate, "{iface}", ifaceName, 1)
+	key = strings.Replace(key, "{queue}", strconv.Itoa(int(queue)), 1)
+	return key
+}
+
+// ParseRxPlacementKey parses key representing rx-placement configured for a given
+// interface queue.
+func ParseRxPlacementKey(key string) (ifaceName string, queue uint32, isRxPlacementKey bool) {
+	if suffix := strings.TrimPrefix(key, "vpp/interface/"); suffix != key {
+		parts := strings.Split(suffix, "/")
+		rxPlacement := -1
+		for i, part := range parts {
+			if part == "rx-placement" {
+				rxPlacement = i
+			}
+		}
+		if rxPlacement != len(parts)-3 {
+			return
+		}
+
+		if parts[len(parts)-2] != "queue" {
+			return
+		}
+
+		queueID, err := strconv.Atoi(parts[len(parts)-1])
+		if err != nil || queueID < 0 {
+			return
+		}
+
+		// beware: interface name may contain forward slashes
+		ifaceName = strings.Join(parts[:rxPlacement], "/")
+		if ifaceName == InvalidKeyPart {
+			ifaceName = ""
+			return
+		}
+
+		queue = uint32(queueID)
+		isRxPlacementKey = true
+	}
+	return
+}
+
+/* Rx modes (derived) */
+
+// RxModesKey returns a key representing rx-mode configuration for all queues
+// of a given interface.
+func RxModesKey(ifaceName string) string {
+	if ifaceName == "" {
+		ifaceName = InvalidKeyPart
+	}
+	return strings.Replace(rxModesKeyTemplate, "{iface}", ifaceName, 1)
+}
+
+// ParseRxModesKey parses key representing rx-mode configuration for all queues
+// of a given interface.
+func ParseRxModesKey(key string) (ifaceName string, isRxModesKey bool) {
+	if suffix := strings.TrimPrefix(key, "vpp/interface/"); suffix != key {
+		parts := strings.Split(suffix, "/")
+		if len(parts) == 0 || parts[len(parts)-1] != "rx-modes" {
+			return
+		}
+
+		// beware: interface name may contain forward slashes
+		ifaceName = strings.Join(parts[:len(parts)-1], "/")
+		if ifaceName == InvalidKeyPart {
+			ifaceName = ""
+			return
+		}
+
+		isRxModesKey = true
 	}
 	return
 }
