@@ -226,7 +226,8 @@
   version = "v1.0.2"
 
 [[projects]]
-  digest = "1:1de75c2173c071ff8a654a7d652fe20591b55fd1fb0e2955270b170b0dbfcc58"
+  branch = "dev"
+  digest = "1:ad8c02d3e6d926dfa83441295673fc3f68937924723d35c266a866322d978924"
   name = "github.com/ligato/cn-infra"
   packages = [
     "agent",
@@ -254,12 +255,11 @@
     "utils/safeclose",
   ]
   pruneopts = "UT"
-  revision = "ceaf6f4fe9f9fa6aa0629edc20156a969928f0e5"
-  version = "v2.1.0"
+  revision = "0af3fde9febd1315467b2f2367ef5beb814dc21a"
 
 [[projects]]
-  branch = "vpp1908"
-  digest = "1:4d43fa8bb0c7ae7251c93120800810d1b6154ce1ea8af72ae4d65e7dd2f79ad6"
+  branch = "dev"
+  digest = "1:f51c9057fd851fd3ccca842aec46450edadaa1b05ee87fdba40784392b446881"
   name = "github.com/ligato/vpp-agent"
   packages = [
     "api/genericmanager",
@@ -272,7 +272,7 @@
     "pkg/models",
   ]
   pruneopts = "UT"
-  revision = "75e002d55662118dbda0d6a6d19280edeecba113"
+  revision = "9313c984c138a9930d4c3eea980d8e20b7bd77fa"
 
 [[projects]]
   digest = "1:ff5ebae34cfbf047d505ee150de27e60570e8c394b3b8fdbb720ff6ac71985fc"

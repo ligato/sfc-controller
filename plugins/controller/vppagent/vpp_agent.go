@@ -42,21 +42,20 @@ func VppAgentSetLogger(l *logrus.Logger) {
 	log = l
 }
 
-func rxModeControllerToInterface(controllerRxMode string) *interfaces.Interface_RxModeSettings {
-
-	rxSettings := &interfaces.Interface_RxModeSettings{}
+func rxModeControllerToInterface(controllerRxMode string) (rxModes []*interfaces.Interface_RxMode) {
+	rxSettings := &interfaces.Interface_RxMode{}
 	switch controllerRxMode {
 	case controller.RxModePolling:
-		rxSettings.RxMode = interfaces.Interface_RxModeSettings_POLLING
-		return rxSettings
+		rxSettings.Mode = interfaces.Interface_RxMode_POLLING
+		rxModes = append(rxModes, rxSettings)
 	case controller.RxModeInterrupt:
-		rxSettings.RxMode = interfaces.Interface_RxModeSettings_INTERRUPT
-		return rxSettings
+		rxSettings.Mode = interfaces.Interface_RxMode_INTERRUPT
+		rxModes = append(rxModes, rxSettings)
 	case controller.RxModeAdaptive:
-		rxSettings.RxMode = interfaces.Interface_RxModeSettings_ADAPTIVE
-		return rxSettings
+		rxSettings.Mode = interfaces.Interface_RxMode_ADAPTIVE
+		rxModes = append(rxModes, rxSettings)
 	}
-	return nil
+	return
 }
 
 // ConstructL2BD returns an KVType
@@ -152,7 +151,7 @@ func ConstructEthernetInterface(vppAgent string,
 		Mtu:         mtu,
 	}
 
-	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
+	iface.RxModes = rxModeControllerToInterface(rxMode)
 
 	key := InterfaceKey(vppAgent, iface.Name)
 
@@ -207,7 +206,7 @@ func ConstructLoopbackInterface(vppAgent string,
 		Mtu:         mtu,
 	}
 
-	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
+	iface.RxModes = rxModeControllerToInterface(rxMode)
 
 	key := InterfaceKey(vppAgent, iface.Name)
 
@@ -310,7 +309,7 @@ func ConstructMemInterface(vppAgent string,
 
 	ifaceMemif.Memif.SocketFilename = defaultMemifDirectory + "/memif_" + masterVppAgent + ".sock"
 
-	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
+	iface.RxModes = rxModeControllerToInterface(rxMode)
 
 	key := InterfaceKey(vppAgent, iface.Name)
 
@@ -421,7 +420,7 @@ func ConstructTapInterface(vppAgent string,
 		Link:        ifaceTap,
 	}
 
-	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
+	iface.RxModes = rxModeControllerToInterface(rxMode)
 
 	if tapParms != nil {
 		ifaceTap.Tap.ToMicroservice = namespace
@@ -524,7 +523,7 @@ func ConstructAFPacketInterface(vppAgent string,
 		Link:        ifaceAFP,
 	}
 
-	iface.RxModeSettings = rxModeControllerToInterface(rxMode)
+	iface.RxModes = rxModeControllerToInterface(rxMode)
 
 	key := InterfaceKey(vppAgent, iface.Name)
 
