@@ -6,7 +6,13 @@
 [![GoDoc](https://godoc.org/github.com/ligato/sfc-controller?status.svg)](https://godoc.org/github.com/ligato/sfc-controller)
 [![GitHub license](https://img.shields.io/badge/license-Apache%20license%202.0-blue.svg)](https://github.com/ligato/sfc-controller/blob/master/LICENSE)
 
-Please note that the content of this repository is currently **WORK IN PROGRESS**.
+---
+
+| DEPRECATION NOTICE :warning: |
+| ------------- |
+| This repository is deprecated and will be archived in the near future. | 
+
+---
 
 The SFC Controller is a Golang implementation of an orchestration module
 for providing data-plane connectivity for cloud native containers.  The
