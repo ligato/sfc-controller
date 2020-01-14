@@ -107,11 +107,11 @@ func (mgr *NetworkNodeMgr) FindVxlanIPaddress(nodeName string) (string, error) {
 		switch iFace.IfType {
 		case controller.IfTypeVxlanTunnel:
 			for _, ipAddress := range iFace.IpAddresses {
-				ip, _, err := net.ParseCIDR(ipAddress)
+				_, _, err := net.ParseCIDR(ipAddress)
 				if err == nil {
 					log.Debugf("FindVxlanIPaddress: node: %s, found vxlan ipaddr: %s",
-						nodeName, ip)
-					return ip.String(), nil
+						nodeName, ipAddress)
+					return ipAddress, nil
 				}
 			}
 		}
@@ -592,9 +592,14 @@ func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 	//var renderedEntries map[string]*controller.RenderedVppAgentEntry
 	var renderedEntries = make(map[string]*controller.RenderedVppAgentEntry)
 
-	fromVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(fromVxlanAddress)
-	toVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(toVxlanAddress)
+	log.Errorf("RenderVxlanLoopbackInterfaceAndStaticRoutes: from %s, to: %s",
+		fromVxlanAddress, toVxlanAddress)
 
+	fromVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(fromVxlanAddress)
+	//toVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(toVxlanAddress)
+
+	log.Errorf("RenderVxlanLoopbackInterfaceAndStaticRoutes: from %s, to: %s",
+		fromVxlanAddress, toVxlanAddress)
 	// depending on the number of ethernet/label:vxlan interfaces on the source node and
 	// the number of ethernet/label:vxlan inerfaces on the dest node, a set of static
 	// routes will be created

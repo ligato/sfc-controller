@@ -75,10 +75,10 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL2MPVxlanHubAndSpoke(
 
 			var ifName string
 			if i == 0 {
-				ifName = fmt.Sprintf("IF_VXLAN_NET_SRVC_%s_CONN_%d_FROM_HUB_%s_TO_SPOKE_%s_VNI_%d",
+				ifName = fmt.Sprintf("IVXH2S_%s_C%d_F_%s_T_%s_V%d",
 					ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 			} else {
-				ifName = fmt.Sprintf("IF_VXLAN_NET_SRVC_%s_CONN_%d_FROM_SPOKE_%s_TO_HUB_%s_VNI_%d",
+				ifName = fmt.Sprintf("IVXS2H_%s_C%d_F_%s_T_%s_V%d",
 					ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 			}
 
@@ -104,6 +104,9 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL2MPVxlanHubAndSpoke(
 				ctlrPlugin.NetworkServiceMgr.AppendStatusMsg(ns, msg)
 				return fmt.Errorf(msg)
 			}
+
+			log.Errorf("renderConnL2MPVxlanHubAndSpoke: from: %s, to: %s",
+				vxlanIPFromAddress, vxlanIPToAddress)
 
 			vppKV := vppagent.ConstructVxlanInterface(
 				fromNode,

@@ -19,7 +19,6 @@ import (
 	interfaces "github.com/ligato/vpp-agent/api/models/vpp/interfaces"
 	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
 	l3 "github.com/ligato/vpp-agent/api/models/vpp/l3"
-	"github.com/ligato/vpp-agent/pkg/models"
 )
 
 // this must match what utils the vpp-agent uses
@@ -49,7 +48,12 @@ func L2XConnectKey(vppLabel string, rxIf string) string {
 
 // L3RouteKey constructs L3 route db key
 func L3RouteKey(vppLabel string, route *l3.Route) string {
-	return agentPrefix + vppLabel + "/" + models.Key(route)
+	//return agentPrefix + vppLabel + "/" + models.Key(route)
+	return agentPrefix + vppLabel + "/" + l3.RouteKey(
+		route.OutgoingInterface,
+		route.VrfId,
+		route.DstNetwork,
+		route.NextHopAddr)
 }
 
 // ArpEntryKey arp key

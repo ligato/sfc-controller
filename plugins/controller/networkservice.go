@@ -789,7 +789,7 @@ func (mgr *NetworkServiceMgr) RenderL2BD(
 		}
 		vppKV := vppagent.ConstructL2BD(
 			nodeName,
-			fmt.Sprintf("BD_%s_CONN_%d", ns.Metadata.Name, connIndex+1),
+			fmt.Sprintf("BD_%s_C%d", ns.Metadata.Name, connIndex+1),
 			l2bdIFs,
 			bdParms)
 		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
@@ -827,7 +827,7 @@ func (mgr *NetworkServiceMgr) RenderNetworkPodL2BD(
 	}
 	vppKV := vppagent.ConstructL2BD(
 		podName,
-		fmt.Sprintf("BD_%s_CONN_%d", ns.Metadata.Name, connIndex+1),
+		fmt.Sprintf("BD_%s_C%d", ns.Metadata.Name, connIndex+1),
 		l2bdIFs,
 		bdParms)
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,

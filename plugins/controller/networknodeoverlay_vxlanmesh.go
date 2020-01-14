@@ -68,7 +68,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL2MPVxlanMesh(
 				continue
 			}
 
-			ifName := fmt.Sprintf("IF_VXLAN_MESH_NET_SRVC_%s_CONN_%d_FROM_%s_TO_%s_VNI_%d",
+			ifName := fmt.Sprintf("IVXMSH_%s_C%d_F_%s_T_%s_V%d",
 				ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 
 			vxlanIPFromAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
@@ -173,7 +173,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL2PPVxlanMesh(
 		from := i
 		to := ^i & 1
 
-		ifName := fmt.Sprintf("IF_VXLAN_L2PP_NET_SRVC_%s_CONN_%d_FROM_%s_%s_TO_%s_%s_VNI_%d",
+		ifName := fmt.Sprintf("IVL2XPP_%s_C%d_F_%s_%s_T_%s_%s_V%d",
 			ns.Metadata.Name, connIndex+1,
 			p2nArray[from].Node, ConnPodInterfaceSlashToUScore(conn.PodInterfaces[from]),
 			p2nArray[to].Node, ConnPodInterfaceSlashToUScore(conn.PodInterfaces[to]),
@@ -285,7 +285,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL3PPVxlanMesh(
 		from := i
 		to := ^i & 1
 
-		ifName := fmt.Sprintf("IF_VXLAN_L2PP_NET_SRVC_%s_CONN_%d_FROM_%s_%s_TO_%s_%s_VNI_%d",
+		ifName := fmt.Sprintf("IVXL2PP_%s_C%d_F_%s_%s_T_%s_%s_V%d",
 			ns.Metadata.Name, connIndex+1,
 			p2nArray[from].Node, ConnPodInterfaceSlashToUScore(conn.PodInterfaces[from]),
 			p2nArray[to].Node, ConnPodInterfaceSlashToUScore(conn.PodInterfaces[to]),
@@ -423,7 +423,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL3MPVxlanMesh(
 				continue
 			}
 
-			ifName := fmt.Sprintf("IF_VXLAN_MESH_NET_SRVC_%s_CONN_%d_FROM_%s_TO_%s_VNI_%d",
+			ifName := fmt.Sprintf("IVXMSH_%s_C%d_F_%s_T_%s_V%d",
 				ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 
 			tunnelMeshMap[fromNode+"/"+toNode] = ifName
