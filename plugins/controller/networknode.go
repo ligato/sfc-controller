@@ -592,14 +592,12 @@ func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 	//var renderedEntries map[string]*controller.RenderedVppAgentEntry
 	var renderedEntries = make(map[string]*controller.RenderedVppAgentEntry)
 
-	log.Errorf("RenderVxlanLoopbackInterfaceAndStaticRoutes: from %s, to: %s",
-		fromVxlanAddress, toVxlanAddress)
-
+	// strip the /xx off of the address
 	fromVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(fromVxlanAddress)
+
+	// keep the /xx for the route
 	//toVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(toVxlanAddress)
 
-	log.Errorf("RenderVxlanLoopbackInterfaceAndStaticRoutes: from %s, to: %s",
-		fromVxlanAddress, toVxlanAddress)
 	// depending on the number of ethernet/label:vxlan interfaces on the source node and
 	// the number of ethernet/label:vxlan inerfaces on the dest node, a set of static
 	// routes will be created
@@ -639,7 +637,7 @@ func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 				l3sr := &controller.L3VRFRoute{
 					VrfId:             vrfID,
 					Description:       fmt.Sprintf("L3VRF_VXLAN Node:%s to Node:%s", fromNode, toNode),
-					DstIpAddr:         toVxlanAddress, // dest node vxlan address
+					DstIpAddr:         toVxlanAddress, // dest node vxlan address/xx
 					NextHopAddr:       node2Iface.IpAddresses[0],
 					OutgoingInterface: node1Iface.Name,
 					Weight:            ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRouteWeight,

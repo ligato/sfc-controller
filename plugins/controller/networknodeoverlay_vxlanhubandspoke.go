@@ -105,9 +105,6 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL2MPVxlanHubAndSpoke(
 				return fmt.Errorf(msg)
 			}
 
-			log.Errorf("renderConnL2MPVxlanHubAndSpoke: from: %s, to: %s",
-				vxlanIPFromAddress, vxlanIPToAddress)
-
 			vppKV := vppagent.ConstructVxlanInterface(
 				fromNode,
 				ifName,
