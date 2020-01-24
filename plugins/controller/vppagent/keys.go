@@ -52,6 +52,11 @@ func L3RouteKey(vppLabel string, route *l3.Route) string {
 	return agentPrefix + vppLabel + "/" + models.Key(route)
 }
 
+// L2FibKey constructs L2 fib db key
+func L2FibKey(vppLabel string, fib *l2.FIBEntry) string {
+	return agentPrefix + vppLabel + "/" + models.Key(fib)
+}
+
 // ArpEntryKey arp key
 func ArpEntryKey(vppLabel string, iface string, ipAddress string) string {
 	return agentPrefix + vppLabel + "/" + l3.ArpEntryKey(iface, ipAddress)

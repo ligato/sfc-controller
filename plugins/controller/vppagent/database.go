@@ -29,7 +29,8 @@ const (
 	VppEntryTypeInterface      = "interface"
 	VppEntryTypeLinuxInterface = "linuxif"
 	VppEntryTypeL2BD           = "l2bd"
-	VppEntryTypeL3Route        = "l3vrf"
+	VppEntryTypeL2Fib          = "l2fib"
+	VppEntryTypeL3Route        = "l3route"
 	VppEntryTypeL2XC           = "l2xc"
 	VppEntryTypeArp            = "arp"
 )
@@ -41,6 +42,7 @@ type KVType struct {
 	VppEntryType string
 	IFace        *interfaces.Interface     `json:"IFace,omitempty"`
 	L2BD         *l2.BridgeDomain       `json:"L2BD,omitempty"`
+	L2Fib         *l2.FIBEntry       `json:"L2BD,omitempty"`
 	L3Route      *l3.Route               `json:"L3Route,omitempty"`
 	XConn        *l2.XConnectPair       `json:"XConn,omitempty"`
 	LinuxIFace   *linuxIntf.Interface `json:"LinuxIFace,omitempty"`
@@ -64,6 +66,11 @@ func (kv *KVType) InterfaceSet(iface *interfaces.Interface) {
 // L3StaticRouteSet updates the static route
 func (kv *KVType) L3StaticRouteSet(l3sr *l3.Route) {
 	kv.L3Route = l3sr
+}
+
+// L2StaticFibSet updates the static fib
+func (kv *KVType) L2StaticFibSet(l2fib *l2.FIBEntry) {
+	kv.L2Fib = l2fib
 }
 
 // ArpEntrySet updates the arp entry
@@ -103,6 +110,10 @@ func (kv *KVType) Equal(kv2 *KVType) bool {
 		if kv.L2BD.String() != kv2.L2BD.String() {
 			return false
 		}
+	case VppEntryTypeL2Fib:
+		if kv.L2Fib.String() != kv2.L2Fib.String() {
+			return false
+		}
 	case VppEntryTypeL2XC:
 		if kv.XConn.String() != kv2.XConn.String() {
 			return false
@@ -139,6 +150,8 @@ func (kv *KVType) WriteToKVStore() error {
 		err = database.WriteToDatastore(kv.VppKey, kv.IFace)
 	case VppEntryTypeL2BD:
 		err = database.WriteToDatastore(kv.VppKey, kv.L2BD)
+	case VppEntryTypeL2Fib:
+		err = database.WriteToDatastore(kv.VppKey, kv.L2Fib)
 	case VppEntryTypeL2XC:
 		err = database.WriteToDatastore(kv.VppKey, kv.XConn)
 	case VppEntryTypeLinuxInterface:
@@ -181,6 +194,13 @@ func (kv *KVType) ReadFromKVStore() error {
 		if err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, l2bd)
 			kv.L2BDSet(l2bd)
+		}
+	case VppEntryTypeL2Fib:
+		l2fib := &l2.FIBEntry{}
+		err = database.ReadFromDatastore(kv.VppKey, l2fib)
+		if err == nil {
+			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, l2fib)
+			kv.L2StaticFibSet(l2fib)
 		}
 	case VppEntryTypeL2XC:
 		l2xc := &l2.XConnectPair{}

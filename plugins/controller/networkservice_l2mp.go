@@ -246,7 +246,7 @@ func (mgr *NetworkServiceMgr) renderConnL2MPSameNode(
 	}
 
 	// no external hub and spoke so simply render the nodes l2bd and local vnf interfaces
-	return mgr.RenderL2BD(ns, conn, connIndex, nodeName, l2bdIFs[nodeName])
+	return mgr.RenderL2BD(ns, conn, connIndex, nodeName, l2bdIFs[nodeName], netPodInterfaces)
 }
 
 

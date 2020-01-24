@@ -486,10 +486,11 @@ func (mgr *NetworkServiceMgr) validateConnections(ns *controller.NetworkService)
 						return fmt.Errorf("network-service: %s, conn: l2bd: %s  has invalid reference to non-existant l2bd template '%s'",
 							ns.Metadata.Name, conn.L2Bd.Name, conn.L2Bd.L2BdTemplate)
 					}
-				} else if conn.L2Bd.BdParms == nil {
-					return fmt.Errorf("network-service: %s, conn: l2bd: %s has no DB parms nor refer to a template",
-						ns.Metadata.Name, conn.L2Bd.Name)
 				}
+				//else if conn.L2Bd.BdParms == nil {
+				//	return fmt.Errorf("network-service: %s, conn: l2bd: %s has no DB parms nor refer to a template",
+				//		ns.Metadata.Name, conn.L2Bd.Name)
+				//}
 			}
 		case controller.ConnTypeL3PP:
 			if len(conn.PodInterfaces)+len(conn.NodeInterfaces)+len(conn.NodeInterfaceLabels) != 2 {
@@ -519,10 +520,11 @@ func (mgr *NetworkServiceMgr) validateConnections(ns *controller.NetworkService)
 						return fmt.Errorf("network-service: %s, conn: l2bd: %s  has invalid reference to non-existant l2bd template '%s'",
 							ns.Metadata.Name, conn.L2Bd.Name, conn.L2Bd.L2BdTemplate)
 					}
-				} else if conn.L2Bd.BdParms == nil {
-					return fmt.Errorf("network-service: %s, conn: l2bd: %s has no DB parms nor refer to a template",
-						ns.Metadata.Name, conn.L2Bd.Name)
 				}
+				//else if conn.L2Bd.BdParms == nil {
+				//	return fmt.Errorf("network-service: %s, conn: l2bd: %s has no DB parms nor refer to a template",
+				//		ns.Metadata.Name, conn.L2Bd.Name)
+				//}
 			}
 		default:
 			return fmt.Errorf("network-service: %s, connection has invalid conn type '%s'",
@@ -753,9 +755,11 @@ func (mgr *NetworkServiceMgr) FindInterfaceStatus(podInterfaceName string) *cont
 
 func (mgr *NetworkServiceMgr) RenderL2BD(
 	ns *controller.NetworkService,
-	conn *controller.Connection, connIndex uint32,
+	conn *controller.Connection,
+	connIndex uint32,
 	nodeName string,
-	l2bdIFs []*l2.BridgeDomain_Interface) error {
+	l2bdIFs []*l2.BridgeDomain_Interface,
+	netPodInterfaces []*controller.Interface) error {
 
 	// if using an existing node bridge, we simply add the i/f's to the bridge
 	if conn.UseNodeL2Bd != "" {
@@ -776,25 +780,120 @@ func (mgr *NetworkServiceMgr) RenderL2BD(
 			vppKV)
 
 	} else {
+
+		bviAddress := ""
+
 		var bdParms *controller.BDParms
 		if conn.L2Bd != nil {
+
+			bviAddress = conn.L2Bd.BviAddress
+
 			// need to create a bridge for this conn
 			if conn.L2Bd.L2BdTemplate != "" {
 				bdParms = ctlrPlugin.SysParametersMgr.FindL2BDTemplate(conn.L2Bd.L2BdTemplate)
-			} else {
+			} else if conn.L2Bd.BdParms != nil {
 				bdParms = conn.L2Bd.BdParms
+			} else {
+				bdParms = ctlrPlugin.SysParametersMgr.GetDefaultSystemBDParms()
 			}
 		} else {
 			bdParms = ctlrPlugin.SysParametersMgr.GetDefaultSystemBDParms()
 		}
+
+		bdName := fmt.Sprintf("BD_%s_C%d", ns.Metadata.Name, connIndex+1)
+
+		// if there is a bvi address defined
+		if bviAddress != "" {
+
+			bviLoopIfNameName := "IFLOOP_" + bdName
+
+			vppKV := vppagent.ConstructLoopbackInterface(
+				ns.Metadata.Name,
+				bviLoopIfNameName,
+				[]string{bviAddress},
+				"",
+				ctlrPlugin.SysParametersMgr.ResolveMtu(0),
+				controller.IfAdminStatusEnabled,
+				ctlrPlugin.SysParametersMgr.ResolveRxMode(""))
+			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
+				vppKV)
+
+			loopIface := &l2.BridgeDomain_Interface{
+				Name:                    bviLoopIfNameName,
+				BridgedVirtualInterface: true,
+			}
+
+			log.Errorf("RenderL2BD: npi=%v, l2bdifs=%v", netPodInterfaces, l2bdIFs)
+
+			if conn.L2Bd.GenerateStaticArps {
+
+				for _, networkPodInterface := range netPodInterfaces {
+
+					podNameAndPort := networkPodInterface.Parent + "/" + networkPodInterface.Name
+					ifStatus, found := ctlrPlugin.NetworkServiceMgr.findInterfaceStatus(ns, podNameAndPort)
+					if !found {
+						msg := fmt.Sprintf("network-service: %s, generating static arps, missing interface: %s/%s",
+							ns.Metadata.Name, networkPodInterface.Name)
+						mgr.AppendStatusMsg(ns, msg)
+						return fmt.Errorf(msg)
+					}
+
+					// for each interface/ip in the pod, create an arp entry
+					for _, ipAddress := range ifStatus.IpAddresses {
+
+						l3ArpEntry := &controller.L3ArpEntry{
+							PhysAddress: ifStatus.MacAddress,
+							IpAddress:   ipAddress,
+							OutgoingInterface: bviLoopIfNameName,
+						}
+
+						vppKV := vppagent.ConstructStaticArpEntry(nodeName, l3ArpEntry)
+						RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+							ModelTypeNetworkService+"/"+ns.Metadata.Name,
+							vppKV)
+					}
+				}
+			}
+
+			if conn.L2Bd.GenerateStaticL2Fibs {
+
+				for i, l2bdif := range l2bdIFs {
+
+					podNameAndPort := netPodInterfaces[i].Parent + "/" + netPodInterfaces[i].Name
+					ifStatus, found := ctlrPlugin.NetworkServiceMgr.findInterfaceStatus(ns, podNameAndPort)
+					if !found {
+						msg := fmt.Sprintf("network-service: %s, generating static fibs, missing interface: %s/%s",
+							ns.Metadata.Name, netPodInterfaces[1].Parent, netPodInterfaces[1].Name)
+						mgr.AppendStatusMsg(ns, msg)
+						return fmt.Errorf(msg)
+					}
+
+					l2FibEntry := &controller.L2FIBEntry{
+						DestMacAddress: ifStatus.MacAddress,
+						BdName:   bdName,
+						OutgoingIf: l2bdif.Name,
+					}
+
+					vppKV := vppagent.ConstructStaticFib(nodeName, l2FibEntry)
+					RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+						ModelTypeNetworkService+"/"+ns.Metadata.Name,
+						vppKV)
+				}
+			}
+
+			l2bdIFs = append(l2bdIFs, loopIface)
+		}
+
 		vppKV := vppagent.ConstructL2BD(
 			nodeName,
-			fmt.Sprintf("BD_%s_CONN_%d", ns.Metadata.Name, connIndex+1),
+			bdName,
 			l2bdIFs,
 			bdParms)
 		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 			ModelTypeNetworkService+"/"+ns.Metadata.Name,
 			vppKV)
+
 	}
 	return nil
 }
@@ -827,7 +926,7 @@ func (mgr *NetworkServiceMgr) RenderNetworkPodL2BD(
 	}
 	vppKV := vppagent.ConstructL2BD(
 		podName,
-		fmt.Sprintf("BD_%s_CONN_%d", ns.Metadata.Name, connIndex+1),
+		fmt.Sprintf("BD_%s_C%d", ns.Metadata.Name, connIndex+1),
 		l2bdIFs,
 		bdParms)
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,

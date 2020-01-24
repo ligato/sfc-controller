@@ -75,10 +75,10 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL2MPVxlanHubAndSpoke(
 
 			var ifName string
 			if i == 0 {
-				ifName = fmt.Sprintf("IF_VXLAN_NET_SRVC_%s_CONN_%d_FROM_HUB_%s_TO_SPOKE_%s_VNI_%d",
+				ifName = fmt.Sprintf("IVXH2S_%s_C%d_F_%s_T_%s_V%d",
 					ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 			} else {
-				ifName = fmt.Sprintf("IF_VXLAN_NET_SRVC_%s_CONN_%d_FROM_SPOKE_%s_TO_HUB_%s_VNI_%d",
+				ifName = fmt.Sprintf("IVXS2H_%s_C%d_F_%s_T_%s_V%d",
 					ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 			}
 
@@ -139,12 +139,12 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL2MPVxlanHubAndSpoke(
 
 	// create the spoke node l2bd's and add the vnf interfaces and vxlan if's from abve
 	for nodeName := range spokeNodeMap {
-		if err := ctlrPlugin.NetworkServiceMgr.RenderL2BD(ns, conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
+		if err := ctlrPlugin.NetworkServiceMgr.RenderL2BD(ns, conn, connIndex, nodeName, l2bdIFs[nodeName], networkPodInterfaces); err != nil {
 			return err
 		}
 	}
 	// create the hub l2bd and add the vxaln if's from above
-	if err := ctlrPlugin.NetworkServiceMgr.RenderL2BD(ns, conn, connIndex, hubNodeName, l2bdIFs[hubNodeName]); err != nil {
+	if err := ctlrPlugin.NetworkServiceMgr.RenderL2BD(ns, conn, connIndex, hubNodeName, l2bdIFs[hubNodeName], networkPodInterfaces); err != nil {
 		return err
 	}
 

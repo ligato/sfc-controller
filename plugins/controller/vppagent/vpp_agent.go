@@ -632,6 +632,28 @@ func ConstructStaticRoute(vppAgent string, l3sr *controller.L3VRFRoute) *KVType 
 	return kv
 }
 
+// ConstructStaticFib returns an KVType
+func ConstructStaticFib(vppAgent string, l2fib *controller.L2FIBEntry) *KVType {
+
+	fib := &l2.FIBEntry{
+		PhysAddress:             l2fib.DestMacAddress,
+		BridgeDomain: l2fib.BdName,
+		OutgoingInterface: l2fib.OutgoingIf,
+		StaticConfig: true,
+	}
+
+	key := L2FibKey(vppAgent, fib)
+
+	log.Debugf("ConstructStaticFib: key='%s', sr='%+v", key, fib)
+
+	kv := &KVType{
+		VppKey:       key,
+		VppEntryType: VppEntryTypeL2Fib,
+		L2Fib:      fib,
+	}
+	return kv
+}
+
 // ConstructIPSecTunnel returns an KVType
 func ConstructIPSecTunnel(vppAgent string, sfcIpsecTunnel *controller.IPSecTunnel, ifname string) *KVType {
 

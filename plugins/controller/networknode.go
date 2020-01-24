@@ -107,11 +107,11 @@ func (mgr *NetworkNodeMgr) FindVxlanIPaddress(nodeName string) (string, error) {
 		switch iFace.IfType {
 		case controller.IfTypeVxlanTunnel:
 			for _, ipAddress := range iFace.IpAddresses {
-				ip, _, err := net.ParseCIDR(ipAddress)
+				_, _, err := net.ParseCIDR(ipAddress)
 				if err == nil {
 					log.Debugf("FindVxlanIPaddress: node: %s, found vxlan ipaddr: %s",
-						nodeName, ip)
-					return ip.String(), nil
+						nodeName, ipAddress)
+					return ipAddress, nil
 				}
 			}
 		}
@@ -456,10 +456,37 @@ func (mgr *NetworkNodeMgr) renderNodeL2BDs(nn *controller.NetworkNode) error {
 				bdParms = l2bd.BdParms
 			}
 		}
+
+		var iFaces []*l2.BridgeDomain_Interface
+
+		// if there is a bvi address defined
+		if l2bd.BviAddress != "" {
+
+			ifName := "IFLOOP_"+vppKeyL2BDName(nn.Metadata.Name, l2bd.Name)
+
+			vppKV := vppagent.ConstructLoopbackInterface(
+				nn.Metadata.Name,
+				ifName,
+				[]string{l2bd.BviAddress},
+				"",
+				ctlrPlugin.SysParametersMgr.ResolveMtu(0),
+				controller.IfAdminStatusEnabled,
+				ctlrPlugin.SysParametersMgr.ResolveRxMode(""))
+			RenderTxnAddVppEntryToTxn(nn.Status.RenderedVppAgentEntries,
+				ModelTypeNetworkNode+"/"+nn.Metadata.Name,
+				vppKV)
+			loopIface := &l2.BridgeDomain_Interface{
+				Name: ifName,
+				BridgedVirtualInterface: true,
+			}
+
+			iFaces = append(iFaces, loopIface)
+		}
+
 		vppKV := vppagent.ConstructL2BD(
 			nn.Metadata.Name,
 			vppKeyL2BDName(nn.Metadata.Name, l2bd.Name),
-			nil,
+			iFaces,
 			bdParms)
 		RenderTxnAddVppEntryToTxn(nn.Status.RenderedVppAgentEntries,
 			ModelTypeNetworkNode+"/"+nn.Metadata.Name,
@@ -592,8 +619,11 @@ func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 	//var renderedEntries map[string]*controller.RenderedVppAgentEntry
 	var renderedEntries = make(map[string]*controller.RenderedVppAgentEntry)
 
+	// strip the /xx off of the address
 	fromVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(fromVxlanAddress)
-	toVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(toVxlanAddress)
+
+	// keep the /xx for the route
+	//toVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(toVxlanAddress)
 
 	// depending on the number of ethernet/label:vxlan interfaces on the source node and
 	// the number of ethernet/label:vxlan inerfaces on the dest node, a set of static
@@ -634,7 +664,7 @@ func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 				l3sr := &controller.L3VRFRoute{
 					VrfId:             vrfID,
 					Description:       fmt.Sprintf("L3VRF_VXLAN Node:%s to Node:%s", fromNode, toNode),
-					DstIpAddr:         toVxlanAddress, // dest node vxlan address
+					DstIpAddr:         toVxlanAddress, // dest node vxlan address/xx
 					NextHopAddr:       node2Iface.IpAddresses[0],
 					OutgoingInterface: node1Iface.Name,
 					Weight:            ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRouteWeight,

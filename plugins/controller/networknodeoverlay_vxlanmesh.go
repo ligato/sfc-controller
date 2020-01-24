@@ -28,7 +28,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL2MPVxlanMesh(
 	ns *controller.NetworkService,
 	conn *controller.Connection,
 	connIndex uint32,
-	vnfInterfaces []*controller.Interface,
+	networkPodInterfaces []*controller.Interface,
 	p2nArray []controller.NetworkPodToNodeMap,
 	vnfTypes []string,
 	nodeMap map[string]bool,
@@ -68,7 +68,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL2MPVxlanMesh(
 				continue
 			}
 
-			ifName := fmt.Sprintf("IF_VXLAN_MESH_NET_SRVC_%s_CONN_%d_FROM_%s_TO_%s_VNI_%d",
+			ifName := fmt.Sprintf("IVXMSH_%s_C%d_F_%s_T_%s_V%d",
 				ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 
 			vxlanIPFromAddress, _, err := ctlrPlugin.NetworkNodeOverlayMgr.AllocateVxlanAddress(
@@ -126,7 +126,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL2MPVxlanMesh(
 
 	// create the perNode L2BD's and add the vnf interfaces
 	for nodeName := range nodeMap {
-		if err := ctlrPlugin.NetworkServiceMgr.RenderL2BD(ns, conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
+		if err := ctlrPlugin.NetworkServiceMgr.RenderL2BD(ns, conn, connIndex, nodeName, l2bdIFs[nodeName], networkPodInterfaces); err != nil {
 			return err
 		}
 	}
@@ -173,7 +173,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL2PPVxlanMesh(
 		from := i
 		to := ^i & 1
 
-		ifName := fmt.Sprintf("IF_VXLAN_L2PP_NET_SRVC_%s_CONN_%d_FROM_%s_%s_TO_%s_%s_VNI_%d",
+		ifName := fmt.Sprintf("IVL2XPP_%s_C%d_F_%s_%s_T_%s_%s_V%d",
 			ns.Metadata.Name, connIndex+1,
 			p2nArray[from].Node, ConnPodInterfaceSlashToUScore(conn.PodInterfaces[from]),
 			p2nArray[to].Node, ConnPodInterfaceSlashToUScore(conn.PodInterfaces[to]),
@@ -285,7 +285,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL3PPVxlanMesh(
 		from := i
 		to := ^i & 1
 
-		ifName := fmt.Sprintf("IF_VXLAN_L2PP_NET_SRVC_%s_CONN_%d_FROM_%s_%s_TO_%s_%s_VNI_%d",
+		ifName := fmt.Sprintf("IVXL2PP_%s_C%d_F_%s_%s_T_%s_%s_V%d",
 			ns.Metadata.Name, connIndex+1,
 			p2nArray[from].Node, ConnPodInterfaceSlashToUScore(conn.PodInterfaces[from]),
 			p2nArray[to].Node, ConnPodInterfaceSlashToUScore(conn.PodInterfaces[to]),
@@ -381,7 +381,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL3MPVxlanMesh(
 	ns *controller.NetworkService,
 	conn *controller.Connection,
 	connIndex uint32,
-	vnfInterfaces []*controller.Interface,
+	networkPodInterfaces []*controller.Interface,
 	p2nArray []controller.NetworkPodToNodeMap,
 	vnfTypes []string,
 	nodeMap map[string]bool,
@@ -423,7 +423,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL3MPVxlanMesh(
 				continue
 			}
 
-			ifName := fmt.Sprintf("IF_VXLAN_MESH_NET_SRVC_%s_CONN_%d_FROM_%s_TO_%s_VNI_%d",
+			ifName := fmt.Sprintf("IVXMSH_%s_C%d_F_%s_T_%s_V%d",
 				ns.Metadata.Name, connIndex+1, fromNode, toNode, vni)
 
 			tunnelMeshMap[fromNode+"/"+toNode] = ifName
@@ -500,7 +500,7 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL3MPVxlanMesh(
 
 	// create the perNode L2BD's and add the vnf interfaces
 	for nodeName := range nodeMap {
-		if err := ctlrPlugin.NetworkServiceMgr.RenderL2BD(ns, conn, connIndex, nodeName, l2bdIFs[nodeName]); err != nil {
+		if err := ctlrPlugin.NetworkServiceMgr.RenderL2BD(ns, conn, connIndex, nodeName, l2bdIFs[nodeName], networkPodInterfaces); err != nil {
 			return err
 		}
 	}

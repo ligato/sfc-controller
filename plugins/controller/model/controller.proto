@@ -77,6 +77,9 @@ message L2BD {
     string name = 1;
     BDParms bd_parms = 2;     // use this to customize or refer to a template, but not both
     string l2bd_template = 3; // use this to refer to a template in system parameters
+    string bvi_address = 4; // if set, a loopback i/f with thus address is created and and added to the l2bd
+    bool generate_static_arps = 5;
+    bool generate_static_l2fibs = 6;
 }
 
 // IPAM will choose an address using the prefix.  In the example, there is an 8 bit address space [0..255]
@@ -167,7 +170,7 @@ message Interface {
     string parent = 14; // internal field: could be a node or pod
     string host_port_label = 15;
     message Forwarding {
-      repeated L3VRFRoute l3_vrf_route = 1;
+      repeated L3VRFRoute l3_route = 1;
       repeated L3ArpEntry l3_arp = 2;
       repeated L2FIBEntry l2_fib = 3;
     }
@@ -208,6 +211,9 @@ message Connection {
                                                // create a l2bd with default parms for l2mp connections
     uint32 vrf_id = 9;
     string conn_method = 10;                   // direct|vswitch optional/default: direct
+    repeated L3VRFRoute l3_routes = 11;
+    repeated L3ArpEntry l3_arps = 12;
+    repeated L2FIBEntry l2_fibs = 13;
 }
 
 message NetworkServiceStatus {
