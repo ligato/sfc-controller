@@ -19,6 +19,7 @@
 package vppagent
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -307,7 +308,8 @@ func ConstructMemInterface(vppAgent string,
 		defaultMemifDirectory = controller.MemifDirectoryName
 	}
 
-	ifaceMemif.Memif.SocketFilename = defaultMemifDirectory + "/memif_" + masterVppAgent + ".sock"
+	sfn := fmt.Sprintf("%s/memif_%s_%d.sock", defaultMemifDirectory, masterVppAgent, ifaceMemif.Memif.Id)
+	ifaceMemif.Memif.SocketFilename = sfn
 
 	iface.RxModes = rxModeControllerToInterface(rxMode)
 
