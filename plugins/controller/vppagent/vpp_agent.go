@@ -717,7 +717,7 @@ func ConstructStaticArpEntry(vppAgent string, l3ae *controller.L3ArpEntry) *KVTy
 
 	key := ArpEntryKey(vppAgent, ae.Interface, ae.IpAddress)
 
-	log.Debugf("ConstructStaticArpEntry: key='%s', arp='%v", key, ae)
+	log.Debugf("ConstructStaticArpEntry: key='%s', arp='%v'", key, ae)
 
 	kv := &KVType{
 		VppKey:       key,
