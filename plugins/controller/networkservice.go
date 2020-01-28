@@ -832,7 +832,7 @@ func (mgr *NetworkServiceMgr) RenderL2BD(
 				BridgedVirtualInterface: true,
 			}
 
-			log.Errorf("RenderL2BD: npi=%v, l2bdifs=%v", netPodInterfaces, l2bdIFs)
+			log.Debugf("RenderL2BD: npi=%v, l2bdifs=%v", netPodInterfaces, l2bdIFs)
 
 			if conn.L2Bd.GenerateStaticArps {
 
@@ -846,6 +846,9 @@ func (mgr *NetworkServiceMgr) RenderL2BD(
 						mgr.AppendStatusMsg(ns, msg)
 						return fmt.Errorf(msg)
 					}
+
+					log.Debugf("RenderL2BD: podNameAndPort=%s, npi=%v, ifStatus=%v",
+						podNameAndPort, networkPodInterface, ifStatus)
 
 					// for each interface/ip in the pod, create an arp entry
 					for _, ipAddress := range ifStatus.IpAddresses {

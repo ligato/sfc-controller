@@ -3,10 +3,13 @@
 
 package controller
 
-import proto "github.com/gogo/protobuf/proto"
-import fmt "fmt"
-import math "math"
-import l3 "github.com/ligato/vpp-agent/api/models/linux/l3"
+import (
+	fmt "fmt"
+	math "math"
+
+	proto "github.com/gogo/protobuf/proto"
+	l3 "github.com/ligato/vpp-agent/api/models/linux/l3"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -44,7 +47,7 @@ func (m *IPSecTunnel) Reset()         { *m = IPSecTunnel{} }
 func (m *IPSecTunnel) String() string { return proto.CompactTextString(m) }
 func (*IPSecTunnel) ProtoMessage()    {}
 func (*IPSecTunnel) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{0}
+	return fileDescriptor_ed7f10298fa1d90f, []int{0}
 }
 func (m *IPSecTunnel) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IPSecTunnel.Unmarshal(m, b)
@@ -52,8 +55,8 @@ func (m *IPSecTunnel) XXX_Unmarshal(b []byte) error {
 func (m *IPSecTunnel) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IPSecTunnel.Marshal(b, m, deterministic)
 }
-func (dst *IPSecTunnel) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_IPSecTunnel.Merge(dst, src)
+func (m *IPSecTunnel) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IPSecTunnel.Merge(m, src)
 }
 func (m *IPSecTunnel) XXX_Size() int {
 	return xxx_messageInfo_IPSecTunnel.Size(m)
@@ -173,8 +176,8 @@ type L3VRFRoute struct {
 	// TODO: Make this a 'oneof' since an interface/connection cannot be active on both VPP and Linux.
 	//       I cannot figure a way to parse a oneof from a YAML (protobuf's lack of JSON tag customization)
 	//       makes this hard. Or I am doing this wrong.
-	Vpp                  *VPPRoute `protobuf:"bytes,1,opt,name=vpp" json:"vpp,omitempty"`
-	Linux                *l3.Route `protobuf:"bytes,2,opt,name=linux" json:"linux,omitempty"`
+	Vpp                  *VPPRoute `protobuf:"bytes,1,opt,name=vpp,proto3" json:"vpp,omitempty"`
+	Linux                *l3.Route `protobuf:"bytes,2,opt,name=linux,proto3" json:"linux,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
 	XXX_unrecognized     []byte    `json:"-"`
 	XXX_sizecache        int32     `json:"-"`
@@ -184,7 +187,7 @@ func (m *L3VRFRoute) Reset()         { *m = L3VRFRoute{} }
 func (m *L3VRFRoute) String() string { return proto.CompactTextString(m) }
 func (*L3VRFRoute) ProtoMessage()    {}
 func (*L3VRFRoute) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{1}
+	return fileDescriptor_ed7f10298fa1d90f, []int{1}
 }
 func (m *L3VRFRoute) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_L3VRFRoute.Unmarshal(m, b)
@@ -192,8 +195,8 @@ func (m *L3VRFRoute) XXX_Unmarshal(b []byte) error {
 func (m *L3VRFRoute) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_L3VRFRoute.Marshal(b, m, deterministic)
 }
-func (dst *L3VRFRoute) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_L3VRFRoute.Merge(dst, src)
+func (m *L3VRFRoute) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_L3VRFRoute.Merge(m, src)
 }
 func (m *L3VRFRoute) XXX_Size() int {
 	return xxx_messageInfo_L3VRFRoute.Size(m)
@@ -235,7 +238,7 @@ func (m *VPPRoute) Reset()         { *m = VPPRoute{} }
 func (m *VPPRoute) String() string { return proto.CompactTextString(m) }
 func (*VPPRoute) ProtoMessage()    {}
 func (*VPPRoute) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{2}
+	return fileDescriptor_ed7f10298fa1d90f, []int{2}
 }
 func (m *VPPRoute) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_VPPRoute.Unmarshal(m, b)
@@ -243,8 +246,8 @@ func (m *VPPRoute) XXX_Unmarshal(b []byte) error {
 func (m *VPPRoute) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_VPPRoute.Marshal(b, m, deterministic)
 }
-func (dst *VPPRoute) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VPPRoute.Merge(dst, src)
+func (m *VPPRoute) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_VPPRoute.Merge(m, src)
 }
 func (m *VPPRoute) XXX_Size() int {
 	return xxx_messageInfo_VPPRoute.Size(m)
@@ -317,7 +320,7 @@ func (m *L3ArpEntry) Reset()         { *m = L3ArpEntry{} }
 func (m *L3ArpEntry) String() string { return proto.CompactTextString(m) }
 func (*L3ArpEntry) ProtoMessage()    {}
 func (*L3ArpEntry) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{3}
+	return fileDescriptor_ed7f10298fa1d90f, []int{3}
 }
 func (m *L3ArpEntry) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_L3ArpEntry.Unmarshal(m, b)
@@ -325,8 +328,8 @@ func (m *L3ArpEntry) XXX_Unmarshal(b []byte) error {
 func (m *L3ArpEntry) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_L3ArpEntry.Marshal(b, m, deterministic)
 }
-func (dst *L3ArpEntry) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_L3ArpEntry.Merge(dst, src)
+func (m *L3ArpEntry) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_L3ArpEntry.Merge(m, src)
 }
 func (m *L3ArpEntry) XXX_Size() int {
 	return xxx_messageInfo_L3ArpEntry.Size(m)
@@ -373,7 +376,7 @@ func (m *L2FIBEntry) Reset()         { *m = L2FIBEntry{} }
 func (m *L2FIBEntry) String() string { return proto.CompactTextString(m) }
 func (*L2FIBEntry) ProtoMessage()    {}
 func (*L2FIBEntry) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{4}
+	return fileDescriptor_ed7f10298fa1d90f, []int{4}
 }
 func (m *L2FIBEntry) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_L2FIBEntry.Unmarshal(m, b)
@@ -381,8 +384,8 @@ func (m *L2FIBEntry) XXX_Unmarshal(b []byte) error {
 func (m *L2FIBEntry) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_L2FIBEntry.Marshal(b, m, deterministic)
 }
-func (dst *L2FIBEntry) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_L2FIBEntry.Merge(dst, src)
+func (m *L2FIBEntry) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_L2FIBEntry.Merge(m, src)
 }
 func (m *L2FIBEntry) XXX_Size() int {
 	return xxx_messageInfo_L2FIBEntry.Size(m)
@@ -445,7 +448,7 @@ func (m *BDParms) Reset()         { *m = BDParms{} }
 func (m *BDParms) String() string { return proto.CompactTextString(m) }
 func (*BDParms) ProtoMessage()    {}
 func (*BDParms) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{5}
+	return fileDescriptor_ed7f10298fa1d90f, []int{5}
 }
 func (m *BDParms) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_BDParms.Unmarshal(m, b)
@@ -453,8 +456,8 @@ func (m *BDParms) XXX_Unmarshal(b []byte) error {
 func (m *BDParms) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_BDParms.Marshal(b, m, deterministic)
 }
-func (dst *BDParms) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_BDParms.Merge(dst, src)
+func (m *BDParms) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BDParms.Merge(m, src)
 }
 func (m *BDParms) XXX_Size() int {
 	return xxx_messageInfo_BDParms.Size(m)
@@ -516,7 +519,7 @@ func (m *BDParms) GetMacAgeMinutes() uint32 {
 
 type L2BD struct {
 	Name                 string   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	BdParms              *BDParms `protobuf:"bytes,2,opt,name=bd_parms,json=bdParms" json:"bd_parms,omitempty"`
+	BdParms              *BDParms `protobuf:"bytes,2,opt,name=bd_parms,json=bdParms,proto3" json:"bd_parms,omitempty"`
 	L2BdTemplate         string   `protobuf:"bytes,3,opt,name=l2bd_template,json=l2bdTemplate,proto3" json:"l2bd_template,omitempty"`
 	BviAddress           string   `protobuf:"bytes,4,opt,name=bvi_address,json=bviAddress,proto3" json:"bvi_address,omitempty"`
 	GenerateStaticArps   bool     `protobuf:"varint,5,opt,name=generate_static_arps,json=generateStaticArps,proto3" json:"generate_static_arps,omitempty"`
@@ -530,7 +533,7 @@ func (m *L2BD) Reset()         { *m = L2BD{} }
 func (m *L2BD) String() string { return proto.CompactTextString(m) }
 func (*L2BD) ProtoMessage()    {}
 func (*L2BD) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{6}
+	return fileDescriptor_ed7f10298fa1d90f, []int{6}
 }
 func (m *L2BD) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_L2BD.Unmarshal(m, b)
@@ -538,8 +541,8 @@ func (m *L2BD) XXX_Unmarshal(b []byte) error {
 func (m *L2BD) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_L2BD.Marshal(b, m, deterministic)
 }
-func (dst *L2BD) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_L2BD.Merge(dst, src)
+func (m *L2BD) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_L2BD.Merge(m, src)
 }
 func (m *L2BD) XXX_Size() int {
 	return xxx_messageInfo_L2BD.Size(m)
@@ -595,7 +598,7 @@ func (m *L2BD) GetGenerateStaticL2Fibs() bool {
 // IPAM will choose an address using the prefix.  In the example, there is an 8 bit address space [0..255]
 // if 0..255 are not desired then a start and end address can be used.  See comments below.
 type IPAMPoolStatus struct {
-	Addresses            map[string]string `protobuf:"bytes,1,rep,name=addresses" json:"addresses,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Addresses            map[string]string `protobuf:"bytes,1,rep,name=addresses,proto3" json:"addresses,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
 	XXX_unrecognized     []byte            `json:"-"`
 	XXX_sizecache        int32             `json:"-"`
@@ -605,7 +608,7 @@ func (m *IPAMPoolStatus) Reset()         { *m = IPAMPoolStatus{} }
 func (m *IPAMPoolStatus) String() string { return proto.CompactTextString(m) }
 func (*IPAMPoolStatus) ProtoMessage()    {}
 func (*IPAMPoolStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{7}
+	return fileDescriptor_ed7f10298fa1d90f, []int{7}
 }
 func (m *IPAMPoolStatus) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IPAMPoolStatus.Unmarshal(m, b)
@@ -613,8 +616,8 @@ func (m *IPAMPoolStatus) XXX_Unmarshal(b []byte) error {
 func (m *IPAMPoolStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IPAMPoolStatus.Marshal(b, m, deterministic)
 }
-func (dst *IPAMPoolStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_IPAMPoolStatus.Merge(dst, src)
+func (m *IPAMPoolStatus) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IPAMPoolStatus.Merge(m, src)
 }
 func (m *IPAMPoolStatus) XXX_Size() int {
 	return xxx_messageInfo_IPAMPoolStatus.Size(m)
@@ -646,7 +649,7 @@ func (m *IPAMPoolSpec) Reset()         { *m = IPAMPoolSpec{} }
 func (m *IPAMPoolSpec) String() string { return proto.CompactTextString(m) }
 func (*IPAMPoolSpec) ProtoMessage()    {}
 func (*IPAMPoolSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{8}
+	return fileDescriptor_ed7f10298fa1d90f, []int{8}
 }
 func (m *IPAMPoolSpec) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IPAMPoolSpec.Unmarshal(m, b)
@@ -654,8 +657,8 @@ func (m *IPAMPoolSpec) XXX_Unmarshal(b []byte) error {
 func (m *IPAMPoolSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IPAMPoolSpec.Marshal(b, m, deterministic)
 }
-func (dst *IPAMPoolSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_IPAMPoolSpec.Merge(dst, src)
+func (m *IPAMPoolSpec) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IPAMPoolSpec.Merge(m, src)
 }
 func (m *IPAMPoolSpec) XXX_Size() int {
 	return xxx_messageInfo_IPAMPoolSpec.Size(m)
@@ -695,9 +698,9 @@ func (m *IPAMPoolSpec) GetEndRange() uint32 {
 }
 
 type IPAMPool struct {
-	Metadata             *MetaDataType   `protobuf:"bytes,1,opt,name=metadata" json:"metadata,omitempty"`
-	Spec                 *IPAMPoolSpec   `protobuf:"bytes,2,opt,name=spec" json:"spec,omitempty"`
-	Status               *IPAMPoolStatus `protobuf:"bytes,3,opt,name=status" json:"status,omitempty"`
+	Metadata             *MetaDataType   `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Spec                 *IPAMPoolSpec   `protobuf:"bytes,2,opt,name=spec,proto3" json:"spec,omitempty"`
+	Status               *IPAMPoolStatus `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
 	XXX_unrecognized     []byte          `json:"-"`
 	XXX_sizecache        int32           `json:"-"`
@@ -707,7 +710,7 @@ func (m *IPAMPool) Reset()         { *m = IPAMPool{} }
 func (m *IPAMPool) String() string { return proto.CompactTextString(m) }
 func (*IPAMPool) ProtoMessage()    {}
 func (*IPAMPool) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{9}
+	return fileDescriptor_ed7f10298fa1d90f, []int{9}
 }
 func (m *IPAMPool) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IPAMPool.Unmarshal(m, b)
@@ -715,8 +718,8 @@ func (m *IPAMPool) XXX_Unmarshal(b []byte) error {
 func (m *IPAMPool) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IPAMPool.Marshal(b, m, deterministic)
 }
-func (dst *IPAMPool) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_IPAMPool.Merge(dst, src)
+func (m *IPAMPool) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IPAMPool.Merge(m, src)
 }
 func (m *IPAMPool) XXX_Size() int {
 	return xxx_messageInfo_IPAMPool.Size(m)
@@ -753,7 +756,7 @@ type SystemParameters struct {
 	MemifDirectory               string     `protobuf:"bytes,2,opt,name=memif_directory,json=memifDirectory,proto3" json:"memif_directory,omitempty"`
 	DefaultStaticRouteWeight     uint32     `protobuf:"varint,3,opt,name=default_static_route_weight,json=defaultStaticRouteWeight,proto3" json:"default_static_route_weight,omitempty"`
 	DefaultStaticRoutePreference uint32     `protobuf:"varint,4,opt,name=default_static_route_preference,json=defaultStaticRoutePreference,proto3" json:"default_static_route_preference,omitempty"`
-	L2BdTemplates                []*BDParms `protobuf:"bytes,5,rep,name=l2bd_templates,json=l2bdTemplates" json:"l2bd_templates,omitempty"`
+	L2BdTemplates                []*BDParms `protobuf:"bytes,5,rep,name=l2bd_templates,json=l2bdTemplates,proto3" json:"l2bd_templates,omitempty"`
 	RxMode                       string     `protobuf:"bytes,7,opt,name=rx_mode,json=rxMode,proto3" json:"rx_mode,omitempty"`
 	MinVrfId                     uint32     `protobuf:"varint,8,opt,name=min_vrf_id,json=minVrfId,proto3" json:"min_vrf_id,omitempty"`
 	XXX_NoUnkeyedLiteral         struct{}   `json:"-"`
@@ -765,7 +768,7 @@ func (m *SystemParameters) Reset()         { *m = SystemParameters{} }
 func (m *SystemParameters) String() string { return proto.CompactTextString(m) }
 func (*SystemParameters) ProtoMessage()    {}
 func (*SystemParameters) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{10}
+	return fileDescriptor_ed7f10298fa1d90f, []int{10}
 }
 func (m *SystemParameters) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SystemParameters.Unmarshal(m, b)
@@ -773,8 +776,8 @@ func (m *SystemParameters) XXX_Unmarshal(b []byte) error {
 func (m *SystemParameters) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SystemParameters.Marshal(b, m, deterministic)
 }
-func (dst *SystemParameters) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SystemParameters.Merge(dst, src)
+func (m *SystemParameters) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SystemParameters.Merge(m, src)
 }
 func (m *SystemParameters) XXX_Size() int {
 	return xxx_messageInfo_SystemParameters.Size(m)
@@ -846,7 +849,7 @@ func (m *NetworkPodToNodeMap) Reset()         { *m = NetworkPodToNodeMap{} }
 func (m *NetworkPodToNodeMap) String() string { return proto.CompactTextString(m) }
 func (*NetworkPodToNodeMap) ProtoMessage()    {}
 func (*NetworkPodToNodeMap) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{11}
+	return fileDescriptor_ed7f10298fa1d90f, []int{11}
 }
 func (m *NetworkPodToNodeMap) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkPodToNodeMap.Unmarshal(m, b)
@@ -854,8 +857,8 @@ func (m *NetworkPodToNodeMap) XXX_Unmarshal(b []byte) error {
 func (m *NetworkPodToNodeMap) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkPodToNodeMap.Marshal(b, m, deterministic)
 }
-func (dst *NetworkPodToNodeMap) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkPodToNodeMap.Merge(dst, src)
+func (m *NetworkPodToNodeMap) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkPodToNodeMap.Merge(m, src)
 }
 func (m *NetworkPodToNodeMap) XXX_Size() int {
 	return xxx_messageInfo_NetworkPodToNodeMap.Size(m)
@@ -894,7 +897,7 @@ func (m *RenderedVppAgentEntry) Reset()         { *m = RenderedVppAgentEntry{} }
 func (m *RenderedVppAgentEntry) String() string { return proto.CompactTextString(m) }
 func (*RenderedVppAgentEntry) ProtoMessage()    {}
 func (*RenderedVppAgentEntry) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{12}
+	return fileDescriptor_ed7f10298fa1d90f, []int{12}
 }
 func (m *RenderedVppAgentEntry) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_RenderedVppAgentEntry.Unmarshal(m, b)
@@ -902,8 +905,8 @@ func (m *RenderedVppAgentEntry) XXX_Unmarshal(b []byte) error {
 func (m *RenderedVppAgentEntry) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_RenderedVppAgentEntry.Marshal(b, m, deterministic)
 }
-func (dst *RenderedVppAgentEntry) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RenderedVppAgentEntry.Merge(dst, src)
+func (m *RenderedVppAgentEntry) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RenderedVppAgentEntry.Merge(m, src)
 }
 func (m *RenderedVppAgentEntry) XXX_Size() int {
 	return xxx_messageInfo_RenderedVppAgentEntry.Size(m)
@@ -934,11 +937,11 @@ func (m *RenderedVppAgentEntry) GetVppAgentType() string {
 type InterfaceStatus struct {
 	Name                 string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Status               string            `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	Msg                  []string          `protobuf:"bytes,3,rep,name=msg" json:"msg,omitempty"`
+	Msg                  []string          `protobuf:"bytes,3,rep,name=msg,proto3" json:"msg,omitempty"`
 	MacAddress           string            `protobuf:"bytes,4,opt,name=mac_address,json=macAddress,proto3" json:"mac_address,omitempty"`
 	MacAddrID            uint32            `protobuf:"varint,5,opt,name=macAddrID,proto3" json:"macAddrID,omitempty"`
-	IpamPoolNums         map[string]uint32 `protobuf:"bytes,6,rep,name=ipam_pool_nums,json=ipamPoolNums" json:"ipam_pool_nums,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
-	IpAddresses          []string          `protobuf:"bytes,7,rep,name=ip_addresses,json=ipAddresses" json:"ip_addresses,omitempty"`
+	IpamPoolNums         map[string]uint32 `protobuf:"bytes,6,rep,name=ipam_pool_nums,json=ipamPoolNums,proto3" json:"ipam_pool_nums,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	IpAddresses          []string          `protobuf:"bytes,7,rep,name=ip_addresses,json=ipAddresses,proto3" json:"ip_addresses,omitempty"`
 	MemifID              uint32            `protobuf:"varint,8,opt,name=memifID,proto3" json:"memifID,omitempty"`
 	Node                 string            `protobuf:"bytes,10,opt,name=node,proto3" json:"node,omitempty"`
 	HostPortLabel        string            `protobuf:"bytes,11,opt,name=host_port_label,json=hostPortLabel,proto3" json:"host_port_label,omitempty"`
@@ -953,7 +956,7 @@ func (m *InterfaceStatus) Reset()         { *m = InterfaceStatus{} }
 func (m *InterfaceStatus) String() string { return proto.CompactTextString(m) }
 func (*InterfaceStatus) ProtoMessage()    {}
 func (*InterfaceStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{13}
+	return fileDescriptor_ed7f10298fa1d90f, []int{13}
 }
 func (m *InterfaceStatus) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_InterfaceStatus.Unmarshal(m, b)
@@ -961,8 +964,8 @@ func (m *InterfaceStatus) XXX_Unmarshal(b []byte) error {
 func (m *InterfaceStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_InterfaceStatus.Marshal(b, m, deterministic)
 }
-func (dst *InterfaceStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_InterfaceStatus.Merge(dst, src)
+func (m *InterfaceStatus) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_InterfaceStatus.Merge(m, src)
 }
 func (m *InterfaceStatus) XXX_Size() int {
 	return xxx_messageInfo_InterfaceStatus.Size(m)
@@ -1065,19 +1068,19 @@ type Interface struct {
 	// 02:00:00:00:00:00 as base, last octet increments
 	Mtu                        uint32                         `protobuf:"varint,5,opt,name=mtu,proto3" json:"mtu,omitempty"`
 	RxMode                     string                         `protobuf:"bytes,6,opt,name=rx_mode,json=rxMode,proto3" json:"rx_mode,omitempty"`
-	IpAddresses                []string                       `protobuf:"bytes,7,rep,name=ip_addresses,json=ipAddresses" json:"ip_addresses,omitempty"`
-	IpamPoolNames              []string                       `protobuf:"bytes,9,rep,name=ipam_pool_names,json=ipamPoolNames" json:"ipam_pool_names,omitempty"`
+	IpAddresses                []string                       `protobuf:"bytes,7,rep,name=ip_addresses,json=ipAddresses,proto3" json:"ip_addresses,omitempty"`
+	IpamPoolNames              []string                       `protobuf:"bytes,9,rep,name=ipam_pool_names,json=ipamPoolNames,proto3" json:"ipam_pool_names,omitempty"`
 	AdminStatus                string                         `protobuf:"bytes,10,opt,name=admin_status,json=adminStatus,proto3" json:"admin_status,omitempty"`
-	MemifParms                 *Interface_MemIFParms          `protobuf:"bytes,11,opt,name=memif_parms,json=memifParms" json:"memif_parms,omitempty"`
-	TapParms                   *Interface_TapParms            `protobuf:"bytes,12,opt,name=tap_parms,json=tapParms" json:"tap_parms,omitempty"`
-	Labels                     []string                       `protobuf:"bytes,13,rep,name=labels" json:"labels,omitempty"`
+	MemifParms                 *Interface_MemIFParms          `protobuf:"bytes,11,opt,name=memif_parms,json=memifParms,proto3" json:"memif_parms,omitempty"`
+	TapParms                   *Interface_TapParms            `protobuf:"bytes,12,opt,name=tap_parms,json=tapParms,proto3" json:"tap_parms,omitempty"`
+	Labels                     []string                       `protobuf:"bytes,13,rep,name=labels,proto3" json:"labels,omitempty"`
 	Parent                     string                         `protobuf:"bytes,14,opt,name=parent,proto3" json:"parent,omitempty"`
 	HostPortLabel              string                         `protobuf:"bytes,15,opt,name=host_port_label,json=hostPortLabel,proto3" json:"host_port_label,omitempty"`
-	Fwd                        *Interface_Forwarding          `protobuf:"bytes,16,opt,name=fwd" json:"fwd,omitempty"`
+	Fwd                        *Interface_Forwarding          `protobuf:"bytes,16,opt,name=fwd,proto3" json:"fwd,omitempty"`
 	LinuxNamespace             string                         `protobuf:"bytes,17,opt,name=linux_namespace,json=linuxNamespace,proto3" json:"linux_namespace,omitempty"`
-	RxPlacementSettings        *Interface_RxPlacementSettings `protobuf:"bytes,18,opt,name=rx_placement_settings,json=rxPlacementSettings" json:"rx_placement_settings,omitempty"`
+	RxPlacementSettings        *Interface_RxPlacementSettings `protobuf:"bytes,18,opt,name=rx_placement_settings,json=rxPlacementSettings,proto3" json:"rx_placement_settings,omitempty"`
 	TcpChecksumOffloadDisabled bool                           `protobuf:"varint,19,opt,name=tcp_checksum_offload_disabled,json=tcpChecksumOffloadDisabled,proto3" json:"tcp_checksum_offload_disabled,omitempty"`
-	IpsecTunnels               []*IPSecTunnel                 `protobuf:"bytes,20,rep,name=ipsec_tunnels,json=ipsecTunnels" json:"ipsec_tunnels,omitempty"`
+	IpsecTunnels               []*IPSecTunnel                 `protobuf:"bytes,20,rep,name=ipsec_tunnels,json=ipsecTunnels,proto3" json:"ipsec_tunnels,omitempty"`
 	XXX_NoUnkeyedLiteral       struct{}                       `json:"-"`
 	XXX_unrecognized           []byte                         `json:"-"`
 	XXX_sizecache              int32                          `json:"-"`
@@ -1087,7 +1090,7 @@ func (m *Interface) Reset()         { *m = Interface{} }
 func (m *Interface) String() string { return proto.CompactTextString(m) }
 func (*Interface) ProtoMessage()    {}
 func (*Interface) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{14}
+	return fileDescriptor_ed7f10298fa1d90f, []int{14}
 }
 func (m *Interface) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Interface.Unmarshal(m, b)
@@ -1095,8 +1098,8 @@ func (m *Interface) XXX_Unmarshal(b []byte) error {
 func (m *Interface) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Interface.Marshal(b, m, deterministic)
 }
-func (dst *Interface) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Interface.Merge(dst, src)
+func (m *Interface) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Interface.Merge(m, src)
 }
 func (m *Interface) XXX_Size() int {
 	return xxx_messageInfo_Interface.Size(m)
@@ -1257,7 +1260,7 @@ func (m *Interface_MemIFParms) Reset()         { *m = Interface_MemIFParms{} }
 func (m *Interface_MemIFParms) String() string { return proto.CompactTextString(m) }
 func (*Interface_MemIFParms) ProtoMessage()    {}
 func (*Interface_MemIFParms) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{14, 0}
+	return fileDescriptor_ed7f10298fa1d90f, []int{14, 0}
 }
 func (m *Interface_MemIFParms) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Interface_MemIFParms.Unmarshal(m, b)
@@ -1265,8 +1268,8 @@ func (m *Interface_MemIFParms) XXX_Unmarshal(b []byte) error {
 func (m *Interface_MemIFParms) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Interface_MemIFParms.Marshal(b, m, deterministic)
 }
-func (dst *Interface_MemIFParms) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Interface_MemIFParms.Merge(dst, src)
+func (m *Interface_MemIFParms) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Interface_MemIFParms.Merge(m, src)
 }
 func (m *Interface_MemIFParms) XXX_Size() int {
 	return xxx_messageInfo_Interface_MemIFParms.Size(m)
@@ -1339,7 +1342,7 @@ func (m *Interface_TapParms) Reset()         { *m = Interface_TapParms{} }
 func (m *Interface_TapParms) String() string { return proto.CompactTextString(m) }
 func (*Interface_TapParms) ProtoMessage()    {}
 func (*Interface_TapParms) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{14, 1}
+	return fileDescriptor_ed7f10298fa1d90f, []int{14, 1}
 }
 func (m *Interface_TapParms) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Interface_TapParms.Unmarshal(m, b)
@@ -1347,8 +1350,8 @@ func (m *Interface_TapParms) XXX_Unmarshal(b []byte) error {
 func (m *Interface_TapParms) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Interface_TapParms.Marshal(b, m, deterministic)
 }
-func (dst *Interface_TapParms) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Interface_TapParms.Merge(dst, src)
+func (m *Interface_TapParms) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Interface_TapParms.Merge(m, src)
 }
 func (m *Interface_TapParms) XXX_Size() int {
 	return xxx_messageInfo_Interface_TapParms.Size(m)
@@ -1381,9 +1384,9 @@ func (m *Interface_TapParms) GetTxRingSize() string {
 }
 
 type Interface_Forwarding struct {
-	L3Route              []*L3VRFRoute `protobuf:"bytes,1,rep,name=l3_route,json=l3Route" json:"l3_route,omitempty"`
-	L3Arp                []*L3ArpEntry `protobuf:"bytes,2,rep,name=l3_arp,json=l3Arp" json:"l3_arp,omitempty"`
-	L2Fib                []*L2FIBEntry `protobuf:"bytes,3,rep,name=l2_fib,json=l2Fib" json:"l2_fib,omitempty"`
+	L3Route              []*L3VRFRoute `protobuf:"bytes,1,rep,name=l3_route,json=l3Route,proto3" json:"l3_route,omitempty"`
+	L3Arp                []*L3ArpEntry `protobuf:"bytes,2,rep,name=l3_arp,json=l3Arp,proto3" json:"l3_arp,omitempty"`
+	L2Fib                []*L2FIBEntry `protobuf:"bytes,3,rep,name=l2_fib,json=l2Fib,proto3" json:"l2_fib,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
 	XXX_unrecognized     []byte        `json:"-"`
 	XXX_sizecache        int32         `json:"-"`
@@ -1393,7 +1396,7 @@ func (m *Interface_Forwarding) Reset()         { *m = Interface_Forwarding{} }
 func (m *Interface_Forwarding) String() string { return proto.CompactTextString(m) }
 func (*Interface_Forwarding) ProtoMessage()    {}
 func (*Interface_Forwarding) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{14, 2}
+	return fileDescriptor_ed7f10298fa1d90f, []int{14, 2}
 }
 func (m *Interface_Forwarding) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Interface_Forwarding.Unmarshal(m, b)
@@ -1401,8 +1404,8 @@ func (m *Interface_Forwarding) XXX_Unmarshal(b []byte) error {
 func (m *Interface_Forwarding) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Interface_Forwarding.Marshal(b, m, deterministic)
 }
-func (dst *Interface_Forwarding) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Interface_Forwarding.Merge(dst, src)
+func (m *Interface_Forwarding) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Interface_Forwarding.Merge(m, src)
 }
 func (m *Interface_Forwarding) XXX_Size() int {
 	return xxx_messageInfo_Interface_Forwarding.Size(m)
@@ -1448,7 +1451,7 @@ func (m *Interface_RxPlacementSettings) Reset()         { *m = Interface_RxPlace
 func (m *Interface_RxPlacementSettings) String() string { return proto.CompactTextString(m) }
 func (*Interface_RxPlacementSettings) ProtoMessage()    {}
 func (*Interface_RxPlacementSettings) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{14, 3}
+	return fileDescriptor_ed7f10298fa1d90f, []int{14, 3}
 }
 func (m *Interface_RxPlacementSettings) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Interface_RxPlacementSettings.Unmarshal(m, b)
@@ -1456,8 +1459,8 @@ func (m *Interface_RxPlacementSettings) XXX_Unmarshal(b []byte) error {
 func (m *Interface_RxPlacementSettings) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Interface_RxPlacementSettings.Marshal(b, m, deterministic)
 }
-func (dst *Interface_RxPlacementSettings) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Interface_RxPlacementSettings.Merge(dst, src)
+func (m *Interface_RxPlacementSettings) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Interface_RxPlacementSettings.Merge(m, src)
 }
 func (m *Interface_RxPlacementSettings) XXX_Size() int {
 	return xxx_messageInfo_Interface_RxPlacementSettings.Size(m)
@@ -1491,8 +1494,8 @@ func (m *Interface_RxPlacementSettings) GetIsMain() bool {
 
 type NetworkPodSpec struct {
 	PodType              string       `protobuf:"bytes,2,opt,name=pod_type,json=podType,proto3" json:"pod_type,omitempty"`
-	Interfaces           []*Interface `protobuf:"bytes,3,rep,name=interfaces" json:"interfaces,omitempty"`
-	L2Bds                []*L2BD      `protobuf:"bytes,4,rep,name=l2bds" json:"l2bds,omitempty"`
+	Interfaces           []*Interface `protobuf:"bytes,3,rep,name=interfaces,proto3" json:"interfaces,omitempty"`
+	L2Bds                []*L2BD      `protobuf:"bytes,4,rep,name=l2bds,proto3" json:"l2bds,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
 	XXX_unrecognized     []byte       `json:"-"`
 	XXX_sizecache        int32        `json:"-"`
@@ -1502,7 +1505,7 @@ func (m *NetworkPodSpec) Reset()         { *m = NetworkPodSpec{} }
 func (m *NetworkPodSpec) String() string { return proto.CompactTextString(m) }
 func (*NetworkPodSpec) ProtoMessage()    {}
 func (*NetworkPodSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{15}
+	return fileDescriptor_ed7f10298fa1d90f, []int{15}
 }
 func (m *NetworkPodSpec) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkPodSpec.Unmarshal(m, b)
@@ -1510,8 +1513,8 @@ func (m *NetworkPodSpec) XXX_Unmarshal(b []byte) error {
 func (m *NetworkPodSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkPodSpec.Marshal(b, m, deterministic)
 }
-func (dst *NetworkPodSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkPodSpec.Merge(dst, src)
+func (m *NetworkPodSpec) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkPodSpec.Merge(m, src)
 }
 func (m *NetworkPodSpec) XXX_Size() int {
 	return xxx_messageInfo_NetworkPodSpec.Size(m)
@@ -1544,8 +1547,8 @@ func (m *NetworkPodSpec) GetL2Bds() []*L2BD {
 }
 
 type NetworkPod struct {
-	Metadata             *MetaDataType   `protobuf:"bytes,1,opt,name=metadata" json:"metadata,omitempty"`
-	Spec                 *NetworkPodSpec `protobuf:"bytes,2,opt,name=spec" json:"spec,omitempty"`
+	Metadata             *MetaDataType   `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Spec                 *NetworkPodSpec `protobuf:"bytes,2,opt,name=spec,proto3" json:"spec,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
 	XXX_unrecognized     []byte          `json:"-"`
 	XXX_sizecache        int32           `json:"-"`
@@ -1555,7 +1558,7 @@ func (m *NetworkPod) Reset()         { *m = NetworkPod{} }
 func (m *NetworkPod) String() string { return proto.CompactTextString(m) }
 func (*NetworkPod) ProtoMessage()    {}
 func (*NetworkPod) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{16}
+	return fileDescriptor_ed7f10298fa1d90f, []int{16}
 }
 func (m *NetworkPod) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkPod.Unmarshal(m, b)
@@ -1563,8 +1566,8 @@ func (m *NetworkPod) XXX_Unmarshal(b []byte) error {
 func (m *NetworkPod) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkPod.Marshal(b, m, deterministic)
 }
-func (dst *NetworkPod) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkPod.Merge(dst, src)
+func (m *NetworkPod) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkPod.Merge(m, src)
 }
 func (m *NetworkPod) XXX_Size() int {
 	return xxx_messageInfo_NetworkPod.Size(m)
@@ -1593,18 +1596,18 @@ type Connection struct {
 	Name                   string   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	ConnType               string   `protobuf:"bytes,2,opt,name=conn_type,json=connType,proto3" json:"conn_type,omitempty"`
 	NetworkNodeOverlayName string   `protobuf:"bytes,3,opt,name=network_node_overlay_name,json=networkNodeOverlayName,proto3" json:"network_node_overlay_name,omitempty"`
-	PodInterfaces          []string `protobuf:"bytes,4,rep,name=pod_interfaces,json=podInterfaces" json:"pod_interfaces,omitempty"`
-	NodeInterfaces         []string `protobuf:"bytes,5,rep,name=node_interfaces,json=nodeInterfaces" json:"node_interfaces,omitempty"`
-	NodeInterfaceLabels    []string `protobuf:"bytes,6,rep,name=node_interface_labels,json=nodeInterfaceLabels" json:"node_interface_labels,omitempty"`
+	PodInterfaces          []string `protobuf:"bytes,4,rep,name=pod_interfaces,json=podInterfaces,proto3" json:"pod_interfaces,omitempty"`
+	NodeInterfaces         []string `protobuf:"bytes,5,rep,name=node_interfaces,json=nodeInterfaces,proto3" json:"node_interfaces,omitempty"`
+	NodeInterfaceLabels    []string `protobuf:"bytes,6,rep,name=node_interface_labels,json=nodeInterfaceLabels,proto3" json:"node_interface_labels,omitempty"`
 	UseNodeL2Bd            string   `protobuf:"bytes,7,opt,name=use_node_l2bd,json=useNodeL2bd,proto3" json:"use_node_l2bd,omitempty"`
 	// only for l2mp connections
-	L2Bd *L2BD `protobuf:"bytes,8,opt,name=l2bd" json:"l2bd,omitempty"`
+	L2Bd *L2BD `protobuf:"bytes,8,opt,name=l2bd,proto3" json:"l2bd,omitempty"`
 	// create a l2bd with default parms for l2mp connections
 	VrfId                uint32        `protobuf:"varint,9,opt,name=vrf_id,json=vrfId,proto3" json:"vrf_id,omitempty"`
 	ConnMethod           string        `protobuf:"bytes,10,opt,name=conn_method,json=connMethod,proto3" json:"conn_method,omitempty"`
-	L3Routes             []*L3VRFRoute `protobuf:"bytes,11,rep,name=l3_routes,json=l3Routes" json:"l3_routes,omitempty"`
-	L3Arps               []*L3ArpEntry `protobuf:"bytes,12,rep,name=l3_arps,json=l3Arps" json:"l3_arps,omitempty"`
-	L2Fibs               []*L2FIBEntry `protobuf:"bytes,13,rep,name=l2_fibs,json=l2Fibs" json:"l2_fibs,omitempty"`
+	L3Routes             []*L3VRFRoute `protobuf:"bytes,11,rep,name=l3_routes,json=l3Routes,proto3" json:"l3_routes,omitempty"`
+	L3Arps               []*L3ArpEntry `protobuf:"bytes,12,rep,name=l3_arps,json=l3Arps,proto3" json:"l3_arps,omitempty"`
+	L2Fibs               []*L2FIBEntry `protobuf:"bytes,13,rep,name=l2_fibs,json=l2Fibs,proto3" json:"l2_fibs,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
 	XXX_unrecognized     []byte        `json:"-"`
 	XXX_sizecache        int32         `json:"-"`
@@ -1614,7 +1617,7 @@ func (m *Connection) Reset()         { *m = Connection{} }
 func (m *Connection) String() string { return proto.CompactTextString(m) }
 func (*Connection) ProtoMessage()    {}
 func (*Connection) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{17}
+	return fileDescriptor_ed7f10298fa1d90f, []int{17}
 }
 func (m *Connection) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Connection.Unmarshal(m, b)
@@ -1622,8 +1625,8 @@ func (m *Connection) XXX_Unmarshal(b []byte) error {
 func (m *Connection) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Connection.Marshal(b, m, deterministic)
 }
-func (dst *Connection) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Connection.Merge(dst, src)
+func (m *Connection) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Connection.Merge(m, src)
 }
 func (m *Connection) XXX_Size() int {
 	return xxx_messageInfo_Connection.Size(m)
@@ -1727,9 +1730,9 @@ func (m *Connection) GetL2Fibs() []*L2FIBEntry {
 
 type NetworkServiceStatus struct {
 	OperStatus              string                            `protobuf:"bytes,2,opt,name=oper_status,json=operStatus,proto3" json:"oper_status,omitempty"`
-	Msg                     []string                          `protobuf:"bytes,3,rep,name=msg" json:"msg,omitempty"`
-	RenderedVppAgentEntries map[string]*RenderedVppAgentEntry `protobuf:"bytes,4,rep,name=rendered_vpp_agent_entries,json=renderedVppAgentEntries" json:"rendered_vpp_agent_entries,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
-	Interfaces              map[string]*InterfaceStatus       `protobuf:"bytes,5,rep,name=interfaces" json:"interfaces,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
+	Msg                     []string                          `protobuf:"bytes,3,rep,name=msg,proto3" json:"msg,omitempty"`
+	RenderedVppAgentEntries map[string]*RenderedVppAgentEntry `protobuf:"bytes,4,rep,name=rendered_vpp_agent_entries,json=renderedVppAgentEntries,proto3" json:"rendered_vpp_agent_entries,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Interfaces              map[string]*InterfaceStatus       `protobuf:"bytes,5,rep,name=interfaces,proto3" json:"interfaces,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral    struct{}                          `json:"-"`
 	XXX_unrecognized        []byte                            `json:"-"`
 	XXX_sizecache           int32                             `json:"-"`
@@ -1739,7 +1742,7 @@ func (m *NetworkServiceStatus) Reset()         { *m = NetworkServiceStatus{} }
 func (m *NetworkServiceStatus) String() string { return proto.CompactTextString(m) }
 func (*NetworkServiceStatus) ProtoMessage()    {}
 func (*NetworkServiceStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{18}
+	return fileDescriptor_ed7f10298fa1d90f, []int{18}
 }
 func (m *NetworkServiceStatus) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkServiceStatus.Unmarshal(m, b)
@@ -1747,8 +1750,8 @@ func (m *NetworkServiceStatus) XXX_Unmarshal(b []byte) error {
 func (m *NetworkServiceStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkServiceStatus.Marshal(b, m, deterministic)
 }
-func (dst *NetworkServiceStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkServiceStatus.Merge(dst, src)
+func (m *NetworkServiceStatus) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkServiceStatus.Merge(m, src)
 }
 func (m *NetworkServiceStatus) XXX_Size() int {
 	return xxx_messageInfo_NetworkServiceStatus.Size(m)
@@ -1788,8 +1791,8 @@ func (m *NetworkServiceStatus) GetInterfaces() map[string]*InterfaceStatus {
 }
 
 type NetworkServiceSpec struct {
-	NetworkPods          []*NetworkPod `protobuf:"bytes,3,rep,name=network_pods,json=networkPods" json:"network_pods,omitempty"`
-	Connections          []*Connection `protobuf:"bytes,4,rep,name=connections" json:"connections,omitempty"`
+	NetworkPods          []*NetworkPod `protobuf:"bytes,3,rep,name=network_pods,json=networkPods,proto3" json:"network_pods,omitempty"`
+	Connections          []*Connection `protobuf:"bytes,4,rep,name=connections,proto3" json:"connections,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
 	XXX_unrecognized     []byte        `json:"-"`
 	XXX_sizecache        int32         `json:"-"`
@@ -1799,7 +1802,7 @@ func (m *NetworkServiceSpec) Reset()         { *m = NetworkServiceSpec{} }
 func (m *NetworkServiceSpec) String() string { return proto.CompactTextString(m) }
 func (*NetworkServiceSpec) ProtoMessage()    {}
 func (*NetworkServiceSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{19}
+	return fileDescriptor_ed7f10298fa1d90f, []int{19}
 }
 func (m *NetworkServiceSpec) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkServiceSpec.Unmarshal(m, b)
@@ -1807,8 +1810,8 @@ func (m *NetworkServiceSpec) XXX_Unmarshal(b []byte) error {
 func (m *NetworkServiceSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkServiceSpec.Marshal(b, m, deterministic)
 }
-func (dst *NetworkServiceSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkServiceSpec.Merge(dst, src)
+func (m *NetworkServiceSpec) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkServiceSpec.Merge(m, src)
 }
 func (m *NetworkServiceSpec) XXX_Size() int {
 	return xxx_messageInfo_NetworkServiceSpec.Size(m)
@@ -1834,9 +1837,9 @@ func (m *NetworkServiceSpec) GetConnections() []*Connection {
 }
 
 type NetworkService struct {
-	Metadata             *MetaDataType         `protobuf:"bytes,1,opt,name=metadata" json:"metadata,omitempty"`
-	Spec                 *NetworkServiceSpec   `protobuf:"bytes,2,opt,name=spec" json:"spec,omitempty"`
-	Status               *NetworkServiceStatus `protobuf:"bytes,3,opt,name=status" json:"status,omitempty"`
+	Metadata             *MetaDataType         `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Spec                 *NetworkServiceSpec   `protobuf:"bytes,2,opt,name=spec,proto3" json:"spec,omitempty"`
+	Status               *NetworkServiceStatus `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
 	XXX_unrecognized     []byte                `json:"-"`
 	XXX_sizecache        int32                 `json:"-"`
@@ -1846,7 +1849,7 @@ func (m *NetworkService) Reset()         { *m = NetworkService{} }
 func (m *NetworkService) String() string { return proto.CompactTextString(m) }
 func (*NetworkService) ProtoMessage()    {}
 func (*NetworkService) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{20}
+	return fileDescriptor_ed7f10298fa1d90f, []int{20}
 }
 func (m *NetworkService) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkService.Unmarshal(m, b)
@@ -1854,8 +1857,8 @@ func (m *NetworkService) XXX_Unmarshal(b []byte) error {
 func (m *NetworkService) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkService.Marshal(b, m, deterministic)
 }
-func (dst *NetworkService) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkService.Merge(dst, src)
+func (m *NetworkService) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkService.Merge(m, src)
 }
 func (m *NetworkService) XXX_Size() int {
 	return xxx_messageInfo_NetworkService.Size(m)
@@ -1889,8 +1892,8 @@ func (m *NetworkService) GetStatus() *NetworkServiceStatus {
 
 type NetworkNodeOverlayStatus struct {
 	Status                  string                            `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	Msg                     []string                          `protobuf:"bytes,2,rep,name=msg" json:"msg,omitempty"`
-	RenderedVppAgentEntries map[string]*RenderedVppAgentEntry `protobuf:"bytes,3,rep,name=rendered_vpp_agent_entries,json=renderedVppAgentEntries" json:"rendered_vpp_agent_entries,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
+	Msg                     []string                          `protobuf:"bytes,2,rep,name=msg,proto3" json:"msg,omitempty"`
+	RenderedVppAgentEntries map[string]*RenderedVppAgentEntry `protobuf:"bytes,3,rep,name=rendered_vpp_agent_entries,json=renderedVppAgentEntries,proto3" json:"rendered_vpp_agent_entries,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral    struct{}                          `json:"-"`
 	XXX_unrecognized        []byte                            `json:"-"`
 	XXX_sizecache           int32                             `json:"-"`
@@ -1900,7 +1903,7 @@ func (m *NetworkNodeOverlayStatus) Reset()         { *m = NetworkNodeOverlayStat
 func (m *NetworkNodeOverlayStatus) String() string { return proto.CompactTextString(m) }
 func (*NetworkNodeOverlayStatus) ProtoMessage()    {}
 func (*NetworkNodeOverlayStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{21}
+	return fileDescriptor_ed7f10298fa1d90f, []int{21}
 }
 func (m *NetworkNodeOverlayStatus) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkNodeOverlayStatus.Unmarshal(m, b)
@@ -1908,8 +1911,8 @@ func (m *NetworkNodeOverlayStatus) XXX_Unmarshal(b []byte) error {
 func (m *NetworkNodeOverlayStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkNodeOverlayStatus.Marshal(b, m, deterministic)
 }
-func (dst *NetworkNodeOverlayStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkNodeOverlayStatus.Merge(dst, src)
+func (m *NetworkNodeOverlayStatus) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkNodeOverlayStatus.Merge(m, src)
 }
 func (m *NetworkNodeOverlayStatus) XXX_Size() int {
 	return xxx_messageInfo_NetworkNodeOverlayStatus.Size(m)
@@ -1944,8 +1947,8 @@ func (m *NetworkNodeOverlayStatus) GetRenderedVppAgentEntries() map[string]*Rend
 type NetworkNodeOverlaySpec struct {
 	ServiceMeshType       string                                        `protobuf:"bytes,1,opt,name=service_mesh_type,json=serviceMeshType,proto3" json:"service_mesh_type,omitempty"`
 	ConnectionType        string                                        `protobuf:"bytes,2,opt,name=connection_type,json=connectionType,proto3" json:"connection_type,omitempty"`
-	VxlanHubAndSpokeParms *NetworkNodeOverlaySpec_VxlanHubAndSpokeParms `protobuf:"bytes,3,opt,name=vxlan_hub_and_spoke_parms,json=vxlanHubAndSpokeParms" json:"vxlan_hub_and_spoke_parms,omitempty"`
-	VxlanMeshParms        *NetworkNodeOverlaySpec_VxlanMeshParms        `protobuf:"bytes,4,opt,name=vxlan_mesh_parms,json=vxlanMeshParms" json:"vxlan_mesh_parms,omitempty"`
+	VxlanHubAndSpokeParms *NetworkNodeOverlaySpec_VxlanHubAndSpokeParms `protobuf:"bytes,3,opt,name=vxlan_hub_and_spoke_parms,json=vxlanHubAndSpokeParms,proto3" json:"vxlan_hub_and_spoke_parms,omitempty"`
+	VxlanMeshParms        *NetworkNodeOverlaySpec_VxlanMeshParms        `protobuf:"bytes,4,opt,name=vxlan_mesh_parms,json=vxlanMeshParms,proto3" json:"vxlan_mesh_parms,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                                      `json:"-"`
 	XXX_unrecognized      []byte                                        `json:"-"`
 	XXX_sizecache         int32                                         `json:"-"`
@@ -1955,7 +1958,7 @@ func (m *NetworkNodeOverlaySpec) Reset()         { *m = NetworkNodeOverlaySpec{}
 func (m *NetworkNodeOverlaySpec) String() string { return proto.CompactTextString(m) }
 func (*NetworkNodeOverlaySpec) ProtoMessage()    {}
 func (*NetworkNodeOverlaySpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{22}
+	return fileDescriptor_ed7f10298fa1d90f, []int{22}
 }
 func (m *NetworkNodeOverlaySpec) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkNodeOverlaySpec.Unmarshal(m, b)
@@ -1963,8 +1966,8 @@ func (m *NetworkNodeOverlaySpec) XXX_Unmarshal(b []byte) error {
 func (m *NetworkNodeOverlaySpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkNodeOverlaySpec.Marshal(b, m, deterministic)
 }
-func (dst *NetworkNodeOverlaySpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkNodeOverlaySpec.Merge(dst, src)
+func (m *NetworkNodeOverlaySpec) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkNodeOverlaySpec.Merge(m, src)
 }
 func (m *NetworkNodeOverlaySpec) XXX_Size() int {
 	return xxx_messageInfo_NetworkNodeOverlaySpec.Size(m)
@@ -2023,7 +2026,7 @@ func (m *NetworkNodeOverlaySpec_VxlanHubAndSpokeParms) String() string {
 }
 func (*NetworkNodeOverlaySpec_VxlanHubAndSpokeParms) ProtoMessage() {}
 func (*NetworkNodeOverlaySpec_VxlanHubAndSpokeParms) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{22, 0}
+	return fileDescriptor_ed7f10298fa1d90f, []int{22, 0}
 }
 func (m *NetworkNodeOverlaySpec_VxlanHubAndSpokeParms) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkNodeOverlaySpec_VxlanHubAndSpokeParms.Unmarshal(m, b)
@@ -2031,8 +2034,8 @@ func (m *NetworkNodeOverlaySpec_VxlanHubAndSpokeParms) XXX_Unmarshal(b []byte) e
 func (m *NetworkNodeOverlaySpec_VxlanHubAndSpokeParms) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkNodeOverlaySpec_VxlanHubAndSpokeParms.Marshal(b, m, deterministic)
 }
-func (dst *NetworkNodeOverlaySpec_VxlanHubAndSpokeParms) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkNodeOverlaySpec_VxlanHubAndSpokeParms.Merge(dst, src)
+func (m *NetworkNodeOverlaySpec_VxlanHubAndSpokeParms) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkNodeOverlaySpec_VxlanHubAndSpokeParms.Merge(m, src)
 }
 func (m *NetworkNodeOverlaySpec_VxlanHubAndSpokeParms) XXX_Size() int {
 	return xxx_messageInfo_NetworkNodeOverlaySpec_VxlanHubAndSpokeParms.Size(m)
@@ -2101,7 +2104,7 @@ func (m *NetworkNodeOverlaySpec_VxlanMeshParms) Reset()         { *m = NetworkNo
 func (m *NetworkNodeOverlaySpec_VxlanMeshParms) String() string { return proto.CompactTextString(m) }
 func (*NetworkNodeOverlaySpec_VxlanMeshParms) ProtoMessage()    {}
 func (*NetworkNodeOverlaySpec_VxlanMeshParms) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{22, 1}
+	return fileDescriptor_ed7f10298fa1d90f, []int{22, 1}
 }
 func (m *NetworkNodeOverlaySpec_VxlanMeshParms) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkNodeOverlaySpec_VxlanMeshParms.Unmarshal(m, b)
@@ -2109,8 +2112,8 @@ func (m *NetworkNodeOverlaySpec_VxlanMeshParms) XXX_Unmarshal(b []byte) error {
 func (m *NetworkNodeOverlaySpec_VxlanMeshParms) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkNodeOverlaySpec_VxlanMeshParms.Marshal(b, m, deterministic)
 }
-func (dst *NetworkNodeOverlaySpec_VxlanMeshParms) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkNodeOverlaySpec_VxlanMeshParms.Merge(dst, src)
+func (m *NetworkNodeOverlaySpec_VxlanMeshParms) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkNodeOverlaySpec_VxlanMeshParms.Merge(m, src)
 }
 func (m *NetworkNodeOverlaySpec_VxlanMeshParms) XXX_Size() int {
 	return xxx_messageInfo_NetworkNodeOverlaySpec_VxlanMeshParms.Size(m)
@@ -2164,9 +2167,9 @@ func (m *NetworkNodeOverlaySpec_VxlanMeshParms) GetNetworkNodeInterfaceLabel() s
 }
 
 type NetworkNodeOverlay struct {
-	Metadata             *MetaDataType             `protobuf:"bytes,1,opt,name=metadata" json:"metadata,omitempty"`
-	Spec                 *NetworkNodeOverlaySpec   `protobuf:"bytes,2,opt,name=spec" json:"spec,omitempty"`
-	Status               *NetworkNodeOverlayStatus `protobuf:"bytes,3,opt,name=status" json:"status,omitempty"`
+	Metadata             *MetaDataType             `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Spec                 *NetworkNodeOverlaySpec   `protobuf:"bytes,2,opt,name=spec,proto3" json:"spec,omitempty"`
+	Status               *NetworkNodeOverlayStatus `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                  `json:"-"`
 	XXX_unrecognized     []byte                    `json:"-"`
 	XXX_sizecache        int32                     `json:"-"`
@@ -2176,7 +2179,7 @@ func (m *NetworkNodeOverlay) Reset()         { *m = NetworkNodeOverlay{} }
 func (m *NetworkNodeOverlay) String() string { return proto.CompactTextString(m) }
 func (*NetworkNodeOverlay) ProtoMessage()    {}
 func (*NetworkNodeOverlay) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{23}
+	return fileDescriptor_ed7f10298fa1d90f, []int{23}
 }
 func (m *NetworkNodeOverlay) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkNodeOverlay.Unmarshal(m, b)
@@ -2184,8 +2187,8 @@ func (m *NetworkNodeOverlay) XXX_Unmarshal(b []byte) error {
 func (m *NetworkNodeOverlay) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkNodeOverlay.Marshal(b, m, deterministic)
 }
-func (dst *NetworkNodeOverlay) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkNodeOverlay.Merge(dst, src)
+func (m *NetworkNodeOverlay) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkNodeOverlay.Merge(m, src)
 }
 func (m *NetworkNodeOverlay) XXX_Size() int {
 	return xxx_messageInfo_NetworkNodeOverlay.Size(m)
@@ -2221,8 +2224,8 @@ func (m *NetworkNodeOverlay) GetStatus() *NetworkNodeOverlayStatus {
 type NetworkNodeSpec struct {
 	K8SNodeName          string       `protobuf:"bytes,1,opt,name=k8s_node_name,json=k8sNodeName,proto3" json:"k8s_node_name,omitempty"`
 	NodeType             string       `protobuf:"bytes,2,opt,name=node_type,json=nodeType,proto3" json:"node_type,omitempty"`
-	Interfaces           []*Interface `protobuf:"bytes,4,rep,name=interfaces" json:"interfaces,omitempty"`
-	L2Bds                []*L2BD      `protobuf:"bytes,5,rep,name=l2bds" json:"l2bds,omitempty"`
+	Interfaces           []*Interface `protobuf:"bytes,4,rep,name=interfaces,proto3" json:"interfaces,omitempty"`
+	L2Bds                []*L2BD      `protobuf:"bytes,5,rep,name=l2bds,proto3" json:"l2bds,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
 	XXX_unrecognized     []byte       `json:"-"`
 	XXX_sizecache        int32        `json:"-"`
@@ -2232,7 +2235,7 @@ func (m *NetworkNodeSpec) Reset()         { *m = NetworkNodeSpec{} }
 func (m *NetworkNodeSpec) String() string { return proto.CompactTextString(m) }
 func (*NetworkNodeSpec) ProtoMessage()    {}
 func (*NetworkNodeSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{24}
+	return fileDescriptor_ed7f10298fa1d90f, []int{24}
 }
 func (m *NetworkNodeSpec) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkNodeSpec.Unmarshal(m, b)
@@ -2240,8 +2243,8 @@ func (m *NetworkNodeSpec) XXX_Unmarshal(b []byte) error {
 func (m *NetworkNodeSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkNodeSpec.Marshal(b, m, deterministic)
 }
-func (dst *NetworkNodeSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkNodeSpec.Merge(dst, src)
+func (m *NetworkNodeSpec) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkNodeSpec.Merge(m, src)
 }
 func (m *NetworkNodeSpec) XXX_Size() int {
 	return xxx_messageInfo_NetworkNodeSpec.Size(m)
@@ -2282,9 +2285,9 @@ func (m *NetworkNodeSpec) GetL2Bds() []*L2BD {
 
 type NetworkNodeStatus struct {
 	Status                  string                            `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
-	Msg                     []string                          `protobuf:"bytes,2,rep,name=msg" json:"msg,omitempty"`
-	RenderedVppAgentEntries map[string]*RenderedVppAgentEntry `protobuf:"bytes,3,rep,name=rendered_vpp_agent_entries,json=renderedVppAgentEntries" json:"rendered_vpp_agent_entries,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
-	Interfaces              map[string]*InterfaceStatus       `protobuf:"bytes,5,rep,name=interfaces" json:"interfaces,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value"`
+	Msg                     []string                          `protobuf:"bytes,2,rep,name=msg,proto3" json:"msg,omitempty"`
+	RenderedVppAgentEntries map[string]*RenderedVppAgentEntry `protobuf:"bytes,3,rep,name=rendered_vpp_agent_entries,json=renderedVppAgentEntries,proto3" json:"rendered_vpp_agent_entries,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Interfaces              map[string]*InterfaceStatus       `protobuf:"bytes,5,rep,name=interfaces,proto3" json:"interfaces,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral    struct{}                          `json:"-"`
 	XXX_unrecognized        []byte                            `json:"-"`
 	XXX_sizecache           int32                             `json:"-"`
@@ -2294,7 +2297,7 @@ func (m *NetworkNodeStatus) Reset()         { *m = NetworkNodeStatus{} }
 func (m *NetworkNodeStatus) String() string { return proto.CompactTextString(m) }
 func (*NetworkNodeStatus) ProtoMessage()    {}
 func (*NetworkNodeStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{25}
+	return fileDescriptor_ed7f10298fa1d90f, []int{25}
 }
 func (m *NetworkNodeStatus) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkNodeStatus.Unmarshal(m, b)
@@ -2302,8 +2305,8 @@ func (m *NetworkNodeStatus) XXX_Unmarshal(b []byte) error {
 func (m *NetworkNodeStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkNodeStatus.Marshal(b, m, deterministic)
 }
-func (dst *NetworkNodeStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkNodeStatus.Merge(dst, src)
+func (m *NetworkNodeStatus) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkNodeStatus.Merge(m, src)
 }
 func (m *NetworkNodeStatus) XXX_Size() int {
 	return xxx_messageInfo_NetworkNodeStatus.Size(m)
@@ -2343,9 +2346,9 @@ func (m *NetworkNodeStatus) GetInterfaces() map[string]*InterfaceStatus {
 }
 
 type NetworkNode struct {
-	Metadata             *MetaDataType      `protobuf:"bytes,1,opt,name=metadata" json:"metadata,omitempty"`
-	Spec                 *NetworkNodeSpec   `protobuf:"bytes,2,opt,name=spec" json:"spec,omitempty"`
-	Status               *NetworkNodeStatus `protobuf:"bytes,3,opt,name=status" json:"status,omitempty"`
+	Metadata             *MetaDataType      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Spec                 *NetworkNodeSpec   `protobuf:"bytes,2,opt,name=spec,proto3" json:"spec,omitempty"`
+	Status               *NetworkNodeStatus `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}           `json:"-"`
 	XXX_unrecognized     []byte             `json:"-"`
 	XXX_sizecache        int32              `json:"-"`
@@ -2355,7 +2358,7 @@ func (m *NetworkNode) Reset()         { *m = NetworkNode{} }
 func (m *NetworkNode) String() string { return proto.CompactTextString(m) }
 func (*NetworkNode) ProtoMessage()    {}
 func (*NetworkNode) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{26}
+	return fileDescriptor_ed7f10298fa1d90f, []int{26}
 }
 func (m *NetworkNode) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NetworkNode.Unmarshal(m, b)
@@ -2363,8 +2366,8 @@ func (m *NetworkNode) XXX_Unmarshal(b []byte) error {
 func (m *NetworkNode) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NetworkNode.Marshal(b, m, deterministic)
 }
-func (dst *NetworkNode) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NetworkNode.Merge(dst, src)
+func (m *NetworkNode) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NetworkNode.Merge(m, src)
 }
 func (m *NetworkNode) XXX_Size() int {
 	return xxx_messageInfo_NetworkNode.Size(m)
@@ -2399,7 +2402,7 @@ func (m *NetworkNode) GetStatus() *NetworkNodeStatus {
 // MetaDataType generic parms for all controller high level objects
 type MetaDataType struct {
 	Name                 string            `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Labels               map[string]string `protobuf:"bytes,2,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Labels               map[string]string `protobuf:"bytes,2,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
 	XXX_unrecognized     []byte            `json:"-"`
 	XXX_sizecache        int32             `json:"-"`
@@ -2409,7 +2412,7 @@ func (m *MetaDataType) Reset()         { *m = MetaDataType{} }
 func (m *MetaDataType) String() string { return proto.CompactTextString(m) }
 func (*MetaDataType) ProtoMessage()    {}
 func (*MetaDataType) Descriptor() ([]byte, []int) {
-	return fileDescriptor_controller_274cc42fee571f90, []int{27}
+	return fileDescriptor_ed7f10298fa1d90f, []int{27}
 }
 func (m *MetaDataType) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_MetaDataType.Unmarshal(m, b)
@@ -2417,8 +2420,8 @@ func (m *MetaDataType) XXX_Unmarshal(b []byte) error {
 func (m *MetaDataType) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_MetaDataType.Marshal(b, m, deterministic)
 }
-func (dst *MetaDataType) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MetaDataType.Merge(dst, src)
+func (m *MetaDataType) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MetaDataType.Merge(m, src)
 }
 func (m *MetaDataType) XXX_Size() int {
 	return xxx_messageInfo_MetaDataType.Size(m)
@@ -2488,9 +2491,9 @@ func init() {
 	proto.RegisterMapType((map[string]string)(nil), "controller.MetaDataType.LabelsEntry")
 }
 
-func init() { proto.RegisterFile("controller.proto", fileDescriptor_controller_274cc42fee571f90) }
+func init() { proto.RegisterFile("controller.proto", fileDescriptor_ed7f10298fa1d90f) }
 
-var fileDescriptor_controller_274cc42fee571f90 = []byte{
+var fileDescriptor_ed7f10298fa1d90f = []byte{
 	// 2949 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe4, 0x5a, 0xcd, 0x6f, 0x1b, 0xc7,
 	0x15, 0x07, 0x45, 0x89, 0x22, 0x1f, 0x45, 0x4a, 0x5e, 0x5b, 0x36, 0x4d, 0x7f, 0x29, 0xac, 0x63,
