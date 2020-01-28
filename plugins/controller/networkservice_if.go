@@ -442,7 +442,7 @@ func (mgr *NetworkServiceMgr) RenderInterfaceForwarding(
 
 	vppAgent := networkPodInterface.Parent
 
-	for _, l3Vrf := range networkPodInterface.Fwd.L3VrfRoute {
+	for _, l3Vrf := range networkPodInterface.Fwd.L3Route {
 		desc := fmt.Sprintf("FWD NS_%s_IF_%s_VRF_%d_DST_%s", ns.Metadata.Name,
 			networkPodInterface.Name, l3Vrf.VrfId, l3Vrf.DstIpAddr)
 		l3sr := &controller.L3VRFRoute{
