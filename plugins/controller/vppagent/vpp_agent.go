@@ -19,6 +19,7 @@
 package vppagent
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -307,7 +308,8 @@ func ConstructMemInterface(vppAgent string,
 		defaultMemifDirectory = controller.MemifDirectoryName
 	}
 
-	ifaceMemif.Memif.SocketFilename = defaultMemifDirectory + "/memif_" + masterVppAgent + ".sock"
+	sfn := fmt.Sprintf("%s/memif_%s_%d.sock", defaultMemifDirectory, masterVppAgent, ifaceMemif.Memif.Id)
+	ifaceMemif.Memif.SocketFilename = sfn
 
 	iface.RxModes = rxModeControllerToInterface(rxMode)
 
@@ -628,6 +630,28 @@ func ConstructStaticRoute(vppAgent string, l3sr *controller.L3VRFRoute) *KVType 
 		VppKey:       key,
 		VppEntryType: VppEntryTypeL3Route,
 		L3Route:      sr,
+	}
+	return kv
+}
+
+// ConstructStaticFib returns an KVType
+func ConstructStaticFib(vppAgent string, l2fib *controller.L2FIBEntry) *KVType {
+
+	fib := &l2.FIBEntry{
+		PhysAddress:             l2fib.DestMacAddress,
+		BridgeDomain: l2fib.BdName,
+		OutgoingInterface: l2fib.OutgoingIf,
+		StaticConfig: true,
+	}
+
+	key := L2FibKey(vppAgent, fib)
+
+	log.Debugf("ConstructStaticFib: key='%s', sr='%+v", key, fib)
+
+	kv := &KVType{
+		VppKey:       key,
+		VppEntryType: VppEntryTypeL2Fib,
+		L2Fib:      fib,
 	}
 	return kv
 }

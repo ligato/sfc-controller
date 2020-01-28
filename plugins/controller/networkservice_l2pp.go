@@ -246,7 +246,7 @@ func (mgr *NetworkServiceMgr) renderConnL2PPSameNode(
 					if ifStatus0.MemifID == ifStatus1.MemifID { // reset as MUST be different id's
 						ifStatus0.MemifID = 0
 						ifStatus1.MemifID = 0
-						log.Debugf("renderConnL2PPSameNode: resettting memif's as need to reallocate separate id's")
+						log.Debugf("renderConnL2PPSameNode: resetting memif's as need to reallocate separate id's")
 					}
 				}
 			}
