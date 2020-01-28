@@ -715,7 +715,7 @@ func ConstructStaticArpEntry(vppAgent string, l3ae *controller.L3ArpEntry) *KVTy
 		PhysAddress: l3ae.PhysAddress,
 	}
 
-	key := ArpEntryKey(vppAgent, ae.Interface, ae.PhysAddress)
+	key := ArpEntryKey(vppAgent, ae.Interface, ae.IpAddress)
 
 	log.Debugf("ConstructStaticArpEntry: key='%s', arp='%v", key, ae)
 
