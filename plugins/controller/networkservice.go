@@ -808,7 +808,7 @@ func (mgr *NetworkServiceMgr) RenderL2BD(
 			bviLoopIfNameName := "IFLOOP_" + bdName
 
 			vppKV := vppagent.ConstructLoopbackInterface(
-				ns.Metadata.Name,
+				nodeName,
 				bviLoopIfNameName,
 				[]string{bviAddress},
 				"",
