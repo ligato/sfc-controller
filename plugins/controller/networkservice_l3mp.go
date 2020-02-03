@@ -17,7 +17,7 @@ package controller
 import (
 	"fmt"
 
-	"github.com/ligato/sfc-controller/plugins/controller/model"
+	controller "github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
 )
@@ -204,32 +204,35 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 		}
 
 		l2bdIF := &l2.BridgeDomain_Interface{
-			Name: ifName,
+			Name:                    ifName,
 			BridgedVirtualInterface: false,
 		}
 		l2bdIFs[nodeName] = append(l2bdIFs[nodeName], l2bdIF)
 
 		if len(ifStatus.IpAddresses) != 0 {
 			desc := fmt.Sprintf("L3MP NS_%s_VRF_%d_CONN_%d", ns.Metadata.Name, conn.VrfId, connIndex+1)
+
 			l3sr := &controller.L3VRFRoute{
-				VrfId:             conn.VrfId,
-				Description:       desc,
-				DstIpAddr:         vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
-				OutgoingInterface: ifName,
+				Vpp: &controller.VPPRoute{
+					VrfId:             conn.VrfId,
+					Description:       desc,
+					DstIpAddr:         vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
+					OutgoingInterface: ifName,
+				},
 			}
 			vppKV := vppagent.ConstructStaticRoute(nodeName, l3sr)
 			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-				ModelTypeNetworkService + "/" + ns.Metadata.Name,
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
 				vppKV)
 		}
 		ae := &controller.L3ArpEntry{
-			IpAddress:vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
-			PhysAddress: ifStatus.MacAddress,
+			IpAddress:         vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
+			PhysAddress:       ifStatus.MacAddress,
 			OutgoingInterface: ifName,
 		}
 		vppKV := vppagent.ConstructStaticArpEntry(nodeName, ae)
 		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService + "/" + ns.Metadata.Name,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
 			vppKV)
 	}
 
@@ -257,7 +260,7 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 		}
 	}
 
-	return nil//ns.RenderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName])
+	return nil //ns.RenderL2BD(conn, connIndex, nodeName, l2bdIFs[nodeName])
 }
 
 // renderConnL3MPInterNode renders this L3MP connection between nodes
@@ -295,7 +298,7 @@ func (mgr *NetworkServiceMgr) renderConnL3MPInterNode(
 		}
 
 		l2bdIF := &l2.BridgeDomain_Interface{
-			Name: ifName,
+			Name:                    ifName,
 			BridgedVirtualInterface: false,
 			SplitHorizonGroup:       0,
 		}
@@ -304,10 +307,12 @@ func (mgr *NetworkServiceMgr) renderConnL3MPInterNode(
 		if len(ifStatus.IpAddresses) != 0 {
 			desc := fmt.Sprintf("L3MP NS_%s_VRF_%d_CONN_%d", ns.Metadata.Name, conn.VrfId, connIndex+1)
 			l3sr := &controller.L3VRFRoute{
-				VrfId:             conn.VrfId,
-				Description:       desc,
-				DstIpAddr:         vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
-				OutgoingInterface: ifName,
+				Vpp: &controller.VPPRoute{
+					VrfId:             conn.VrfId,
+					Description:       desc,
+					DstIpAddr:         vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
+					OutgoingInterface: ifName,
+				},
 			}
 
 			l3vrfs[p2nArray[i].Node] = append(l3vrfs[p2nArray[i].Node], l3sr)
@@ -318,13 +323,13 @@ func (mgr *NetworkServiceMgr) renderConnL3MPInterNode(
 			//	vppKV)
 		}
 		ae := &controller.L3ArpEntry{
-			IpAddress:vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
-			PhysAddress: ifStatus.MacAddress,
+			IpAddress:         vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
+			PhysAddress:       ifStatus.MacAddress,
 			OutgoingInterface: ifName,
 		}
 		vppKV := vppagent.ConstructStaticArpEntry(p2nArray[i].Node, ae)
 		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService + "/" + ns.Metadata.Name,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
 			vppKV)
 	}
 

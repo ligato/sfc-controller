@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:generate protoc --proto_path=model --gogo_out=model model/controller.proto
+//go:generate protoc --proto_path=model "-I.:$GOPATH/src/" --gogo_out=model model/controller.proto
 
 package controller
 
@@ -32,7 +32,7 @@ import (
 	"github.com/ligato/sfc-controller/plugins/controller/database"
 	"github.com/ligato/sfc-controller/plugins/controller/idapi"
 	"github.com/ligato/sfc-controller/plugins/controller/idapi/ipam"
-	"github.com/ligato/sfc-controller/plugins/controller/model"
+	controller "github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 	"github.com/namsral/flag"
 	"github.com/unrolled/render"
@@ -44,7 +44,7 @@ const PluginID infra.PluginName = "Controller"
 var (
 	sfcConfigFile               string // cli flag - see RegisterFlags
 	CleanDatastore              bool
-	ServerMode              bool
+	ServerMode                  bool
 	BypassModelTypeHttpHandlers bool
 	log                         = logrus.NewLogger("Controller")
 	ctlrPlugin                  *Plugin
@@ -78,13 +78,13 @@ func init() {
 // CacheType is ram cache of controller entities
 type CacheType struct {
 	// state
-	InterfaceStates       map[string]*controller.InterfaceStatus                  // key[entity/ifname]
-	VppEntries            map[string]*vppagent.KVType                             // key[vppkey]
-	MacAddrAllocator      *idapi.MacAddrAllocatorType
-	MemifIDAllocator      *idapi.MemifAllocatorType
-	VrfIDAllocator        *idapi.VrfAllocatorType
-	IPAMPoolAllocators    map[string]*ipam.PoolAllocatorType // key[modelType/ipamPoolName]
-	NetworkPodToNodeMap   map[string]*controller.NetworkPodToNodeMap    // key[pod]
+	InterfaceStates     map[string]*controller.InterfaceStatus // key[entity/ifname]
+	VppEntries          map[string]*vppagent.KVType            // key[vppkey]
+	MacAddrAllocator    *idapi.MacAddrAllocatorType
+	MemifIDAllocator    *idapi.MemifAllocatorType
+	VrfIDAllocator      *idapi.VrfAllocatorType
+	IPAMPoolAllocators  map[string]*ipam.PoolAllocatorType         // key[modelType/ipamPoolName]
+	NetworkPodToNodeMap map[string]*controller.NetworkPodToNodeMap // key[pod]
 }
 
 // Plugin contains the controllers information
@@ -143,6 +143,7 @@ func (s *Plugin) Init() error {
 	s.initMgrs()
 
 	if err := s.PostProcessLoadedDatastore(); err != nil {
+		log.Error("Error reading datastore: ", err)
 		os.Exit(1)
 	}
 
@@ -200,7 +201,7 @@ func (s *Plugin) AfterInit() error {
 	// at this point, plugins are all loaded, all is read in from the database
 	// so render the config ... note: resync will ensure etcd is not written to
 	// unnecessarily
-	
+
 	s.afterInitMgrs()
 
 	go ctlrPlugin.NetworkPodNodeMapMgr.RunContivKSRNetworkPodToNodeMappingWatcher()

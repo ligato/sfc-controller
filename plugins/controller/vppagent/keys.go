@@ -16,6 +16,7 @@ package vppagent
 
 import (
 	linux "github.com/ligato/vpp-agent/api/models/linux/interfaces"
+	linuxL3 "github.com/ligato/vpp-agent/api/models/linux/l3"
 	interfaces "github.com/ligato/vpp-agent/api/models/vpp/interfaces"
 	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
 	l3 "github.com/ligato/vpp-agent/api/models/vpp/l3"
@@ -49,6 +50,11 @@ func L2XConnectKey(vppLabel string, rxIf string) string {
 
 // L3RouteKey constructs L3 route db key
 func L3RouteKey(vppLabel string, route *l3.Route) string {
+	return agentPrefix + vppLabel + "/" + models.Key(route)
+}
+
+// LinuxL3RouteKey constructs Linux L3 route db key
+func LinuxL3RouteKey(vppLabel string, route *linuxL3.Route) string {
 	return agentPrefix + vppLabel + "/" + models.Key(route)
 }
 

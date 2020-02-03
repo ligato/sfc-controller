@@ -16,7 +16,8 @@ package controller
 
 import (
 	"fmt"
-	"github.com/ligato/sfc-controller/plugins/controller/model"
+
+	controller "github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
 )
@@ -264,19 +265,22 @@ func (mgr *NetworkServiceMgr) renderConnL3PPInterNode(
 		if len(ifStatus.IpAddresses) != 0 {
 			desc := fmt.Sprintf("L3PP NS_%s_VRF_%d_CONN_%d", ns.Metadata.Name, conn.VrfId, connIndex+1)
 			l3sr := &controller.L3VRFRoute{
-				VrfId:             conn.VrfId,
-				Description:       desc,
-				DstIpAddr:         vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
-				OutgoingInterface: ifName,
+				Vpp: &controller.VPPRoute{
+					VrfId:             conn.VrfId,
+					Description:       desc,
+					DstIpAddr:         vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
+					OutgoingInterface: ifName,
+				},
 			}
+
 			vppKV := vppagent.ConstructStaticRoute(p2nArray[i].Node, l3sr)
 			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-				ModelTypeNetworkService + "/" + ns.Metadata.Name,
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
 				vppKV)
 		}
 
 		l2bdIF := &l2.BridgeDomain_Interface{
-			Name: ifName,
+			Name:                    ifName,
 			BridgedVirtualInterface: false,
 			SplitHorizonGroup:       0,
 		}

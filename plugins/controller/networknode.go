@@ -27,7 +27,7 @@ import (
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/sfc-controller/plugins/controller/database"
-	"github.com/ligato/sfc-controller/plugins/controller/model"
+	controller "github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
 	"github.com/unrolled/render"
@@ -462,7 +462,7 @@ func (mgr *NetworkNodeMgr) renderNodeL2BDs(nn *controller.NetworkNode) error {
 		// if there is a bvi address defined
 		if l2bd.BviAddress != "" {
 
-			ifName := "IFLOOP_"+vppKeyL2BDName(nn.Metadata.Name, l2bd.Name)
+			ifName := "IFLOOP_" + vppKeyL2BDName(nn.Metadata.Name, l2bd.Name)
 
 			vppKV := vppagent.ConstructLoopbackInterface(
 				nn.Metadata.Name,
@@ -476,7 +476,7 @@ func (mgr *NetworkNodeMgr) renderNodeL2BDs(nn *controller.NetworkNode) error {
 				ModelTypeNetworkNode+"/"+nn.Metadata.Name,
 				vppKV)
 			loopIface := &l2.BridgeDomain_Interface{
-				Name: ifName,
+				Name:                    ifName,
 				BridgedVirtualInterface: true,
 			}
 
@@ -540,7 +540,7 @@ func (mgr *NetworkNodeMgr) renderNodeInterfaces(nn *controller.NetworkNode) erro
 func (mgr *NetworkNodeMgr) renderComplete(nn *controller.NetworkNode) error {
 
 	if len(nn.Status.Msg) == 0 {
-		mgr.AppendStatusMsg(nn,"OK")
+		mgr.AppendStatusMsg(nn, "OK")
 		nn.Status.Status = controller.OperStatusUp
 	} else {
 		RenderTxnConfigEntityRemoveEntries()
@@ -662,14 +662,17 @@ func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 				}
 
 				l3sr := &controller.L3VRFRoute{
-					VrfId:             vrfID,
-					Description:       fmt.Sprintf("L3VRF_VXLAN Node:%s to Node:%s", fromNode, toNode),
-					DstIpAddr:         toVxlanAddress, // dest node vxlan address/xx
-					NextHopAddr:       node2Iface.IpAddresses[0],
-					OutgoingInterface: node1Iface.Name,
-					Weight:            ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRouteWeight,
-					Preference:        ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRoutePreference,
+					Vpp: &controller.VPPRoute{
+						VrfId:             vrfID,
+						Description:       fmt.Sprintf("L3VRF_VXLAN Node:%s to Node:%s", fromNode, toNode),
+						DstIpAddr:         toVxlanAddress, // dest node vxlan address/xx
+						NextHopAddr:       node2Iface.IpAddresses[0],
+						OutgoingInterface: node1Iface.Name,
+						Weight:            ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRouteWeight,
+						Preference:        ctlrPlugin.SysParametersMgr.sysParmCache.DefaultStaticRoutePreference,
+					},
 				}
+
 				vppKV := vppagent.ConstructStaticRoute(n1.Metadata.Name, l3sr)
 				RenderTxnAddVppEntryToTxn(renderedEntries, renderingEntity, vppKV)
 			}

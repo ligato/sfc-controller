@@ -1,5 +1,0 @@
-kubectl delete networknode vswitch2
-kubectl delete customresourcedefinition networkservices.sfccontroller.ligato.github.com
-kubectl delete customresourcedefinition networknodes.sfccontroller.ligato.github.com
-kubectl delete customresourcedefinition networknodeoverlays.sfccontroller.ligato.github.com
-kubectl delete customresourcedefinition ipampools.sfccontroller.ligato.github.com
