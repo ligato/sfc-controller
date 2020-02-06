@@ -138,6 +138,12 @@ func (s *Plugin) Init() error {
 	vppagent.VppAgentSetLogger(log)
 	s.RegisterModelTypeManagers()
 
+	// DB cleanup requested; remove the vpp agent & controller entries
+	if s.CleanDatastore {
+		database.CleanDatastore(controller.SfcControllerConfigPrefix())
+		s.CleanVppAgentEntriesFromEtcd()
+	}
+
 	s.InitRAMCache()
 
 	s.initMgrs()
@@ -145,14 +151,6 @@ func (s *Plugin) Init() error {
 	if err := s.PostProcessLoadedDatastore(); err != nil {
 		log.Error("Error reading datastore: ", err)
 		os.Exit(1)
-	}
-
-	// the DB has been loaded and vpp entries known so now we can clean up the
-	// DB and remove the vpp agent entries that the controller has managed/created
-	if s.CleanDatastore {
-		database.CleanDatastore(controller.SfcControllerConfigPrefix())
-		s.CleanVppAgentEntriesFromEtcd()
-		s.InitRAMCache()
 	}
 
 	// If a startup yaml file is provided, then pull it into the ram cache and write it to the database
