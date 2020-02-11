@@ -48,7 +48,12 @@ func (mgr *NetworkServiceMgr) RenderConnInterfacePair(
 		ifName, ifStatus, err = mgr.RenderConnTapPair(ns, vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeEthernet:
 		// the ethernet interface is special and has been created by the node already
-		return netPodInterface.Name, nil, nil
+		// Retrieve interface status from the RAM cache
+		ok := false
+		if ifStatus, ok = ctlrPlugin.ramCache.InterfaceStates[ifName]; !ok {
+			err = errors.Errorf("no interface status for interface: %s", ifName)
+		}
+		return netPodInterface.Name, ifStatus, err
 	}
 
 	if err == nil && netPodInterface.Fwd != nil {
@@ -539,6 +544,40 @@ func (mgr *NetworkServiceMgr) RenderInterfaceIPSecTunnels(
 			ModelTypeNetworkService+"/"+ns.Metadata.Name,
 			vppKV)
 	}
+
+	return nil
+}
+
+// RenderEthernetInterface renders an ethernet interface
+func (mgr *NetworkServiceMgr) RenderEthernetInterface(
+	ns *controller.NetworkService,
+	podName string,
+	networkPodInterface *controller.Interface) error {
+
+	interfaceName := networkPodInterface.Name
+
+	ifStatus, err := InitInterfaceStatus(ns.Metadata.Name, podName, networkPodInterface)
+	if err != nil {
+		RemoveInterfaceStatus(ns.Status.Interfaces, podName, interfaceName)
+		msg := fmt.Sprintf("network pod interface: %s/%s, %s", podName, interfaceName, err)
+		mgr.AppendStatusMsg(ns, msg)
+		return err
+	}
+	PersistInterfaceStatus(ns.Status.Interfaces, ifStatus, podName, interfaceName)
+
+	vppKV := vppagent.ConstructEthernetInterface(
+		podName,
+		interfaceName,
+		ifStatus.IpAddresses,
+		ifStatus.MacAddress,
+		ctlrPlugin.SysParametersMgr.ResolveMtu(networkPodInterface.Mtu),
+		networkPodInterface.AdminStatus,
+		ctlrPlugin.SysParametersMgr.ResolveRxMode(networkPodInterface.RxMode))
+
+	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+		ModelTypeNetworkService+"/"+ns.Metadata.Name, vppKV)
+
+	log.Debugf("RenderLoopbackInterface: ifName: %s, %v", interfaceName, vppKV)
 
 	return nil
 }

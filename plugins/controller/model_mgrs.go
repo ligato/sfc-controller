@@ -90,11 +90,12 @@ const (
 )
 
 type OperationalMsg struct {
-	model string
+	model  string
 	opCode int
-	data interface{}
+	data   interface{}
 }
-var OperationalMsgChannel = make(chan *OperationalMsg,0)
+
+var OperationalMsgChannel = make(chan *OperationalMsg, 0)
 
 //ProcessOperationalMessages is a single threaded go routine processing all operations in sequence
 func (s *Plugin) ProcessOperationalMessages() {
@@ -174,10 +175,10 @@ func (s *Plugin) ProcessOperationalMessages() {
 }
 
 func (s *Plugin) AddOperationMsgToQueue(model string, opCode int, data interface{}) {
-	msg := &OperationalMsg {
-		model : model,
+	msg := &OperationalMsg{
+		model:  model,
 		opCode: opCode,
-		data: data,
+		data:   data,
 	}
 	log.Debugf("AddOperationMsgToQueue: %v", msg)
 	OperationalMsgChannel <- msg

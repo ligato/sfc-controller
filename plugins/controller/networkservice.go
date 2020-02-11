@@ -22,17 +22,18 @@ import (
 	"net/http"
 	"os"
 
+	"strconv"
+
 	"github.com/gogo/protobuf/proto"
 	"github.com/gorilla/mux"
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/sfc-controller/plugins/controller/database"
-	"github.com/ligato/sfc-controller/plugins/controller/model"
+	controller "github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 	ipsec "github.com/ligato/vpp-agent/api/models/vpp/ipsec"
 	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
 	"github.com/unrolled/render"
-	"strconv"
 )
 
 type NetworkServiceMgr struct {
@@ -352,14 +353,21 @@ func (mgr *NetworkServiceMgr) renderConfig(ns *controller.NetworkService) error 
 
 	// there is a special case where loopbacks are not really part of connections but is
 	// desirable to be created in the pod, so find them and render them, the connection
-	// related interfaces (vnf-vswitch pairs), get rendered in renderConnectionSegments below
+	// related interfaces (vnf-vswitch pairs), get rendered in renderConnectionSegments below.
+	// The same goes for ethernet interfaces (eg: admin_status requested is enabled but it's currently disabled)
 	for _, networkPod := range ns.Spec.NetworkPods {
 		for _, iface := range networkPod.Spec.Interfaces {
-			if iface.IfType == controller.IfTypeLoopBack {
+			switch iface.IfType {
+			case controller.IfTypeLoopBack:
 				if err := mgr.RenderLoopbackInterface(ns, networkPod.Metadata.Name, iface); err != nil {
 					return err
 				}
+			case controller.IfTypeEthernet:
+				if err := mgr.RenderEthernetInterface(ns, networkPod.Metadata.Name, iface); err != nil {
+					return err
+				}
 			}
+
 		}
 	}
 
@@ -843,8 +851,8 @@ func (mgr *NetworkServiceMgr) RenderL2BD(
 					for _, ipAddress := range ifStatus.IpAddresses {
 
 						l3ArpEntry := &controller.L3ArpEntry{
-							PhysAddress: ifStatus.MacAddress,
-							IpAddress:   ipAddress,
+							PhysAddress:       ifStatus.MacAddress,
+							IpAddress:         ipAddress,
 							OutgoingInterface: bviLoopIfNameName,
 						}
 
@@ -871,8 +879,8 @@ func (mgr *NetworkServiceMgr) RenderL2BD(
 
 					l2FibEntry := &controller.L2FIBEntry{
 						DestMacAddress: ifStatus.MacAddress,
-						BdName:   bdName,
-						OutgoingIf: l2bdif.Name,
+						BdName:         bdName,
+						OutgoingIf:     l2bdif.Name,
 					}
 
 					vppKV := vppagent.ConstructStaticFib(nodeName, l2FibEntry)
