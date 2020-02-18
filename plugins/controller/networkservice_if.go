@@ -47,12 +47,16 @@ func (mgr *NetworkServiceMgr) RenderConnInterfacePair(
 	case controller.IfTypeTap:
 		ifName, ifStatus, err = mgr.RenderConnTapPair(ns, vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeEthernet:
-		// the ethernet interface is special and has been created by the node already
+		fallthrough
+	case controller.IfTypeLoopBack:
+		ifName = netPodInterface.Parent + "/" + netPodInterface.Name
+		// the ethernet/loopback interfaces are special and would have been created by the node already
 		// Retrieve interface status from the RAM cache
 		ok := false
 		if ifStatus, ok = ctlrPlugin.ramCache.InterfaceStates[ifName]; !ok {
 			err = errors.Errorf("no interface status for interface: %s", ifName)
 		}
+		log.Infof("Found interface status for: %s - %+v", ifName, ifStatus)
 		return netPodInterface.Name, ifStatus, err
 	}
 

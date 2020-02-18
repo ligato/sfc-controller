@@ -197,7 +197,7 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 	}
 
 	for i := 0; i < len(netPodInterfaces); i++ {
-
+		log.Infof("Render connection interface pair: %+v - %+v", conn, netPodInterfaces[i])
 		ifName, ifStatus, err := mgr.RenderConnInterfacePair(ns, nodeName, conn, netPodInterfaces[i], networkPodTypes[i])
 		if err != nil {
 			return err
