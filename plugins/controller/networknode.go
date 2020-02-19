@@ -592,8 +592,8 @@ func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 	//var renderedEntries map[string]*controller.RenderedVppAgentEntry
 	var renderedEntries = make(map[string]*controller.RenderedVppAgentEntry)
 
-	// strip the /xx off of the address
-	fromVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(fromVxlanAddress)
+	// keep the /xx address for the loopback addr
+	//fromVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(fromVxlanAddress)
 
 	// keep the /xx for the route
 	//toVxlanAddress = vppagent.StripSlashAndSubnetIPAddress(toVxlanAddress)
