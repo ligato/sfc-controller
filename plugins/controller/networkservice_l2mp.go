@@ -167,11 +167,12 @@ func (mgr *NetworkServiceMgr) RenderConnL2MP(
 	}
 
 	// special case where need to create a bridge in the vnf
-	if len(vnfMap) == 1 && allInterfacesAssignedToSameVnf {
-		log.Debugf("RenderTopologyL2MP: render a bridge in the vnf")
-		return mgr.renderConnL2MPSameVnf(ns, conn, connIndex, netPodInterfaces,
-			nno, p2nArray, networkPodTypes)
-	}
+	// TODO: need to find out what the intent of this was/is
+	//if len(vnfMap) == 1 && allInterfacesAssignedToSameVnf {
+	//	log.Debugf("RenderTopologyL2MP: render a bridge in the vnf")
+	//	return mgr.renderConnL2MPSameVnf(ns, conn, connIndex, netPodInterfaces,
+	//		nno, p2nArray, networkPodTypes)
+	//}
 
 	// see if the networkPods are on the same node ...
 	if len(nodeMap) == 1 {
