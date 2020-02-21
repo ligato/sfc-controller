@@ -19,6 +19,7 @@
 package vppagent
 
 import (
+	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -614,9 +615,11 @@ func ConstructVEthInterface(vppAgent string,
 // ConstructStaticRoute returns an KVType
 func ConstructStaticRoute(vppAgent string, l3sr *controller.L3VRFRoute) *KVType {
 
+	_, destNet, _ := net.ParseCIDR(l3sr.DstIpAddr)
+
 	sr := &l3.Route{
 		VrfId:             l3sr.VrfId,
-		DstNetwork:        l3sr.DstIpAddr,
+		DstNetwork:        destNet.String(),
 		NextHopAddr:       StripSlashAndSubnetIPAddress(l3sr.NextHopAddr),
 		Weight:            l3sr.Weight,
 		OutgoingInterface: l3sr.OutgoingInterface,
