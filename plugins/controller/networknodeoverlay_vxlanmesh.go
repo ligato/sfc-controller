@@ -17,7 +17,7 @@ package controller
 import (
 	"fmt"
 
-	"github.com/ligato/sfc-controller/plugins/controller/model"
+	controller "github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
 )
@@ -358,11 +358,14 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL3PPVxlanMesh(
 		// now create a route for the dest container's ipaddress using the local vxlan tunnel
 		if len(ifStatuses[to].IpAddresses) != 0 {
 			desc := fmt.Sprintf("L3PP NS_%s_VRF_%d_CONN_%d", ns.Metadata.Name, conn.VrfId, connIndex+1)
+
 			l3sr := &controller.L3VRFRoute{
-				VrfId:             conn.VrfId,
-				Description:       desc,
-				DstIpAddr:         vppagent.StripSlashAndSubnetIPAddress(ifStatuses[to].IpAddresses[0]),
-				OutgoingInterface: ifName,
+				Vpp: &controller.VPPRoute{
+					VrfId:             conn.VrfId,
+					Description:       desc,
+					DstIpAddr:         vppagent.StripSlashAndSubnetIPAddress(ifStatuses[to].IpAddresses[0]),
+					OutgoingInterface: ifName,
+				},
 			}
 			vppKV := vppagent.ConstructStaticRoute(p2nArray[from].Node, l3sr)
 			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
@@ -477,11 +480,14 @@ func (mgr *NetworkNodeOverlayMgr) renderConnL3MPVxlanMesh(
 			// fromNode needs a static entry for each container residing in the toNode using the
 			// outgoing tunnel from the fromNode to the toNode
 			for _, toNodel3Vrf := range l3vrfs[toNode] {
+
 				l3sr := &controller.L3VRFRoute{
-					VrfId:             toNodel3Vrf.VrfId,
-					DstIpAddr:         toNodel3Vrf.DstIpAddr,
-					OutgoingInterface: ifName,
-					Description:       toNodel3Vrf.Description,
+					Vpp: &controller.VPPRoute{
+						VrfId:             toNodel3Vrf.GetVpp().VrfId,
+						DstIpAddr:         toNodel3Vrf.GetVpp().DstIpAddr,
+						OutgoingInterface: ifName,
+						Description:       toNodel3Vrf.GetVpp().Description,
+					},
 				}
 				vppKV := vppagent.ConstructStaticRoute(fromNode, l3sr)
 				RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,

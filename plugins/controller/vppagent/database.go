@@ -16,8 +16,10 @@ package vppagent
 
 import (
 	"fmt"
+
 	"github.com/ligato/sfc-controller/plugins/controller/database"
 	linuxIntf "github.com/ligato/vpp-agent/api/models/linux/interfaces"
+	linuxL3 "github.com/ligato/vpp-agent/api/models/linux/l3"
 	interfaces "github.com/ligato/vpp-agent/api/models/vpp/interfaces"
 	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
 	l3 "github.com/ligato/vpp-agent/api/models/vpp/l3"
@@ -31,6 +33,7 @@ const (
 	VppEntryTypeL2BD           = "l2bd"
 	VppEntryTypeL2Fib          = "l2fib"
 	VppEntryTypeL3Route        = "l3route"
+	VppEntryTypeL3LinuxRoute   = "l3linuxroute"
 	VppEntryTypeL2XC           = "l2xc"
 	VppEntryTypeArp            = "arp"
 )
@@ -40,13 +43,14 @@ type KVType struct {
 	modelType    string
 	VppKey       string
 	VppEntryType string
-	IFace        *interfaces.Interface     `json:"IFace,omitempty"`
-	L2BD         *l2.BridgeDomain       `json:"L2BD,omitempty"`
-	L2Fib         *l2.FIBEntry       `json:"L2BD,omitempty"`
-	L3Route      *l3.Route               `json:"L3Route,omitempty"`
-	XConn        *l2.XConnectPair       `json:"XConn,omitempty"`
-	LinuxIFace   *linuxIntf.Interface `json:"LinuxIFace,omitempty"`
-	ArpEntry     *l3.ARPEntry                `json:"ArpEntry,omitempty"`
+	IFace        *interfaces.Interface `json:"IFace,omitempty"`
+	L2BD         *l2.BridgeDomain      `json:"L2BD,omitempty"`
+	L2Fib        *l2.FIBEntry          `json:"L2Fib,omitempty"`
+	LinuxL3Route *linuxL3.Route        `json:"LinuxL3Route,omitempty"`
+	L3Route      *l3.Route             `json:"L3Route,omitempty"`
+	XConn        *l2.XConnectPair      `json:"XConn,omitempty"`
+	LinuxIFace   *linuxIntf.Interface  `json:"LinuxIFace,omitempty"`
+	ArpEntry     *l3.ARPEntry          `json:"ArpEntry,omitempty"`
 }
 
 // NewKVEntry initializes a vpp KV entry type
@@ -66,6 +70,11 @@ func (kv *KVType) InterfaceSet(iface *interfaces.Interface) {
 // L3StaticRouteSet updates the static route
 func (kv *KVType) L3StaticRouteSet(l3sr *l3.Route) {
 	kv.L3Route = l3sr
+}
+
+// L3StaticLinuxRouteSet updates the static linux route
+func (kv *KVType) L3StaticLinuxRouteSet(l3sr *linuxL3.Route) {
+	kv.LinuxL3Route = l3sr
 }
 
 // L2StaticFibSet updates the static fib
@@ -129,6 +138,13 @@ func (kv *KVType) Equal(kv2 *KVType) bool {
 		if l3Route1.String() != l3Route2.String() {
 			return false
 		}
+	case VppEntryTypeL3LinuxRoute:
+		// disregard route description when comparing routes
+		l3Route1 := *kv.LinuxL3Route
+		l3Route2 := *kv2.LinuxL3Route
+		if l3Route1.String() != l3Route2.String() {
+			return false
+		}
 	case VppEntryTypeArp:
 		if kv.ArpEntry.String() != kv2.ArpEntry.String() {
 			return false
@@ -158,6 +174,8 @@ func (kv *KVType) WriteToKVStore() error {
 		err = database.WriteToDatastore(kv.VppKey, kv.LinuxIFace)
 	case VppEntryTypeL3Route:
 		err = database.WriteToDatastore(kv.VppKey, kv.L3Route)
+	case VppEntryTypeL3LinuxRoute:
+		err = database.WriteToDatastore(kv.VppKey, kv.LinuxL3Route)
 	case VppEntryTypeArp:
 		err = database.WriteToDatastore(kv.VppKey, kv.ArpEntry)
 	default:
@@ -215,6 +233,13 @@ func (kv *KVType) ReadFromKVStore() error {
 		if err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, l3sr)
 			kv.L3StaticRouteSet(l3sr)
+		}
+	case VppEntryTypeL3LinuxRoute:
+		l3sr := &linuxL3.Route{}
+		err = database.ReadFromDatastore(kv.VppKey, l3sr)
+		if err == nil {
+			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, l3sr)
+			kv.L3StaticLinuxRouteSet(l3sr)
 		}
 	case VppEntryTypeArp:
 		ae := &l3.ARPEntry{}

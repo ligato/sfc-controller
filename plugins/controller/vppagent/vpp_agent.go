@@ -26,13 +26,14 @@ import (
 
 	"github.com/ligato/cn-infra/logging/logrus"
 	linuxIntf "github.com/ligato/vpp-agent/api/models/linux/interfaces"
+	linuxL3 "github.com/ligato/vpp-agent/api/models/linux/l3"
 	namespace "github.com/ligato/vpp-agent/api/models/linux/namespace"
 	interfaces "github.com/ligato/vpp-agent/api/models/vpp/interfaces"
 	ipsec "github.com/ligato/vpp-agent/api/models/vpp/ipsec"
 	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
 	l3 "github.com/ligato/vpp-agent/api/models/vpp/l3"
 
-	"github.com/ligato/sfc-controller/plugins/controller/model"
+	controller "github.com/ligato/sfc-controller/plugins/controller/model"
 )
 
 var (
@@ -613,35 +614,45 @@ func ConstructVEthInterface(vppAgent string,
 // ConstructStaticRoute returns an KVType
 func ConstructStaticRoute(vppAgent string, l3sr *controller.L3VRFRoute) *KVType {
 
-	sr := &l3.Route{
-		VrfId:             l3sr.VrfId,
-		DstNetwork:        l3sr.DstIpAddr,
-		NextHopAddr:       StripSlashAndSubnetIPAddress(l3sr.NextHopAddr),
-		Weight:            l3sr.Weight,
-		OutgoingInterface: l3sr.OutgoingInterface,
-		Preference:        l3sr.Preference,
+	if l3sr.GetVpp() != nil {
+		var vppSR *l3.Route
+		vppSR = &l3.Route{
+			VrfId:             l3sr.GetVpp().VrfId,
+			DstNetwork:        l3sr.GetVpp().DstIpAddr,
+			NextHopAddr:       StripSlashAndSubnetIPAddress(l3sr.GetVpp().NextHopAddr),
+			Weight:            l3sr.GetVpp().Weight,
+			OutgoingInterface: l3sr.GetVpp().OutgoingInterface,
+			Preference:        l3sr.GetVpp().Preference,
+		}
+		key := L3RouteKey(vppAgent, vppSR)
+		log.Debugf("ConstructStaticRoute: key='%s', VPPSR='%+v", key, vppSR)
+		return &KVType{
+			VppKey:       key,
+			VppEntryType: VppEntryTypeL3Route,
+			L3Route:      vppSR,
+		}
+	} else if l3sr.GetLinux() != nil {
+		var linuxSR *linuxL3.Route
+		linuxSR = l3sr.GetLinux()
+		key := LinuxL3RouteKey(vppAgent, linuxSR)
+		log.Debugf("ConstructStaticLinuxRoute: key='%s', LinuxSR='%+v", key, linuxSR)
+		return &KVType{
+			VppKey:       key,
+			VppEntryType: VppEntryTypeL3LinuxRoute,
+			LinuxL3Route: linuxSR,
+		}
 	}
-
-	key := L3RouteKey(vppAgent, sr)
-
-	log.Debugf("ConstructStaticRoute: key='%s', sr='%+v", key, sr)
-
-	kv := &KVType{
-		VppKey:       key,
-		VppEntryType: VppEntryTypeL3Route,
-		L3Route:      sr,
-	}
-	return kv
+	return nil
 }
 
 // ConstructStaticFib returns an KVType
 func ConstructStaticFib(vppAgent string, l2fib *controller.L2FIBEntry) *KVType {
 
 	fib := &l2.FIBEntry{
-		PhysAddress:             l2fib.DestMacAddress,
-		BridgeDomain: l2fib.BdName,
+		PhysAddress:       l2fib.DestMacAddress,
+		BridgeDomain:      l2fib.BdName,
 		OutgoingInterface: l2fib.OutgoingIf,
-		StaticConfig: true,
+		StaticConfig:      true,
 	}
 
 	key := L2FibKey(vppAgent, fib)
@@ -651,7 +662,7 @@ func ConstructStaticFib(vppAgent string, l2fib *controller.L2FIBEntry) *KVType {
 	kv := &KVType{
 		VppKey:       key,
 		VppEntryType: VppEntryTypeL2Fib,
-		L2Fib:      fib,
+		L2Fib:        fib,
 	}
 	return kv
 }

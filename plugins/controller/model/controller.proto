@@ -16,6 +16,8 @@ syntax = "proto3";
 
 package controller;
 
+import "github.com/ligato/vpp-agent/api/models/linux/l3/route.proto";
+
 message IPSecTunnel {
     string name = 1;
     bool esn = 2;                       /* Extended sequence number */
@@ -38,6 +40,14 @@ message IPSecTunnel {
 }
 
 message L3VRFRoute {
+    // TODO: Make this a 'oneof' since an interface/connection cannot be active on both VPP and Linux.
+    //       I cannot figure a way to parse a oneof from a YAML (protobuf's lack of JSON tag customization)
+    //       makes this hard. Or I am doing this wrong.
+    VPPRoute vpp = 1;
+    linux.l3.Route linux = 2;
+};
+
+message VPPRoute {
     uint32 vrf_id = 1;                   /* optional: 0 by default */
     string description = 2;              /* optional description */
     string dst_ip_addr = 3;              /* ip address + prefix in format <address>/<prefix> */
@@ -47,7 +57,7 @@ message L3VRFRoute {
     uint32 preference = 7;               /* The preference of the path. Lowest preference is preferred.  */
                                          /* Only paths with the best preference contribute to forwarding. */
                                          /* (a poor man's primary and backup) */
-};
+}
 
 message L3ArpEntry {
     string ip_address = 1;               /* IP address */

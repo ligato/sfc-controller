@@ -11,11 +11,17 @@ ETCD_CONFIG_FILE  = "etcd/etcd.conf"
 KAFKA_CONFIG_FILE = "kafka/kafka.conf"
 SFC_CONFIG_FILE   = "sfc.conf"
 
-# generate go structures from proto files & binapi json files
+# generate go structures from proto files & binapi json files; also generate deepcopy functions
 define generate_sources
         $(if $(shell command -v protoc --gogo_out=. 2> /dev/null),$(info gogo/protobuf is installed),$(error gogo/protobuf missing, please install it with go get github.com/gogo/protobuf))
         @echo "# generating sources"
         @cd plugins/controller && go generate -v
+        @echo "# generating deepcopy functions"
+        @go install k8s.io/code-generator/cmd/deepcopy-gen
+        @deepcopy-gen --go-header-file ./plugins/controller/boilerplate.go.txt -i github.com/ligato/sfc-controller/plugins/controller/model --bounding-dirs github.com/ligato/sfc-controller/plugins/controller/model -o ${GOPATH}/src/ -O zz_generated.deepcopy --logtostderr --v=2
+        @echo "# package model → package controller"
+		# TODO: Remove this once we refactor plugins/controller/model to stop overloading the package name
+        @sed -i '' '/package/s/model/controller/g' plugins/controller/model/zz_generated.deepcopy.go
         @echo "# done"
 endef
 
