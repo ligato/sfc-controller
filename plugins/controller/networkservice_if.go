@@ -453,7 +453,6 @@ func (mgr *NetworkServiceMgr) RenderInterfaceForwarding(
 		return nil
 	}
 
-<<<<<<< HEAD
 	for _, l3Vrf := range networkPodInterface.Fwd.L3Route {
 
 		var desc string
@@ -507,19 +506,6 @@ func (mgr *NetworkServiceMgr) RenderInterfaceForwarding(
 			}
 		} else {
 			return errors.Errorf("Invalid L3 route type - %+v", l3Vrf)
-=======
-	vppAgent := networkPodInterface.Parent
-
-	for _, l3Vrf := range networkPodInterface.Fwd.L3Route {
-		desc := fmt.Sprintf("FWD NS_%s_IF_%s_VRF_%d_DST_%s", ns.Metadata.Name,
-			networkPodInterface.Name, l3Vrf.VrfId, l3Vrf.DstIpAddr)
-		l3sr := &controller.L3VRFRoute{
-			VrfId:             l3Vrf.VrfId,
-			Description:       desc,
-			DstIpAddr:         l3Vrf.DstIpAddr,
-			NextHopAddr:       l3Vrf.NextHopAddr,
-			OutgoingInterface: networkPodInterface.Name,
->>>>>>> aef1d9d2... debug logs for arp in the l2bd
 		}
 
 		vppKV := vppagent.ConstructStaticRoute(vppAgent, l3sr)

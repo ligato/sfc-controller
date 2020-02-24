@@ -855,7 +855,7 @@ func (mgr *NetworkServiceMgr) RenderL2BD(
 
 						l3ArpEntry := &controller.L3ArpEntry{
 							PhysAddress:       ifStatus.MacAddress,
-							IpAddress:         ipAddress,
+							IpAddress:         vppagent.StripSlashAndSubnetIPAddress(ipAddress),
 							OutgoingInterface: bviLoopIfNameName,
 						}
 
