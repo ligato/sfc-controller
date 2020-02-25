@@ -28,9 +28,9 @@ required = [
     "github.com/gogo/protobuf/protoc-gen-gogo"
 ]
 
-[[constraint]]
+[[override]]
   name = "github.com/ligato/vpp-agent"
-  branch = "dev"
+  version = "v2.3.0"
 
 [[override]]
   name = "github.com/coreos/etcd"

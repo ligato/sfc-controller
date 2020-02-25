@@ -1,0 +1,159 @@
+# github.com/beorn7/perks v1.0.0
+github.com/beorn7/perks/quantile
+# github.com/bshuster-repo/logrus-logstash-hook v0.4.1
+github.com/bshuster-repo/logrus-logstash-hook
+# github.com/coreos/etcd v3.3.10+incompatible
+github.com/coreos/etcd/auth/authpb
+github.com/coreos/etcd/clientv3
+github.com/coreos/etcd/clientv3/concurrency
+github.com/coreos/etcd/clientv3/namespace
+github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes
+github.com/coreos/etcd/etcdserver/etcdserverpb
+github.com/coreos/etcd/mvcc/mvccpb
+github.com/coreos/etcd/pkg/tlsutil
+github.com/coreos/etcd/pkg/types
+# github.com/dgrijalva/jwt-go v3.2.0+incompatible
+github.com/dgrijalva/jwt-go
+# github.com/evalphobia/logrus_fluent v0.4.0
+github.com/evalphobia/logrus_fluent
+# github.com/fluent/fluent-logger-golang v1.4.0
+github.com/fluent/fluent-logger-golang/fluent
+# github.com/ghodss/yaml v1.0.0
+github.com/ghodss/yaml
+# github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
+github.com/gogo/protobuf/gogoproto
+github.com/gogo/protobuf/jsonpb
+github.com/gogo/protobuf/proto
+github.com/gogo/protobuf/protoc-gen-gogo/descriptor
+github.com/gogo/protobuf/sortkeys
+github.com/gogo/protobuf/types
+# github.com/golang/protobuf v1.3.2
+github.com/golang/protobuf/proto
+github.com/golang/protobuf/ptypes
+github.com/golang/protobuf/ptypes/any
+github.com/golang/protobuf/ptypes/duration
+github.com/golang/protobuf/ptypes/timestamp
+# github.com/gorilla/mux v1.7.1
+github.com/gorilla/mux
+# github.com/konsorten/go-windows-terminal-sequences v1.0.2
+github.com/konsorten/go-windows-terminal-sequences
+# github.com/ligato/cn-infra v1.7.1-0.20190605105459-0af3fde9febd
+github.com/ligato/cn-infra/agent
+github.com/ligato/cn-infra/config
+github.com/ligato/cn-infra/datasync
+github.com/ligato/cn-infra/datasync/resync
+github.com/ligato/cn-infra/db/keyval
+github.com/ligato/cn-infra/db/keyval/etcd
+github.com/ligato/cn-infra/db/keyval/kvproto
+github.com/ligato/cn-infra/health/probe
+github.com/ligato/cn-infra/health/statuscheck
+github.com/ligato/cn-infra/health/statuscheck/model/status
+github.com/ligato/cn-infra/infra
+github.com/ligato/cn-infra/logging
+github.com/ligato/cn-infra/logging/logmanager
+github.com/ligato/cn-infra/logging/logrus
+github.com/ligato/cn-infra/logging/measure
+github.com/ligato/cn-infra/logging/measure/model/apitrace
+github.com/ligato/cn-infra/rpc/prometheus
+github.com/ligato/cn-infra/rpc/rest
+github.com/ligato/cn-infra/rpc/rest/security
+github.com/ligato/cn-infra/rpc/rest/security/model/access-security
+github.com/ligato/cn-infra/servicelabel
+github.com/ligato/cn-infra/utils/once
+github.com/ligato/cn-infra/utils/safeclose
+# github.com/ligato/vpp-agent v2.2.0-alpha.0.20190717044706-9313c984c138+incompatible
+github.com/ligato/vpp-agent/api/genericmanager
+github.com/ligato/vpp-agent/api/models/linux/interfaces
+github.com/ligato/vpp-agent/api/models/linux/l3
+github.com/ligato/vpp-agent/api/models/linux/namespace
+github.com/ligato/vpp-agent/api/models/vpp/interfaces
+github.com/ligato/vpp-agent/api/models/vpp/ipsec
+github.com/ligato/vpp-agent/api/models/vpp/l2
+github.com/ligato/vpp-agent/api/models/vpp/l3
+github.com/ligato/vpp-agent/pkg/models
+# github.com/matttproud/golang_protobuf_extensions v1.0.1
+github.com/matttproud/golang_protobuf_extensions/pbutil
+# github.com/namsral/flag v1.7.4-pre
+github.com/namsral/flag
+# github.com/philhofer/fwd v1.0.0
+github.com/philhofer/fwd
+# github.com/pkg/errors v0.8.1
+github.com/pkg/errors
+# github.com/prometheus/client_golang v0.9.1
+github.com/prometheus/client_golang/prometheus
+github.com/prometheus/client_golang/prometheus/internal
+github.com/prometheus/client_golang/prometheus/promhttp
+# github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
+github.com/prometheus/client_model/go
+# github.com/prometheus/common v0.3.0
+github.com/prometheus/common/expfmt
+github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
+github.com/prometheus/common/model
+# github.com/prometheus/procfs v0.0.0-20190416084830-8368d24ba045
+github.com/prometheus/procfs
+# github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
+github.com/satori/go.uuid
+# github.com/sirupsen/logrus v1.4.2
+github.com/sirupsen/logrus
+github.com/sirupsen/logrus/hooks/syslog
+# github.com/tinylib/msgp v1.1.0
+github.com/tinylib/msgp/msgp
+# github.com/unrolled/render v1.0.1-0.20190325150441-1ac792296fd4
+github.com/unrolled/render
+# golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
+golang.org/x/crypto/bcrypt
+golang.org/x/crypto/blowfish
+# golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
+golang.org/x/net/context
+golang.org/x/net/http/httpguts
+golang.org/x/net/http2
+golang.org/x/net/http2/hpack
+golang.org/x/net/idna
+golang.org/x/net/internal/timeseries
+golang.org/x/net/trace
+# golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
+golang.org/x/sys/unix
+# golang.org/x/text v0.3.2
+golang.org/x/text/secure/bidirule
+golang.org/x/text/transform
+golang.org/x/text/unicode/bidi
+golang.org/x/text/unicode/norm
+# google.golang.org/genproto v0.0.0-20190927181202-20e1ac93f88c
+google.golang.org/genproto/googleapis/rpc/status
+# google.golang.org/grpc v1.24.0
+google.golang.org/grpc
+google.golang.org/grpc/balancer
+google.golang.org/grpc/balancer/base
+google.golang.org/grpc/balancer/roundrobin
+google.golang.org/grpc/binarylog/grpc_binarylog_v1
+google.golang.org/grpc/codes
+google.golang.org/grpc/connectivity
+google.golang.org/grpc/credentials
+google.golang.org/grpc/credentials/internal
+google.golang.org/grpc/encoding
+google.golang.org/grpc/encoding/proto
+google.golang.org/grpc/grpclog
+google.golang.org/grpc/health/grpc_health_v1
+google.golang.org/grpc/internal
+google.golang.org/grpc/internal/backoff
+google.golang.org/grpc/internal/balancerload
+google.golang.org/grpc/internal/binarylog
+google.golang.org/grpc/internal/channelz
+google.golang.org/grpc/internal/envconfig
+google.golang.org/grpc/internal/grpcrand
+google.golang.org/grpc/internal/grpcsync
+google.golang.org/grpc/internal/syscall
+google.golang.org/grpc/internal/transport
+google.golang.org/grpc/keepalive
+google.golang.org/grpc/metadata
+google.golang.org/grpc/naming
+google.golang.org/grpc/peer
+google.golang.org/grpc/resolver
+google.golang.org/grpc/resolver/dns
+google.golang.org/grpc/resolver/passthrough
+google.golang.org/grpc/serviceconfig
+google.golang.org/grpc/stats
+google.golang.org/grpc/status
+google.golang.org/grpc/tap
+# gopkg.in/yaml.v2 v2.2.4
+gopkg.in/yaml.v2
