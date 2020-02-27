@@ -257,7 +257,7 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 				l3sr := &controller.L3VRFRoute{
 					Vpp: &controller.VPPRoute{
 						VrfId:             0,
-						DstIpAddr:         conn.LoopbackAddress + "/32",
+						DstIpAddr:         conn.LoopbackAddress,
 						OutgoingInterface: netPodInterfaces[i].Name,
 					},
 				}
