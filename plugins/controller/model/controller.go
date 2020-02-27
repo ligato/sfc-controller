@@ -33,9 +33,9 @@ const (
 	IfAdminStatusEnabled  = "enabled"
 	IfAdminStatusDisabled = "disabled"
 
-	IfMemifModeEhernet             = "ethernet"
-	IfMemifModeIP                  = "ip"
-	IfMemifModePuntInject          = "puntinject"
+	IfMemifModeEthernet   = "ethernet"
+	IfMemifModeIP         = "ip"
+	IfMemifModePuntInject = "puntinject"
 
 	ConnMethodDirect  = "direct"
 	ConnMethodVswitch = "vswitch"

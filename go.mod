@@ -16,7 +16,7 @@ require (
 	github.com/evalphobia/logrus_fluent v0.4.0 // indirect
 	github.com/fluent/fluent-logger-golang v1.4.0 // indirect
 	github.com/ghodss/yaml v1.0.0
-	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
+	github.com/gogo/protobuf v1.3.1
 	github.com/golang/groupcache v0.0.0-20190129154638-5b532d6fd5ef // indirect
 	github.com/google/btree v1.0.0 // indirect
 	github.com/gorilla/mux v1.7.1

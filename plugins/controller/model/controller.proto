@@ -87,9 +87,6 @@ message L2BD {
     string name = 1;
     BDParms bd_parms = 2;     // use this to customize or refer to a template, but not both
     string l2bd_template = 3; // use this to refer to a template in system parameters
-    string bvi_address = 4; // if set, a loopback i/f with thus address is created and and added to the l2bd
-    bool generate_static_arps = 5;
-    bool generate_static_l2fibs = 6;
 }
 
 // IPAM will choose an address using the prefix.  In the example, there is an 8 bit address space [0..255]
@@ -224,6 +221,10 @@ message Connection {
     repeated L3VRFRoute l3_routes = 11;
     repeated L3ArpEntry l3_arps = 12;
     repeated L2FIBEntry l2_fibs = 13;
+    string loopback_address = 14; // if set, a loopback i/f with this address is created and added to the l2bd
+    bool generate_static_l3routes = 16;
+    bool generate_static_arps = 17;
+    bool generate_static_l2fibs = 18;
 }
 
 message NetworkServiceStatus {

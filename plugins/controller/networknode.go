@@ -457,36 +457,10 @@ func (mgr *NetworkNodeMgr) renderNodeL2BDs(nn *controller.NetworkNode) error {
 			}
 		}
 
-		var iFaces []*l2.BridgeDomain_Interface
-
-		// if there is a bvi address defined
-		if l2bd.BviAddress != "" {
-
-			ifName := "IFLOOP_" + vppKeyL2BDName(nn.Metadata.Name, l2bd.Name)
-
-			vppKV := vppagent.ConstructLoopbackInterface(
-				nn.Metadata.Name,
-				ifName,
-				[]string{l2bd.BviAddress},
-				"",
-				ctlrPlugin.SysParametersMgr.ResolveMtu(0),
-				controller.IfAdminStatusEnabled,
-				ctlrPlugin.SysParametersMgr.ResolveRxMode(""))
-			RenderTxnAddVppEntryToTxn(nn.Status.RenderedVppAgentEntries,
-				ModelTypeNetworkNode+"/"+nn.Metadata.Name,
-				vppKV)
-			loopIface := &l2.BridgeDomain_Interface{
-				Name:                    ifName,
-				BridgedVirtualInterface: true,
-			}
-
-			iFaces = append(iFaces, loopIface)
-		}
-
 		vppKV := vppagent.ConstructL2BD(
 			nn.Metadata.Name,
 			vppKeyL2BDName(nn.Metadata.Name, l2bd.Name),
-			iFaces,
+			nil,
 			bdParms)
 		RenderTxnAddVppEntryToTxn(nn.Status.RenderedVppAgentEntries,
 			ModelTypeNetworkNode+"/"+nn.Metadata.Name,
