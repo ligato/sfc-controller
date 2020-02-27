@@ -614,6 +614,7 @@ func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 			[]string{fromVxlanAddress},
 			"",
 			ctlrPlugin.SysParametersMgr.sysParmCache.Mtu,
+			vrfID,
 			controller.IfAdminStatusEnabled,
 			ctlrPlugin.SysParametersMgr.sysParmCache.RxMode)
 		RenderTxnAddVppEntryToTxn(renderedEntries, renderingEntity, vppKV)

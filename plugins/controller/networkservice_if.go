@@ -609,6 +609,7 @@ func (mgr *NetworkServiceMgr) RenderLoopbackInterface(
 		ifStatus.IpAddresses,
 		ifStatus.MacAddress,
 		ctlrPlugin.SysParametersMgr.ResolveMtu(networkPodInterface.Mtu),
+		0,
 		networkPodInterface.AdminStatus,
 		ctlrPlugin.SysParametersMgr.ResolveRxMode(networkPodInterface.RxMode))
 
