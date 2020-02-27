@@ -209,6 +209,7 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 			[]string{conn.LoopbackAddress},
 			"",
 			ctlrPlugin.SysParametersMgr.ResolveMtu(0),
+			conn.VrfId,
 			controller.IfAdminStatusEnabled,
 			ctlrPlugin.SysParametersMgr.ResolveRxMode(""))
 		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
@@ -256,7 +257,7 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 				// on the pod ... route down to the vswitch
 				l3sr := &controller.L3VRFRoute{
 					Vpp: &controller.VPPRoute{
-						VrfId:             conn.VrfId,
+						VrfId:             0,
 						DstIpAddr:         conn.LoopbackAddress + "/32",
 						OutgoingInterface: netPodInterfaces[i].Name,
 					},

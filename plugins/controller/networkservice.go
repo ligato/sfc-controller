@@ -821,6 +821,7 @@ func (mgr *NetworkServiceMgr) RenderL2BD(
 				[]string{bviAddress},
 				"",
 				ctlrPlugin.SysParametersMgr.ResolveMtu(0),
+				0,
 				controller.IfAdminStatusEnabled,
 				ctlrPlugin.SysParametersMgr.ResolveRxMode(""))
 			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,

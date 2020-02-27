@@ -196,6 +196,7 @@ func ConstructLoopbackInterface(vppAgent string,
 	ipAddresses []string,
 	macAddr string,
 	mtu uint32,
+	vrf uint32,
 	adminStatus string,
 	rxMode string) *KVType {
 
@@ -204,6 +205,7 @@ func ConstructLoopbackInterface(vppAgent string,
 		Type:        interfaces.Interface_SOFTWARE_LOOPBACK,
 		Enabled:     adminStatusStringToBool(adminStatus),
 		PhysAddress: macAddr,
+		Vrf:         vrf,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
 	}
@@ -273,6 +275,7 @@ func ConstructMemInterface(vppAgent string,
 			Master: isMaster,
 		},
 	}
+
 	iface := &interfaces.Interface{
 		Name:        ifname,
 		Type:        interfaces.Interface_MEMIF,
@@ -303,6 +306,10 @@ func ConstructMemInterface(vppAgent string,
 			ifaceMemif.Memif.TxQueues = strToUInt32(memifParms.TxQueues)
 		}
 		ifaceMemif.Memif.Secret = memifParms.Secret
+
+		if ifaceMemif.Memif.Mode == interfaces.MemifLink_IP {
+			iface.PhysAddress = ""
+		}
 	}
 
 	if defaultMemifDirectory == "" {
