@@ -646,7 +646,7 @@ func (mgr *NetworkServiceMgr) validateNetworkPod(
 		if iFace.MemifParms != nil {
 			if iFace.MemifParms.Mode != "" {
 				switch iFace.MemifParms.Mode {
-				case controller.IfMemifModeEhernet:
+				case controller.IfMemifModeEthernet:
 				case controller.IfMemifModeIP:
 				case controller.IfMemifModePuntInject:
 				default:
@@ -794,7 +794,7 @@ func (mgr *NetworkServiceMgr) RenderL2BD(
 		var bdParms *controller.BDParms
 		if conn.L2Bd != nil {
 
-			bviAddress = conn.L2Bd.BviAddress
+			bviAddress = conn.LoopbackAddress
 
 			// need to create a bridge for this conn
 			if conn.L2Bd.L2BdTemplate != "" {
@@ -834,7 +834,7 @@ func (mgr *NetworkServiceMgr) RenderL2BD(
 
 			log.Debugf("RenderL2BD: npi=%v, l2bdifs=%v", netPodInterfaces, l2bdIFs)
 
-			if conn.L2Bd.GenerateStaticArps {
+			if conn.GenerateStaticArps {
 
 				for _, networkPodInterface := range netPodInterfaces {
 
@@ -867,7 +867,7 @@ func (mgr *NetworkServiceMgr) RenderL2BD(
 				}
 			}
 
-			if conn.L2Bd.GenerateStaticL2Fibs {
+			if conn.GenerateStaticL2Fibs {
 
 				for i, l2bdif := range l2bdIFs {
 

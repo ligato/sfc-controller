@@ -188,12 +188,32 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 	// The interfaces should be created in the vnf and the vswitch then the vswitch
 	// interfaces will be added associated with the vrf.
 
-	var l2bdIFs = make(map[string][]*l2.BridgeDomain_Interface, 0)
+	//var l2bdIFs = make(map[string][]*l2.BridgeDomain_Interface, 0)
 
 	nodeName := p2nArray[0].Node
 
 	if conn.VrfId == 0 {
 		conn.VrfId = ctlrPlugin.ramCache.VrfIDAllocator.Allocate()
+	}
+
+	vrfName := fmt.Sprintf("VRF_%d_%s_C%d", conn.VrfId, ns.Metadata.Name, connIndex+1)
+
+	// if there is a conn/vrf loop address defined
+	if conn.LoopbackAddress != "" {
+
+		vrfLoopIfNameName := "IFLOOP_" + vrfName
+
+		vppKV := vppagent.ConstructLoopbackInterface(
+			nodeName,
+			vrfLoopIfNameName,
+			[]string{conn.LoopbackAddress},
+			"",
+			ctlrPlugin.SysParametersMgr.ResolveMtu(0),
+			controller.IfAdminStatusEnabled,
+			ctlrPlugin.SysParametersMgr.ResolveRxMode(""))
+		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
+			vppKV)
 	}
 
 	for i := 0; i < len(netPodInterfaces); i++ {
@@ -203,37 +223,81 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 			return err
 		}
 
-		l2bdIF := &l2.BridgeDomain_Interface{
-			Name:                    ifName,
-			BridgedVirtualInterface: false,
-		}
-		l2bdIFs[nodeName] = append(l2bdIFs[nodeName], l2bdIF)
+		//l2bdIF := &l2.BridgeDomain_Interface{
+		//	Name:                    ifName,
+		//	BridgedVirtualInterface: false,
+		//}
+		//l2bdIFs[nodeName] = append(l2bdIFs[nodeName], l2bdIF)
 
-		if len(ifStatus.IpAddresses) != 0 {
-			desc := fmt.Sprintf("L3MP NS_%s_VRF_%d_CONN_%d", ns.Metadata.Name, conn.VrfId, connIndex+1)
+		if netPodInterfaces[i].IfType == controller.IfTypeMemif &&
+			(netPodInterfaces[i].MemifParms != nil &&
+				netPodInterfaces[i].MemifParms.Mode == controller.IfMemifModeIP) {
 
-			l3sr := &controller.L3VRFRoute{
-				Vpp: &controller.VPPRoute{
-					VrfId:             conn.VrfId,
-					Description:       desc,
-					DstIpAddr:         vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
-					OutgoingInterface: ifName,
-				},
+			if len(ifStatus.IpAddresses) != 0 {
+				desc := fmt.Sprintf("L3MP NS_%s_VRF_%d_CONN_%d", ns.Metadata.Name, conn.VrfId, connIndex+1)
+
+				// on the vswitch ... route up to the pod
+				l3sr := &controller.L3VRFRoute{
+					Vpp: &controller.VPPRoute{
+						VrfId:             conn.VrfId,
+						Description:       desc,
+						DstIpAddr:         ifStatus.IpAddresses[0],
+						OutgoingInterface: ifName,
+					},
+				}
+				vppKV := vppagent.ConstructStaticRoute(nodeName, l3sr)
+				RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+					ModelTypeNetworkService+"/"+ns.Metadata.Name,
+					vppKV)
 			}
-			vppKV := vppagent.ConstructStaticRoute(nodeName, l3sr)
-			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-				ModelTypeNetworkService+"/"+ns.Metadata.Name,
-				vppKV)
+			if conn.LoopbackAddress != "" {
+
+				// on the pod ... route down to the vswitch
+				l3sr := &controller.L3VRFRoute{
+					Vpp: &controller.VPPRoute{
+						VrfId:             conn.VrfId,
+						DstIpAddr:         conn.LoopbackAddress + "/32",
+						OutgoingInterface: netPodInterfaces[i].Name,
+					},
+				}
+				vppKV := vppagent.ConstructStaticRoute(p2nArray[i].Pod, l3sr)
+				RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+					ModelTypeNetworkService+"/"+ns.Metadata.Name,
+					vppKV)
+			}
 		}
-		ae := &controller.L3ArpEntry{
-			IpAddress:         vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
-			PhysAddress:       ifStatus.MacAddress,
-			OutgoingInterface: ifName,
+
+		if netPodInterfaces[i].IfType == controller.IfTypeMemif &&
+			(netPodInterfaces[i].MemifParms == nil ||
+				netPodInterfaces[i].MemifParms.Mode == controller.IfMemifModeEthernet) {
+
+			if conn.GenerateStaticArps {
+
+				// create an arp in the vswitch
+				ae := &controller.L3ArpEntry{
+					IpAddress:         ifStatus.IpAddresses[0],
+					PhysAddress:       ifStatus.MacAddress,
+					OutgoingInterface: ifName,
+				}
+				vppKV := vppagent.ConstructStaticArpEntry(nodeName, ae)
+				RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+					ModelTypeNetworkService+"/"+ns.Metadata.Name,
+					vppKV)
+
+				// create an arp in the pod ... should check node type
+				if networkPodTypes[i] == controller.NetworkPodTypeVPPContainer {
+					ae = &controller.L3ArpEntry{
+						IpAddress:         conn.LoopbackAddress,
+						PhysAddress:       "FF:FF:FF:FF:FF:FF",
+						OutgoingInterface: netPodInterfaces[i].Name,
+					}
+					vppKV = vppagent.ConstructStaticArpEntry(p2nArray[i].Pod, ae)
+					RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+						ModelTypeNetworkService+"/"+ns.Metadata.Name,
+						vppKV)
+				}
+			}
 		}
-		vppKV := vppagent.ConstructStaticArpEntry(nodeName, ae)
-		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService+"/"+ns.Metadata.Name,
-			vppKV)
 	}
 
 	// all VNFs are on the same node so no vxlan inter-node mesh code required but
@@ -256,7 +320,8 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 				p2nArray,
 				networkPodTypes,
 				singleSpokeMap,
-				l2bdIFs)
+				//l2bdIFs)
+				nil)
 		}
 	}
 

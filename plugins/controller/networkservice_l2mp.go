@@ -325,33 +325,3 @@ func (mgr *NetworkServiceMgr) renderConnL2MPInterNode(
 
 	return nil
 }
-
-// renderConnL2MPSameVnf bridge the l2mp interfaces on this vnf
-func (mgr *NetworkServiceMgr) renderConnL2MPSameVnf(
-	ns *controller.NetworkService,
-	conn *controller.Connection,
-	connIndex uint32,
-	netPodInterfaces []*controller.Interface,
-	nno *controller.NetworkNodeOverlay,
-	p2nArray []controller.NetworkPodToNodeMap,
-	networkPodTypes []string) error {
-
-	// The interfaces should be created in the vnf and the vswitch then the vswitch
-	// interfaces will be added to the bridge.
-
-	var l2bdIFs = make(map[string][]*l2.BridgeDomain_Interface, 0)
-
-	podName := p2nArray[0].Pod
-
-	for i := 0; i < len(netPodInterfaces); i++ {
-
-		l2bdIF := &l2.BridgeDomain_Interface{
-			Name: netPodInterfaces[i].Name,
-			BridgedVirtualInterface: false,
-		}
-		l2bdIFs[podName] = append(l2bdIFs[podName], l2bdIF)
-	}
-
-	// associate the local vnf interfaces with the vnf bridge
-	return mgr.RenderNetworkPodL2BD(ns, conn, connIndex, podName, l2bdIFs[podName])
-}

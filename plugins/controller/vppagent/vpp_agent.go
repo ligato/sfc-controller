@@ -234,7 +234,7 @@ func memifMode(modeString string) interfaces.MemifLink_MemifMode {
 	mode := interfaces.MemifLink_ETHERNET
 	if modeString != "" {
 		switch modeString {
-		case controller.IfMemifModeEhernet:
+		case controller.IfMemifModeEthernet:
 			mode = interfaces.MemifLink_ETHERNET
 		case controller.IfMemifModeIP:
 			mode = interfaces.MemifLink_IP
