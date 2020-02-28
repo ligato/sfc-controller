@@ -267,6 +267,7 @@ func ConstructMemInterface(vppAgent string,
 	isMaster bool,
 	memifParms *controller.Interface_MemIFParms,
 	defaultMemifDirectory string,
+	vswitchLoopInterfaceName string,
 	masterVppAgent string) *KVType {
 
 	ifaceMemif := &interfaces.Interface_Memif{
@@ -284,6 +285,12 @@ func ConstructMemInterface(vppAgent string,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
 		Link:        ifaceMemif,
+	}
+
+	if vswitchLoopInterfaceName != "" {
+		iface.Unnumbered = &interfaces.Interface_Unnumbered{
+			InterfaceWithIp: vswitchLoopInterfaceName,
+		}
 	}
 
 	if memifParms != nil {

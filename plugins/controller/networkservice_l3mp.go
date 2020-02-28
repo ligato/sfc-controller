@@ -193,15 +193,17 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 	nodeName := p2nArray[0].Node
 
 	if conn.VrfId == 0 {
-		//conn.VrfId = ctlrPlugin.ramCache.VrfIDAllocator.Allocate()
+		conn.VrfId = ctlrPlugin.ramCache.VrfIDAllocator.Allocate()
 	}
 
 	vrfName := fmt.Sprintf("VRF_%d_%s_C%d", conn.VrfId, ns.Metadata.Name, connIndex+1)
 
 	// if there is a conn/vrf loop address defined
+	vrfLoopIfNameName := ""
+
 	if conn.LoopbackAddress != "" {
 
-		vrfLoopIfNameName := "IFLOOP_" + vrfName
+		vrfLoopIfNameName = "IFLOOP_" + vrfName
 
 		vppKV := vppagent.ConstructLoopbackInterface(
 			nodeName,
@@ -220,7 +222,7 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 	for i := 0; i < len(netPodInterfaces); i++ {
 
 		log.Infof("Render connection interface pair: %+v - %+v", conn, netPodInterfaces[i])
-		ifName, ifStatus, err := mgr.RenderConnInterfacePair(ns, nodeName, conn, netPodInterfaces[i], networkPodTypes[i])
+		ifName, ifStatus, err := mgr.RenderConnInterfacePair(ns, nodeName, conn, netPodInterfaces[i], networkPodTypes[i], vrfLoopIfNameName)
 		if err != nil {
 			return err
 		}
@@ -371,7 +373,7 @@ func (mgr *NetworkServiceMgr) renderConnL3MPInterNode(
 	// And, each local i/f must have a vrf entry on every remote node.
 
 	if conn.VrfId == 0 {
-		conn.VrfId = ctlrPlugin.ramCache.VrfIDAllocator.Allocate()
+		//conn.VrfId = ctlrPlugin.ramCache.VrfIDAllocator.Allocate()
 	}
 
 	l2bdIFs := make(map[string][]*l2.BridgeDomain_Interface, 0)
@@ -381,7 +383,7 @@ func (mgr *NetworkServiceMgr) renderConnL3MPInterNode(
 	// interfaces per node
 	for i := 0; i < len(netPodInterfaces); i++ {
 
-		ifName, ifStatus, err := mgr.RenderConnInterfacePair(ns, p2nArray[i].Node, conn, netPodInterfaces[i], networkPodTypes[i])
+		ifName, ifStatus, err := mgr.RenderConnInterfacePair(ns, p2nArray[i].Node, conn, netPodInterfaces[i], networkPodTypes[i], "")
 		if err != nil {
 			return err
 		}
