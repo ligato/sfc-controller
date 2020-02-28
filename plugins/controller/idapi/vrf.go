@@ -32,6 +32,9 @@ func (v *VrfAllocatorType) String() string {
 func (v *VrfAllocatorType) Allocate() uint32 {
 
 	return 0
+	//id := v.VrfID
+	//v.VrfID++
+	//return id
 }
 
 // SetVrfAllocatorInitialValue sets the starting value

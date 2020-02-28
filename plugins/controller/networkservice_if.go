@@ -30,7 +30,8 @@ func (mgr *NetworkServiceMgr) RenderConnInterfacePair(
 	vppAgent string,
 	conn *controller.Connection,
 	netPodInterface *controller.Interface,
-	networkPodType string) (string, *controller.InterfaceStatus, error) {
+	networkPodType string,
+	vswitchLoopInterfaceName string) (string, *controller.InterfaceStatus, error) {
 
 	// The interface should be created in the vnf and the vswitch then the
 	// interfaces will be added to the bridge.
@@ -41,7 +42,7 @@ func (mgr *NetworkServiceMgr) RenderConnInterfacePair(
 
 	switch netPodInterface.IfType {
 	case controller.IfTypeMemif:
-		ifName, ifStatus, err = mgr.RenderConnMemifPair(ns, vppAgent, conn, netPodInterface, networkPodType)
+		ifName, ifStatus, err = mgr.RenderConnMemifPair(ns, vppAgent, conn, netPodInterface, networkPodType, vswitchLoopInterfaceName)
 	case controller.IfTypeVeth:
 		ifName, ifStatus, err = mgr.RenderConnVethAfpPair(ns, vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeTap:
@@ -81,7 +82,8 @@ func (mgr *NetworkServiceMgr) RenderConnMemifPair(
 	vppAgent string,
 	conn *controller.Connection,
 	networkPodInterface *controller.Interface,
-	networkPodType string) (string, *controller.InterfaceStatus, error) {
+	networkPodType string,
+	vswitchLoopInterfaceName string) (string, *controller.InterfaceStatus, error) {
 
 	var ifName string
 
@@ -112,6 +114,7 @@ func (mgr *NetworkServiceMgr) RenderConnMemifPair(
 		false,
 		networkPodInterface.MemifParms,
 		ctlrPlugin.SysParametersMgr.sysParmCache.MemifDirectory,
+		"",
 		vppAgent)
 
 	//vppKV.IFace.Vrf = conn.VrfId
@@ -136,6 +139,7 @@ func (mgr *NetworkServiceMgr) RenderConnMemifPair(
 		true,
 		networkPodInterface.MemifParms,
 		ctlrPlugin.SysParametersMgr.sysParmCache.MemifDirectory,
+		vswitchLoopInterfaceName,
 		vppAgent)
 
 	vppKV.IFace.Vrf = conn.VrfId
@@ -184,6 +188,7 @@ func (mgr *NetworkServiceMgr) RenderConnDirectInterPodMemifPair(
 		false,
 		networkPodInterfaces[0].MemifParms,
 		ctlrPlugin.SysParametersMgr.sysParmCache.MemifDirectory,
+		"",
 		connPodName1)
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService+"/"+ns.Metadata.Name,
@@ -225,6 +230,7 @@ func (mgr *NetworkServiceMgr) RenderConnDirectInterPodMemifPair(
 		true,
 		networkPodInterfaces[1].MemifParms,
 		ctlrPlugin.SysParametersMgr.sysParmCache.MemifDirectory,
+		"",
 		connPodName1)
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
 		ModelTypeNetworkService+"/"+ns.Metadata.Name,

@@ -256,7 +256,7 @@ func (mgr *NetworkServiceMgr) renderConnL2PPSameNode(
 		// render the if's, and then l2xc them
 		for i := 0; i < 2; i++ {
 
-			ifName, _, err := mgr.RenderConnInterfacePair(ns, vppAgent, conn, networkPodInterfaces[i], networkPodTypes[i])
+			ifName, _, err := mgr.RenderConnInterfacePair(ns, vppAgent, conn, networkPodInterfaces[i], networkPodTypes[i], "")
 			if err != nil {
 				return err
 			}
@@ -290,7 +290,7 @@ func (mgr *NetworkServiceMgr) renderConnL2PPInterNode(
 	// create the interfaces in the containers and vswitch on each node
 	for i := 0; i < 2; i++ {
 
-		ifName, _, err := mgr.RenderConnInterfacePair(ns, p2nArray[i].Node, conn, networkPodInterfaces[i], networkPodTypes[i])
+		ifName, _, err := mgr.RenderConnInterfacePair(ns, p2nArray[i].Node, conn, networkPodInterfaces[i], networkPodTypes[i], "")
 		if err != nil {
 			return err
 		}

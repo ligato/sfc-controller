@@ -210,7 +210,7 @@ func (mgr *NetworkServiceMgr) renderConnL2MPSameNode(
 
 	for i := 0; i < len(netPodInterfaces); i++ {
 
-		ifName, _, err := mgr.RenderConnInterfacePair(ns, nodeName, conn, netPodInterfaces[i], networkPodTypes[i])
+		ifName, _, err := mgr.RenderConnInterfacePair(ns, nodeName, conn, netPodInterfaces[i], networkPodTypes[i], "")
 		if err != nil {
 			return err
 		}
@@ -276,7 +276,7 @@ func (mgr *NetworkServiceMgr) renderConnL2MPInterNode(
 	// example, or ...
 	for i := 0; i < len(netPodInterfaces); i++ {
 
-		ifName, _, err := mgr.RenderConnInterfacePair(ns, p2nArray[i].Node, conn, netPodInterfaces[i], networkPodTypes[i])
+		ifName, _, err := mgr.RenderConnInterfacePair(ns, p2nArray[i].Node, conn, netPodInterfaces[i], networkPodTypes[i], "")
 		if err != nil {
 			return err
 		}
