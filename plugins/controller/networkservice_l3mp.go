@@ -193,7 +193,7 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 	nodeName := p2nArray[0].Node
 
 	if conn.VrfId == 0 {
-		//conn.VrfId = ctlrPlugin.ramCache.VrfIDAllocator.Allocate()
+		conn.VrfId = ctlrPlugin.ramCache.VrfIDAllocator.Allocate()
 	}
 
 	vrfName := fmt.Sprintf("VRF_%d_%s_C%d", conn.VrfId, ns.Metadata.Name, connIndex+1)
