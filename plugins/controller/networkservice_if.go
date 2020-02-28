@@ -44,9 +44,9 @@ func (mgr *NetworkServiceMgr) RenderConnInterfacePair(
 	case controller.IfTypeMemif:
 		ifName, ifStatus, err = mgr.RenderConnMemifPair(ns, vppAgent, conn, netPodInterface, networkPodType, vswitchLoopInterfaceName)
 	case controller.IfTypeVeth:
-		ifName, ifStatus, err = mgr.RenderConnVethAfpPair(ns, vppAgent, conn, netPodInterface, networkPodType)
+		ifName, ifStatus, err = mgr.RenderConnVethAfpPair(ns, vppAgent, conn, netPodInterface, networkPodType, vswitchLoopInterfaceName)
 	case controller.IfTypeTap:
-		ifName, ifStatus, err = mgr.RenderConnTapPair(ns, vppAgent, conn, netPodInterface, networkPodType)
+		ifName, ifStatus, err = mgr.RenderConnTapPair(ns, vppAgent, conn, netPodInterface, networkPodType, vswitchLoopInterfaceName)
 	case controller.IfTypeEthernet:
 		fallthrough
 	case controller.IfTypeLoopBack:
@@ -259,7 +259,8 @@ func (mgr *NetworkServiceMgr) RenderConnTapPair(
 	vppAgent string,
 	conn *controller.Connection,
 	networkPodInterface *controller.Interface,
-	networkPodType string) (string, *controller.InterfaceStatus, error) {
+	networkPodType string,
+	vswitchLoopInterfaceName string) (string, *controller.InterfaceStatus, error) {
 
 	connPodName := networkPodInterface.Parent
 	connInterfaceName := networkPodInterface.Name
@@ -316,7 +317,8 @@ func (mgr *NetworkServiceMgr) RenderConnTapPair(
 		networkPodInterface.AdminStatus,
 		ctlrPlugin.SysParametersMgr.ResolveRxMode(networkPodInterface.RxMode),
 		networkPodInterface.TapParms,
-		hostNameSpace)
+		hostNameSpace,
+		vswitchLoopInterfaceName)
 
 	vppKV.IFace.Vrf = conn.VrfId
 
@@ -333,7 +335,8 @@ func (mgr *NetworkServiceMgr) RenderConnVethAfpPair(
 	vppAgent string,
 	conn *controller.Connection,
 	networkPodInterface *controller.Interface,
-	networkPodType string) (string, *controller.InterfaceStatus, error) {
+	networkPodType string,
+	vswitchLoopInterfaceName string) (string, *controller.InterfaceStatus, error) {
 
 	var ifName string
 
@@ -419,7 +422,7 @@ func (mgr *NetworkServiceMgr) RenderConnVethAfpPair(
 			ctlrPlugin.SysParametersMgr.ResolveMtu(networkPodInterface.Mtu),
 			networkPodInterface.AdminStatus,
 			ctlrPlugin.SysParametersMgr.ResolveRxMode(networkPodInterface.RxMode),
-			host1Name)
+			host1Name, "")
 
 		vppKV.IFace.Vrf = conn.VrfId
 
@@ -436,7 +439,8 @@ func (mgr *NetworkServiceMgr) RenderConnVethAfpPair(
 		ctlrPlugin.SysParametersMgr.ResolveMtu(networkPodInterface.Mtu),
 		networkPodInterface.AdminStatus,
 		ctlrPlugin.SysParametersMgr.ResolveRxMode(networkPodInterface.RxMode),
-		host2Name)
+		host2Name,
+		vswitchLoopInterfaceName)
 
 	vppKV.IFace.Vrf = conn.VrfId
 
@@ -473,13 +477,7 @@ func (mgr *NetworkServiceMgr) RenderInterfaceForwarding(
 			nextHopAddr = l3Vrf.GetVpp().NextHopAddr
 			desc = fmt.Sprintf("FWD NS_%s_IF_%s_VRF_%d_DST_%s", ns.Metadata.Name,
 				networkPodInterface.Name, vrfID, dstIPAddr)
-			if networkPodInterface.IfType == controller.IfTypeTap {
-				outgoing = "IF_TAP_VSWITCH_" + networkPodInterface.Parent + "_" + networkPodInterface.Name
-			} else if networkPodInterface.IfType == controller.IfTypeVeth {
-				outgoing = "IF_VETH_VSWITCH_" + networkPodInterface.Parent + "_" + networkPodInterface.Name
-			} else {
-				outgoing = networkPodInterface.Name
-			}
+			outgoing = networkPodInterface.Name
 			l3sr = &controller.L3VRFRoute{
 				Vpp: &controller.VPPRoute{
 					VrfId:             vrfID,
@@ -489,6 +487,10 @@ func (mgr *NetworkServiceMgr) RenderInterfaceForwarding(
 					OutgoingInterface: outgoing,
 				},
 			}
+			vppKV := vppagent.ConstructStaticRoute(networkPodInterface.Parent, l3sr)
+			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
+				vppKV)
 		} else if l3Vrf.GetLinux() != nil {
 			vrfID = 0
 			dstIPAddr = l3Vrf.GetLinux().DstNetwork
@@ -510,14 +512,15 @@ func (mgr *NetworkServiceMgr) RenderInterfaceForwarding(
 					Scope:             l3Vrf.GetLinux().Scope,
 				},
 			}
+			vppKV := vppagent.ConstructStaticRoute(vppAgent, l3sr)
+			RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+				ModelTypeNetworkService+"/"+ns.Metadata.Name,
+				vppKV)
 		} else {
 			return errors.Errorf("Invalid L3 route type - %+v", l3Vrf)
 		}
 
-		vppKV := vppagent.ConstructStaticRoute(vppAgent, l3sr)
-		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService+"/"+ns.Metadata.Name,
-			vppKV)
+
 	}
 	for _, l3Arp := range networkPodInterface.Fwd.L3Arp {
 		ae := &controller.L3ArpEntry{
