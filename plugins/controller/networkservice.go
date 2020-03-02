@@ -31,8 +31,8 @@ import (
 	"github.com/ligato/sfc-controller/plugins/controller/database"
 	controller "github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	ipsec "github.com/ligato/vpp-agent/api/models/vpp/ipsec"
-	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
+	ipsec "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/ipsec"
+	l2 "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/l2"
 	"github.com/unrolled/render"
 )
 

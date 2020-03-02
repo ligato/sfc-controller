@@ -19,7 +19,7 @@ import (
 
 	controller "github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
+	l2 "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/l2"
 )
 
 // The L3PP topology is rendered in this module for a connection with a vnf-service

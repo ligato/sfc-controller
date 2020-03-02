@@ -17,8 +17,6 @@ package controller
 import (
 	"fmt"
 
-	linux_l3 "github.com/ligato/vpp-agent/api/models/linux/l3"
-
 	controller "github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
 	"github.com/pkg/errors"
@@ -505,7 +503,7 @@ func (mgr *NetworkServiceMgr) RenderInterfaceForwarding(
 				outgoing = networkPodInterface.Name
 			}
 			l3sr = &controller.L3VRFRoute{
-				Linux: &linux_l3.Route{
+				Linux: &controller.LinuxRoute{
 					DstNetwork:        dstIPAddr,
 					GwAddr:            nextHopAddr,
 					OutgoingInterface: outgoing,
@@ -519,7 +517,6 @@ func (mgr *NetworkServiceMgr) RenderInterfaceForwarding(
 		} else {
 			return errors.Errorf("Invalid L3 route type - %+v", l3Vrf)
 		}
-
 
 	}
 	for _, l3Arp := range networkPodInterface.Fwd.L3Arp {

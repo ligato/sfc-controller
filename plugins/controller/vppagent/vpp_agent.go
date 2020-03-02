@@ -25,13 +25,13 @@ import (
 	"strings"
 
 	"github.com/ligato/cn-infra/logging/logrus"
-	linuxIntf "github.com/ligato/vpp-agent/api/models/linux/interfaces"
-	linuxL3 "github.com/ligato/vpp-agent/api/models/linux/l3"
-	namespace "github.com/ligato/vpp-agent/api/models/linux/namespace"
-	interfaces "github.com/ligato/vpp-agent/api/models/vpp/interfaces"
-	ipsec "github.com/ligato/vpp-agent/api/models/vpp/ipsec"
-	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
-	l3 "github.com/ligato/vpp-agent/api/models/vpp/l3"
+	linuxIntf "go.ligato.io/vpp-agent/v3/proto/ligato/linux/interfaces"
+	linuxL3 "go.ligato.io/vpp-agent/v3/proto/ligato/linux/l3"
+	namespace "go.ligato.io/vpp-agent/v3/proto/ligato/linux/namespace"
+	interfaces "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/interfaces"
+	ipsec "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/ipsec"
+	l2 "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/l2"
+	l3 "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/l3"
 
 	controller "github.com/ligato/sfc-controller/plugins/controller/model"
 )
@@ -660,8 +660,13 @@ func ConstructStaticRoute(vppAgent string, l3sr *controller.L3VRFRoute) *KVType 
 			L3Route:      vppSR,
 		}
 	} else if l3sr.GetLinux() != nil {
-		var linuxSR *linuxL3.Route
-		linuxSR = l3sr.GetLinux()
+		linuxSR := &linuxL3.Route{
+			OutgoingInterface: l3sr.GetLinux().OutgoingInterface,
+			Scope:             linuxL3.Route_Scope(l3sr.GetLinux().Scope),
+			DstNetwork:        l3sr.GetLinux().DstNetwork,
+			GwAddr:            l3sr.GetLinux().GwAddr,
+			Metric:            l3sr.GetLinux().Metric,
+		}
 		key := LinuxL3RouteKey(vppAgent, linuxSR)
 		log.Debugf("ConstructStaticLinuxRoute: key='%s', LinuxSR='%+v", key, linuxSR)
 		return &KVType{

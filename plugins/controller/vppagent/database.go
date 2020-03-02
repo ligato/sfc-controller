@@ -18,11 +18,11 @@ import (
 	"fmt"
 
 	"github.com/ligato/sfc-controller/plugins/controller/database"
-	linuxIntf "github.com/ligato/vpp-agent/api/models/linux/interfaces"
-	linuxL3 "github.com/ligato/vpp-agent/api/models/linux/l3"
-	interfaces "github.com/ligato/vpp-agent/api/models/vpp/interfaces"
-	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
-	l3 "github.com/ligato/vpp-agent/api/models/vpp/l3"
+	linuxIntf "go.ligato.io/vpp-agent/v3/proto/ligato/linux/interfaces"
+	linuxL3 "go.ligato.io/vpp-agent/v3/proto/ligato/linux/l3"
+	interfaces "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/interfaces"
+	l2 "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/l2"
+	l3 "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/l3"
 )
 
 // Types in the model were defined as strings for readability not enums with

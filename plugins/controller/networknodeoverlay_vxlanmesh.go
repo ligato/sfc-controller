@@ -19,7 +19,7 @@ import (
 
 	controller "github.com/ligato/sfc-controller/plugins/controller/model"
 	"github.com/ligato/sfc-controller/plugins/controller/vppagent"
-	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
+	l2 "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/l2"
 )
 
 // renderConnL2MPVxlanMesh renders these L2MP tunnels between nodes

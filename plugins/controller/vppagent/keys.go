@@ -15,12 +15,12 @@
 package vppagent
 
 import (
-	linux "github.com/ligato/vpp-agent/api/models/linux/interfaces"
-	linuxL3 "github.com/ligato/vpp-agent/api/models/linux/l3"
-	interfaces "github.com/ligato/vpp-agent/api/models/vpp/interfaces"
-	l2 "github.com/ligato/vpp-agent/api/models/vpp/l2"
-	l3 "github.com/ligato/vpp-agent/api/models/vpp/l3"
-	"github.com/ligato/vpp-agent/pkg/models"
+	"go.ligato.io/vpp-agent/v3/pkg/models"
+	linux "go.ligato.io/vpp-agent/v3/proto/ligato/linux/interfaces"
+	linuxL3 "go.ligato.io/vpp-agent/v3/proto/ligato/linux/l3"
+	interfaces "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/interfaces"
+	l2 "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/l2"
+	l3 "go.ligato.io/vpp-agent/v3/proto/ligato/vpp/l3"
 )
 
 // this must match what utils the vpp-agent uses
