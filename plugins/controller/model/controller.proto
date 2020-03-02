@@ -16,297 +16,342 @@ syntax = "proto3";
 
 package controller;
 
-import "github.com/ligato/vpp-agent/api/models/linux/l3/route.proto";
-
 message IPSecTunnel {
-    string name = 1;
-    bool esn = 2;                       /* Extended sequence number */
-    bool anti_replay = 3;               /* Anti replay option */
-    string local_ip = 4;                /* Local IP address */
-    string remote_ip = 5;               /* Remote IP address */
-    uint32 local_spi = 6;               /* Local security parameter index */
-    uint32 remote_spi = 7;              /* Remote security parameter index */
+  string name = 1;
+  bool esn = 2;          /* Extended sequence number */
+  bool anti_replay = 3;  /* Anti replay option */
+  string local_ip = 4;   /* Local IP address */
+  string remote_ip = 5;  /* Remote IP address */
+  uint32 local_spi = 6;  /* Local security parameter index */
+  uint32 remote_spi = 7; /* Remote security parameter index */
 
-    string crypto_alg = 8;     /* Cryptographic algorithm for encryption */
-    string local_crypto_key = 9;
-    string remote_crypto_key = 10;
+  string crypto_alg = 8; /* Cryptographic algorithm for encryption */
+  string local_crypto_key = 9;
+  string remote_crypto_key = 10;
 
-    string integ_alg = 11;      /* Cryptographic algorithm for authentication */
-    string local_integ_key = 12;
-    string remote_integ_key = 13;
+  string integ_alg = 11; /* Cryptographic algorithm for authentication */
+  string local_integ_key = 12;
+  string remote_integ_key = 13;
 
-    bool enable_udp_encap = 14;         /* Enable UDP encapsulation */
-    uint32 mtu = 15; /* 9000 default, voerride here if need to */
+  bool enable_udp_encap = 14; /* Enable UDP encapsulation */
+  uint32 mtu = 15;            /* 9000 default, voerride here if need to */
 }
 
 message L3VRFRoute {
-    // TODO: Make this a 'oneof' since an interface/connection cannot be active on both VPP and Linux.
-    //       I cannot figure a way to parse a oneof from a YAML (protobuf's lack of JSON tag customization)
-    //       makes this hard. Or I am doing this wrong.
-    VPPRoute vpp = 1;
-    linux.l3.Route linux = 2;
+  // TODO: Make this a 'oneof' since an interface/connection cannot be active on
+  // both VPP and Linux.
+  //       I cannot figure a way to parse a oneof from a YAML (protobuf's lack
+  //       of JSON tag customization) makes this hard. Or I am doing this wrong.
+  VPPRoute vpp = 1;
+  LinuxRoute linux = 2;
 };
 
+message LinuxRoute {
+  // Outgoing interface logical name (mandatory).
+  string outgoing_interface = 1;
+
+  enum Scope {
+    UNDEFINED = 0;
+    GLOBAL = 1;
+    SITE = 2;
+    LINK = 3;
+    HOST = 4;
+  }
+  // The scope of the area where the link is valid.
+  Scope scope = 2;
+
+  // Destination network address in the format <address>/<prefix> (mandatory)
+  // Address can be also allocated via netalloc plugin and referenced here,
+  // see: api/models/netalloc/netalloc.proto
+  string dst_network = 3;
+
+  // Gateway IP address (without mask, optional).
+  // Address can be also allocated via netalloc plugin and referenced here,
+  // see: api/models/netalloc/netalloc.proto
+  string gw_addr = 4;
+
+  // routing metric (weight)
+  uint32 metric = 5;
+}
+
 message VPPRoute {
-    uint32 vrf_id = 1;                   /* optional: 0 by default */
-    string description = 2;              /* optional description */
-    string dst_ip_addr = 3;              /* ip address + prefix in format <address>/<prefix> */
-    string next_hop_addr = 4;            /* next hop address */
-    string outgoing_interface = 5;       /* outgoing interface name */
-    uint32 weight = 6;                   /* weight (used for unequal cost load balncing) */
-    uint32 preference = 7;               /* The preference of the path. Lowest preference is preferred.  */
-                                         /* Only paths with the best preference contribute to forwarding. */
-                                         /* (a poor man's primary and backup) */
+  uint32 vrf_id = 1;      /* optional: 0 by default */
+  string description = 2; /* optional description */
+  string dst_ip_addr = 3; /* ip address + prefix in format <address>/<prefix> */
+  string next_hop_addr = 4;      /* next hop address */
+  string outgoing_interface = 5; /* outgoing interface name */
+  uint32 weight = 6; /* weight (used for unequal cost load balncing) */
+  uint32 preference =
+      7; /* The preference of the path. Lowest preference is preferred.  */
+         /* Only paths with the best preference contribute to forwarding. */
+         /* (a poor man's primary and backup) */
 }
 
 message L3ArpEntry {
-    string ip_address = 1;               /* IP address */
-    string phys_address = 2;             /* MAC address matching to the IP */
-    string outgoing_interface = 3;
+  string ip_address = 1;   /* IP address */
+  string phys_address = 2; /* MAC address matching to the IP */
+  string outgoing_interface = 3;
 };
 
 message L2FIBEntry {
-    string dest_mac_address = 1;
-    string bd_name = 2;
-    string outgoing_if = 3;
-    string action = 4; // forward|drop
-    bool bvi = 5;
+  string dest_mac_address = 1;
+  string bd_name = 2;
+  string outgoing_if = 3;
+  string action = 4; // forward|drop
+  bool bvi = 5;
 };
 
 message BDParms {
-    string name = 1;
-    bool flood = 2;
-    bool unknown_unicast_flood = 3;
-    bool forward = 4;
-    bool learn = 5;
-    bool arp_termination = 6;
-    uint32 mac_age_minutes = 7; // 0 is no aging
+  string name = 1;
+  bool flood = 2;
+  bool unknown_unicast_flood = 3;
+  bool forward = 4;
+  bool learn = 5;
+  bool arp_termination = 6;
+  uint32 mac_age_minutes = 7; // 0 is no aging
 };
 
 message L2BD {
-    string name = 1;
-    BDParms bd_parms = 2;     // use this to customize or refer to a template, but not both
-    string l2bd_template = 3; // use this to refer to a template in system parameters
+  string name = 1;
+  BDParms bd_parms =
+      2; // use this to customize or refer to a template, but not both
+  string l2bd_template =
+      3; // use this to refer to a template in system parameters
 }
 
-// IPAM will choose an address using the prefix.  In the example, there is an 8 bit address space [0..255]
-// if 0..255 are not desired then a start and end address can be used.  See comments below.
+// IPAM will choose an address using the prefix.  In the example, there is an 8
+// bit address space [0..255] if 0..255 are not desired then a start and end
+// address can be used.  See comments below.
 message IPAMPoolStatus {
-    map<string,string> addresses = 1; // foramt: scope.name, allocated addr count
+  map<string, string> addresses = 1; // foramt: scope.name, allocated addr count
 }
 message IPAMPoolSpec {
-    string scope = 2; // node|system|vnf_service
-    string network = 3; // format 10.1.1.0/24 or ipv6
-    uint32 start_range = 4; // optional: if omitted start at 1, ie 10.1.1.1 or ipv6
-    uint32 end_range = 5;   // optional: if omitted end at (all F's - 1), ie 10.1.1.254 or ipv6
+  string scope = 2;   // node|system|vnf_service
+  string network = 3; // format 10.1.1.0/24 or ipv6
+  uint32 start_range =
+      4; // optional: if omitted start at 1, ie 10.1.1.1 or ipv6
+  uint32 end_range =
+      5; // optional: if omitted end at (all F's - 1), ie 10.1.1.254 or ipv6
 }
 message IPAMPool {
-    MetaDataType metadata = 1;
-    IPAMPoolSpec spec = 2;
-    IPAMPoolStatus status = 3;
+  MetaDataType metadata = 1;
+  IPAMPoolSpec spec = 2;
+  IPAMPoolStatus status = 3;
 }
 
 message SystemParameters {
-    uint32 mtu = 1; // optional, overrrides default 1500
-    string memif_directory = 2; // optional: defaults to /tmp
-    uint32 default_static_route_weight = 3; // optional, overrrides default 5
-    uint32 default_static_route_preference = 4; // optional, overrrides default 0
-    repeated BDParms l2bd_templates =  5; // L2BDs can referene these
-    string rx_mode = 7; // polling|interrupt|adaptive
-    uint32 min_vrf_id = 8; // start value for l3 network services
+  uint32 mtu = 1;                         // optional, overrrides default 1500
+  string memif_directory = 2;             // optional: defaults to /tmp
+  uint32 default_static_route_weight = 3; // optional, overrrides default 5
+  uint32 default_static_route_preference = 4; // optional, overrrides default 0
+  repeated BDParms l2bd_templates = 5;        // L2BDs can referene these
+  string rx_mode = 7;                         // polling|interrupt|adaptive
+  uint32 min_vrf_id = 8; // start value for l3 network services
 }
 
 message NetworkPodToNodeMap {
-    string pod = 1;
-    string node = 2;
+  string pod = 1;
+  string node = 2;
 }
 
-// The rendered vpp agent entry is identified by the key, and type, which are used
-// to read the entry from etcd
+// The rendered vpp agent entry is identified by the key, and type, which are
+// used to read the entry from etcd
 message RenderedVppAgentEntry {
-    string vpp_agent_key = 1;
-    string vpp_agent_type = 2; // see type in vppagentapi/keys.go eg. interface|l2bd|l3vrf, etc
+  string vpp_agent_key = 1;
+  string vpp_agent_type =
+      2; // see type in vppagentapi/keys.go eg. interface|l2bd|l3vrf, etc
 }
 
 //
 // Interface
 //
 message InterfaceStatus {
-    string name = 1; // format: pod/ifname
-    string status = 2; // unknown|up|down
-    repeated string msg = 3;
-    string mac_address = 4;
-    uint32 macAddrID = 5;
-    map<string,uint32> ipam_pool_nums = 6; // format: pool_name/ipNum
-    repeated string ip_addresses = 7;
-    uint32 memifID  = 8;
-    string node = 10;
-    string host_port_label = 11;
-    uint32 vni = 12;
-    string nno_name = 13;
+  string name = 1;   // format: pod/ifname
+  string status = 2; // unknown|up|down
+  repeated string msg = 3;
+  string mac_address = 4;
+  uint32 macAddrID = 5;
+  map<string, uint32> ipam_pool_nums = 6; // format: pool_name/ipNum
+  repeated string ip_addresses = 7;
+  uint32 memifID = 8;
+  string node = 10;
+  string host_port_label = 11;
+  uint32 vni = 12;
+  string nno_name = 13;
 }
 
 message Interface {
-    string name = 1;
-    bool bypass_renderer = 2; // optional: if set to true, then DONT create/render
-    string if_type = 3;     // ethernet|loopback|vxlan_tunnel|memif|tap
-    string mac_address = 4; // format mm:aa:cc:aa:dd:rr, if omitted, sys generates one using
-                            // 02:00:00:00:00:00 as base, last octet increments
-    uint32 mtu = 5;         // optional: if omitted, use system parameter default
-    string rx_mode = 6;     // optional: polling|interrupt|adaptive or uses system defaults
-    repeated string ip_addresses = 7; // format i.p.v.4/xx, or ip::v6/xx
-    repeated string ipam_pool_names = 9;
-    string admin_status = 10; // enabled|disabled
-    message MemIFParms {
-        string mode = 1; //ethernet|ip|puntinject optional/default: ethernet
-        string memif_directory = 2; // optional: use system parameter if empty
-        string secret = 3;
-        string ring_size = 4;
-        string buffer_size = 5;
-        string rx_queues = 6;
-        string tx_queues = 7;
-    }
-    MemIFParms memif_parms = 11;
-    message TapParms {
-        string namespace = 1;
-        string rx_ring_size = 2;
-        string tx_ring_size = 3;
-    }
-    TapParms tap_parms = 12;
-    repeated string labels = 13;
-    string parent = 14; // internal field: could be a node or pod
-    string host_port_label = 15;
-    message Forwarding {
-      repeated L3VRFRoute l3_route = 1;
-      repeated L3ArpEntry l3_arp = 2;
-      repeated L2FIBEntry l2_fib = 3;
-    }
-    Forwarding fwd = 16;
-    string linux_namespace = 17; // one of "pid/<pid>|microservice/<microservice>|name/<name>|filepath/<filepath"
-                                 // if emptry ... will be set to microservice/<MICROSERVICE_LABEL>, i.e. the vnf name
-    message RxPlacementSettings {
-        uint32 queue = 1;
-        uint32 worker = 2;
-        bool is_main = 3;
-    }
-    RxPlacementSettings rx_placement_settings = 18;
-    bool tcp_checksum_offload_disabled = 19;
-    repeated IPSecTunnel ipsec_tunnels = 20;
+  string name = 1;
+  bool bypass_renderer = 2; // optional: if set to true, then DONT create/render
+  string if_type = 3;       // ethernet|loopback|vxlan_tunnel|memif|tap
+  string mac_address =
+      4; // format mm:aa:cc:aa:dd:rr, if omitted, sys generates one using
+         // 02:00:00:00:00:00 as base, last octet increments
+  uint32 mtu = 5; // optional: if omitted, use system parameter default
+  string rx_mode =
+      6; // optional: polling|interrupt|adaptive or uses system defaults
+  repeated string ip_addresses = 7; // format i.p.v.4/xx, or ip::v6/xx
+  repeated string ipam_pool_names = 9;
+  string admin_status = 10; // enabled|disabled
+  message MemIFParms {
+    string mode = 1; // ethernet|ip|puntinject optional/default: ethernet
+    string memif_directory = 2; // optional: use system parameter if empty
+    string secret = 3;
+    string ring_size = 4;
+    string buffer_size = 5;
+    string rx_queues = 6;
+    string tx_queues = 7;
+  }
+  MemIFParms memif_parms = 11;
+  message TapParms {
+    string namespace = 1;
+    string rx_ring_size = 2;
+    string tx_ring_size = 3;
+  }
+  TapParms tap_parms = 12;
+  repeated string labels = 13;
+  string parent = 14; // internal field: could be a node or pod
+  string host_port_label = 15;
+  message Forwarding {
+    repeated L3VRFRoute l3_route = 1;
+    repeated L3ArpEntry l3_arp = 2;
+    repeated L2FIBEntry l2_fib = 3;
+  }
+  Forwarding fwd = 16;
+  string linux_namespace =
+      17; // one of
+          // "pid/<pid>|microservice/<microservice>|name/<name>|filepath/<filepath"
+          // if emptry ... will be set to microservice/<MICROSERVICE_LABEL>,
+          // i.e. the vnf name
+  message RxPlacementSettings {
+    uint32 queue = 1;
+    uint32 worker = 2;
+    bool is_main = 3;
+  }
+  RxPlacementSettings rx_placement_settings = 18;
+  bool tcp_checksum_offload_disabled = 19;
+  repeated IPSecTunnel ipsec_tunnels = 20;
 }
 
 message NetworkPodSpec {
-    string pod_type = 2; // vppcontainer|nonvppcontainer|vppvswitch
-    repeated Interface interfaces = 3;
-    repeated L2BD l2bds = 4; // per pod default l2bds [future]
+  string pod_type = 2; // vppcontainer|nonvppcontainer|vppvswitch
+  repeated Interface interfaces = 3;
+  repeated L2BD l2bds = 4; // per pod default l2bds [future]
 }
 
 message NetworkPod {
-    MetaDataType metadata = 1;
-    NetworkPodSpec spec = 2;
+  MetaDataType metadata = 1;
+  NetworkPodSpec spec = 2;
 }
 
 message Connection {
-    string name = 1;                           // id for this conn, optional
-    string conn_type = 2;                      // l2pp|l2mp|   future: l3mp|l3pp
-    string network_node_overlay_name = 3;      // needed if require inter-node vnf's
-    repeated string pod_interfaces = 4;        // format: pod/ifname
-    repeated string node_interfaces = 5;       // format: node/ifname
-    repeated string node_interface_labels = 6; // format: label
-    string use_node_l2bd = 7;                  // optional: use an existing node level l2bd
-                                               // only for l2mp connections
-    L2BD l2bd = 8;                             // optional: if omitted and use_node_l2bd is not set then
-                                               // create a l2bd with default parms for l2mp connections
-    uint32 vrf_id = 9;
-    string conn_method = 10;                   // direct|vswitch optional/default: direct
-    repeated L3VRFRoute l3_routes = 11;
-    repeated L3ArpEntry l3_arps = 12;
-    repeated L2FIBEntry l2_fibs = 13;
-    string loopback_address = 14; // if set, a loopback i/f with this address is created and added to the l2bd
-    bool generate_static_l3routes = 16;
-    bool generate_static_arps = 17;
-    bool generate_static_l2fibs = 18;
+  string name = 1;                      // id for this conn, optional
+  string conn_type = 2;                 // l2pp|l2mp|   future: l3mp|l3pp
+  string network_node_overlay_name = 3; // needed if require inter-node vnf's
+  repeated string pod_interfaces = 4;   // format: pod/ifname
+  repeated string node_interfaces = 5;  // format: node/ifname
+  repeated string node_interface_labels = 6; // format: label
+  string use_node_l2bd = 7; // optional: use an existing node level l2bd
+                            // only for l2mp connections
+  L2BD l2bd = 8; // optional: if omitted and use_node_l2bd is not set then
+                 // create a l2bd with default parms for l2mp connections
+  uint32 vrf_id = 9;
+  string conn_method = 10; // direct|vswitch optional/default: direct
+  repeated L3VRFRoute l3_routes = 11;
+  repeated L3ArpEntry l3_arps = 12;
+  repeated L2FIBEntry l2_fibs = 13;
+  string loopback_address = 14; // if set, a loopback i/f with this address is
+                                // created and added to the l2bd
+  bool generate_static_l3routes = 16;
+  bool generate_static_arps = 17;
+  bool generate_static_l2fibs = 18;
 }
 
 message NetworkServiceStatus {
-    string oper_status = 2; // unknown|up|down
-    repeated string msg = 3;
-    map<string,RenderedVppAgentEntry> rendered_vpp_agent_entries = 4; // key: modeltype/name
-    map<string,InterfaceStatus> interfaces = 5;
+  string oper_status = 2; // unknown|up|down
+  repeated string msg = 3;
+  map<string, RenderedVppAgentEntry> rendered_vpp_agent_entries =
+      4; // key: modeltype/name
+  map<string, InterfaceStatus> interfaces = 5;
 }
 message NetworkServiceSpec {
-    repeated NetworkPod network_pods = 3;
-    repeated Connection connections = 4;
+  repeated NetworkPod network_pods = 3;
+  repeated Connection connections = 4;
 }
 message NetworkService {
-    MetaDataType metadata = 1;
-    NetworkServiceSpec spec = 2;
-    NetworkServiceStatus status = 3;
+  MetaDataType metadata = 1;
+  NetworkServiceSpec spec = 2;
+  NetworkServiceStatus status = 3;
 }
 
 message NetworkNodeOverlayStatus {
-    string status = 1; // unknown|up|down
-    repeated string msg = 2;
-    map<string,RenderedVppAgentEntry> rendered_vpp_agent_entries = 3; // key: modeltype/name
+  string status = 1; // unknown|up|down
+  repeated string msg = 2;
+  map<string, RenderedVppAgentEntry> rendered_vpp_agent_entries =
+      3; // key: modeltype/name
 }
 message NetworkNodeOverlaySpec {
-    string service_mesh_type = 1; // hubandspoke|mesh
-    string connection_type = 2;   //vxlan
+  string service_mesh_type = 1; // hubandspoke|mesh
+  string connection_type = 2;   // vxlan
 
-    message VxlanHubAndSpokeParms {
-        string hub_node_name = 1;
-        uint32 vni = 2;
-        string loopback_ipam_pool_name = 3;
-        bool create_loopback_interface = 4;
-        bool create_loopback_static_routes = 5;
-        string network_node_interface_label = 6; // needed for static routes of loopback to outgoing i/f
-                                             // all ethernet labels matching will have a static route
-                                             // if this outgoing_interface_label is not provided then
-                                             // static routes will only be created on the first gige
-    }
-    VxlanHubAndSpokeParms vxlan_hub_and_spoke_parms = 3;
+  message VxlanHubAndSpokeParms {
+    string hub_node_name = 1;
+    uint32 vni = 2;
+    string loopback_ipam_pool_name = 3;
+    bool create_loopback_interface = 4;
+    bool create_loopback_static_routes = 5;
+    string network_node_interface_label =
+        6; // needed for static routes of loopback to outgoing i/f
+           // all ethernet labels matching will have a static route
+           // if this outgoing_interface_label is not provided then
+           // static routes will only be created on the first gige
+  }
+  VxlanHubAndSpokeParms vxlan_hub_and_spoke_parms = 3;
 
-    message VxlanMeshParms {
-        uint32 vni_range_start = 1;
-        uint32 vni_range_end = 2;
-        string loopback_ipam_pool_name = 3;
-        bool create_loopback_interface = 4;
-        bool create_loopback_static_routes = 5;
-        string network_node_interface_label = 6; // needed for static routes of loopback to outgoing i/f
-                                             // all ethernet labels matching will have a static route
-                                             // if this outgoing_interface_label is not provided then
-                                             // static routes will only be created on the first gige
-    }
-    VxlanMeshParms vxlan_mesh_parms = 4;
+  message VxlanMeshParms {
+    uint32 vni_range_start = 1;
+    uint32 vni_range_end = 2;
+    string loopback_ipam_pool_name = 3;
+    bool create_loopback_interface = 4;
+    bool create_loopback_static_routes = 5;
+    string network_node_interface_label =
+        6; // needed for static routes of loopback to outgoing i/f
+           // all ethernet labels matching will have a static route
+           // if this outgoing_interface_label is not provided then
+           // static routes will only be created on the first gige
+  }
+  VxlanMeshParms vxlan_mesh_parms = 4;
 }
 
 message NetworkNodeOverlay {
-    MetaDataType metadata = 1;
-    NetworkNodeOverlaySpec spec = 2;
-    NetworkNodeOverlayStatus status = 3;
+  MetaDataType metadata = 1;
+  NetworkNodeOverlaySpec spec = 2;
+  NetworkNodeOverlayStatus status = 3;
 }
 
 // NetworkNodeSpec extends the k8s node
 message NetworkNodeSpec {
-    string k8s_node_name = 1; // if not provided, use network node name
-    string node_type = 2; // host|external
-    repeated Interface interfaces = 4; // use this if modelling only one vswitch per host
-    repeated L2BD l2bds = 5; // per node l2bds
+  string k8s_node_name = 1; // if not provided, use network node name
+  string node_type = 2;     // host|external
+  repeated Interface interfaces =
+      4;                   // use this if modelling only one vswitch per host
+  repeated L2BD l2bds = 5; // per node l2bds
 }
 message NetworkNodeStatus {
-    string status = 1;
-    repeated string msg = 2;
-    map<string,RenderedVppAgentEntry> rendered_vpp_agent_entries = 3; // key: modeltype/name
-    map<string,InterfaceStatus> interfaces = 5;
+  string status = 1;
+  repeated string msg = 2;
+  map<string, RenderedVppAgentEntry> rendered_vpp_agent_entries =
+      3; // key: modeltype/name
+  map<string, InterfaceStatus> interfaces = 5;
 }
 message NetworkNode {
-    MetaDataType metadata = 1;
-    NetworkNodeSpec spec = 2;
-    NetworkNodeStatus status = 3;
+  MetaDataType metadata = 1;
+  NetworkNodeSpec spec = 2;
+  NetworkNodeStatus status = 3;
 }
 
 // MetaDataType generic parms for all controller high level objects
 message MetaDataType {
-    string name = 1;
-    map<string,string> labels = 2;
+  string name = 1;
+  map<string, string> labels = 2;
 }
-
