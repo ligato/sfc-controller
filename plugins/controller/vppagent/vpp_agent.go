@@ -419,7 +419,8 @@ func ConstructTapInterface(vppAgent string,
 	adminStatus string,
 	rxMode string,
 	tapParms *controller.Interface_TapParms,
-	namespace string) *KVType {
+	namespace string,
+	vswitchLoopInterfaceName string) *KVType {
 
 	ifaceTap := &interfaces.Interface_Tap{
 		Tap: &interfaces.TapLink{
@@ -435,6 +436,12 @@ func ConstructTapInterface(vppAgent string,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
 		Link:        ifaceTap,
+	}
+
+	if vswitchLoopInterfaceName != "" {
+		iface.Unnumbered = &interfaces.Interface_Unnumbered{
+			InterfaceWithIp: vswitchLoopInterfaceName,
+		}
 	}
 
 	iface.RxModes = rxModeControllerToInterface(rxMode)
@@ -522,7 +529,8 @@ func ConstructAFPacketInterface(vppAgent string,
 	mtu uint32,
 	adminStatus string,
 	rxMode string,
-	hostIfName string) *KVType {
+	hostIfName string,
+	vswitchLoopInterfaceName string) *KVType {
 
 	ifaceAFP := &interfaces.Interface_Afpacket{
 		Afpacket: &interfaces.AfpacketLink{
@@ -538,6 +546,12 @@ func ConstructAFPacketInterface(vppAgent string,
 		IpAddresses: sortedIPAddresses(ipAddresses),
 		Mtu:         mtu,
 		Link:        ifaceAFP,
+	}
+
+	if vswitchLoopInterfaceName != "" {
+		iface.Unnumbered = &interfaces.Interface_Unnumbered{
+			InterfaceWithIp: vswitchLoopInterfaceName,
+		}
 	}
 
 	iface.RxModes = rxModeControllerToInterface(rxMode)
