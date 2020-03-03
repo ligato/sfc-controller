@@ -254,13 +254,29 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 						ModelTypeNetworkService+"/"+ns.Metadata.Name,
 						vppKV)
 				}
+				//if conn.LoopbackAddress != "" {
+				//
+				//	// on the pod ... route down to the vswitch
+				//	l3sr := &controller.L3VRFRoute{
+				//		Vpp: &controller.VPPRoute{
+				//			VrfId:             0,
+				//			DstIpAddr:         conn.LoopbackAddress,
+				//			OutgoingInterface: netPodInterfaces[i].Name,
+				//		},
+				//	}
+				//	vppKV := vppagent.ConstructStaticRoute(p2nArray[i].Pod, l3sr)
+				//	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+				//		ModelTypeNetworkService+"/"+ns.Metadata.Name,
+				//		vppKV)
+				//}
 				if conn.LoopbackAddress != "" {
 
 					// on the pod ... route down to the vswitch
 					l3sr := &controller.L3VRFRoute{
 						Vpp: &controller.VPPRoute{
 							VrfId:             0,
-							DstIpAddr:         conn.LoopbackAddress,
+							DstIpAddr:         "0.0.0.0/0",
+							NextHopAddr:       conn.LoopbackAddress,
 							OutgoingInterface: netPodInterfaces[i].Name,
 						},
 					}
