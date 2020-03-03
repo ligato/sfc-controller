@@ -390,10 +390,10 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 
 					// on the pod ... route down to the vswitch
 					l3sr := &controller.L3VRFRoute{
-						Vpp: &controller.VPPRoute{
-							VrfId:             0,
-							DstIpAddr:         "0.0.0.0/0",
-							NextHopAddr:       conn.LoopbackAddress,
+						Linux: &controller.LinuxRoute{
+							Scope: controller.LinuxRoute_GLOBAL,
+							DstNetwork:         "0.0.0.0/0",
+							GwAddr:       conn.LoopbackAddress,
 							OutgoingInterface: netPodInterfaces[i].Name,
 						},
 					}
