@@ -1,6 +1,7 @@
 glide.lock
 .idea/
 .vscode/
+vendor/
 *.log
 .vagrant
 .DS_Store

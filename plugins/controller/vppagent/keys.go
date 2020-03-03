@@ -67,3 +67,8 @@ func L2FibKey(vppLabel string, fib *l2.FIBEntry) string {
 func ArpEntryKey(vppLabel string, iface string, ipAddress string) string {
 	return agentPrefix + vppLabel + "/" + l3.ArpEntryKey(iface, ipAddress)
 }
+
+// LinuxArpEntryKey arp key
+func LinuxArpEntryKey(vppLabel string, iface string, ipAddress string) string {
+	return agentPrefix + vppLabel + "/" + linuxL3.ArpKey(iface, ipAddress)
+}

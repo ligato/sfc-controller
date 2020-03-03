@@ -770,3 +770,23 @@ func ConstructStaticArpEntry(vppAgent string, l3ae *controller.L3ArpEntry) *KVTy
 	}
 	return kv
 }
+
+func ConstructStaticArpLinuxEntry(vppAgent string, l3ae *controller.L3ArpEntry) *KVType {
+
+	ae := &linuxL3.ARPEntry{
+		Interface: l3ae.OutgoingInterface,
+		IpAddress: l3ae.IpAddress,
+		HwAddress: l3ae.PhysAddress,
+	}
+
+	key := LinuxArpEntryKey(vppAgent, ae.Interface, ae.IpAddress)
+
+	log.Debugf("ConstructStaticArpLinuxEntry: key='%s', arp='%v'", key, ae)
+
+	kv := &KVType{
+		VppKey:        key,
+		VppEntryType:  VppEntryTypeArp,
+		LinuxArpEntry: ae,
+	}
+	return kv
+}

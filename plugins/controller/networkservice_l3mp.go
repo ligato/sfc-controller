@@ -321,6 +321,87 @@ func (mgr *NetworkServiceMgr) renderConnL3MPSameNode(
 						ModelTypeNetworkService+"/"+ns.Metadata.Name,
 						vppKV)
 				}
+				if conn.LoopbackAddress != "" {
+
+					// on the pod ... route down to the vswitch
+					l3sr := &controller.L3VRFRoute{
+						Vpp: &controller.VPPRoute{
+							VrfId:             0,
+							DstIpAddr:         "0.0.0.0/0",
+							NextHopAddr:       conn.LoopbackAddress,
+							OutgoingInterface: netPodInterfaces[i].Name,
+						},
+					}
+					vppKV := vppagent.ConstructStaticRoute(p2nArray[i].Pod, l3sr)
+					RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+						ModelTypeNetworkService+"/"+ns.Metadata.Name,
+						vppKV)
+				}
+			}
+		}
+
+		if netPodInterfaces[i].IfType == controller.IfTypeTap {
+
+			if conn.GenerateStaticArps {
+
+				// create an arp in the vswitch
+				ae := &controller.L3ArpEntry{
+					IpAddress:         ifStatus.IpAddresses[0],
+					PhysAddress:       ifStatus.MacAddress,
+					OutgoingInterface: ifName,
+				}
+				vppKV := vppagent.ConstructStaticArpEntry(nodeName, ae)
+				RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+					ModelTypeNetworkService+"/"+ns.Metadata.Name,
+					vppKV)
+
+				// create an arp in the pod ... should check node type
+				ae = &controller.L3ArpEntry{
+					IpAddress:         conn.LoopbackAddress,
+					PhysAddress:       "FF:FF:FF:FF:FF:FF",
+					OutgoingInterface: netPodInterfaces[i].Name,
+				}
+				vppKV = vppagent.ConstructStaticArpLinuxEntry(p2nArray[i].Pod, ae)
+				RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+					ModelTypeNetworkService+"/"+ns.Metadata.Name,
+					vppKV)
+
+			}
+			if conn.GenerateStaticL3Routes {
+				if len(ifStatus.IpAddresses) != 0 {
+					desc := fmt.Sprintf("L3MP NS_%s_VRF_%d_CONN_%d", ns.Metadata.Name, conn.VrfId, connIndex+1)
+
+					// on the vswitch ... route up to the pod
+					l3sr := &controller.L3VRFRoute{
+						Vpp: &controller.VPPRoute{
+							VrfId:             conn.VrfId,
+							Description:       desc,
+							NextHopAddr:       vppagent.StripSlashAndSubnetIPAddress(ifStatus.IpAddresses[0]),
+							DstIpAddr:         ifStatus.IpAddresses[0],
+							OutgoingInterface: ifName,
+						},
+					}
+					vppKV := vppagent.ConstructStaticRoute(nodeName, l3sr)
+					RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+						ModelTypeNetworkService+"/"+ns.Metadata.Name,
+						vppKV)
+				}
+				if conn.LoopbackAddress != "" {
+
+					// on the pod ... route down to the vswitch
+					l3sr := &controller.L3VRFRoute{
+						Vpp: &controller.VPPRoute{
+							VrfId:             0,
+							DstIpAddr:         "0.0.0.0/0",
+							NextHopAddr:       conn.LoopbackAddress,
+							OutgoingInterface: netPodInterfaces[i].Name,
+						},
+					}
+					vppKV := vppagent.ConstructStaticRoute(p2nArray[i].Pod, l3sr)
+					RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
+						ModelTypeNetworkService+"/"+ns.Metadata.Name,
+						vppKV)
+				}
 			}
 		}
 	}

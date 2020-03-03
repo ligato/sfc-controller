@@ -36,6 +36,7 @@ const (
 	VppEntryTypeL3LinuxRoute   = "l3linuxroute"
 	VppEntryTypeL2XC           = "l2xc"
 	VppEntryTypeArp            = "arp"
+	VppEntryTypeLinuxArp       = "linuxarp"
 )
 
 // KVType tracks each allocated key/value vnf/vpp agent
@@ -51,6 +52,7 @@ type KVType struct {
 	XConn        *l2.XConnectPair      `json:"XConn,omitempty"`
 	LinuxIFace   *linuxIntf.Interface  `json:"LinuxIFace,omitempty"`
 	ArpEntry     *l3.ARPEntry          `json:"ArpEntry,omitempty"`
+	LinuxArpEntry     *linuxL3.ARPEntry          `json:"LinuxArpEntry,omitempty"`
 }
 
 // NewKVEntry initializes a vpp KV entry type
@@ -85,6 +87,11 @@ func (kv *KVType) L2StaticFibSet(l2fib *l2.FIBEntry) {
 // ArpEntrySet updates the arp entry
 func (kv *KVType) ArpEntrySet(ae *l3.ARPEntry) {
 	kv.ArpEntry = ae
+}
+
+// LinuxArpEntrySet updates the arp entry
+func (kv *KVType) LinuxArpEntrySet(ae *linuxL3.ARPEntry) {
+	kv.LinuxArpEntry = ae
 }
 
 // LinuxInterfaceSet updates the interface
@@ -149,6 +156,10 @@ func (kv *KVType) Equal(kv2 *KVType) bool {
 		if kv.ArpEntry.String() != kv2.ArpEntry.String() {
 			return false
 		}
+	case VppEntryTypeLinuxArp:
+		if kv.LinuxArpEntry.String() != kv2.LinuxArpEntry.String() {
+			return false
+		}
 	default:
 		log.Errorf("Equal: unknown interface type: %v", kv)
 		return false
@@ -178,6 +189,8 @@ func (kv *KVType) WriteToKVStore() error {
 		err = database.WriteToDatastore(kv.VppKey, kv.LinuxL3Route)
 	case VppEntryTypeArp:
 		err = database.WriteToDatastore(kv.VppKey, kv.ArpEntry)
+	case VppEntryTypeLinuxArp:
+		err = database.WriteToDatastore(kv.VppKey, kv.LinuxArpEntry)
 	default:
 		msg := fmt.Sprintf("WriteToEtcd: unknown vpp entry type: %v", kv)
 		log.Errorf(msg)
@@ -247,6 +260,13 @@ func (kv *KVType) ReadFromKVStore() error {
 		if err == nil {
 			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, ae)
 			kv.ArpEntrySet(ae)
+		}
+	case VppEntryTypeLinuxArp:
+		ae := &linuxL3.ARPEntry{}
+		err = database.ReadFromDatastore(kv.VppKey, ae)
+		if err == nil {
+			log.Debugf("ReadFromEtcd: read etcd key %s: %v", kv.VppKey, ae)
+			kv.LinuxArpEntrySet(ae)
 		}
 	default:
 		msg := fmt.Sprintf("ReadFromEtcd: unsupported vpp entry type: %v", kv)
