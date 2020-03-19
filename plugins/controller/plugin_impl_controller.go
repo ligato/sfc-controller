@@ -47,6 +47,7 @@ var (
 	ServerMode                  bool
 	BypassModelTypeHttpHandlers bool
 	log                         = logrus.NewLogger("Controller")
+	LogLevel                    = logging.DebugLevel
 	ctlrPlugin                  *Plugin
 )
 
@@ -72,7 +73,7 @@ func LogFlags() {
 
 func init() {
 	RegisterFlags()
-	log.SetLevel(logging.DebugLevel)
+	log.SetLevel(LogLevel)
 }
 
 // CacheType is ram cache of controller entities
