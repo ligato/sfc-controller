@@ -184,7 +184,9 @@ func (s *Plugin) initMgrs() {
 }
 
 func (s *Plugin) afterInitMgrs() {
-	s.InitSystemHTTPHandler()
+	if !s.BypassModelTypeHttpHandlers {
+		s.InitSystemHTTPHandler()
+	}
 
 	for _, entry := range RegisteredManagers {
 		log.Infof("afterInitMgrs: after initing %s ...", entry.modelTypeName)
