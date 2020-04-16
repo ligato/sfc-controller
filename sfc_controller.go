@@ -16,22 +16,22 @@
 package main
 
 import (
-	"github.com/ligato/cn-infra/logging"
-	"github.com/ligato/cn-infra/logging/logmanager"
-	log "github.com/ligato/cn-infra/logging/logrus"
+	"go.ligato.io/cn-infra/v2/logging"
+	"go.ligato.io/cn-infra/v2/logging/logmanager"
+	log "go.ligato.io/cn-infra/v2/logging/logrus"
 
-	"github.com/ligato/cn-infra/rpc/rest"
 	"github.com/namsral/flag"
+	"go.ligato.io/cn-infra/v2/rpc/rest"
 
 	"os"
 	"time"
 
-	"github.com/ligato/cn-infra/agent"
-	"github.com/ligato/cn-infra/health/probe"
+	"go.ligato.io/cn-infra/v2/agent"
+	"go.ligato.io/cn-infra/v2/health/probe"
 
-	"github.com/ligato/cn-infra/db/keyval/etcd"
-	"github.com/ligato/cn-infra/health/statuscheck"
 	sfc "github.com/ligato/sfc-controller/plugins/controller"
+	"go.ligato.io/cn-infra/v2/db/keyval/etcd"
+	"go.ligato.io/cn-infra/v2/health/statuscheck"
 )
 
 // Init is the Go init() function for the plugin. It should

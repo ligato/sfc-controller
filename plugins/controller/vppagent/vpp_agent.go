@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ligato/cn-infra/logging/logrus"
+	"go.ligato.io/cn-infra/v2/logging/logrus"
 	linuxIntf "go.ligato.io/vpp-agent/v3/proto/ligato/linux/interfaces"
 	linuxL3 "go.ligato.io/vpp-agent/v3/proto/ligato/linux/l3"
 	namespace "go.ligato.io/vpp-agent/v3/proto/ligato/linux/namespace"

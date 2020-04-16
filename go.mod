@@ -13,7 +13,6 @@ require (
 	github.com/hashicorp/golang-lru v0.5.1 // indirect
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/kubernetes/gengo v0.0.0-20200127102705-1e9b17e831be // indirect
-	github.com/ligato/cn-infra v2.2.1-0.20191030081411-42c7431fdca1+incompatible
 	github.com/lyft/protoc-gen-validate v0.0.13 // indirect
 	github.com/namsral/flag v1.7.4-pre
 	github.com/petar/GoLLRB v0.0.0-20130427215148-53be0d36a84c // indirect
@@ -22,6 +21,7 @@ require (
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b // indirect
 	github.com/tinylib/msgp v1.1.0 // indirect
 	github.com/unrolled/render v1.0.1-0.20190325150441-1ac792296fd4
+	go.ligato.io/cn-infra/v2 v2.5.0
 	go.ligato.io/vpp-agent/v3 v3.0.1
 	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
