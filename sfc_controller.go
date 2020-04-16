@@ -34,6 +34,11 @@ import (
 	"go.ligato.io/cn-infra/v2/health/statuscheck"
 )
 
+// Package level configuration
+var (
+	DefaultLogLevel = logging.DebugLevel
+)
+
 // Init is the Go init() function for the plugin. It should
 // contain the boiler plate initialization code that is executed
 // when the plugin is loaded into the Agent.
@@ -42,12 +47,10 @@ func init() {
 		"Location of the Etcd configuration file; also set via 'ETCDV3_CONFIG' env variable.")
 
 	log.DefaultLogger().SetOutput(os.Stdout)
-	log.DefaultLogger().SetLevel(logging.DebugLevel)
+	log.DefaultLogger().SetLevel(DefaultLogLevel)
 }
 
-// Flavor is set of common used generic plugins. This flavour can be used as a base
-// for different flavours. The plugins are initialized in the same order as they appear
-// in the structure.
+// SfcController to manage Service Function Chaining across cloud-native infrastructure
 type SfcController struct {
 	LogManager  *logmanager.Plugin
 	HTTP        *rest.Plugin
@@ -55,7 +58,6 @@ type SfcController struct {
 	ETCD        *etcd.Plugin
 
 	Sfc *sfc.Plugin
-	//Crd *crd.Plugin
 }
 
 func (SfcController) String() string {
@@ -79,7 +81,7 @@ func (SfcController) Close() error {
 
 func main() {
 
-	log.DefaultLogger().SetLevel(logging.DebugLevel)
+	log.DefaultLogger().SetLevel(DefaultLogLevel)
 
 	sfcPlugin := sfc.NewPlugin(
 		sfc.UseDeps(func(deps *sfc.Deps) {
@@ -89,22 +91,12 @@ func main() {
 		}),
 	)
 
-	//crdPlugin := crd.NewPlugin(
-	//	crd.UseDeps(func(deps *crd.Deps) {
-	//		deps.HTTPHandlers = &rest.DefaultPlugin
-	//		deps.Etcd = &etcd.DefaultPlugin
-	//		deps.Controller = sfcPlugin
-	//		deps.StatusCheck = &statuscheck.DefaultPlugin
-	//	}),
-	//)
-
 	sfcAgent := &SfcController{
 		LogManager:  &logmanager.DefaultPlugin,
 		HTTP:        &rest.DefaultPlugin,
 		HealthProbe: &probe.DefaultPlugin,
 		ETCD:        &etcd.DefaultPlugin,
 		Sfc:         sfcPlugin,
-		//Crd:         crdPlugin,
 	}
 
 	a := agent.NewAgent(agent.AllPlugins(sfcAgent), agent.StartTimeout(getStartupTimeout()))

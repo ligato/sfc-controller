@@ -23,7 +23,6 @@ require (
 	github.com/unrolled/render v1.0.1-0.20190325150441-1ac792296fd4
 	go.ligato.io/cn-infra/v2 v2.5.0
 	go.ligato.io/vpp-agent/v3 v3.0.1
-	golang.org/x/sys v0.0.0-20200302150141-5c8b2ff67527 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/api v0.0.0-20180628040859-072894a440bd // indirect
 	k8s.io/apiextensions-apiserver v0.0.0-20180628053655-3de98c57bc05 // indirect
@@ -32,3 +31,5 @@ require (
 	k8s.io/code-generator v0.17.2 // indirect
 	k8s.io/gengo v0.0.0-20200127102705-1e9b17e831be // indirect
 )
+
+replace go.ligato.io/cn-infra/v2 => go.ligato.io/cn-infra/v2 v2.5.0-alpha.0.20200331084557-303f10cd5c84
