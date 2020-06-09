@@ -139,7 +139,7 @@ message InterfaceStatus {
 message Interface {
     string name = 1;
     bool bypass_renderer = 2; // optional: if set to true, then DONT create/render
-    string if_type = 3;     // ethernet|loopback|vxlan_tunnel|memif|tap
+    string if_type = 3;     // ethernet|loopback|vxlan_tunnel|memif|tap|bond
     string mac_address = 4; // format mm:aa:cc:aa:dd:rr, if omitted, sys generates one using
                             // 02:00:00:00:00:00 as base, last octet increments
     uint32 mtu = 5;         // optional: if omitted, use system parameter default
@@ -182,6 +182,18 @@ message Interface {
     RxPlacementSettings rx_placement_settings = 18;
     bool tcp_checksum_offload_disabled = 19;
     repeated IPSecTunnel ipsec_tunnels = 20;
+    message BondIFParms {
+        uint32 id = 1;
+        string mode = 2; //lacp|roundrobin|activebackup|xor|broadcast
+        string load_balance = 3; //L2|L34|L23|RR|BC|AB
+        message IFParms {
+            string name = 1;
+            bool is_passive = 2;
+            bool is_long_timeout = 3;
+        }
+        repeated IFParms if_parms = 4;
+    }
+    BondIFParms bond_if_parms = 21;
 }
 
 message NetworkPodSpec {

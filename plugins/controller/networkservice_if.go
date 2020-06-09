@@ -40,11 +40,14 @@ func (mgr *NetworkServiceMgr) RenderConnInterfacePair(
 	case controller.IfTypeMemif:
 		ifName, ifStatus, err = mgr.RenderConnMemifPair(ns, vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeVeth:
-		ifName, ifStatus, err =  mgr.RenderConnVethAfpPair(ns, vppAgent, conn, netPodInterface, networkPodType)
+		ifName, ifStatus, err = mgr.RenderConnVethAfpPair(ns, vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeTap:
-		ifName, ifStatus, err =  mgr.RenderConnTapPair(ns, vppAgent, conn, netPodInterface, networkPodType)
+		ifName, ifStatus, err = mgr.RenderConnTapPair(ns, vppAgent, conn, netPodInterface, networkPodType)
 	case controller.IfTypeEthernet:
 		// the ethernet interface is special and has been created by the node already
+		return netPodInterface.Name, nil, nil
+	case controller.IfTypeBond:
+		// the bonded interface is special and has been created by the node already
 		return netPodInterface.Name, nil, nil
 	}
 
@@ -105,7 +108,7 @@ func (mgr *NetworkServiceMgr) RenderConnMemifPair(
 	//vppKV.IFace.Vrf = conn.VrfId
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-		ModelTypeNetworkService + "/" + ns.Metadata.Name,
+		ModelTypeNetworkService+"/"+ns.Metadata.Name,
 		vppKV)
 
 	log.Debugf("RenderToplogyMemifPair: ifName: %s, %v", connInterfaceName, vppKV)
@@ -129,7 +132,7 @@ func (mgr *NetworkServiceMgr) RenderConnMemifPair(
 	vppKV.IFace.Vrf = conn.VrfId
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-		ModelTypeNetworkService + "/" + ns.Metadata.Name,
+		ModelTypeNetworkService+"/"+ns.Metadata.Name,
 		vppKV)
 
 	log.Debugf("RenderToplogyMemifPair: ifName: %s, %v", ifName, vppKV)
@@ -174,7 +177,7 @@ func (mgr *NetworkServiceMgr) RenderConnDirectInterPodMemifPair(
 		ctlrPlugin.SysParametersMgr.sysParmCache.MemifDirectory,
 		connPodName1)
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-		ModelTypeNetworkService + "/" + ns.Metadata.Name,
+		ModelTypeNetworkService+"/"+ns.Metadata.Name,
 		vppKV)
 
 	if networkPodInterfaces[0].Fwd != nil {
@@ -215,7 +218,7 @@ func (mgr *NetworkServiceMgr) RenderConnDirectInterPodMemifPair(
 		ctlrPlugin.SysParametersMgr.sysParmCache.MemifDirectory,
 		connPodName1)
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-		ModelTypeNetworkService + "/" + ns.Metadata.Name,
+		ModelTypeNetworkService+"/"+ns.Metadata.Name,
 		vppKV)
 
 	if networkPodInterfaces[1].Fwd != nil {
@@ -277,12 +280,12 @@ func (mgr *NetworkServiceMgr) RenderConnTapPair(
 		ctlrPlugin.SysParametersMgr.ResolveMtu(networkPodInterface.Mtu),
 		networkPodInterface.AdminStatus,
 		connInterfaceName,
-		tapIfName,//hostPortLabel,
+		tapIfName, //hostPortLabel,
 		hostNameSpace,
 		connPodName)
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-		ModelTypeNetworkService + "/" + ns.Metadata.Name,
+		ModelTypeNetworkService+"/"+ns.Metadata.Name,
 		vppKV)
 
 	if hostNameSpace == "" {
@@ -303,7 +306,7 @@ func (mgr *NetworkServiceMgr) RenderConnTapPair(
 	vppKV.IFace.Vrf = conn.VrfId
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-		ModelTypeNetworkService + "/" + ns.Metadata.Name,
+		ModelTypeNetworkService+"/"+ns.Metadata.Name,
 		vppKV)
 
 	return tapIfName, ifStatus, nil
@@ -371,7 +374,7 @@ func (mgr *NetworkServiceMgr) RenderConnVethAfpPair(
 		networkPodInterface.TcpChecksumOffloadDisabled)
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-		ModelTypeNetworkService + "/" + ns.Metadata.Name,
+		ModelTypeNetworkService+"/"+ns.Metadata.Name,
 		vppKV)
 
 	// Configure the VETH interface for the VSWITCH end
@@ -389,7 +392,7 @@ func (mgr *NetworkServiceMgr) RenderConnVethAfpPair(
 		false)
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-		ModelTypeNetworkService + "/" + ns.Metadata.Name,
+		ModelTypeNetworkService+"/"+ns.Metadata.Name,
 		vppKV)
 
 	// Configure the AFP interface for the VNF end
@@ -406,7 +409,7 @@ func (mgr *NetworkServiceMgr) RenderConnVethAfpPair(
 		vppKV.IFace.Vrf = conn.VrfId
 
 		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService + "/" + ns.Metadata.Name,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
 			vppKV)
 	}
 	// Configure the AFP interface for the VSWITCH end
@@ -423,7 +426,7 @@ func (mgr *NetworkServiceMgr) RenderConnVethAfpPair(
 	vppKV.IFace.Vrf = conn.VrfId
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-		ModelTypeNetworkService + "/" + ns.Metadata.Name,
+		ModelTypeNetworkService+"/"+ns.Metadata.Name,
 		vppKV)
 
 	return ifName, ifStatus, nil
@@ -436,7 +439,7 @@ func (mgr *NetworkServiceMgr) RenderInterfaceForwarding(
 
 	log.Debugf("renderInterfaceForwarding: %v", networkPodInterface)
 
-	if 	networkPodInterface.Fwd == nil {
+	if networkPodInterface.Fwd == nil {
 		return nil
 	}
 
@@ -454,18 +457,18 @@ func (mgr *NetworkServiceMgr) RenderInterfaceForwarding(
 		}
 		vppKV := vppagent.ConstructStaticRoute(vppAgent, l3sr)
 		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService + "/" + ns.Metadata.Name,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
 			vppKV)
 	}
 	for _, l3Arp := range networkPodInterface.Fwd.L3Arp {
 		ae := &controller.L3ArpEntry{
-			IpAddress: l3Arp.IpAddress,
-			PhysAddress: l3Arp.PhysAddress,
+			IpAddress:         l3Arp.IpAddress,
+			PhysAddress:       l3Arp.PhysAddress,
 			OutgoingInterface: networkPodInterface.Name,
 		}
 		vppKV := vppagent.ConstructStaticArpEntry(vppAgent, ae)
 		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService + "/" + ns.Metadata.Name,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
 			vppKV)
 	}
 
@@ -480,7 +483,7 @@ func (mgr *NetworkServiceMgr) RenderInterfaceIPSecTunnels(
 
 	log.Debugf("RenderInterfaceIpsecTunnels: %v", networkPodInterface)
 
-	if 	networkPodInterface.IpsecTunnels == nil {
+	if networkPodInterface.IpsecTunnels == nil {
 		return nil
 	}
 
@@ -489,7 +492,7 @@ func (mgr *NetworkServiceMgr) RenderInterfaceIPSecTunnels(
 	for _, sfcIpsecTunnel := range networkPodInterface.IpsecTunnels {
 		vppKV := vppagent.ConstructIPSecTunnel(vppAgent, sfcIpsecTunnel, networkPodInterface.Name)
 		RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-			ModelTypeNetworkService + "/" + ns.Metadata.Name,
+			ModelTypeNetworkService+"/"+ns.Metadata.Name,
 			vppKV)
 	}
 
@@ -523,7 +526,7 @@ func (mgr *NetworkServiceMgr) RenderLoopbackInterface(
 		ctlrPlugin.SysParametersMgr.ResolveRxMode(networkPodInterface.RxMode))
 
 	RenderTxnAddVppEntryToTxn(ns.Status.RenderedVppAgentEntries,
-		ModelTypeNetworkService + "/" + ns.Metadata.Name,
+		ModelTypeNetworkService+"/"+ns.Metadata.Name,
 		vppKV)
 
 	log.Debugf("RenderLoopbackInterface: ifName: %s, %v", interfaceName, vppKV)

@@ -108,12 +108,12 @@ func (mgr *NetworkNodeOverlayMgr) AllocateVxlanAddress(poolName string, nodeName
 			return ipAddress, 0, err
 		}
 		if nodeLabel != "" {
-			nodeInterfaces, nodeIfTypes := ctlrPlugin.NetworkNodeMgr.FindInterfacesForThisLabelInNode(nodeName, []string{nodeLabel})
+			nodeInterfaces, _ := ctlrPlugin.NetworkNodeMgr.FindInterfacesForThisLabelInNode(nodeName, []string{nodeLabel})
 			if len(nodeInterfaces) != 1 {
 				return "", 0, fmt.Errorf("One interface must have a label: %s", nodeLabel)
 			}
-			if nodeIfTypes[0] != controller.IfTypeEthernet || len(nodeInterfaces[0].IpAddresses) != 1 {
-				return "", 0, fmt.Errorf("An ethernet interface with an ip_address is required for this label: %s", nodeLabel)
+			if len(nodeInterfaces[0].IpAddresses) != 1 {
+				return "", 0, fmt.Errorf("An ethernet/bond interface with an ip_address is required for this label: %s", nodeLabel)
 			}
 			return nodeInterfaces[0].IpAddresses[0], 0, nil
 		}

@@ -18,13 +18,12 @@
 
 package controller
 
-import ()
-
 // Types in the model were defined as strings for readability not enums with
 // numbers
 const (
 	IfTypeLoopBack    = "loopback"
 	IfTypeEthernet    = "ethernet"
+	IfTypeBond        = "bond"
 	IfTypeVxlanTunnel = "vxlan_tunnel"
 	IfTypeMemif       = "memif"
 	IfTypeVeth        = "veth"
@@ -33,9 +32,9 @@ const (
 	IfAdminStatusEnabled  = "enabled"
 	IfAdminStatusDisabled = "disabled"
 
-	IfMemifModeEhernet             = "ethernet"
-	IfMemifModeIP                  = "ip"
-	IfMemifModePuntInject          = "puntinject"
+	IfMemifModeEhernet    = "ethernet"
+	IfMemifModeIP         = "ip"
+	IfMemifModePuntInject = "puntinject"
 
 	ConnMethodDirect  = "direct"
 	ConnMethodVswitch = "vswitch"
@@ -71,6 +70,6 @@ const (
 
 	LinuxNamespacePID          = "pid"          /* Attach to namespace of a given process. */
 	LinuxNamespaceMICROSERVICE = "microservice" /* Attach to namespace of a docker container running given microservice. */
-	LinuxNamespaceNAME         = "name"        /* Attach to named namespace. */
+	LinuxNamespaceNAME         = "name"         /* Attach to named namespace. */
 	LinuxNamespaceFILE         = "file"         /* Attach to namespace referenced by a file handle.*/
 )

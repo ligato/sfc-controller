@@ -169,6 +169,89 @@ func ConstructEthernetInterface(vppAgent string,
 	return kv
 }
 
+// ConstructBondInterface returns an KVType
+func ConstructBondInterface(vppAgent string,
+	ifname string,
+	ipAddresses []string,
+	macAddr string,
+	mtu uint32,
+	adminStatus string,
+	rxMode string,
+	bp *controller.Interface_BondIFParms) *KVType {
+
+	bpMode := interfaces.BondLink_UNKNOWN
+	switch bp.Mode {
+	case "lacp":
+		bpMode = interfaces.BondLink_LACP
+	case "broadcast":
+		bpMode = interfaces.BondLink_BROADCAST
+	case "activebackup":
+		bpMode = interfaces.BondLink_ACTIVE_BACKUP
+	case "roundrobin":
+		bpMode = interfaces.BondLink_ROUND_ROBIN
+	case "xor":
+		bpMode = interfaces.BondLink_XOR
+	}
+
+	bpLb := interfaces.BondLink_L2
+	switch bp.LoadBalance {
+	case "L2":
+		bpLb = interfaces.BondLink_L2
+	case "L34":
+		bpLb = interfaces.BondLink_L34
+	case "L23":
+		bpLb = interfaces.BondLink_L23
+	case "RR":
+		bpLb = interfaces.BondLink_RR
+	case "BC":
+		bpLb = interfaces.BondLink_BC
+	case "AB":
+		bpLb = interfaces.BondLink_AB
+	}
+
+	var bpifs []*interfaces.BondLink_BondedInterface
+	for _, ifp := range bp.IfParms {
+		bpif := &interfaces.BondLink_BondedInterface{
+			Name:          ifp.Name,
+			IsPassive:     ifp.IsPassive,
+			IsLongTimeout: ifp.IsLongTimeout,
+		}
+		bpifs = append(bpifs, bpif)
+	}
+
+	ifaceBondIf := &interfaces.Interface_Bond{
+		Bond: &interfaces.BondLink{
+			Id:               bp.Id,
+			Mode:             bpMode,
+			Lb:               bpLb,
+			BondedInterfaces: bpifs,
+		},
+	}
+
+	iface := &interfaces.Interface{
+		Name:        ifname,
+		Type:        interfaces.Interface_BOND_INTERFACE,
+		Enabled:     adminStatusStringToBool(adminStatus),
+		PhysAddress: macAddr,
+		IpAddresses: sortedIPAddresses(ipAddresses),
+		Mtu:         mtu,
+		Link:        ifaceBondIf,
+	}
+
+	iface.RxModes = rxModeControllerToInterface(rxMode)
+
+	key := InterfaceKey(vppAgent, iface.Name)
+
+	log.Debugf("ConstructBondInterface: key='%s', iface='%v", key, iface)
+
+	kv := &KVType{
+		VppKey:       key,
+		VppEntryType: VppEntryTypeInterface,
+		IFace:        iface,
+	}
+	return kv
+}
+
 func sortedIPAddresses(ipAddresses []string) []string {
 	// keep the addresses sorted so subsequent comparing during transaction processing
 	// is easier as it does a String() then compares strings and an unsorted array
@@ -210,7 +293,8 @@ func ConstructLoopbackInterface(vppAgent string,
 		Mtu:         mtu,
 	}
 
-	iface.RxModes = rxModeControllerToInterface(rxMode)
+	// not applicable here for LB interfaces
+	//iface.RxModes = rxModeControllerToInterface(rxMode)
 
 	key := InterfaceKey(vppAgent, iface.Name)
 

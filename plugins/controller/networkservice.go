@@ -618,6 +618,7 @@ func (mgr *NetworkServiceMgr) validateNetworkPod(
 		switch iFace.IfType {
 		case controller.IfTypeMemif:
 		case controller.IfTypeEthernet:
+		case controller.IfTypeBond:
 		case controller.IfTypeVeth:
 		case controller.IfTypeLoopBack:
 		case controller.IfTypeTap:

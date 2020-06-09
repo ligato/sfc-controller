@@ -502,6 +502,32 @@ func (mgr *NetworkNodeMgr) renderNodeInterfaces(nn *controller.NetworkNode) erro
 					ModelTypeNetworkNode+"/"+nn.Metadata.Name,
 					vppKV)
 			}
+		case controller.IfTypeBond:
+			if !iFace.BypassRenderer {
+
+				ifStatus, err := InitInterfaceStatus(nn.Metadata.Name, nn.Metadata.Name, iFace)
+				if err != nil {
+					RemoveInterfaceStatus(nn.Status.Interfaces, iFace.Parent, iFace.Name)
+					msg := fmt.Sprintf("node interface: %s/%s, %s", iFace.Parent, iFace.Name, err)
+					mgr.AppendStatusMsg(nn, msg)
+					return err
+				}
+				PersistInterfaceStatus(nn.Status.Interfaces, ifStatus, iFace.Parent, iFace.Name)
+
+				vppKV = vppagent.ConstructBondInterface(
+					nn.Metadata.Name,
+					iFace.Name,
+					ifStatus.IpAddresses,
+					ifStatus.MacAddress,
+					ctlrPlugin.SysParametersMgr.ResolveMtu(iFace.Mtu),
+					iFace.AdminStatus,
+					ctlrPlugin.SysParametersMgr.ResolveRxMode(iFace.RxMode),
+					iFace.BondIfParms)
+
+				RenderTxnAddVppEntryToTxn(nn.Status.RenderedVppAgentEntries,
+					ModelTypeNetworkNode+"/"+nn.Metadata.Name,
+					vppKV)
+			}
 		}
 		log.Infof("renderNodeInterfaces: vswitch: %s, ifType: %s, vppKV: %v",
 			nn.Metadata.Name, iFace.IfType, vppKV)
@@ -513,7 +539,7 @@ func (mgr *NetworkNodeMgr) renderNodeInterfaces(nn *controller.NetworkNode) erro
 func (mgr *NetworkNodeMgr) renderComplete(nn *controller.NetworkNode) error {
 
 	if len(nn.Status.Msg) == 0 {
-		mgr.AppendStatusMsg(nn,"OK")
+		mgr.AppendStatusMsg(nn, "OK")
 		nn.Status.Status = controller.OperStatusUp
 	} else {
 		RenderTxnConfigEntityRemoveEntries()
@@ -620,17 +646,47 @@ func (mgr *NetworkNodeMgr) RenderVxlanLoopbackInterfaceAndStaticRoutes(
 
 	n2 := mgr.networkNodeCache[toNode]
 
+	// need to get the set of interfaces ... if an ethernet interface is part of a binded
+	// interface them do not have it as part of the list
+
+	// add all eth/bond if's to a map, then pull the names of the members of the bonded if's out of the
+	// set
+	node1IFs := make(map[string]*controller.Interface, 0)
+	for _, nodeIF := range n1.Spec.Interfaces {
+		if nodeIF.IfType == controller.IfTypeBond || nodeIF.IfType == controller.IfTypeEthernet {
+			node1IFs[nodeIF.Name] = nodeIF
+		}
+	}
+	for _, nodeIF := range node1IFs {
+		if nodeIF.IfType == controller.IfTypeBond {
+			for _, bif := range nodeIF.BondIfParms.IfParms {
+				delete(node1IFs, bif.Name)
+			}
+		}
+	}
+	node2IFs := make(map[string]*controller.Interface, 0)
+	for _, nodeIF := range n2.Spec.Interfaces {
+		if nodeIF.IfType == controller.IfTypeBond || nodeIF.IfType == controller.IfTypeEthernet {
+			node2IFs[nodeIF.Name] = nodeIF
+		}
+	}
+	for _, nodeIF := range node2IFs {
+		if nodeIF.IfType == controller.IfTypeBond {
+			for _, bif := range nodeIF.BondIfParms.IfParms {
+				delete(node2IFs, bif.Name)
+			}
+		}
+	}
+
 	if createLoopbackStaticRoutes {
-		for _, node1Iface := range n1.Spec.Interfaces {
-			if node1Iface.IfType != controller.IfTypeEthernet ||
-				!(findInterfaceLabel(node1Iface.Labels, networkNodeInterfaceLabel) ||
-					len(n1.Spec.Interfaces) == 1) { // if only one ethernet if, it does not need the label
+		for _, node1Iface := range node1IFs {
+			if !(findInterfaceLabel(node1Iface.Labels, networkNodeInterfaceLabel) ||
+				len(node1IFs) == 1) { // if only one ethernet if, it does not need the label
 				continue
 			}
-			for _, node2Iface := range n2.Spec.Interfaces {
-				if node2Iface.IfType != controller.IfTypeEthernet ||
-					!(findInterfaceLabel(node2Iface.Labels, networkNodeInterfaceLabel) ||
-						len(n2.Spec.Interfaces) == 1) { // if only one ethernet if, it does not need the label
+			for _, node2Iface := range node2IFs {
+				if !(findInterfaceLabel(node2Iface.Labels, networkNodeInterfaceLabel) ||
+					len(node2IFs) == 1) { // if only one ethernet if, it does not need the label
 					continue
 				}
 
@@ -713,6 +769,7 @@ func (mgr *NetworkNodeMgr) nodeValidateInterfaces(nn *controller.NetworkNode,
 	for _, iFace := range iFaces {
 		switch iFace.IfType {
 		case controller.IfTypeEthernet:
+		case controller.IfTypeBond:
 		case controller.IfTypeVxlanTunnel:
 		default:
 			return fmt.Errorf("node/if: %s/%s has invalid if type '%s'",
