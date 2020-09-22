@@ -79,6 +79,9 @@ docker pull ligato/sfc-controller
 docker run -it --name sfc-contoller --rm ligato/sfc-controller
 ```
 
+## REST api
+
+See this [api](docs/RestAPI.md) doc for examples of the rest api.
 ## Documentation
 
 GoDoc can be browsed [online](https://godoc.org/github.com/ligato/sfc-controller).
